@@ -9,10 +9,7 @@
     :root {
       --blue: #0b74c9;
       --blue-dark: #06324a;
-      --cyan: #1bb7f0;
       --green: #12bfa0;
-      --white: #ffffff;
-      --soft: #eaf8ff;
       --text: #102033;
       --muted: #6c7a89;
       --border: rgba(11, 116, 201, 0.16);
@@ -39,17 +36,20 @@
       z-index: 10;
     }
 
-    .language-switcher button {
+    .language-switcher button,
+    .role-switcher button,
+    .logout-button {
       border: 1px solid rgba(11, 116, 201, 0.25);
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.95);
       color: var(--blue-dark);
       border-radius: 999px;
-      padding: 8px 13px;
+      padding: 9px 14px;
       cursor: pointer;
       font-weight: 800;
     }
 
-    .language-switcher button.active {
+    .language-switcher button.active,
+    .role-switcher button.active {
       background: var(--blue);
       color: white;
     }
@@ -67,7 +67,7 @@
     .login-card {
       width: 100%;
       max-width: 470px;
-      background: rgba(255, 255, 255, 0.82);
+      background: rgba(255, 255, 255, 0.86);
       border: 1px solid var(--border);
       border-radius: 28px;
       padding: 34px;
@@ -163,18 +163,8 @@
       object-fit: contain;
     }
 
-    .logout-button {
-      border: 1px solid var(--border);
-      background: white;
-      color: var(--blue-dark);
-      border-radius: 999px;
-      padding: 12px 18px;
-      cursor: pointer;
-      font-weight: 900;
-    }
-
     .dashboard-panel {
-      background: rgba(255, 255, 255, 0.82);
+      background: rgba(255, 255, 255, 0.86);
       border: 1px solid var(--border);
       border-radius: 28px;
       padding: 30px;
@@ -188,9 +178,35 @@
     }
 
     .dashboard-desc {
-      margin: 0 0 26px;
+      margin: 0 0 22px;
       color: var(--muted);
       font-size: 16px;
+    }
+
+    .role-box {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px;
+      margin-bottom: 22px;
+    }
+
+    .role-title {
+      font-weight: 900;
+      color: var(--blue-dark);
+      margin-bottom: 10px;
+    }
+
+    .role-switcher {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .role-note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
     }
 
     .tiles {
@@ -308,7 +324,7 @@
 
       <div class="footer">
         <div class="powered">Powered by WaterAI</div>
-        <div>v0.5.0</div>
+        <div>v0.6.0</div>
       </div>
     </section>
   </main>
@@ -326,49 +342,19 @@
           Wybierz moduł, z którym chcesz pracować.
         </p>
 
-        <div class="tiles">
-          <div class="tile" onclick="openModule('clients')">
-            <div class="tile-icon">👥</div>
-            <h3 data-i18n="clientsTitle">Klienci</h3>
-            <p data-i18n="clientsDesc">Baza klientów i osób kontaktowych.</p>
+        <div class="role-box">
+          <div class="role-title" data-i18n="roleModeTitle">Tryb testowy roli</div>
+          <div class="role-switcher">
+            <button id="role-admin" class="active" onclick="setRole('admin')" data-i18n="roleAdmin">Admin</button>
+            <button id="role-staff" onclick="setRole('staff')" data-i18n="roleStaff">Obsługa</button>
+            <button id="role-client" onclick="setRole('client')" data-i18n="roleClient">Klient</button>
           </div>
-
-          <div class="tile" onclick="openModule('objects')">
-            <div class="tile-icon">🏢</div>
-            <h3 data-i18n="objectsTitle">Obiekty</h3>
-            <p data-i18n="objectsDesc">Budynki, źródła ciepła i dane techniczne.</p>
-          </div>
-
-          <div class="tile" onclick="openModule('measurements')">
-            <div class="tile-icon">📊</div>
-            <h3 data-i18n="measurementsTitle">Pomiary</h3>
-            <p data-i18n="measurementsDesc">Zużycie energii, koszty, HDD i stopniodni.</p>
-          </div>
-
-          <div class="tile" onclick="openModule('excel')">
-            <div class="tile-icon">📁</div>
-            <h3 data-i18n="excelTitle">Import Excel</h3>
-            <p data-i18n="excelDesc">Wczytywanie danych z arkuszy rozliczeniowych.</p>
-          </div>
-
-          <div class="tile" onclick="openModule('pdf')">
-            <div class="tile-icon">📄</div>
-            <h3 data-i18n="pdfTitle">Import PDF</h3>
-            <p data-i18n="pdfDesc">Analiza dokumentów i faktur w formacie PDF.</p>
-          </div>
-
-          <div class="tile" onclick="openModule('reports')">
-            <div class="tile-icon">📈</div>
-            <h3 data-i18n="reportsTitle">Raporty ESCO</h3>
-            <p data-i18n="reportsDesc">Oszczędności, rozliczenia i raporty dla klienta.</p>
-          </div>
-
-          <div class="tile" onclick="openModule('settings')">
-            <div class="tile-icon">⚙️</div>
-            <h3 data-i18n="settingsTitle">Ustawienia</h3>
-            <p data-i18n="settingsDesc">Język, użytkownicy, role i konfiguracja systemu.</p>
+          <div class="role-note" data-i18n="roleModeNote">
+            To jest tryb testowy. Docelowo rola będzie pobierana automatycznie z Supabase po zalogowaniu.
           </div>
         </div>
+
+        <div id="tiles" class="tiles"></div>
 
         <div id="module-view" class="module-view">
           <h3 id="module-title">Moduł</h3>
@@ -389,20 +375,11 @@
         logoutButton: "Wyloguj",
         dashboardTitle: "Panel główny",
         dashboardDesc: "Wybierz moduł, z którym chcesz pracować.",
-        clientsTitle: "Klienci",
-        clientsDesc: "Baza klientów i osób kontaktowych.",
-        objectsTitle: "Obiekty",
-        objectsDesc: "Budynki, źródła ciepła i dane techniczne.",
-        measurementsTitle: "Pomiary",
-        measurementsDesc: "Zużycie energii, koszty, HDD i stopniodni.",
-        excelTitle: "Import Excel",
-        excelDesc: "Wczytywanie danych z arkuszy rozliczeniowych.",
-        pdfTitle: "Import PDF",
-        pdfDesc: "Analiza dokumentów i faktur w formacie PDF.",
-        reportsTitle: "Raporty ESCO",
-        reportsDesc: "Oszczędności, rozliczenia i raporty dla klienta.",
-        settingsTitle: "Ustawienia",
-        settingsDesc: "Język, użytkownicy, role i konfiguracja systemu.",
+        roleModeTitle: "Tryb testowy roli",
+        roleModeNote: "To jest tryb testowy. Docelowo rola będzie pobierana automatycznie z Supabase po zalogowaniu.",
+        roleAdmin: "Admin",
+        roleStaff: "Obsługa",
+        roleClient: "Klient",
         moduleDefault: "Ten moduł zostanie rozwinięty w kolejnym etapie."
       },
       en: {
@@ -414,20 +391,11 @@
         logoutButton: "Logout",
         dashboardTitle: "Dashboard",
         dashboardDesc: "Choose the module you want to work with.",
-        clientsTitle: "Clients",
-        clientsDesc: "Client database and contact persons.",
-        objectsTitle: "Buildings",
-        objectsDesc: "Buildings, heat sources and technical data.",
-        measurementsTitle: "Measurements",
-        measurementsDesc: "Energy use, costs, HDD and degree days.",
-        excelTitle: "Excel import",
-        excelDesc: "Import data from settlement spreadsheets.",
-        pdfTitle: "PDF import",
-        pdfDesc: "Analyze documents and invoices in PDF format.",
-        reportsTitle: "ESCO reports",
-        reportsDesc: "Savings, settlements and client reports.",
-        settingsTitle: "Settings",
-        settingsDesc: "Language, users, roles and system configuration.",
+        roleModeTitle: "Test role mode",
+        roleModeNote: "This is a test mode. In production, the role will be loaded automatically from Supabase after login.",
+        roleAdmin: "Admin",
+        roleStaff: "Staff",
+        roleClient: "Client",
         moduleDefault: "This module will be developed in the next stage."
       },
       de: {
@@ -439,20 +407,11 @@
         logoutButton: "Ausloggen",
         dashboardTitle: "Hauptpanel",
         dashboardDesc: "Wählen Sie das Modul aus, mit dem Sie arbeiten möchten.",
-        clientsTitle: "Kunden",
-        clientsDesc: "Kundendatenbank und Kontaktpersonen.",
-        objectsTitle: "Objekte",
-        objectsDesc: "Gebäude, Wärmequellen und technische Daten.",
-        measurementsTitle: "Messungen",
-        measurementsDesc: "Energieverbrauch, Kosten, HDD und Gradtage.",
-        excelTitle: "Excel-Import",
-        excelDesc: "Import von Daten aus Abrechnungsdateien.",
-        pdfTitle: "PDF-Import",
-        pdfDesc: "Analyse von Dokumenten und Rechnungen im PDF-Format.",
-        reportsTitle: "ESCO-Berichte",
-        reportsDesc: "Einsparungen, Abrechnungen und Berichte für Kunden.",
-        settingsTitle: "Einstellungen",
-        settingsDesc: "Sprache, Benutzer, Rollen und Systemkonfiguration.",
+        roleModeTitle: "Testmodus der Rolle",
+        roleModeNote: "Dies ist ein Testmodus. Später wird die Rolle nach dem Login automatisch aus Supabase geladen.",
+        roleAdmin: "Admin",
+        roleStaff: "Bedienung",
+        roleClient: "Kunde",
         moduleDefault: "Dieses Modul wird in der nächsten Phase entwickelt."
       },
       cs: {
@@ -464,20 +423,11 @@
         logoutButton: "Odhlásit se",
         dashboardTitle: "Hlavní panel",
         dashboardDesc: "Vyberte modul, se kterým chcete pracovat.",
-        clientsTitle: "Klienti",
-        clientsDesc: "Databáze klientů a kontaktních osob.",
-        objectsTitle: "Objekty",
-        objectsDesc: "Budovy, zdroje tepla a technické údaje.",
-        measurementsTitle: "Měření",
-        measurementsDesc: "Spotřeba energie, náklady, HDD a denostupně.",
-        excelTitle: "Import Excel",
-        excelDesc: "Načítání dat z vyúčtovacích tabulek.",
-        pdfTitle: "Import PDF",
-        pdfDesc: "Analýza dokumentů a faktur ve formátu PDF.",
-        reportsTitle: "ESCO reporty",
-        reportsDesc: "Úspory, vyúčtování a reporty pro klienta.",
-        settingsTitle: "Nastavení",
-        settingsDesc: "Jazyk, uživatelé, role a konfigurace systému.",
+        roleModeTitle: "Testovací režim role",
+        roleModeNote: "Toto je testovací režim. Později bude role načtena automaticky ze Supabase po přihlášení.",
+        roleAdmin: "Admin",
+        roleStaff: "Obsluha",
+        roleClient: "Klient",
         moduleDefault: "Tento modul bude rozvinut v další fázi."
       },
       sk: {
@@ -489,25 +439,56 @@
         logoutButton: "Odhlásiť sa",
         dashboardTitle: "Hlavný panel",
         dashboardDesc: "Vyberte modul, s ktorým chcete pracovať.",
-        clientsTitle: "Klienti",
-        clientsDesc: "Databáza klientov a kontaktných osôb.",
-        objectsTitle: "Objekty",
-        objectsDesc: "Budovy, zdroje tepla a technické údaje.",
-        measurementsTitle: "Merania",
-        measurementsDesc: "Spotreba energie, náklady, HDD a dennostupne.",
-        excelTitle: "Import Excel",
-        excelDesc: "Načítanie dát z vyúčtovacích tabuliek.",
-        pdfTitle: "Import PDF",
-        pdfDesc: "Analýza dokumentov a faktúr vo formáte PDF.",
-        reportsTitle: "ESCO reporty",
-        reportsDesc: "Úspory, vyúčtovania a reporty pre klienta.",
-        settingsTitle: "Nastavenia",
-        settingsDesc: "Jazyk, používatelia, roly a konfigurácia systému.",
+        roleModeTitle: "Testovací režim roly",
+        roleModeNote: "Toto je testovací režim. Neskôr bude rola načítaná automaticky zo Supabase po prihlásení.",
+        roleAdmin: "Admin",
+        roleStaff: "Obsluha",
+        roleClient: "Klient",
         moduleDefault: "Tento modul bude rozvinutý v ďalšej fáze."
       }
     };
 
+    const moduleLabels = {
+      pl: {
+        clients: ["👥", "Klienci", "Baza klientów i osób kontaktowych."],
+        objects: ["🏢", "Obiekty", "Budynki, źródła ciepła i dane techniczne."],
+        myObjects: ["🏢", "Moje obiekty", "Obiekty przypisane do konta klienta."],
+        measurements: ["📊", "Pomiary", "Zużycie energii, koszty, HDD i stopniodni."],
+        myMeasurements: ["📊", "Moje pomiary", "Pomiary i dane energetyczne Twoich obiektów."],
+        excel: ["📁", "Import Excel", "Wczytywanie danych z arkuszy rozliczeniowych."],
+        pdf: ["📄", "Import PDF", "Analiza dokumentów i faktur w formacie PDF."],
+        reports: ["📈", "Raporty ESCO", "Oszczędności, rozliczenia i raporty dla klienta."],
+        myReports: ["📈", "Moje raporty", "Raporty oszczędności dostępne dla klienta."],
+        users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i poziomami dostępu."],
+        settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
+      },
+      en: {
+        clients: ["👥", "Clients", "Client database and contact persons."],
+        objects: ["🏢", "Buildings", "Buildings, heat sources and technical data."],
+        myObjects: ["🏢", "My buildings", "Buildings assigned to the client account."],
+        measurements: ["📊", "Measurements", "Energy use, costs, HDD and degree days."],
+        myMeasurements: ["📊", "My measurements", "Energy data for your buildings."],
+        excel: ["📁", "Excel import", "Import data from settlement spreadsheets."],
+        pdf: ["📄", "PDF import", "Analyze documents and invoices in PDF format."],
+        reports: ["📈", "ESCO reports", "Savings, settlements and client reports."],
+        myReports: ["📈", "My reports", "Savings reports available for the client."],
+        users: ["🔐", "Users and roles", "Account and access level management."],
+        settings: ["⚙️", "Settings", "Language, roles and system configuration."]
+      }
+    };
+
+    const roleModules = {
+      admin: ["clients", "objects", "measurements", "excel", "pdf", "reports", "users", "settings"],
+      staff: ["objects", "measurements", "excel", "pdf", "reports"],
+      client: ["myObjects", "myMeasurements", "myReports"]
+    };
+
     let currentLanguage = "pl";
+    let currentRole = "admin";
+
+    function getModuleLabels() {
+      return moduleLabels[currentLanguage] || moduleLabels.en;
+    }
 
     function setLanguage(language) {
       currentLanguage = language;
@@ -523,6 +504,42 @@
       });
 
       document.getElementById("lang-" + language).classList.add("active");
+      renderDashboard();
+    }
+
+    function setRole(role) {
+      currentRole = role;
+
+      ["admin", "staff", "client"].forEach((roleName) => {
+        document.getElementById("role-" + roleName).classList.remove("active");
+      });
+
+      document.getElementById("role-" + role).classList.add("active");
+      document.getElementById("module-view").classList.remove("active");
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      const labels = getModuleLabels();
+      const modules = roleModules[currentRole];
+      const tilesContainer = document.getElementById("tiles");
+
+      tilesContainer.innerHTML = "";
+
+      modules.forEach((moduleName) => {
+        const item = labels[moduleName];
+        const tile = document.createElement("div");
+
+        tile.className = "tile";
+        tile.onclick = () => openModule(moduleName);
+        tile.innerHTML = `
+          <div class="tile-icon">${item[0]}</div>
+          <h3>${item[1]}</h3>
+          <p>${item[2]}</p>
+        `;
+
+        tilesContainer.appendChild(tile);
+      });
     }
 
     function login() {
@@ -536,31 +553,27 @@
 
       document.getElementById("login-screen").classList.remove("active");
       document.getElementById("dashboard-screen").classList.add("active");
+      renderDashboard();
     }
 
     function logout() {
       document.getElementById("dashboard-screen").classList.remove("active");
       document.getElementById("login-screen").classList.add("active");
       document.getElementById("password").value = "";
+      document.getElementById("module-view").classList.remove("active");
     }
 
     function openModule(moduleName) {
-      const titles = {
-        clients: translations[currentLanguage].clientsTitle,
-        objects: translations[currentLanguage].objectsTitle,
-        measurements: translations[currentLanguage].measurementsTitle,
-        excel: translations[currentLanguage].excelTitle,
-        pdf: translations[currentLanguage].pdfTitle,
-        reports: translations[currentLanguage].reportsTitle,
-        settings: translations[currentLanguage].settingsTitle
-      };
+      const labels = getModuleLabels();
+      const item = labels[moduleName];
 
-      document.getElementById("module-title").textContent = titles[moduleName];
+      document.getElementById("module-title").textContent = item[1];
       document.getElementById("module-description").textContent = translations[currentLanguage].moduleDefault;
       document.getElementById("module-view").classList.add("active");
     }
 
     setLanguage("pl");
+    setRole("admin");
   </script>
 </body>
 </html>
