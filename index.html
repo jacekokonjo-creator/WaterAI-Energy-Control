@@ -34,11 +34,17 @@
       display: flex;
       gap: 8px;
       z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: inherit;
     }
 
     .language-switcher button,
     .role-switcher button,
-    .logout-button {
+    .logout-button,
+    .small-button {
       border: 1px solid rgba(11, 116, 201, 0.25);
       background: rgba(255, 255, 255, 0.95);
       color: var(--blue-dark);
@@ -98,18 +104,18 @@
 
     label {
       display: block;
-      margin-top: 16px;
+      margin-top: 14px;
       margin-bottom: 7px;
       font-weight: 800;
       color: var(--blue-dark);
     }
 
-    input {
+    input, select {
       width: 100%;
-      padding: 15px;
+      padding: 14px;
       border: 1px solid rgba(11, 116, 201, 0.25);
       border-radius: 14px;
-      font-size: 16px;
+      font-size: 15px;
       background: white;
     }
 
@@ -267,8 +273,46 @@
       color: var(--blue-dark);
     }
 
+    .calendar-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .calendar-actions {
+      grid-column: 1 / -1;
+    }
+
+    .reminder-list {
+      margin-top: 22px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .reminder-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      background: #f8fdff;
+    }
+
+    .reminder-card strong {
+      color: var(--blue-dark);
+    }
+
+    .reminder-meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
     @media (max-width: 900px) {
-      .tiles { grid-template-columns: 1fr; }
+      .tiles,
+      .calendar-form {
+        grid-template-columns: 1fr;
+      }
 
       .dashboard-header {
         flex-direction: column;
@@ -284,7 +328,6 @@
         position: static;
         padding: 14px;
         justify-content: center;
-        flex-wrap: wrap;
       }
 
       .screen {
@@ -308,9 +351,7 @@
       <img src="logo-waterai.png" alt="WaterAI" class="logo" />
 
       <h1 data-i18n="appTitle">Energy Control</h1>
-      <p class="subtitle" data-i18n="appSubtitle">
-        System pomiaru i rozliczania oszczędności energii
-      </p>
+      <p class="subtitle" data-i18n="appSubtitle">System pomiaru i rozliczania oszczędności energii</p>
 
       <label for="email" data-i18n="emailLabel">Login / e-mail</label>
       <input id="email" type="email" placeholder="np. admin@waterai.pl" />
@@ -318,13 +359,11 @@
       <label for="password" data-i18n="passwordLabel">Hasło</label>
       <input id="password" type="password" placeholder="Wpisz hasło" />
 
-      <button class="primary-button" onclick="login()" data-i18n="loginButton">
-        Zaloguj
-      </button>
+      <button class="primary-button" onclick="login()" data-i18n="loginButton">Zaloguj</button>
 
       <div class="footer">
         <div class="powered">Powered by WaterAI</div>
-        <div>v0.6.0</div>
+        <div>v0.7.0</div>
       </div>
     </section>
   </main>
@@ -338,16 +377,15 @@
 
       <div class="dashboard-panel">
         <h2 class="dashboard-title" data-i18n="dashboardTitle">Panel główny</h2>
-        <p class="dashboard-desc" data-i18n="dashboardDesc">
-          Wybierz moduł, z którym chcesz pracować.
-        </p>
+        <p class="dashboard-desc" data-i18n="dashboardDesc">Wybierz moduł, z którym chcesz pracować.</p>
 
         <div class="role-box">
           <div class="role-title" data-i18n="roleModeTitle">Tryb testowy roli</div>
           <div class="role-switcher">
-            <button id="role-admin" class="active" onclick="setRole('admin')" data-i18n="roleAdmin">Admin</button>
-            <button id="role-staff" onclick="setRole('staff')" data-i18n="roleStaff">Obsługa</button>
-            <button id="role-client" onclick="setRole('client')" data-i18n="roleClient">Klient</button>
+            <button id="role-superAdmin" class="active" onclick="setRole('superAdmin')" data-i18n="roleSuperAdmin">Super Admin</button>
+            <button id="role-backOffice" onclick="setRole('backOffice')" data-i18n="roleBackOffice">Back Office</button>
+            <button id="role-energyAnalyst" onclick="setRole('energyAnalyst')" data-i18n="roleEnergyAnalyst">Energy Analyst</button>
+            <button id="role-client" onclick="setRole('client')" data-i18n="roleClient">Client</button>
           </div>
           <div class="role-note" data-i18n="roleModeNote">
             To jest tryb testowy. Docelowo rola będzie pobierana automatycznie z Supabase po zalogowaniu.
@@ -359,6 +397,7 @@
         <div id="module-view" class="module-view">
           <h3 id="module-title">Moduł</h3>
           <p id="module-description">Ten moduł zostanie rozwinięty w kolejnym etapie.</p>
+          <div id="module-content"></div>
         </div>
       </div>
     </section>
@@ -377,10 +416,29 @@
         dashboardDesc: "Wybierz moduł, z którym chcesz pracować.",
         roleModeTitle: "Tryb testowy roli",
         roleModeNote: "To jest tryb testowy. Docelowo rola będzie pobierana automatycznie z Supabase po zalogowaniu.",
-        roleAdmin: "Admin",
-        roleStaff: "Obsługa",
-        roleClient: "Klient",
-        moduleDefault: "Ten moduł zostanie rozwinięty w kolejnym etapie."
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Ten moduł zostanie rozwinięty w kolejnym etapie.",
+        calendarIntro: "Przypomnienia są przypisane indywidualnie do obiektu i roli.",
+        objectName: "Nazwa obiektu",
+        taskType: "Typ działania",
+        responsibleRole: "Rola odpowiedzialna",
+        cycle: "Cykl",
+        firstReminder: "Pierwsze przypomnienie",
+        addReminder: "Dodaj przypomnienie",
+        noReminders: "Brak przypomnień.",
+        taskRequestInvoice: "Poproś klienta o FV za energię",
+        taskEnterInvoice: "Wprowadź FV za energię od klienta",
+        taskEnterInvoiceData: "Wprowadź dane z FV klienta",
+        taskCheckInvoice: "Sprawdź FV",
+        taskCheckCalculations: "Sprawdź wyliczenia",
+        monthly: "Co miesiąc",
+        twoMonths: "Co 2 miesiące",
+        quarterly: "Co kwartał",
+        halfYear: "Co pół roku",
+        yearly: "Co rok"
       },
       en: {
         appTitle: "Energy Control",
@@ -393,10 +451,29 @@
         dashboardDesc: "Choose the module you want to work with.",
         roleModeTitle: "Test role mode",
         roleModeNote: "This is a test mode. In production, the role will be loaded automatically from Supabase after login.",
-        roleAdmin: "Admin",
-        roleStaff: "Staff",
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
         roleClient: "Client",
-        moduleDefault: "This module will be developed in the next stage."
+        moduleDefault: "This module will be developed in the next stage.",
+        calendarIntro: "Reminders are assigned individually to a building and role.",
+        objectName: "Building name",
+        taskType: "Task type",
+        responsibleRole: "Responsible role",
+        cycle: "Cycle",
+        firstReminder: "First reminder",
+        addReminder: "Add reminder",
+        noReminders: "No reminders.",
+        taskRequestInvoice: "Request energy invoice from client",
+        taskEnterInvoice: "Enter energy invoice from client",
+        taskEnterInvoiceData: "Enter data from client invoice",
+        taskCheckInvoice: "Check invoice",
+        taskCheckCalculations: "Check calculations",
+        monthly: "Monthly",
+        twoMonths: "Every 2 months",
+        quarterly: "Quarterly",
+        halfYear: "Every half year",
+        yearly: "Yearly"
       },
       de: {
         appTitle: "Energy Control",
@@ -409,10 +486,29 @@
         dashboardDesc: "Wählen Sie das Modul aus, mit dem Sie arbeiten möchten.",
         roleModeTitle: "Testmodus der Rolle",
         roleModeNote: "Dies ist ein Testmodus. Später wird die Rolle nach dem Login automatisch aus Supabase geladen.",
-        roleAdmin: "Admin",
-        roleStaff: "Bedienung",
-        roleClient: "Kunde",
-        moduleDefault: "Dieses Modul wird in der nächsten Phase entwickelt."
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Dieses Modul wird in der nächsten Phase entwickelt.",
+        calendarIntro: "Erinnerungen werden individuell einem Objekt und einer Rolle zugeordnet.",
+        objectName: "Objektname",
+        taskType: "Aufgabentyp",
+        responsibleRole: "Verantwortliche Rolle",
+        cycle: "Zyklus",
+        firstReminder: "Erste Erinnerung",
+        addReminder: "Erinnerung hinzufügen",
+        noReminders: "Keine Erinnerungen.",
+        taskRequestInvoice: "Energie-Rechnung vom Kunden anfordern",
+        taskEnterInvoice: "Energie-Rechnung vom Kunden eingeben",
+        taskEnterInvoiceData: "Daten aus Kundenrechnung eingeben",
+        taskCheckInvoice: "Rechnung prüfen",
+        taskCheckCalculations: "Berechnungen prüfen",
+        monthly: "Monatlich",
+        twoMonths: "Alle 2 Monate",
+        quarterly: "Quartalsweise",
+        halfYear: "Halbjährlich",
+        yearly: "Jährlich"
       },
       cs: {
         appTitle: "Energy Control",
@@ -425,10 +521,29 @@
         dashboardDesc: "Vyberte modul, se kterým chcete pracovat.",
         roleModeTitle: "Testovací režim role",
         roleModeNote: "Toto je testovací režim. Později bude role načtena automaticky ze Supabase po přihlášení.",
-        roleAdmin: "Admin",
-        roleStaff: "Obsluha",
-        roleClient: "Klient",
-        moduleDefault: "Tento modul bude rozvinut v další fázi."
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Tento modul bude rozvinut v další fázi.",
+        calendarIntro: "Připomínky jsou přiřazeny individuálně k objektu a roli.",
+        objectName: "Název objektu",
+        taskType: "Typ úkolu",
+        responsibleRole: "Odpovědná role",
+        cycle: "Cyklus",
+        firstReminder: "První připomínka",
+        addReminder: "Přidat připomínku",
+        noReminders: "Žádné připomínky.",
+        taskRequestInvoice: "Vyžádat fakturu za energii od klienta",
+        taskEnterInvoice: "Zadat fakturu za energii od klienta",
+        taskEnterInvoiceData: "Zadat data z klientské faktury",
+        taskCheckInvoice: "Zkontrolovat fakturu",
+        taskCheckCalculations: "Zkontrolovat výpočty",
+        monthly: "Měsíčně",
+        twoMonths: "Každé 2 měsíce",
+        quarterly: "Čtvrtletně",
+        halfYear: "Pololetně",
+        yearly: "Ročně"
       },
       sk: {
         appTitle: "Energy Control",
@@ -441,50 +556,127 @@
         dashboardDesc: "Vyberte modul, s ktorým chcete pracovať.",
         roleModeTitle: "Testovací režim roly",
         roleModeNote: "Toto je testovací režim. Neskôr bude rola načítaná automaticky zo Supabase po prihlásení.",
-        roleAdmin: "Admin",
-        roleStaff: "Obsluha",
-        roleClient: "Klient",
-        moduleDefault: "Tento modul bude rozvinutý v ďalšej fáze."
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Tento modul bude rozvinutý v ďalšej fáze.",
+        calendarIntro: "Pripomienky sú priradené individuálne k objektu a role.",
+        objectName: "Názov objektu",
+        taskType: "Typ úlohy",
+        responsibleRole: "Zodpovedná rola",
+        cycle: "Cyklus",
+        firstReminder: "Prvá pripomienka",
+        addReminder: "Pridať pripomienku",
+        noReminders: "Žiadne pripomienky.",
+        taskRequestInvoice: "Vyžiadať faktúru za energiu od klienta",
+        taskEnterInvoice: "Zadať faktúru za energiu od klienta",
+        taskEnterInvoiceData: "Zadať údaje z klientskej faktúry",
+        taskCheckInvoice: "Skontrolovať faktúru",
+        taskCheckCalculations: "Skontrolovať výpočty",
+        monthly: "Mesačne",
+        twoMonths: "Každé 2 mesiace",
+        quarterly: "Štvrťročne",
+        halfYear: "Polročne",
+        yearly: "Ročne"
       }
     };
 
     const moduleLabels = {
       pl: {
-        clients: ["👥", "Klienci", "Baza klientów i osób kontaktowych."],
-        objects: ["🏢", "Obiekty", "Budynki, źródła ciepła i dane techniczne."],
+        clients: ["👥", "Klienci", "Baza klientów i danych do FV."],
+        objects: ["🏢", "Obiekty", "Budynki, źródła ciepła i harmonogramy."],
         myObjects: ["🏢", "Moje obiekty", "Obiekty przypisane do konta klienta."],
         measurements: ["📊", "Pomiary", "Zużycie energii, koszty, HDD i stopniodni."],
         myMeasurements: ["📊", "Moje pomiary", "Pomiary i dane energetyczne Twoich obiektów."],
-        excel: ["📁", "Import Excel", "Wczytywanie danych z arkuszy rozliczeniowych."],
-        pdf: ["📄", "Import PDF", "Analiza dokumentów i faktur w formacie PDF."],
-        reports: ["📈", "Raporty ESCO", "Oszczędności, rozliczenia i raporty dla klienta."],
+        excel: ["📁", "Import Excel", "Wczytywanie danych z arkuszy."],
+        pdf: ["📄", "Import PDF", "Analiza dokumentów i faktur PDF."],
+        reports: ["📈", "Raporty ESCO", "Oszczędności, rozliczenia i raporty."],
         myReports: ["📈", "Moje raporty", "Raporty oszczędności dostępne dla klienta."],
-        users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i poziomami dostępu."],
+        calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
+        invoicing: ["🧾", "Fakturowanie", "Podsumowanie oszczędności i dane do FV."],
+        users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
       },
       en: {
-        clients: ["👥", "Clients", "Client database and contact persons."],
-        objects: ["🏢", "Buildings", "Buildings, heat sources and technical data."],
+        clients: ["👥", "Clients", "Client database and invoice data."],
+        objects: ["🏢", "Buildings", "Buildings, heat sources and schedules."],
         myObjects: ["🏢", "My buildings", "Buildings assigned to the client account."],
         measurements: ["📊", "Measurements", "Energy use, costs, HDD and degree days."],
         myMeasurements: ["📊", "My measurements", "Energy data for your buildings."],
-        excel: ["📁", "Excel import", "Import data from settlement spreadsheets."],
-        pdf: ["📄", "PDF import", "Analyze documents and invoices in PDF format."],
-        reports: ["📈", "ESCO reports", "Savings, settlements and client reports."],
+        excel: ["📁", "Excel import", "Import data from spreadsheets."],
+        pdf: ["📄", "PDF import", "Analyze PDF documents and invoices."],
+        reports: ["📈", "ESCO reports", "Savings, settlements and reports."],
         myReports: ["📈", "My reports", "Savings reports available for the client."],
-        users: ["🔐", "Users and roles", "Account and access level management."],
+        calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
+        invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
+        users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."]
+      },
+      de: {
+        clients: ["👥", "Kunden", "Kundendatenbank und Rechnungsdaten."],
+        objects: ["🏢", "Objekte", "Gebäude, Wärmequellen und Zeitpläne."],
+        myObjects: ["🏢", "Meine Objekte", "Objekte, die dem Kundenkonto zugeordnet sind."],
+        measurements: ["📊", "Messungen", "Energieverbrauch, Kosten, HDD und Gradtage."],
+        myMeasurements: ["📊", "Meine Messungen", "Energiedaten Ihrer Objekte."],
+        excel: ["📁", "Excel-Import", "Import von Daten aus Tabellen."],
+        pdf: ["📄", "PDF-Import", "Analyse von PDF-Dokumenten und Rechnungen."],
+        reports: ["📈", "ESCO-Berichte", "Einsparungen, Abrechnungen und Berichte."],
+        myReports: ["📈", "Meine Berichte", "Für den Kunden verfügbare Einsparberichte."],
+        calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
+        invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
+        users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
+        settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."]
+      },
+      cs: {
+        clients: ["👥", "Klienti", "Databáze klientů a fakturační údaje."],
+        objects: ["🏢", "Objekty", "Budovy, zdroje tepla a harmonogramy."],
+        myObjects: ["🏢", "Moje objekty", "Objekty přiřazené ke klientskému účtu."],
+        measurements: ["📊", "Měření", "Spotřeba energie, náklady, HDD a denostupně."],
+        myMeasurements: ["📊", "Moje měření", "Energetická data vašich objektů."],
+        excel: ["📁", "Import Excel", "Import dat z tabulek."],
+        pdf: ["📄", "Import PDF", "Analýza PDF dokumentů a faktur."],
+        reports: ["📈", "ESCO reporty", "Úspory, vyúčtování a reporty."],
+        myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
+        calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
+        invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
+        users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
+        settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."]
+      },
+      sk: {
+        clients: ["👥", "Klienti", "Databáza klientov a fakturačné údaje."],
+        objects: ["🏢", "Objekty", "Budovy, zdroje tepla a harmonogramy."],
+        myObjects: ["🏢", "Moje objekty", "Objekty priradené ku klientskemu účtu."],
+        measurements: ["📊", "Merania", "Spotreba energie, náklady, HDD a dennostupne."],
+        myMeasurements: ["📊", "Moje merania", "Energetické údaje vašich objektov."],
+        excel: ["📁", "Import Excel", "Import údajov z tabuliek."],
+        pdf: ["📄", "Import PDF", "Analýza PDF dokumentov a faktúr."],
+        reports: ["📈", "ESCO reporty", "Úspory, vyúčtovania a reporty."],
+        myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
+        calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
+        invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
+        users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
+        settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."]
       }
     };
 
     const roleModules = {
-      admin: ["clients", "objects", "measurements", "excel", "pdf", "reports", "users", "settings"],
-      staff: ["objects", "measurements", "excel", "pdf", "reports"],
+      superAdmin: ["clients", "objects", "measurements", "calendar", "excel", "pdf", "reports", "invoicing", "users", "settings"],
+      backOffice: ["clients", "objects", "calendar", "pdf", "reports", "invoicing"],
+      energyAnalyst: ["objects", "measurements", "calendar", "excel", "pdf", "reports"],
       client: ["myObjects", "myMeasurements", "myReports"]
     };
 
+    const taskRoles = ["BACK_OFFICE", "ENERGY_ANALYST", "CLIENT"];
+    const storageKey = "waterai_reminders_v1";
+
     let currentLanguage = "pl";
-    let currentRole = "admin";
+    let currentRole = "superAdmin";
+    let reminders = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+    function t(key) {
+      return translations[currentLanguage][key] || translations.en[key] || key;
+    }
 
     function getModuleLabels() {
       return moduleLabels[currentLanguage] || moduleLabels.en;
@@ -496,13 +688,10 @@
 
       document.querySelectorAll("[data-i18n]").forEach((element) => {
         const key = element.getAttribute("data-i18n");
-        element.textContent = translations[language][key];
+        element.textContent = t(key);
       });
 
-      document.querySelectorAll(".language-switcher button").forEach((button) => {
-        button.classList.remove("active");
-      });
-
+      document.querySelectorAll(".language-switcher button").forEach((button) => button.classList.remove("active"));
       document.getElementById("lang-" + language).classList.add("active");
       renderDashboard();
     }
@@ -510,12 +699,12 @@
     function setRole(role) {
       currentRole = role;
 
-      ["admin", "staff", "client"].forEach((roleName) => {
+      ["superAdmin", "backOffice", "energyAnalyst", "client"].forEach((roleName) => {
         document.getElementById("role-" + roleName).classList.remove("active");
       });
 
       document.getElementById("role-" + role).classList.add("active");
-      document.getElementById("module-view").classList.remove("active");
+      closeModule();
       renderDashboard();
     }
 
@@ -560,7 +749,12 @@
       document.getElementById("dashboard-screen").classList.remove("active");
       document.getElementById("login-screen").classList.add("active");
       document.getElementById("password").value = "";
+      closeModule();
+    }
+
+    function closeModule() {
       document.getElementById("module-view").classList.remove("active");
+      document.getElementById("module-content").innerHTML = "";
     }
 
     function openModule(moduleName) {
@@ -568,12 +762,132 @@
       const item = labels[moduleName];
 
       document.getElementById("module-title").textContent = item[1];
-      document.getElementById("module-description").textContent = translations[currentLanguage].moduleDefault;
+      document.getElementById("module-description").textContent =
+        moduleName === "calendar" ? t("calendarIntro") : t("moduleDefault");
+
+      if (moduleName === "calendar") {
+        renderCalendarModule();
+      } else {
+        document.getElementById("module-content").innerHTML = "";
+      }
+
       document.getElementById("module-view").classList.add("active");
     }
 
+    function renderCalendarModule() {
+      document.getElementById("module-content").innerHTML = `
+        <div class="calendar-form">
+          <div>
+            <label for="reminder-object">${t("objectName")}</label>
+            <input id="reminder-object" type="text" placeholder="np. Hotel Warszawa" />
+          </div>
+
+          <div>
+            <label for="reminder-task">${t("taskType")}</label>
+            <select id="reminder-task">
+              <option value="taskRequestInvoice">${t("taskRequestInvoice")}</option>
+              <option value="taskEnterInvoice">${t("taskEnterInvoice")}</option>
+              <option value="taskEnterInvoiceData">${t("taskEnterInvoiceData")}</option>
+              <option value="taskCheckInvoice">${t("taskCheckInvoice")}</option>
+              <option value="taskCheckCalculations">${t("taskCheckCalculations")}</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="reminder-role">${t("responsibleRole")}</label>
+            <select id="reminder-role">
+              ${taskRoles.map(role => `<option value="${role}">${role}</option>`).join("")}
+            </select>
+          </div>
+
+          <div>
+            <label for="reminder-cycle">${t("cycle")}</label>
+            <select id="reminder-cycle">
+              <option value="monthly">${t("monthly")}</option>
+              <option value="twoMonths">${t("twoMonths")}</option>
+              <option value="quarterly">${t("quarterly")}</option>
+              <option value="halfYear">${t("halfYear")}</option>
+              <option value="yearly">${t("yearly")}</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="reminder-date">${t("firstReminder")}</label>
+            <input id="reminder-date" type="date" />
+          </div>
+
+          <div class="calendar-actions">
+            <button class="primary-button" onclick="addReminder()">${t("addReminder")}</button>
+          </div>
+        </div>
+
+        <div id="reminder-list" class="reminder-list"></div>
+      `;
+
+      renderReminderList();
+    }
+
+    function addReminder() {
+      const objectName = document.getElementById("reminder-object").value.trim();
+      const task = document.getElementById("reminder-task").value;
+      const role = document.getElementById("reminder-role").value;
+      const cycle = document.getElementById("reminder-cycle").value;
+      const firstDate = document.getElementById("reminder-date").value;
+
+      if (!objectName || !firstDate) {
+        alert(currentLanguage === "pl" ? "Wpisz obiekt i datę pierwszego przypomnienia." : "Enter building and first reminder date.");
+        return;
+      }
+
+      reminders.push({
+        id: Date.now(),
+        objectName,
+        task,
+        role,
+        cycle,
+        firstDate
+      });
+
+      localStorage.setItem(storageKey, JSON.stringify(reminders));
+      document.getElementById("reminder-object").value = "";
+      document.getElementById("reminder-date").value = "";
+      renderReminderList();
+    }
+
+    function removeReminder(id) {
+      reminders = reminders.filter(item => item.id !== id);
+      localStorage.setItem(storageKey, JSON.stringify(reminders));
+      renderReminderList();
+    }
+
+    function renderReminderList() {
+      const list = document.getElementById("reminder-list");
+
+      if (!list) return;
+
+      if (reminders.length === 0) {
+        list.innerHTML = `<p>${t("noReminders")}</p>`;
+        return;
+      }
+
+      list.innerHTML = reminders.map(item => `
+        <div class="reminder-card">
+          <strong>${item.objectName}</strong>
+          <div class="reminder-meta">
+            ${t(item.task)}<br />
+            ${t("responsibleRole")}: ${item.role}<br />
+            ${t("cycle")}: ${t(item.cycle)}<br />
+            ${t("firstReminder")}: ${item.firstDate}
+          </div>
+          <div style="margin-top: 12px;">
+            <button class="small-button" onclick="removeReminder(${item.id})">Usuń</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
     setLanguage("pl");
-    setRole("admin");
+    setRole("superAdmin");
   </script>
 </body>
 </html>
