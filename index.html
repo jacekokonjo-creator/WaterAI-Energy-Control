@@ -1,16 +1,122 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WaterAI Energy Control</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #07111f, #0b3a4a);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-box {
+      width: 360px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #b8d8e0;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      margin-top: 16px;
+      font-size: 14px;
+      color: #d9eef2;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 10px;
+      border: none;
+      box-sizing: border-box;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      background: #00b894;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #00a383;
+    }
+
+    .info {
+      margin-top: 18px;
+      font-size: 13px;
+      color: #a9cfd8;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
-  <h1>WaterAI Energy Control</h1>
-  <p>System pomiaru i rozliczania oszczędności energii.</p>
 
-  <button onclick="alert('Aplikacja działa!')">
-    Test działania
-  </button>
+  <div class="login-box">
+    <h1>WaterAI</h1>
+    <div class="subtitle">Energy Control</div>
+
+    <label for="email">Login / e-mail</label>
+    <input id="email" type="email" placeholder="np. admin@waterai.pl" />
+
+    <label for="password">Hasło</label>
+    <input id="password" type="password" placeholder="Wpisz hasło" />
+
+    <label for="role">Rola użytkownika</label>
+    <select id="role">
+      <option>Admin</option>
+      <option>Obsługa</option>
+      <option>Klient</option>
+    </select>
+
+    <button onclick="login()">Zaloguj</button>
+
+    <div class="info">
+      System pomiaru i rozliczania oszczędności energii
+    </div>
+  </div>
+
+  <script>
+    function login() {
+      const email = document.getElementById("email").value;
+      const role = document.getElementById("role").value;
+
+      if (!email) {
+        alert("Wpisz login lub e-mail.");
+        return;
+      }
+
+      alert("Logowanie testowe: " + role + " / " + email);
+    }
+  </script>
+
 </body>
 </html>
