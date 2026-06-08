@@ -4,119 +4,506 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WaterAI Energy Control</title>
+  <link rel="icon" href="logo-waterai-icon.png" />
   <style>
+    :root {
+      --blue: #0b74c9;
+      --blue-dark: #06324a;
+      --cyan: #1bb7f0;
+      --green: #12bfa0;
+      --white: #ffffff;
+      --soft: #eaf8ff;
+      --text: #102033;
+      --muted: #6c7a89;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #07111f, #0b3a4a);
-      color: white;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(27, 183, 240, 0.28), transparent 35%),
+        linear-gradient(135deg, #eefbff, #ccefff 45%, #f8fdff);
+      color: var(--text);
     }
 
-    .login-box {
-      width: 360px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 18px;
-      padding: 32px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    .language-switcher {
+      position: fixed;
+      top: 18px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .language-switcher button {
+      border: 1px solid rgba(11, 116, 201, 0.25);
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--blue-dark);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(10, 75, 115, 0.08);
+    }
+
+    .language-switcher button.active {
+      background: var(--blue);
+      color: white;
+    }
+
+    .screen {
+      min-height: 100vh;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 72px 20px 32px;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 460px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(11, 116, 201, 0.16);
+      border-radius: 28px;
+      padding: 34px;
+      box-shadow: 0 28px 80px rgba(6, 50, 74, 0.18);
+      backdrop-filter: blur(14px);
+    }
+
+    .logo {
+      width: 100%;
+      max-width: 320px;
+      display: block;
+      margin: 0 auto 18px;
     }
 
     h1 {
-      margin: 0 0 8px;
+      text-align: center;
+      margin: 0;
       font-size: 28px;
+      color: var(--blue-dark);
     }
 
     .subtitle {
-      color: #b8d8e0;
-      font-size: 14px;
-      margin-bottom: 28px;
+      text-align: center;
+      margin: 8px 0 26px;
+      color: var(--muted);
+      font-size: 15px;
     }
 
     label {
       display: block;
       margin-top: 16px;
-      font-size: 14px;
-      color: #d9eef2;
+      margin-bottom: 7px;
+      font-weight: 700;
+      color: var(--blue-dark);
     }
 
-    input, select {
+    input {
       width: 100%;
-      padding: 12px;
-      margin-top: 6px;
-      border-radius: 10px;
-      border: none;
-      box-sizing: border-box;
-      font-size: 15px;
+      padding: 14px;
+      border: 1px solid rgba(11, 116, 201, 0.25);
+      border-radius: 14px;
+      font-size: 16px;
+      background: white;
     }
 
-    button {
+    .primary-button {
       width: 100%;
       margin-top: 24px;
-      padding: 13px;
+      padding: 15px;
       border: none;
-      border-radius: 10px;
-      background: #00b894;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue), var(--green));
       color: white;
-      font-size: 16px;
-      font-weight: bold;
+      font-size: 17px;
+      font-weight: 800;
       cursor: pointer;
+      box-shadow: 0 14px 32px rgba(18, 191, 160, 0.25);
     }
 
-    button:hover {
-      background: #00a383;
+    .primary-button:hover {
+      filter: brightness(0.96);
     }
 
-    .info {
-      margin-top: 18px;
-      font-size: 13px;
-      color: #a9cfd8;
+    .footer {
+      margin-top: 22px;
       text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .powered {
+      font-weight: 800;
+      color: var(--blue);
+    }
+
+    .dashboard {
+      width: 100%;
+      max-width: 1120px;
+    }
+
+    .dashboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .dashboard-logo {
+      height: 58px;
+    }
+
+    .logout-button {
+      border: 1px solid rgba(11, 116, 201, 0.25);
+      background: white;
+      color: var(--blue-dark);
+      border-radius: 999px;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .dashboard-panel {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(11, 116, 201, 0.16);
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: 0 28px 80px rgba(6, 50, 74, 0.14);
+    }
+
+    .dashboard-title {
+      margin: 0 0 8px;
+      color: var(--blue-dark);
+      font-size: 30px;
+    }
+
+    .dashboard-desc {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .tile {
+      background: white;
+      border-radius: 22px;
+      padding: 22px;
+      min-height: 142px;
+      border: 1px solid rgba(11, 116, 201, 0.12);
+      box-shadow: 0 10px 26px rgba(6, 50, 74, 0.08);
+    }
+
+    .tile-icon {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .tile h3 {
+      margin: 0 0 8px;
+      color: var(--blue-dark);
+    }
+
+    .tile p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 820px) {
+      .tiles {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .dashboard-logo {
+        max-width: 260px;
+        height: auto;
+      }
+
+      .language-switcher {
+        position: static;
+        padding: 14px;
+        justify-content: center;
+      }
+
+      .screen {
+        padding-top: 20px;
+      }
     }
   </style>
 </head>
+
 <body>
-
-  <div class="login-box">
-    <h1>WaterAI</h1>
-    <div class="subtitle">Energy Control</div>
-
-    <label for="email">Login / e-mail</label>
-    <input id="email" type="email" placeholder="np. admin@waterai.pl" />
-
-    <label for="password">Hasło</label>
-    <input id="password" type="password" placeholder="Wpisz hasło" />
-
-    <label for="role">Rola użytkownika</label>
-    <select id="role">
-      <option>Admin</option>
-      <option>Obsługa</option>
-      <option>Klient</option>
-    </select>
-
-    <button onclick="login()">Zaloguj</button>
-
-    <div class="info">
-      System pomiaru i rozliczania oszczędności energii
-    </div>
+  <div class="language-switcher">
+    <button onclick="setLanguage('pl')" id="lang-pl" class="active">PL</button>
+    <button onclick="setLanguage('en')" id="lang-en">EN</button>
+    <button onclick="setLanguage('de')" id="lang-de">DE</button>
+    <button onclick="setLanguage('cs')" id="lang-cs">CZ</button>
+    <button onclick="setLanguage('sk')" id="lang-sk">SK</button>
   </div>
 
-  <script>
-    function login() {
-      const email = document.getElementById("email").value;
-      const role = document.getElementById("role").value;
+  <main id="login-screen" class="screen active">
+    <section class="login-card">
+      <img src="logo-waterai.png" alt="WaterAI" class="logo" />
 
-      if (!email) {
-        alert("Wpisz login lub e-mail.");
+      <h1 data-i18n="appTitle">Energy Control</h1>
+      <p class="subtitle" data-i18n="appSubtitle">
+        System pomiaru i rozliczania oszczędności energii
+      </p>
+
+      <label for="email" data-i18n="emailLabel">Login / e-mail</label>
+      <input id="email" type="email" placeholder="np. admin@waterai.pl" />
+
+      <label for="password" data-i18n="passwordLabel">Hasło</label>
+      <input id="password" type="password" placeholder="Wpisz hasło" />
+
+      <button class="primary-button" onclick="login()" data-i18n="loginButton">
+        Zaloguj
+      </button>
+
+      <div class="footer">
+        <div class="powered">Powered by WaterAI</div>
+        <div>v0.4.0</div>
+      </div>
+    </section>
+  </main>
+
+  <main id="dashboard-screen" class="screen">
+    <section class="dashboard">
+      <div class="dashboard-header">
+        <img src="logo-waterai.png" alt="WaterAI" class="dashboard-logo" />
+        <button class="logout-button" onclick="logout()" data-i18n="logoutButton">
+          Wyloguj
+        </button>
+      </div>
+
+      <div class="dashboard-panel">
+        <h2 class="dashboard-title" data-i18n="dashboardTitle">
+          Panel główny
+        </h2>
+        <p class="dashboard-desc" data-i18n="dashboardDesc">
+          Wybierz moduł, z którym chcesz pracować.
+        </p>
+
+        <div class="tiles">
+          <div class="tile">
+            <div class="tile-icon">👥</div>
+            <h3 data-i18n="clientsTitle">Klienci</h3>
+            <p data-i18n="clientsDesc">Baza klientów i osób kontaktowych.</p>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon">🏢</div>
+            <h3 data-i18n="objectsTitle">Obiekty</h3>
+            <p data-i18n="objectsDesc">Budynki, źródła ciepła i dane techniczne.</p>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon">📊</div>
+            <h3 data-i18n="measurementsTitle">Pomiary</h3>
+            <p data-i18n="measurementsDesc">Zużycie energii, koszty, HDD i stopniodni.</p>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon">📁</div>
+            <h3 data-i18n="excelTitle">Import Excel</h3>
+            <p data-i18n="excelDesc">Wczytywanie danych z arkuszy rozliczeniowych.</p>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon">📄</div>
+            <h3 data-i18n="pdfTitle">Import PDF</h3>
+            <p data-i18n="pdfDesc">Analiza dokumentów i faktur w formacie PDF.</p>
+          </div>
+
+          <div class="tile">
+            <div class="tile-icon">📈</div>
+            <h3 data-i18n="reportsTitle">Raporty ESCO</h3>
+            <p data-i18n="reportsDesc">Oszczędności, rozliczenia i raporty dla klienta.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const translations = {
+      pl: {
+        appTitle: "Energy Control",
+        appSubtitle: "System pomiaru i rozliczania oszczędności energii",
+        emailLabel: "Login / e-mail",
+        passwordLabel: "Hasło",
+        loginButton: "Zaloguj",
+        logoutButton: "Wyloguj",
+        dashboardTitle: "Panel główny",
+        dashboardDesc: "Wybierz moduł, z którym chcesz pracować.",
+        clientsTitle: "Klienci",
+        clientsDesc: "Baza klientów i osób kontaktowych.",
+        objectsTitle: "Obiekty",
+        objectsDesc: "Budynki, źródła ciepła i dane techniczne.",
+        measurementsTitle: "Pomiary",
+        measurementsDesc: "Zużycie energii, koszty, HDD i stopniodni.",
+        excelTitle: "Import Excel",
+        excelDesc: "Wczytywanie danych z arkuszy rozliczeniowych.",
+        pdfTitle: "Import PDF",
+        pdfDesc: "Analiza dokumentów i faktur w formacie PDF.",
+        reportsTitle: "Raporty ESCO",
+        reportsDesc: "Oszczędności, rozliczenia i raporty dla klienta."
+      },
+      en: {
+        appTitle: "Energy Control",
+        appSubtitle: "Energy savings measurement and settlement system",
+        emailLabel: "Login / e-mail",
+        passwordLabel: "Password",
+        loginButton: "Login",
+        logoutButton: "Logout",
+        dashboardTitle: "Dashboard",
+        dashboardDesc: "Choose the module you want to work with.",
+        clientsTitle: "Clients",
+        clientsDesc: "Client database and contact persons.",
+        objectsTitle: "Buildings",
+        objectsDesc: "Buildings, heat sources and technical data.",
+        measurementsTitle: "Measurements",
+        measurementsDesc: "Energy use, costs, HDD and degree days.",
+        excelTitle: "Excel import",
+        excelDesc: "Import data from settlement spreadsheets.",
+        pdfTitle: "PDF import",
+        pdfDesc: "Analyze documents and invoices in PDF format.",
+        reportsTitle: "ESCO reports",
+        reportsDesc: "Savings, settlements and client reports."
+      },
+      de: {
+        appTitle: "Energy Control",
+        appSubtitle: "System zur Messung und Abrechnung von Energieeinsparungen",
+        emailLabel: "Login / E-Mail",
+        passwordLabel: "Passwort",
+        loginButton: "Einloggen",
+        logoutButton: "Ausloggen",
+        dashboardTitle: "Hauptpanel",
+        dashboardDesc: "Wählen Sie das Modul aus, mit dem Sie arbeiten möchten.",
+        clientsTitle: "Kunden",
+        clientsDesc: "Kundendatenbank und Kontaktpersonen.",
+        objectsTitle: "Objekte",
+        objectsDesc: "Gebäude, Wärmequellen und technische Daten.",
+        measurementsTitle: "Messungen",
+        measurementsDesc: "Energieverbrauch, Kosten, HDD und Gradtage.",
+        excelTitle: "Excel-Import",
+        excelDesc: "Import von Daten aus Abrechnungsdateien.",
+        pdfTitle: "PDF-Import",
+        pdfDesc: "Analyse von Dokumenten und Rechnungen im PDF-Format.",
+        reportsTitle: "ESCO-Berichte",
+        reportsDesc: "Einsparungen, Abrechnungen und Berichte für Kunden."
+      },
+      cs: {
+        appTitle: "Energy Control",
+        appSubtitle: "Systém měření a vyúčtování úspor energie",
+        emailLabel: "Login / e-mail",
+        passwordLabel: "Heslo",
+        loginButton: "Přihlásit se",
+        logoutButton: "Odhlásit se",
+        dashboardTitle: "Hlavní panel",
+        dashboardDesc: "Vyberte modul, se kterým chcete pracovat.",
+        clientsTitle: "Klienti",
+        clientsDesc: "Databáze klientů a kontaktních osob.",
+        objectsTitle: "Objekty",
+        objectsDesc: "Budovy, zdroje tepla a technické údaje.",
+        measurementsTitle: "Měření",
+        measurementsDesc: "Spotřeba energie, náklady, HDD a denostupně.",
+        excelTitle: "Import Excel",
+        excelDesc: "Načítání dat z vyúčtovacích tabulek.",
+        pdfTitle: "Import PDF",
+        pdfDesc: "Analýza dokumentů a faktur ve formátu PDF.",
+        reportsTitle: "ESCO reporty",
+        reportsDesc: "Úspory, vyúčtování a reporty pro klienta."
+      },
+      sk: {
+        appTitle: "Energy Control",
+        appSubtitle: "Systém merania a vyúčtovania úspor energie",
+        emailLabel: "Login / e-mail",
+        passwordLabel: "Heslo",
+        loginButton: "Prihlásiť sa",
+        logoutButton: "Odhlásiť sa",
+        dashboardTitle: "Hlavný panel",
+        dashboardDesc: "Vyberte modul, s ktorým chcete pracovať.",
+        clientsTitle: "Klienti",
+        clientsDesc: "Databáza klientov a kontaktných osôb.",
+        objectsTitle: "Objekty",
+        objectsDesc: "Budovy, zdroje tepla a technické údaje.",
+        measurementsTitle: "Merania",
+        measurementsDesc: "Spotreba energie, náklady, HDD a dennostupne.",
+        excelTitle: "Import Excel",
+        excelDesc: "Načítanie dát z vyúčtovacích tabuliek.",
+        pdfTitle: "Import PDF",
+        pdfDesc: "Analýza dokumentov a faktúr vo formáte PDF.",
+        reportsTitle: "ESCO reporty",
+        reportsDesc: "Úspory, vyúčtovania a reporty pre klienta."
+      }
+    };
+
+    let currentLanguage = "pl";
+
+    function setLanguage(language) {
+      currentLanguage = language;
+
+      document.documentElement.lang = language;
+
+      document.querySelectorAll("[data-i18n]").forEach((element) => {
+        const key = element.getAttribute("data-i18n");
+        element.textContent = translations[language][key];
+      });
+
+      document.querySelectorAll(".language-switcher button").forEach((button) => {
+        button.classList.remove("active");
+      });
+
+      document.getElementById("lang-" + language).classList.add("active");
+    }
+
+    function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      if (!email || !password) {
+        alert(currentLanguage === "pl"
+          ? "Wpisz login i hasło."
+          : "Please enter login and password.");
         return;
       }
 
-      alert("Logowanie testowe: " + role + " / " + email);
+      document.getElementById("login-screen").classList.remove("active");
+      document.getElementById("dashboard-screen").classList.add("active");
     }
-  </script>
 
+    function logout() {
+      document.getElementById("dashboard-screen").classList.remove("active");
+      document.getElementById("login-screen").classList.add("active");
+      document.getElementById("password").value = "";
+    }
+
+    setLanguage("pl");
+  </script>
 </body>
 </html>
