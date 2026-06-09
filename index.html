@@ -765,12 +765,15 @@
       document.getElementById("module-description").textContent =
         moduleName === "calendar" ? t("calendarIntro") : t("moduleDefault");
 
-      if (moduleName === "calendar") {
-        renderCalendarModule();
-      } else {
-        document.getElementById("module-content").innerHTML = "";
-      }
-
+ if (moduleName === "calendar") {
+  renderCalendarModule();
+}
+else if (moduleName === "clients") {
+  renderClientsModule();
+}
+else {
+  document.getElementById("module-content").innerHTML = "";
+}
       document.getElementById("module-view").classList.add("active");
     }
 
