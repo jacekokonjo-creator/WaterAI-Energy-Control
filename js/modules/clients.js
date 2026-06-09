@@ -1,5 +1,5 @@
 // WaterAI Energy Control
-// Clients Module v0.8.0
+// Clients Module v0.8.1
 
 const ClientsModule = {
   storageKey: "waterai_clients_v1",
@@ -20,19 +20,24 @@ const ClientsModule = {
       createdAt: new Date().toISOString(),
 
       name: client.name || "",
-      nip: client.nip || "",
+      clientType: client.clientType || "HOTEL",
+      vatId: client.vatId || "",
       country: client.country || "PL",
       language: client.language || "pl",
 
-      address: client.address || "",
-      email: client.email || "",
-      phone: client.phone || "",
+      postalCode: client.postalCode || "",
+      city: client.city || "",
+      street: client.street || "",
+      buildingNumber: client.buildingNumber || "",
+      apartmentNumber: client.apartmentNumber || "",
+      googleMapsUrl: client.googleMapsUrl || "",
 
       invoiceEmail: client.invoiceEmail || "",
       paymentDays: Number(client.paymentDays || 14),
-
       settlementModel: client.settlementModel || "ESCO",
       escoShare: Number(client.escoShare || 50),
+
+      contacts: client.contacts || [],
 
       status: client.status || "IMPLEMENTATION"
     });
@@ -51,9 +56,7 @@ const ClientsModule = {
 
   update(id, updatedClient) {
     const clients = this.getAll().map(client => {
-      if (client.id !== Number(id)) {
-        return client;
-      }
+      if (client.id !== Number(id)) return client;
 
       return {
         ...client,
@@ -65,4 +68,5 @@ const ClientsModule = {
     this.saveAll(clients);
   }
 };
+
 window.ClientsModule = ClientsModule;
