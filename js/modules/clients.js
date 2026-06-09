@@ -1,48 +1,67 @@
+// WaterAI Energy Control
 // Clients Module v0.8.0
 
 const ClientsModule = {
-    storageKey: "waterai_clients_v1",
+  storageKey: "waterai_clients_v1",
 
-    getAll() {
-        return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
-    },
+  getAll() {
+    return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+  },
 
-    saveAll(clients) {
-        localStorage.setItem(this.storageKey, JSON.stringify(clients));
-    },
+  saveAll(clients) {
+    localStorage.setItem(this.storageKey, JSON.stringify(clients));
+  },
 
-    add(client) {
-        const clients = this.getAll();
+  add(client) {
+    const clients = this.getAll();
 
-        clients.push({
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            status: client.status || "ACTIVE",
+    clients.push({
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
 
-            name: client.name || "",
-            nip: client.nip || "",
-            country: client.country || "PL",
+      name: client.name || "",
+      nip: client.nip || "",
+      country: client.country || "PL",
+      language: client.language || "pl",
 
-            invoiceEmail: client.invoiceEmail || "",
-            paymentDays: client.paymentDays || 14,
+      address: client.address || "",
+      email: client.email || "",
+      phone: client.phone || "",
 
-            escoShare: client.escoShare || 50
-        });
+      invoiceEmail: client.invoiceEmail || "",
+      paymentDays: Number(client.paymentDays || 14),
 
-        this.saveAll(clients);
-    },
+      settlementModel: client.settlementModel || "ESCO",
+      escoShare: Number(client.escoShare || 50),
 
-    remove(id) {
-        const clients = this
-            .getAll()
-            .filter(client => client.id !== id);
+      status: client.status || "IMPLEMENTATION"
+    });
 
-        this.saveAll(clients);
-    },
+    this.saveAll(clients);
+  },
 
-    find(id) {
-        return this
-            .getAll()
-            .find(client => client.id === id);
-    }
-};// clients module
+  remove(id) {
+    const clients = this.getAll().filter(client => client.id !== Number(id));
+    this.saveAll(clients);
+  },
+
+  find(id) {
+    return this.getAll().find(client => client.id === Number(id));
+  },
+
+  update(id, updatedClient) {
+    const clients = this.getAll().map(client => {
+      if (client.id !== Number(id)) {
+        return client;
+      }
+
+      return {
+        ...client,
+        ...updatedClient,
+        updatedAt: new Date().toISOString()
+      };
+    });
+
+    this.saveAll(clients);
+  }
+};
