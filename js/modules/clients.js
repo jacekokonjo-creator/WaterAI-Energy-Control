@@ -1,3 +1,4 @@
+// WaterAI Energy Control
 // Clients Module v0.8.0
 
 const ClientsModule = {
@@ -64,3 +65,4 @@ const ClientsModule = {
     this.saveAll(clients);
   }
 };
+window.ClientsModule = ClientsModule;
