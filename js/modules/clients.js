@@ -1,4 +1,3 @@
-// WaterAI Energy Control
 // Clients Module v0.8.0
 
 const ClientsModule = {
