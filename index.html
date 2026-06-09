@@ -771,14 +771,35 @@ if (moduleName === "calendar") {
 else if (moduleName === "clients") {
   document.getElementById("module-content").innerHTML = `
     <form onsubmit="createClient(this); return false;" class="calendar-form">
-      <div>
-        <label>Nazwa klienta</label>
-        <input name="name" required />
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane podstawowe</h3>
       </div>
 
       <div>
-        <label>NIP</label>
-        <input name="nip" />
+        <label>Nazwa klienta</label>
+        <input name="name" required placeholder="np. Hotel Group XYZ" />
+      </div>
+
+      <div>
+        <label>Typ klienta</label>
+        <select name="clientType">
+          <option value="HOTEL">Hotel</option>
+          <option value="SCHOOL">Szkoła</option>
+          <option value="KINDERGARTEN">Przedszkole</option>
+          <option value="OFFICE">Urząd / administracja</option>
+          <option value="HOUSING_COMMUNITY">Wspólnota mieszkaniowa</option>
+          <option value="COOPERATIVE">Spółdzielnia</option>
+          <option value="INDUSTRY">Zakład przemysłowy</option>
+          <option value="OFFICE_BUILDING">Biurowiec</option>
+          <option value="HOSPITAL">Szpital</option>
+          <option value="OTHER">Inne</option>
+        </select>
+      </div>
+
+      <div>
+        <label>VAT ID</label>
+        <input name="vatId" placeholder="np. PL1234567890" />
       </div>
 
       <div>
@@ -788,27 +809,23 @@ else if (moduleName === "clients") {
           <option value="CZ">Czechy</option>
           <option value="SK">Słowacja</option>
           <option value="DE">Niemcy</option>
-          <option value="EN">Inny</option>
+          <option value="EN">Inny / English</option>
         </select>
       </div>
 
       <div>
-        <label>Email do FV</label>
-        <input name="invoiceEmail" type="email" />
+        <label>Język klienta</label>
+        <select name="language">
+          <option value="pl">Polski</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="cs">Čeština</option>
+          <option value="sk">Slovenčina</option>
+        </select>
       </div>
 
       <div>
-        <label>Termin płatności</label>
-        <input name="paymentDays" type="number" value="14" />
-      </div>
-
-      <div>
-        <label>Udział WaterAI (%)</label>
-        <input name="escoShare" type="number" value="50" />
-      </div>
-
-      <div>
-        <label>Status</label>
+        <label>Status klienta</label>
         <select name="status">
           <option value="IMPLEMENTATION">Wdrożenie</option>
           <option value="ACTIVE">Aktywny</option>
@@ -817,7 +834,99 @@ else if (moduleName === "clients") {
         </select>
       </div>
 
+      <div style="grid-column: 1 / -1;">
+        <h3>Adres klienta</h3>
+      </div>
+
+      <div>
+        <label>Kod pocztowy</label>
+        <input name="postalCode" placeholder="np. 00-001" />
+      </div>
+
+      <div>
+        <label>Miasto</label>
+        <input name="city" placeholder="np. Warszawa" />
+      </div>
+
+      <div>
+        <label>Ulica</label>
+        <input name="street" placeholder="np. Prosta" />
+      </div>
+
+      <div>
+        <label>Nr budynku</label>
+        <input name="buildingNumber" placeholder="np. 10" />
+      </div>
+
+      <div>
+        <label>Nr lokalu</label>
+        <input name="apartmentNumber" placeholder="opcjonalnie" />
+      </div>
+
+      <div>
+        <label>Google Maps URL</label>
+        <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane finansowe</h3>
+      </div>
+
+      <div>
+        <label>Email do FV</label>
+        <input name="invoiceEmail" type="email" placeholder="faktury@firma.pl" />
+      </div>
+
+      <div>
+        <label>Termin płatności FV</label>
+        <input name="paymentDays" type="number" value="14" min="0" />
+      </div>
+
+      <div>
+        <label>Model rozliczeń</label>
+        <select name="settlementModel">
+          <option value="ESCO">ESCO</option>
+          <option value="SUBSCRIPTION">Abonament</option>
+          <option value="CUSTOM">Własny</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Udział WaterAI w oszczędności (%)</label>
+        <input name="escoShare" type="number" value="50" min="0" max="100" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane kontaktowe</h3>
+        <p class="reminder-meta">Możesz dodać wiele osób kontaktowych dla jednego klienta.</p>
+      </div>
+
+      <div id="contacts-container" style="grid-column: 1 / -1;">
+        <div class="contact-row calendar-form" style="grid-column: 1 / -1;">
+          <div>
+            <label>Osoba kontaktowa</label>
+            <input name="contactName" type="text" placeholder="Imię i nazwisko" />
+          </div>
+
+          <div>
+            <label>Funkcja</label>
+            <input name="contactRole" type="text" placeholder="np. Księgowość / Dyrektor techniczny" />
+          </div>
+
+          <div>
+            <label>Email</label>
+            <input name="contactEmail" type="email" />
+          </div>
+
+          <div>
+            <label>Telefon</label>
+            <input name="contactPhone" type="text" />
+          </div>
+        </div>
+      </div>
+
       <div class="calendar-actions">
+        <button class="small-button" type="button" onclick="addContactRow()">Dodaj kolejną osobę</button>
         <button class="primary-button" type="submit">Dodaj klienta</button>
       </div>
     </form>
