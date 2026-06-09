@@ -308,11 +308,78 @@
       line-height: 1.5;
     }
 
+.app-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.sidebar {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 10px 26px rgba(6, 50, 74, 0.08);
+  position: sticky;
+  top: 20px;
+}
+
+.sidebar-menu {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-menu .tile {
+  min-height: auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.sidebar-menu .tile:hover {
+  transform: none;
+}
+
+.sidebar-menu .tile-icon {
+  margin: 0;
+  font-size: 24px;
+}
+
+.sidebar-menu .tile h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.sidebar-menu .tile p {
+  display: none;
+}
+
+.content-area {
+  min-width: 0;
+}
+
+.content-area .module-view {
+  margin-top: 0;
+  display: block;
+  min-height: 520px;
+}
+ 
     @media (max-width: 900px) {
       .tiles,
       .calendar-form {
         grid-template-columns: 1fr;
       }
+      .app-layout {
+       grid-template-columns: 1fr;
+}
+
+       .sidebar {
+       position: static;
+}
 
       .dashboard-header {
         flex-direction: column;
@@ -392,17 +459,22 @@
           </div>
         </div>
 
-        <div id="tiles" class="tiles"></div>
+          <div class="app-layout">
+          <aside class="sidebar">
+            <div id="tiles" class="sidebar-menu"></div>
+          </aside>
 
-        <div id="module-view" class="module-view">
+          <section class="content-area">
+            <div id="module-view" class="module-view active">
           <h3 id="module-title">Moduł</h3>
           <p id="module-description">Ten moduł zostanie rozwinięty w kolejnym etapie.</p>
           <div id="module-content"></div>
+            </div>
+          </section>
         </div>
       </div>
     </section>
   </main>
-
   <script>
     const translations = {
       pl: {
