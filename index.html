@@ -765,10 +765,13 @@
       document.getElementById("module-description").textContent =
         moduleName === "calendar" ? t("calendarIntro") : t("moduleDefault");
 
- if (moduleName === "calendar") {
+if (moduleName === "calendar") {
   renderCalendarModule();
 }
 else if (moduleName === "clients") {
+  document.getElementById("module-content").innerHTML = `
+    <div id="clients-list"></div>
+  `;
   renderClientsList();
 }
 else {
