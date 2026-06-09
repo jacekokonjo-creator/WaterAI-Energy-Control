@@ -770,6 +770,58 @@ if (moduleName === "calendar") {
 }
 else if (moduleName === "clients") {
   document.getElementById("module-content").innerHTML = `
+    <form onsubmit="createClient(this); return false;" class="calendar-form">
+      <div>
+        <label>Nazwa klienta</label>
+        <input name="name" required />
+      </div>
+
+      <div>
+        <label>NIP</label>
+        <input name="nip" />
+      </div>
+
+      <div>
+        <label>Kraj</label>
+        <select name="country">
+          <option value="PL">Polska</option>
+          <option value="CZ">Czechy</option>
+          <option value="SK">Słowacja</option>
+          <option value="DE">Niemcy</option>
+          <option value="EN">Inny</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Email do FV</label>
+        <input name="invoiceEmail" type="email" />
+      </div>
+
+      <div>
+        <label>Termin płatności</label>
+        <input name="paymentDays" type="number" value="14" />
+      </div>
+
+      <div>
+        <label>Udział WaterAI (%)</label>
+        <input name="escoShare" type="number" value="50" />
+      </div>
+
+      <div>
+        <label>Status</label>
+        <select name="status">
+          <option value="IMPLEMENTATION">Wdrożenie</option>
+          <option value="ACTIVE">Aktywny</option>
+          <option value="PAUSED">Wstrzymany</option>
+          <option value="FINISHED">Zakończony</option>
+        </select>
+      </div>
+
+      <div class="calendar-actions">
+        <button class="primary-button" type="submit">Dodaj klienta</button>
+      </div>
+    </form>
+
     <div id="clients-list"></div>
   `;
   renderClientsList();
