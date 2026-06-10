@@ -175,9 +175,10 @@ function createObject(form) {
     constructionYear: Number(form.constructionYear.value),
     usersCount: Number(form.usersCount.value),
 
-    billingCycle: form.billingCycle.value,
-    customPeriodFrom: form.customPeriodFrom.value,
-    customPeriodTo: form.customPeriodTo.value,
+   billingCycle: form.billingCycle.value,
+   billingStartDate: form.billingStartDate.value,
+   manualBillingDates: getManualBillingDates(),
+   reminderDaysBefore: Number(form.reminderDaysBefore.value),
 
     backOfficeOwner: form.backOfficeOwner.value.trim(),
     energyAnalystOwner: form.energyAnalystOwner.value.trim(),
@@ -333,18 +334,45 @@ function renderObjectsModule() {
         <h3>Rozliczenia i opiekunowie</h3>
       </div>
 
-      <div>
-        <label>Cykl rozliczeniowy</label>
-        <select name="billingCycle">
-          <option value="MONTHLY">Miesięczny</option>
-          <option value="TWO_MONTHS">Co 2 miesiące</option>
-          <option value="QUARTERLY">Kwartalny</option>
-          <option value="HALF_YEAR">Półroczny</option>
-          <option value="YEARLY">Roczny</option>
-          <option value="SEASONAL">Sezonowy</option>
-          <option value="CUSTOM_DATE_RANGE">Od daty do daty</option>
-        </select>
-      </div>
+     <div>
+  <label>Cykl rozliczeniowy</label>
+  <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
+    <option value="MONTHLY">Miesięczny</option>
+    <option value="TWO_MONTHS">Co 2 miesiące</option>
+    <option value="QUARTERLY">Kwartalny</option>
+    <option value="HALF_YEAR">Półroczny</option>
+    <option value="YEARLY">Roczny</option>
+    <option value="MANUAL_DATES">Wg wskazanych dat</option>
+  </select>
+</div>
+
+<div id="billingStartDateContainer">
+  <label>Data pierwszego rozliczenia</label>
+  <input name="billingStartDate" type="date" />
+</div>
+
+<div id="manualDatesContainer" style="display:none;">
+  <label>Daty rozliczeń</label>
+
+  <div id="manualDatesList"></div>
+
+  <button
+    type="button"
+    class="small-button"
+    onclick="addManualBillingDate()">
+    Dodaj datę
+  </button>
+</div>
+
+<div>
+  <label>Przypomnij przed terminem (dni)</label>
+  <input
+    name="reminderDaysBefore"
+    type="number"
+    min="0"
+    value="14"
+  />
+</div>
 
       <div>
         <label>Data od</label>
@@ -637,4 +665,43 @@ function renderWorkflowList() {
       </div>
     </div>
   `).join("");
+}
+function toggleBillingFields() {
+  const cycle = document.getElementById("billingCycle")?.value;
+
+  const manual = document.getElementById("manualDatesContainer");
+  const start = document.getElementById("billingStartDateContainer");
+
+  if (!manual || !start) return;
+
+  if (cycle === "MANUAL_DATES") {
+    manual.style.display = "block";
+    start.style.display = "none";
+  } else {
+    manual.style.display = "none";
+    start.style.display = "block";
+  }
+}
+
+function addManualBillingDate() {
+  const container = document.getElementById("manualDatesList");
+  if (!container) return;
+
+  const row = document.createElement("div");
+
+  row.innerHTML = `
+    <input
+      type="date"
+      class="manual-billing-date"
+      style="margin-top:8px;"
+    />
+  `;
+
+  container.appendChild(row);
+}
+
+function getManualBillingDates() {
+  return Array.from(
+    document.querySelectorAll(".manual-billing-date")
+  ).map(item => item.value).filter(Boolean);
 }
