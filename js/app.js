@@ -420,3 +420,221 @@ function renderObjectsList() {
     </div>
   `).join("");
 }
+function getWorkflowItems() {
+  return WorkflowModule.getAll();
+}
+
+function getObjectName(objectId) {
+  const object = ObjectsModule.find(Number(objectId));
+  return object ? object.name : "Nieznany obiekt";
+}
+
+function createWorkflowItem(form) {
+  WorkflowModule.add({
+    clientId: form.clientId.value,
+    objectId: form.objectId.value,
+    title: form.title.value.trim(),
+    description: form.description.value.trim(),
+    taskType: form.taskType.value,
+    responsibleRole: form.responsibleRole.value,
+    priority: form.priority.value,
+    status: form.status.value,
+    scheduleType: form.scheduleType.value,
+    firstReminderDate: form.firstReminderDate.value,
+    dueDate: form.dueDate.value,
+    documentRequired: form.documentRequired.checked
+  });
+
+  form.reset();
+  renderWorkflowModule();
+}
+
+function deleteWorkflowItem(id) {
+  if (!confirm("Czy na pewno usunąć zadanie workflow?")) return;
+  WorkflowModule.remove(id);
+  renderWorkflowModule();
+}
+
+function markWorkflowDone(id) {
+  WorkflowModule.markDone(id);
+  renderWorkflowModule();
+}
+
+function renderWorkflowModule() {
+  const container = document.getElementById("module-content");
+  if (!container) return;
+
+  const clients = getClients();
+  const objects = getObjects();
+
+  if (clients.length === 0 || objects.length === 0) {
+    container.innerHTML = `
+      <div class="reminder-card">
+        <strong>Najpierw dodaj klienta i obiekt</strong>
+        <div class="reminder-meta">
+          Workflow musi być przypisany do konkretnego obiektu.
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <form onsubmit="createWorkflowItem(this); return false;" class="calendar-form">
+      <div style="grid-column: 1 / -1;">
+        <h3>Workflow / Przypomnienie</h3>
+      </div>
+
+      <div>
+        <label>Klient</label>
+        <select name="clientId" required>
+          ${clients.map(client => `
+            <option value="${client.id}">${escapeHtml(client.name)}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div>
+        <label>Obiekt</label>
+        <select name="objectId" required>
+          ${objects.map(object => `
+            <option value="${object.id}">${escapeHtml(getClientName(object.clientId))} — ${escapeHtml(object.name)}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div>
+        <label>Tytuł zadania</label>
+        <input name="title" required placeholder="np. Poproś klienta o FV za energię" />
+      </div>
+
+      <div>
+        <label>Typ zadania</label>
+        <select name="taskType">
+          <option value="REQUEST_INVOICE">Pobierz FV od klienta</option>
+          <option value="ENTER_INVOICE">Wprowadź FV</option>
+          <option value="VERIFY_INVOICE">Zweryfikuj FV</option>
+          <option value="GENERATE_REPORT">Wygeneruj raport</option>
+          <option value="PREPARE_ESCO_INVOICE">Przygotuj FV ESCO</option>
+          <option value="SEND_REPORT">Wyślij raport</option>
+          <option value="INSTALLATION">Montaż</option>
+          <option value="SERVICE">Serwis</option>
+          <option value="DATA_CHECK">Kontrola danych</option>
+          <option value="OTHER">Inne</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Rola odpowiedzialna</label>
+        <select name="responsibleRole">
+          <option value="BACK_OFFICE">Back Office</option>
+          <option value="ENERGY_ANALYST">Energy Analyst</option>
+          <option value="CLIENT">Client</option>
+          <option value="SUPER_ADMIN">Super Admin</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Priorytet</label>
+        <select name="priority">
+          <option value="LOW">Niski</option>
+          <option value="NORMAL" selected>Normalny</option>
+          <option value="HIGH">Wysoki</option>
+          <option value="CRITICAL">Krytyczny</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Status</label>
+        <select name="status">
+          <option value="NEW">Nowe</option>
+          <option value="IN_PROGRESS">W trakcie</option>
+          <option value="WAITING">Oczekuje</option>
+          <option value="DONE">Wykonane</option>
+          <option value="CANCELLED">Anulowane</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Harmonogram</label>
+        <select name="scheduleType">
+          <option value="ONE_TIME">Jednorazowo</option>
+          <option value="MONTHLY">Miesięcznie</option>
+          <option value="TWO_MONTHS">Co 2 miesiące</option>
+          <option value="QUARTERLY">Kwartalnie</option>
+          <option value="HALF_YEAR">Półrocznie</option>
+          <option value="YEARLY">Rocznie</option>
+          <option value="SEASONAL">Sezonowo</option>
+          <option value="CUSTOM_DATE_RANGE">Od daty do daty</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Data pierwszego przypomnienia</label>
+        <input name="firstReminderDate" type="date" />
+      </div>
+
+      <div>
+        <label>Termin wykonania</label>
+        <input name="dueDate" type="date" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Opis</label>
+        <input name="description" placeholder="Dodatkowe informacje do zadania" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>
+          <input name="documentRequired" type="checkbox" style="width:auto;" />
+          Wymagany dokument
+        </label>
+      </div>
+
+      <div class="calendar-actions">
+        <button class="primary-button" type="submit">Dodaj zadanie workflow</button>
+      </div>
+    </form>
+
+    <div id="workflow-list"></div>
+  `;
+
+  renderWorkflowList();
+}
+
+function renderWorkflowList() {
+  const container = document.getElementById("workflow-list");
+  if (!container) return;
+
+  const items = getWorkflowItems();
+
+  if (items.length === 0) {
+    container.innerHTML = `<p>Brak zadań workflow. Dodaj pierwsze przypomnienie.</p>`;
+    return;
+  }
+
+  container.innerHTML = items.map(item => `
+    <div class="reminder-card">
+      <strong>${escapeHtml(item.title)}</strong>
+
+      <div class="reminder-meta">
+        Klient: ${escapeHtml(getClientName(item.clientId))}<br />
+        Obiekt: ${escapeHtml(getObjectName(item.objectId))}<br />
+        Typ: ${escapeHtml(item.taskType)}<br />
+        Rola: ${escapeHtml(item.responsibleRole)}<br />
+        Priorytet: ${escapeHtml(item.priority)}<br />
+        Status: ${escapeHtml(item.status)}<br />
+        Harmonogram: ${escapeHtml(item.scheduleType)}<br />
+        Pierwsze przypomnienie: ${escapeHtml(item.firstReminderDate)}<br />
+        Termin: ${escapeHtml(item.dueDate)}<br />
+        Dokument wymagany: ${item.documentRequired ? "TAK" : "NIE"}<br />
+        EspoCRM sync: ${escapeHtml(item.syncStatus)}
+      </div>
+
+      <div style="margin-top: 12px;">
+        <button class="small-button" onclick="markWorkflowDone(${item.id})">Oznacz jako wykonane</button>
+        <button class="small-button" onclick="deleteWorkflowItem(${item.id})">Usuń</button>
+      </div>
+    </div>
+  `).join("");
+}
