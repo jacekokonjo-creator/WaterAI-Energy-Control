@@ -20,7 +20,6 @@ const ClientsModule = {
       createdAt: new Date().toISOString(),
 
       name: client.name || "",
-      clientType: client.clientType || "HOTEL",
       vatId: client.vatId || "",
       country: client.country || "PL",
       language: client.language || "pl",
@@ -38,9 +37,7 @@ const ClientsModule = {
       escoShare: Number(client.escoShare || 50),
 
       contacts: client.contacts || [],
-
-      status: client.status || "IMPLEMENTATION"
-    });
+        });
 
     this.saveAll(clients);
   },
