@@ -115,7 +115,6 @@ function renderClientsList() {
       <strong>${escapeHtml(client.name)}</strong>
 
       <div class="reminder-meta">
-        Typ klienta: ${escapeHtml(client.clientType)}<br />
         VAT ID: ${escapeHtml(client.vatId)}<br />
         Kraj: ${escapeHtml(client.country)}<br />
         Język: ${escapeHtml(client.language)}<br />
@@ -131,7 +130,6 @@ function renderClientsList() {
         Termin płatności: ${escapeHtml(client.paymentDays)} dni<br />
         Model rozliczeń: ${escapeHtml(client.settlementModel)}<br />
         Udział WaterAI: ${escapeHtml(client.escoShare)}%<br />
-        Status: ${escapeHtml(client.status)}
       </div>
 
       <div class="reminder-meta" style="margin-top: 12px;">
