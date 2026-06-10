@@ -58,6 +58,22 @@ function createClient(form) {
   form.reset();
   renderClientsList();
 }
+let editingClientId = null;
+
+function editClient(id) {
+  const client = ClientsModule.find(id);
+
+  if (!client) return;
+
+  editingClientId = id;
+
+  alert(
+    "Edycja klienta będzie kolejnym krokiem. Dane klienta zostały wybrane."
+  );
+
+  console.log(client);
+}
+
 
 function deleteClient(id) {
   if (!confirm("Czy na pewno usunąć klienta?")) return;
@@ -145,7 +161,17 @@ function renderClientsList() {
       </div>
 
       <div style="margin-top: 12px;">
-        <button class="small-button" onclick="deleteClient(${client.id})">Usuń</button>
+       <button
+  class="small-button"
+  onclick="editClient(${client.id})">
+  Edytuj
+</button>
+
+<button
+  class="small-button"
+  onclick="deleteClient(${client.id})">
+  Usuń
+</button>
       </div>
     </div>
   `).join("");
