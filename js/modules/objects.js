@@ -1,5 +1,5 @@
 // WaterAI Energy Control
-// Objects Module v1.0.0
+// Objects Module v1.0.1
 
 const ObjectsModule = {
   storageKey: "waterai_objects_v1",
@@ -38,8 +38,9 @@ const ObjectsModule = {
       usersCount: Number(object.usersCount || 0),
 
       billingCycle: object.billingCycle || "MONTHLY",
-      customPeriodFrom: object.customPeriodFrom || "",
-      customPeriodTo: object.customPeriodTo || "",
+      billingStartDate: object.billingStartDate || "",
+      manualBillingDates: object.manualBillingDates || [],
+      reminderDaysBefore: Number(object.reminderDaysBefore || 14),
 
       backOfficeOwner: object.backOfficeOwner || "",
       energyAnalystOwner: object.energyAnalystOwner || "",
