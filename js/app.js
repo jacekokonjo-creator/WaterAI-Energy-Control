@@ -39,8 +39,7 @@ function createClient(form) {
 
   ClientsModule.add({
     name: form.name.value.trim(),
-    clientType: form.clientType.value,
-    vatId: form.vatId.value.trim(),
+     vatId: form.vatId.value.trim(),
     country: form.country.value,
     language: form.language.value,
     postalCode: form.postalCode.value.trim(),
@@ -54,7 +53,6 @@ function createClient(form) {
     settlementModel: form.settlementModel.value,
     escoShare: Number(form.escoShare.value),
     contacts,
-    status: form.status.value
   });
 
   form.reset();
