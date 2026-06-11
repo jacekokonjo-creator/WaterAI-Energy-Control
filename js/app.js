@@ -560,29 +560,28 @@ function renderWorkflowModule() {
         <h3>Workflow / Przypomnienie</h3>
       </div>
 
-      <div>
-        <label>Klient</label>
-        <select name="clientId" required>
-          ${clients.map(client => `
-            <option value="${client.id}">${escapeHtml(client.name)}</option>
-          `).join("")}
-        </select>
-      </div>
+   <div>
+  <label>Klient</label>
+  <select name="clientId" required onchange="updateWorkflowObjectOptions(this.value)">
+    ${clients.map(client => `
+      <option value="${client.id}">${escapeHtml(client.name)}</option>
+    `).join("")}
+  </select>
+</div>
 
-      <div>
-        <label>Obiekt</label>
-        <select name="objectId" required>
-          ${objects.map(object => `
-            <option value="${object.id}">${escapeHtml(getClientName(object.clientId))} — ${escapeHtml(object.name)}</option>
-          `).join("")}
-        </select>
-      </div>
+<div>
+  <label>Obiekt</label>
+  <select name="objectId" id="workflow-object-select" required>
+    ${ObjectsModule.findByClient(clients[0].id).map(object => `
+      <option value="${object.id}">${escapeHtml(object.name)}</option>
+    `).join("")}
+  </select>
+</div>
 
-      <div>
-        <label>Tytuł zadania</label>
-        <input name="title" required placeholder="np. Poproś klienta o FV za energię" />
-      </div>
-
+<div>
+  <label>Tytuł zadania</label>
+  <input name="title" required placeholder="np. Poproś klienta o FV za energię" />
+</div>
       <div>
         <label>Typ zadania</label>
         <select name="taskType">
@@ -751,4 +750,20 @@ function getManualBillingDates() {
   return Array.from(
     document.querySelectorAll(".manual-billing-date")
   ).map(item => item.value).filter(Boolean);
+}
+
+function updateWorkflowObjectOptions(clientId) {
+  const select = document.getElementById("workflow-object-select");
+  if (!select) return;
+
+  const objects = ObjectsModule.findByClient(Number(clientId));
+
+  if (objects.length === 0) {
+    select.innerHTML = `<option value="">Brak obiektów dla tego klienta</option>`;
+    return;
+  }
+
+  select.innerHTML = objects.map(object => `
+    <option value="${object.id}">${escapeHtml(object.name)}</option>
+  `).join("");
 }
