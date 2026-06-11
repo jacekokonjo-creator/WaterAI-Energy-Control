@@ -1,5 +1,5 @@
 // WaterAI Energy Control
-// Objects Module v1.0.1
+// Objects Module v1.1.0
 
 const ObjectsModule = {
   storageKey: "waterai_objects_v1",
@@ -32,10 +32,9 @@ const ObjectsModule = {
       apartmentNumber: object.apartmentNumber || "",
       googleMapsUrl: object.googleMapsUrl || "",
 
-      heatedArea: Number(object.heatedArea || 0),
-      volume: Number(object.volume || 0),
-      constructionYear: Number(object.constructionYear || 0),
-      usersCount: Number(object.usersCount || 0),
+      heatSource: object.heatSource || "NONE",
+      heatConsumptionReading: object.heatConsumptionReading || "INVOICE",
+      heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || "",
 
       billingCycle: object.billingCycle || "MONTHLY",
       billingStartDate: object.billingStartDate || "",
