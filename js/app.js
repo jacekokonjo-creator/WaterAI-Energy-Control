@@ -192,10 +192,10 @@ function createObject(form) {
     apartmentNumber: form.apartmentNumber.value.trim(),
     googleMapsUrl: form.googleMapsUrl.value.trim(),
 
-    heatedArea: Number(form.heatedArea.value),
-    volume: Number(form.volume.value),
-    constructionYear: Number(form.constructionYear.value),
-    usersCount: Number(form.usersCount.value),
+   heatSource: form.heatSource.value,
+   heatConsumptionReading: form.heatConsumptionReading.value,
+   heatConsumptionReadingDetails:
+   form.heatConsumptionReadingDetails.value.trim(),
 
    billingCycle: form.billingCycle.value,
    billingStartDate: form.billingStartDate.value,
