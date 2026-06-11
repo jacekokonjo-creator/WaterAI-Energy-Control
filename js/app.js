@@ -472,10 +472,10 @@ function renderObjectsList() {
             ? `<a href="${escapeHtml(object.googleMapsUrl)}" target="_blank">Otwórz lokalizację</a>`
             : "brak"
         }<br />
-        Powierzchnia ogrzewana: ${escapeHtml(object.heatedArea)} m²<br />
-        Kubatura: ${escapeHtml(object.volume)} m³<br />
-        Rok budowy: ${escapeHtml(object.constructionYear)}<br />
-        Liczba użytkowników: ${escapeHtml(object.usersCount)}<br />
+        Źródło ciepła: ${escapeHtml(object.heatSource)}<br />
+        Odczyt zużycia: ${escapeHtml(object.heatConsumptionReading)}<br />
+        Szczegóły odczytu:
+        ${escapeHtml(object.heatConsumptionReadingDetails)}<br />
         Cykl rozliczeniowy: ${escapeHtml(object.billingCycle)}<br />
         Okres własny: ${escapeHtml(object.customPeriodFrom)} - ${escapeHtml(object.customPeriodTo)}<br />
         Back Office: ${escapeHtml(object.backOfficeOwner)}<br />
