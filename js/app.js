@@ -485,7 +485,6 @@ function renderObjectsList() {
         Szczegóły odczytu:
         ${escapeHtml(object.heatConsumptionReadingDetails)}<br />
         Cykl rozliczeniowy: ${escapeHtml(object.billingCycle)}<br />
-        Okres własny: ${escapeHtml(object.customPeriodFrom)} - ${escapeHtml(object.customPeriodTo)}<br />
         Back Office: ${escapeHtml(object.backOfficeOwner)}<br />
         Energy Analyst: ${escapeHtml(object.energyAnalystOwner)}
       </div>
