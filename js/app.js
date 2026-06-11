@@ -192,25 +192,46 @@ function createObject(form) {
     apartmentNumber: form.apartmentNumber.value.trim(),
     googleMapsUrl: form.googleMapsUrl.value.trim(),
 
-   heatingSourceCO: form.heatingSourceCO.value,
-   heatingSourceCWU: form.heatingSourceCWU.value,
-   heatConsumptionReading: form.heatConsumptionReading.value,
-   heatConsumptionReadingDetails:
-   form.heatConsumptionReadingDetails.value.trim(),
+    heatingSourceCO: form.heatingSourceCO
+      ? form.heatingSourceCO.value
+      : "NONE",
 
-   billingCycle: form.billingCycle.value,
-   billingStartDate: form.billingStartDate.value,
-   manualBillingDates: getManualBillingDates(),
-   reminderDaysBefore: Number(form.reminderDaysBefore.value),
+    heatingSourceCWU: form.heatingSourceCWU
+      ? form.heatingSourceCWU.value
+      : "NONE",
+
+    heatConsumptionReading: form.heatConsumptionReading
+      ? form.heatConsumptionReading.value
+      : "INVOICE",
+
+    heatConsumptionReadingDetails: form.heatConsumptionReadingDetails
+      ? form.heatConsumptionReadingDetails.value.trim()
+      : "",
+
+    billingCycle: form.billingCycle.value,
+
+    billingStartDate: form.billingStartDate
+      ? form.billingStartDate.value
+      : "",
+
+    manualBillingDates:
+      typeof getManualBillingDates === "function"
+        ? getManualBillingDates()
+        : [],
+
+    reminderDaysBefore: form.reminderDaysBefore
+      ? Number(form.reminderDaysBefore.value)
+      : 14,
 
     backOfficeOwner: form.backOfficeOwner.value.trim(),
-    energyAnalystOwner: form.energyAnalystOwner.value.trim(),
-
-    heatSources: []
+    energyAnalystOwner: form.energyAnalystOwner.value.trim()
   });
 
   form.reset();
-  renderObjectsModule();
+
+  if (typeof renderObjectsModule === "function") {
+    renderObjectsModule();
+  }
 }
 
 function deleteObject(id) {
