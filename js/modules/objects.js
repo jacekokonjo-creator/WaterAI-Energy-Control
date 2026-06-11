@@ -32,7 +32,8 @@ const ObjectsModule = {
       apartmentNumber: object.apartmentNumber || "",
       googleMapsUrl: object.googleMapsUrl || "",
 
-      heatSource: object.heatSource || "NONE",
+      heatingSourceCO: object.heatingSourceCO || "NONE",
+      heatingSourceCWU: object.heatingSourceCWU || "NONE",
       heatConsumptionReading: object.heatConsumptionReading || "INVOICE",
       heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || "",
 
