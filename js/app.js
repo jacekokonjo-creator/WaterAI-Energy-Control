@@ -430,17 +430,7 @@ function renderObjectsModule() {
     value="14"
   />
 </div>
-
-      <div>
-        <label>Data od</label>
-        <input name="customPeriodFrom" type="date" />
-      </div>
-
-      <div>
-        <label>Data do</label>
-        <input name="customPeriodTo" type="date" />
-      </div>
-
+   
       <div>
         <label>Opiekun Back Office</label>
         <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
