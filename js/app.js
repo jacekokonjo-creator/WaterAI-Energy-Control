@@ -332,30 +332,48 @@ function renderObjectsModule() {
         <h3>Parametry budynku</h3>
       </div>
 
-      <div>
-        <label>Powierzchnia ogrzewana [m²]</label>
-        <input name="heatedArea" type="number" min="0" step="0.01" />
-      </div>
+<div style="grid-column: 1 / -1;">
+  <h3>System grzewczy</h3>
+</div>
 
-      <div>
-        <label>Kubatura [m³]</label>
-        <input name="volume" type="number" min="0" step="0.01" />
-      </div>
+<div>
+  <label>Źródło ciepła</label>
 
-      <div>
-        <label>Rok budowy</label>
-        <input name="constructionYear" type="number" min="1800" max="2100" />
-      </div>
+  <select name="heatSource">
+    <option value="NONE">Brak</option>
+    <option value="HEAT_PUMP">Pompa ciepła</option>
+    <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+    <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+    <option value="OIL_BOILER">Kocioł olejowy</option>
+    <option value="GAS_BOILER">Kocioł gazowy</option>
+    <option value="BIOMASS">Inna biomasa</option>
+    <option value="PELLET_BOILER">Kocioł na pellet</option>
+    <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+    <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+    <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+  </select>
+</div>
 
-      <div>
-        <label>Liczba użytkowników</label>
-        <input name="usersCount" type="number" min="0" />
-      </div>
+<div>
+  <label>Odczyt zużycia ciepła</label>
 
-      <div style="grid-column: 1 / -1;">
-        <h3>Rozliczenia i opiekunowie</h3>
-      </div>
+  <select name="heatConsumptionReading">
+    <option value="ONLINE">On-line</option>
+    <option value="CLIENT">Podawany przez Klienta</option>
+    <option value="WATERAI">Wykonywany przez WAI</option>
+    <option value="INVOICE">Z FV</option>
+  </select>
+</div>
 
+<div style="grid-column: 1 / -1;">
+  <label>Szczegóły odczytu</label>
+
+  <input
+    name="heatConsumptionReadingDetails"
+    placeholder="np. SUPLA, Modbus TCP, licznik Kamstrup, aplikacja dostawcy ciepła..."
+    />
+    </div>
+  
      <div>
   <label>Cykl rozliczeniowy</label>
   <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
