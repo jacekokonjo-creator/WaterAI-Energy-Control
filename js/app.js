@@ -192,7 +192,8 @@ function createObject(form) {
     apartmentNumber: form.apartmentNumber.value.trim(),
     googleMapsUrl: form.googleMapsUrl.value.trim(),
 
-   heatSource: form.heatSource.value,
+   heatingSourceCO: form.heatingSourceCO.value,
+   heatingSourceCWU: form.heatingSourceCWU.value,
    heatConsumptionReading: form.heatConsumptionReading.value,
    heatConsumptionReadingDetails:
    form.heatConsumptionReadingDetails.value.trim(),
@@ -355,6 +356,22 @@ function renderObjectsModule() {
 </div>
 
 <div>
+  <label>Źródło ciepła C.W.U.</label>
+  <select name="heatingSourceCWU">
+    <option value="NONE">Brak</option>
+    <option value="HEAT_PUMP">Pompa ciepła</option>
+    <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+    <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+    <option value="OIL_BOILER">Kocioł olejowy</option>
+    <option value="GAS_BOILER">Kocioł gazowy</option>
+    <option value="BIOMASS">Inna biomasa</option>
+    <option value="PELLET_BOILER">Kocioł na pellet</option>
+    <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+    <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+    <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+  </select>
+</div>
+<div>
   <label>Odczyt zużycia ciepła</label>
 
   <select name="heatConsumptionReading">
@@ -472,7 +489,8 @@ function renderObjectsList() {
             ? `<a href="${escapeHtml(object.googleMapsUrl)}" target="_blank">Otwórz lokalizację</a>`
             : "brak"
         }<br />
-        Źródło ciepła: ${escapeHtml(object.heatSource)}<br />
+        Źródło ciepła C.O.: ${escapeHtml(object.heatingSourceCO)}<br />
+        Źródło ciepła C.W.U.: ${escapeHtml(object.heatingSourceCWU)}<br />
         Odczyt zużycia: ${escapeHtml(object.heatConsumptionReading)}<br />
         Szczegóły odczytu:
         ${escapeHtml(object.heatConsumptionReadingDetails)}<br />
