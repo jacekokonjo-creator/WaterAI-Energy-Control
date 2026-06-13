@@ -253,6 +253,7 @@ function renderClientsList() {
 }
 
 function createObject(form) {
+  console.log("editingObjectId =", editingObjectId);
   const objectData = {
     clientId: form.clientId.value,
     name: form.name.value.trim(),
@@ -294,7 +295,7 @@ function createObject(form) {
         ? getManualBillingDates()
         : [],
 
-    reminderDaysBefore: form.reminderDaysBefore
+   reminderDaysBefore: form.reminderDaysBefore
       ? Number(form.reminderDaysBefore.value)
       : 14,
 
@@ -302,10 +303,14 @@ function createObject(form) {
     energyAnalystOwner: form.energyAnalystOwner.value.trim()
   };
 
+  console.log("TRYB EDYCJI?", !!editingObjectId);
+
   if (editingObjectId) {
+    console.log("UPDATE", editingObjectId);
     ObjectsModule.update(editingObjectId, objectData);
     editingObjectId = null;
   } else {
+    console.log("ADD");
     ObjectsModule.add(objectData);
   }
 
