@@ -72,6 +72,7 @@ function createClient(form) {
   renderClientsList();
 }
 let editingClientId = null;
+let editingObjectId = null;
 
 function editClient(id) {
   const client = ClientsModule.find(id);
@@ -585,7 +586,8 @@ function renderObjectsList() {
       </div>
 
       <div style="margin-top: 12px;">
-        <button class="small-button" onclick="deleteObject(${object.id})">Usuń</button>
+       <button class="small-button" onclick="editObject(${object.id})">Edytuj</button>
+       <button class="small-button" onclick="deleteObject(${object.id})">Usuń</button>
       </div>
     </div>
   `).join("");
