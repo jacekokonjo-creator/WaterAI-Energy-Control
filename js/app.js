@@ -310,13 +310,11 @@ function createObject(form) {
 }
 function editObject(id) {
   const object = ObjectsModule.find(id);
-
   if (!object) return;
 
   editingObjectId = id;
 
   const form = document.querySelector("#module-content form");
-
   if (!form) return;
 
   form.clientId.value = object.clientId || "";
@@ -332,49 +330,16 @@ function editObject(id) {
   form.apartmentNumber.value = object.apartmentNumber || "";
   form.googleMapsUrl.value = object.googleMapsUrl || "";
 
-  if (form.heatingSourceCO) {
-    form.heatingSourceCO.value = object.heatingSourceCO || "NONE";
-  }
-
-  if (form.heatingSourceCWU) {
-    form.heatingSourceCWU.value = object.heatingSourceCWU || "NONE";
-  }
-
-  if (form.heatConsumptionReading) {
-    form.heatConsumptionReading.value =
-      object.heatConsumptionReading || "INVOICE";
-  }
-
-  if (form.heatConsumptionReadingDetails) {
-    form.heatConsumptionReadingDetails.value =
-      object.heatConsumptionReadingDetails || "";
-  }
+  form.heatingSourceCO.value = object.heatingSourceCO || "NONE";
+  form.heatingSourceCWU.value = object.heatingSourceCWU || "NONE";
+  form.heatConsumptionReading.value = object.heatConsumptionReading || "INVOICE";
+  form.heatConsumptionReadingDetails.value = object.heatConsumptionReadingDetails || "";
 
   form.billingCycle.value = object.billingCycle || "MONTHLY";
-
   toggleBillingFields();
 
   if (form.billingStartDate) {
     form.billingStartDate.value = object.billingStartDate || "";
-  }
-
-  const manualDatesList = document.getElementById("manualDatesList");
-
-  if (manualDatesList) {
-    manualDatesList.innerHTML = "";
-
-    if (object.manualBillingDates && object.manualBillingDates.length) {
-      object.manualBillingDates.forEach(date => {
-        addManualBillingDate();
-
-        const inputs = document.querySelectorAll(".manual-billing-date");
-        const input = inputs[inputs.length - 1];
-
-        if (input) {
-          input.value = date;
-        }
-      });
-    }
   }
 
   if (form.reminderDaysBefore) {
@@ -385,113 +350,18 @@ function editObject(id) {
   form.energyAnalystOwner.value = object.energyAnalystOwner || "";
 
   const submitButton = form.querySelector("button[type='submit']");
-
   if (submitButton) {
     submitButton.textContent = "Zapisz zmiany";
   }
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function editObject(id) {
-  const object = ObjectsModule.find(id);
-
-  if (!object) return;
-
-  editingObjectId = id;
-
-  const form = document.querySelector("#module-content form");
-
-  if (!form) return;
-
-  form.clientId.value = object.clientId || "";
-  form.name.value = object.name || "";
-  form.objectType.value = object.objectType || "HOTEL";
-  form.status.value = object.status || "IMPLEMENTATION";
-
-  form.country.value = object.country || "PL";
-  form.postalCode.value = object.postalCode || "";
-  form.city.value = object.city || "";
-  form.street.value = object.street || "";
-  form.buildingNumber.value = object.buildingNumber || "";
-  form.apartmentNumber.value = object.apartmentNumber || "";
-  form.googleMapsUrl.value = object.googleMapsUrl || "";
-
-  if (form.heatingSourceCO) {
-    form.heatingSourceCO.value = object.heatingSourceCO || "NONE";
-  }
-
-  if (form.heatingSourceCWU) {
-    form.heatingSourceCWU.value = object.heatingSourceCWU || "NONE";
-  }
-
-  if (form.heatConsumptionReading) {
-    form.heatConsumptionReading.value =
-      object.heatConsumptionReading || "INVOICE";
-  }
-
-  if (form.heatConsumptionReadingDetails) {
-    form.heatConsumptionReadingDetails.value =
-      object.heatConsumptionReadingDetails || "";
-  }
-
-  form.billingCycle.value = object.billingCycle || "MONTHLY";
-
-  toggleBillingFields();
-
-  if (form.billingStartDate) {
-    form.billingStartDate.value = object.billingStartDate || "";
-  }
-
-  const manualDatesList = document.getElementById("manualDatesList");
-
-  if (manualDatesList) {
-    manualDatesList.innerHTML = "";
-
-    if (object.manualBillingDates && object.manualBillingDates.length) {
-      object.manualBillingDates.forEach(date => {
-        addManualBillingDate();
-
-        const inputs = document.querySelectorAll(".manual-billing-date");
-        const input = inputs[inputs.length - 1];
-
-        if (input) {
-          input.value = date;
-        }
-      });
-    }
-  }
-
-  if (form.reminderDaysBefore) {
-    form.reminderDaysBefore.value = object.reminderDaysBefore || 14;
-  }
-
-  form.backOfficeOwner.value = object.backOfficeOwner || "";
-  form.energyAnalystOwner.value = object.energyAnalystOwner || "";
-
-  const submitButton = form.querySelector("button[type='submit']");
-
-  if (submitButton) {
-    submitButton.textContent = "Zapisz zmiany";
-  }
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
-
-function deleteObject(id) {
-  
 function deleteObject(id) {
   if (!confirm("Czy na pewno usunąć obiekt?")) return;
   ObjectsModule.remove(id);
   renderObjectsModule();
 }
-
 function renderObjectsModule() {
   const container = document.getElementById("module-content");
   if (!container) return;
