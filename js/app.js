@@ -361,7 +361,7 @@ function renderObjectsModule() {
 <div>
   <label>Źródło ciepła</label>
 
-  <select name="heatSource">
+ <select name="heatingSourceCO">
     <option value="NONE">Brak</option>
     <option value="HEAT_PUMP">Pompa ciepła</option>
     <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
