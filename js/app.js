@@ -253,7 +253,7 @@ function renderClientsList() {
 }
 
 function createObject(form) {
-  ObjectsModule.add({
+  const objectData = {
     clientId: form.clientId.value,
     name: form.name.value.trim(),
     objectType: form.objectType.value,
@@ -300,14 +300,27 @@ function createObject(form) {
 
     backOfficeOwner: form.backOfficeOwner.value.trim(),
     energyAnalystOwner: form.energyAnalystOwner.value.trim()
-  });
+  };
+
+  if (editingObjectId) {
+    ObjectsModule.update(editingObjectId, objectData);
+    editingObjectId = null;
+  } else {
+    ObjectsModule.add(objectData);
+  }
 
   form.reset();
+
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.textContent = "Dodaj obiekt";
+  }
 
   if (typeof renderObjectsModule === "function") {
     renderObjectsModule();
   }
 }
+
 function editObject(id) {
   const object = ObjectsModule.find(id);
   if (!object) return;
