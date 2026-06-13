@@ -37,9 +37,9 @@ function createClient(form) {
     }
   });
 
-  ClientsModule.add({
+  const clientData = {
     name: form.name.value.trim(),
-     vatId: form.vatId.value.trim(),
+    vatId: form.vatId.value.trim(),
     country: form.country.value,
     language: form.language.value,
     postalCode: form.postalCode.value.trim(),
@@ -52,10 +52,23 @@ function createClient(form) {
     paymentDays: Number(form.paymentDays.value),
     settlementModel: form.settlementModel.value,
     escoShare: Number(form.escoShare.value),
-    contacts,
-  });
+    contacts
+  };
+
+  if (editingClientId) {
+    ClientsModule.update(editingClientId, clientData);
+    editingClientId = null;
+  } else {
+    ClientsModule.add(clientData);
+  }
 
   form.reset();
+
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.textContent = "Dodaj klienta";
+  }
+
   renderClientsList();
 }
 let editingClientId = null;
