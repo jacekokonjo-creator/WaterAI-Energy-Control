@@ -80,11 +80,72 @@ function editClient(id) {
 
   editingClientId = id;
 
-  alert(
-    "Edycja klienta będzie kolejnym krokiem. Dane klienta zostały wybrane."
+  const form = document.querySelector(
+    "#module-content form"
   );
 
-  console.log(client);
+  if (!form) return;
+
+  form.name.value = client.name || "";
+  form.vatId.value = client.vatId || "";
+  form.country.value = client.country || "PL";
+  form.language.value = client.language || "pl";
+
+  form.postalCode.value = client.postalCode || "";
+  form.city.value = client.city || "";
+  form.street.value = client.street || "";
+  form.buildingNumber.value = client.buildingNumber || "";
+  form.apartmentNumber.value = client.apartmentNumber || "";
+  form.googleMapsUrl.value = client.googleMapsUrl || "";
+
+  form.invoiceEmail.value = client.invoiceEmail || "";
+  form.paymentDays.value = client.paymentDays || 14;
+  form.settlementModel.value = client.settlementModel || "ESCO";
+  form.escoShare.value = client.escoShare || 50;
+
+  const contactsContainer =
+    document.getElementById("contacts-container");
+
+  if (contactsContainer) {
+    contactsContainer.innerHTML = "";
+  }
+
+  if (client.contacts && client.contacts.length) {
+    client.contacts.forEach(contact => {
+      addContactRow();
+
+      const rows =
+        document.querySelectorAll(".contact-row");
+
+      const row = rows[rows.length - 1];
+
+      row.querySelector("[name='contactName']").value =
+        contact.name || "";
+
+      row.querySelector("[name='contactRole']").value =
+        contact.role || "";
+
+      row.querySelector("[name='contactEmail']").value =
+        contact.email || "";
+
+      row.querySelector("[name='contactPhone']").value =
+        contact.phone || "";
+    });
+  } else {
+    addContactRow();
+  }
+
+  const submitButton =
+    form.querySelector("button[type='submit']");
+
+  if (submitButton) {
+    submitButton.textContent = "Zapisz zmiany";
+  }
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
 
