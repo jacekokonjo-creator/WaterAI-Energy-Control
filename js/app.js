@@ -1099,10 +1099,10 @@ function calcHDD(months, tempField, daysField, baseTemp) {
 function calcESCOResults(protocol) {
   const base = Number(protocol.baseTemperature || 21);
   const tymMonthly = protocol.tymMonthly || [];
-  const realMonthly = protocol.realMonthly || [];
+  const realMonthly = protocol.comparisonMonthly || protocol.realMonthly || [];
 
   const hddTym = calcHDD(tymMonthly, "tymTemperature", "tymDays", base);
-  const hddReal = calcHDD(realMonthly, "realTemperature", "realDays", base);
+  const hddReal = calcHDD(realMonthly, "temperature", "days", base);
 
   const billingConsumption = Number(protocol.billingConsumption || 0);
   const comparisonConsumption = Number(protocol.comparisonConsumption || 0);
@@ -1144,14 +1144,15 @@ function createMeasurement(form) {
   const comparisonEnd = Number(form.comparisonPeriodEndReading.value || 0);
 
   const tymMonthly = buildTymMonthlyFromForm(form);
-  const realMonthly = buildRealMonthlyFromForm(form);
+  const realMonthly = buildPeriodMonthlyFromForm("billing");
+  const comparisonMonthly = buildPeriodMonthlyFromForm("comparison");
 
   const protocolData = {
     clientId: object.clientId,
     objectId: form.objectId.value,
 
     protocolDate: form.protocolDate.value,
-    preparedBy: form.preparedBy.value.trim(),
+    preparedBy: form.preparedBy ? form.preparedBy.value.trim() : "",
 
     weatherStation: form.weatherStation.value.trim(),
     weatherSource: form.weatherSource.value.trim(),
@@ -1176,8 +1177,13 @@ function createMeasurement(form) {
     comparisonPeriodEndReading: comparisonEnd,
     comparisonConsumption: comparisonEnd - comparisonStart,
 
+    tymPeriodStart: form.tymPeriodStart ? form.tymPeriodStart.value.trim() : "",
+    tymPeriodEnd: form.tymPeriodEnd ? form.tymPeriodEnd.value.trim() : "",
+    tymDataSource: form.tymDataSource ? form.tymDataSource.value.trim() : "",
+
     tymMonthly,
     realMonthly,
+    comparisonMonthly,
 
     includeLinearRegression: form.includeLinearRegression
       ? form.includeLinearRegression.checked
@@ -1285,6 +1291,180 @@ function cancelMeasurementEdit() {
   renderMeasurementsModule();
 }
 
+// ─── helpers dla dynamicznych tabelek miesięcznych ───────────────────────────
+
+function buildMonthsFromDates(startDate, endDate) {
+  if (!startDate || !endDate) return [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (isNaN(start) || isNaN(end) || end < start) return [];
+
+  const months = [];
+  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+
+  while (cur <= end) {
+    const year = cur.getFullYear();
+    const month = cur.getMonth(); // 0-based
+    const firstOfMonth = new Date(year, month, 1);
+    const lastOfMonth = new Date(year, month + 1, 0);
+
+    const dayFrom = (firstOfMonth < start) ? start.getDate() : 1;
+    const dayTo   = (lastOfMonth > end)    ? end.getDate()   : lastOfMonth.getDate();
+    const days    = dayTo - dayFrom + 1;
+
+    months.push({
+      year,
+      month: month + 1, // 1-based
+      monthName: MONTHS_PL[month] + " " + year,
+      days
+    });
+
+    cur = new Date(year, month + 1, 1);
+  }
+
+  return months;
+}
+
+function refreshPeriodTable(prefix) {
+  const startDateEl = document.querySelector(`[name="${prefix}PeriodStartDate"]`);
+  const endDateEl   = document.querySelector(`[name="${prefix}PeriodEndDate"]`);
+  const tbody       = document.getElementById(`${prefix}-months-tbody`);
+  const hddEl       = document.getElementById(`${prefix}-hdd-display`);
+  const consEl      = document.getElementById(`${prefix}-consumption-display`);
+  if (!tbody) return;
+
+  const startDate = startDateEl ? startDateEl.value : "";
+  const endDate   = endDateEl   ? endDateEl.value   : "";
+  const months    = buildMonthsFromDates(startDate, endDate);
+
+  const baseTempEl = document.querySelector("[name='baseTemperature']");
+  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+
+  if (months.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--color-text-tertiary);padding:14px;font-size:13px;">Wybierz daty aby zobaczyć miesiące</td></tr>`;
+    if (hddEl) hddEl.textContent = "—";
+    return;
+  }
+
+  // zachowaj istniejące wartości temp jeśli wiersze już są
+  const existingTemps = {};
+  tbody.querySelectorAll("tr[data-key]").forEach(tr => {
+    const key   = tr.dataset.key;
+    const tInput = tr.querySelector("input.month-temp");
+    const dInput = tr.querySelector("input.month-days");
+    if (tInput) existingTemps[key] = { temp: tInput.value, days: dInput ? dInput.value : "" };
+  });
+
+  tbody.innerHTML = months.map(m => {
+    const key  = `${m.year}-${m.month}`;
+    const prev = existingTemps[key] || {};
+    const tempVal = prev.temp !== undefined ? prev.temp : "";
+    const daysVal = prev.days !== undefined ? prev.days : m.days;
+    const hddAuto = tempVal !== "" ? Math.max(0, baseTemp - Number(tempVal)) * Number(daysVal) : null;
+
+    return `<tr data-key="${key}">
+      <td style="padding:5px 8px;font-size:13px;color:var(--color-text-secondary);">${m.monthName}</td>
+      <td style="padding:3px 6px;"><input class="month-temp" type="number" step="0.01" placeholder="°C"
+        name="${prefix}Temp_${m.year}_${m.month}" value="${tempVal}"
+        style="width:90px;font-size:13px;padding:3px 6px;"
+        oninput="refreshPeriodHDD('${prefix}')" /></td>
+      <td style="padding:3px 6px;"><input class="month-days" type="number" min="1" max="31"
+        name="${prefix}Days_${m.year}_${m.month}" value="${daysVal}"
+        style="width:60px;font-size:13px;padding:3px 6px;"
+        oninput="refreshPeriodHDD('${prefix}')" /></td>
+      <td style="padding:5px 8px;font-size:13px;color:var(--color-text-tertiary);" class="hdd-cell">
+        ${hddAuto !== null ? hddAuto.toFixed(1) : "—"}
+      </td>
+    </tr>`;
+  }).join("");
+
+  refreshPeriodHDD(prefix);
+  if (consEl) refreshConsumption(prefix);
+}
+
+function refreshPeriodHDD(prefix) {
+  const tbody  = document.getElementById(`${prefix}-months-tbody`);
+  const hddEl  = document.getElementById(`${prefix}-hdd-display`);
+  if (!tbody) return;
+
+  const baseTempEl = document.querySelector("[name='baseTemperature']");
+  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+
+  let total = 0;
+  tbody.querySelectorAll("tr[data-key]").forEach(tr => {
+    const tInput = tr.querySelector("input.month-temp");
+    const dInput = tr.querySelector("input.month-days");
+    const hddCell = tr.querySelector(".hdd-cell");
+    if (!tInput || tInput.value === "") {
+      if (hddCell) hddCell.textContent = "—";
+      return;
+    }
+    const hdd = Math.max(0, baseTemp - Number(tInput.value)) * Number(dInput ? dInput.value : 0);
+    total += hdd;
+    if (hddCell) hddCell.textContent = hdd.toFixed(1);
+  });
+
+  if (hddEl) hddEl.textContent = total.toFixed(2);
+}
+
+function refreshConsumption(prefix) {
+  const startEl = document.querySelector(`[name="${prefix}PeriodStartReading"]`);
+  const endEl   = document.querySelector(`[name="${prefix}PeriodEndReading"]`);
+  const dispEl  = document.getElementById(`${prefix}-consumption-display`);
+  if (!dispEl) return;
+  if (!startEl || !endEl || startEl.value === "" || endEl.value === "") {
+    dispEl.textContent = "—";
+    return;
+  }
+  const cons = Number(endEl.value) - Number(startEl.value);
+  dispEl.textContent = cons.toFixed(3);
+}
+
+// ─── TYM (12 miesięcy stałych) ────────────────────────────────────────────────
+
+function refreshTymHDD() {
+  const baseTempEl = document.querySelector("[name='baseTemperature']");
+  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+  const hddEl      = document.getElementById("tym-hdd-display");
+
+  let total = 0;
+  for (let m = 1; m <= 12; m++) {
+    const tInput = document.querySelector(`[name="tymTemp_${m}"]`);
+    const dInput = document.querySelector(`[name="tymDays_${m}"]`);
+    const hddCell = document.getElementById(`tym-hdd-cell-${m}`);
+    if (!tInput || tInput.value === "") {
+      if (hddCell) hddCell.textContent = "—";
+      continue;
+    }
+    const hdd = Math.max(0, baseTemp - Number(tInput.value)) * Number(dInput ? dInput.value : 0);
+    total += hdd;
+    if (hddCell) hddCell.textContent = hdd.toFixed(1);
+  }
+  if (hddEl) hddEl.textContent = total.toFixed(2);
+}
+
+// ─── Odczytanie danych tabelek z formularza ───────────────────────────────────
+
+function buildPeriodMonthlyFromForm(prefix) {
+  const tbody = document.getElementById(`${prefix}-months-tbody`);
+  if (!tbody) return [];
+  const rows = [];
+  tbody.querySelectorAll("tr[data-key]").forEach(tr => {
+    const [year, month] = tr.dataset.key.split("-").map(Number);
+    const tInput = tr.querySelector("input.month-temp");
+    const dInput = tr.querySelector("input.month-days");
+    rows.push({
+      year, month,
+      monthName: MONTHS_PL[month - 1] + " " + year,
+      temperature: tInput ? Number(tInput.value || 0) : 0,
+      days: dInput ? Number(dInput.value || 0) : 0
+    });
+  });
+  return rows;
+}
+
+// ─── GŁÓWNA FUNKCJA RENDER ────────────────────────────────────────────────────
+
 function renderMeasurementsModule() {
   const container = document.getElementById("module-content");
   if (!container) return;
@@ -1296,9 +1476,7 @@ function renderMeasurementsModule() {
     container.innerHTML = `
       <div class="reminder-card">
         <strong>Najpierw dodaj klienta i obiekt</strong>
-        <div class="reminder-meta">
-          Protokół TYM musi być przypisany do konkretnego obiektu.
-        </div>
+        <div class="reminder-meta">Protokół TYM musi być przypisany do konkretnego obiektu.</div>
       </div>
     `;
     return;
@@ -1307,245 +1485,300 @@ function renderMeasurementsModule() {
   let selectedObject = selectedMeasurementObjectId
     ? ObjectsModule.find(selectedMeasurementObjectId)
     : objects[0];
-
   if (!selectedObject) selectedObject = objects[0];
 
   const selectedClientId = Number(selectedObject.clientId);
   const objectsForClient = ObjectsModule.findByClient(selectedClientId);
   selectedMeasurementObjectId = Number(selectedObject.id);
-
   const currentYear = new Date().getFullYear();
 
+  const secStyle = (bg, border) =>
+    `border:1px solid ${border};border-radius:10px;margin-bottom:20px;overflow:hidden;`;
+  const headerStyle = (bg, color) =>
+    `background:${bg};padding:12px 16px;display:flex;align-items:center;gap:10px;`;
+  const h3Style = (color) =>
+    `margin:0;font-size:15px;font-weight:500;color:${color};`;
+  const badgeStyle = (bg, color) =>
+    `font-size:11px;padding:2px 8px;border-radius:20px;background:${bg};color:${color};`;
+  const bodyStyle = `padding:16px;background:var(--color-background-primary);`;
+  const tableStyle = `width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;`;
+  const thStyle = `text-align:left;padding:6px 8px;font-weight:500;font-size:11px;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary);`;
+  const chipStyle = (bg, color) =>
+    `display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;margin-top:10px;background:${bg};color:${color};`;
+  const row2 = `display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;`;
+
+  const tymMonthsRows = MONTHS_PL.map((monthName, idx) => {
+    const m = idx + 1;
+    const days = getDaysInMonth(m, currentYear);
+    return `<tr>
+      <td style="padding:5px 8px;color:var(--color-text-secondary);">${monthName}</td>
+      <td style="padding:3px 6px;"><input name="tymTemp_${m}" type="number" step="0.01" placeholder="°C"
+        style="width:90px;font-size:13px;padding:3px 6px;" oninput="refreshTymHDD()" /></td>
+      <td style="padding:3px 6px;"><input name="tymDays_${m}" type="number" value="${days}"
+        style="width:60px;font-size:13px;padding:3px 6px;" oninput="refreshTymHDD()" /></td>
+      <td style="padding:5px 8px;color:var(--color-text-tertiary);" id="tym-hdd-cell-${m}">—</td>
+    </tr>`;
+  }).join("");
+
   container.innerHTML = `
-    <form onsubmit="createMeasurement(this); return false;" class="calendar-form">
+  <style>
+    .tym-section { margin-bottom:20px; border-radius:10px; overflow:hidden; }
+    .tym-field label { font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px; }
+    .tym-grid2 { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px; }
+    .tym-grid4 { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px; }
+    .tym-body { padding:16px;background:var(--color-background-primary); }
+    .tym-table { width:100%;border-collapse:collapse;font-size:13px;margin-top:8px; }
+    .tym-table th { text-align:left;padding:6px 8px;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary); }
+    .tym-note { font-size:11px;color:var(--color-text-tertiary);margin-top:6px; }
+    .tym-summary { display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;align-items:center; }
+  </style>
 
-      <div style="grid-column: 1 / -1;">
-        <h3>Protokół TYM — Rozliczenie ESCO</h3>
-        <p class="reminder-meta">
-          Protokół jest podstawą rozliczenia ESCO. Wypełnij dane podstawowe, energetyczne, okresy i temperatury.
-        </p>
+  <form onsubmit="createMeasurement(this); return false;">
+
+    <!-- ═══ DANE PODSTAWOWE ═══ -->
+    <div style="margin-bottom:20px;">
+      <h3 style="font-size:16px;font-weight:500;margin-bottom:12px;">Protokół TYM — Rozliczenie ESCO</h3>
+      <div class="tym-grid4">
+        <div class="tym-field">
+          <label>Klient</label>
+          <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)" style="width:100%;">
+            ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === selectedClientId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="tym-field">
+          <label>Obiekt</label>
+          <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsList();" style="width:100%;">
+            ${objectsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`).join("")}
+          </select>
+        </div>
+        <div class="tym-field">
+          <label>Data protokołu</label>
+          <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
+        </div>
+        <div class="tym-field">
+          <label>Opracował / Energy Analyst</label>
+          <input name="preparedBy" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko" style="width:100%;box-sizing:border-box;" />
+        </div>
       </div>
 
-      <!-- DANE PODSTAWOWE -->
-      <div>
-        <label>Klient</label>
-        <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)">
-          ${clients.map(client => `
-            <option value="${client.id}" ${Number(client.id) === Number(selectedClientId) ? "selected" : ""}>
-              ${escapeHtml(client.name)}
-            </option>
-          `).join("")}
-        </select>
+      <div class="tym-grid4">
+        <div class="tym-field">
+          <label>Stacja meteorologiczna</label>
+          <input name="weatherStation" value="${escapeHtml(selectedObject.weatherStation || "")}" placeholder="np. Warszawa-Okęcie" style="width:100%;box-sizing:border-box;" />
+        </div>
+        <div class="tym-field">
+          <label>Źródło danych</label>
+          <input name="weatherSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" style="width:100%;box-sizing:border-box;" />
+        </div>
+        <div class="tym-field">
+          <label>Data pobrania danych</label>
+          <input name="weatherDataDownloadDate" type="date" value="${escapeHtml(selectedObject.weatherDataDownloadDate || "")}" style="width:100%;box-sizing:border-box;" />
+        </div>
+        <div class="tym-field">
+          <label>Temperatura bazowa °C</label>
+          <input name="baseTemperature" type="number" step="0.1" value="${escapeHtml(String(selectedObject.baseTemperature ?? 21))}"
+            style="width:100%;box-sizing:border-box;" oninput="refreshPeriodHDD('billing');refreshPeriodHDD('comparison');refreshTymHDD();" />
+        </div>
+      </div>
+      <div class="tym-field" style="margin-bottom:12px;">
+        <label>Link do źródła danych</label>
+        <input name="weatherSourceUrl" type="url" value="${escapeHtml(selectedObject.weatherSourceUrl || "")}" placeholder="https://..." style="width:100%;box-sizing:border-box;" />
       </div>
 
-      <div>
-        <label>Obiekt</label>
-        <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId = Number(this.value); renderMeasurementsList();">
-          ${objectsForClient.map(object => `
-            <option value="${object.id}" ${Number(object.id) === Number(selectedObject.id) ? "selected" : ""}>
-              ${escapeHtml(object.name || "Obiekt bez nazwy")}
-            </option>
-          `).join("")}
-        </select>
+      <div class="tym-grid4">
+        <div class="tym-field">
+          <label>Jednostka energii</label>
+          <select name="energyUnit" style="width:100%;">
+            ${["GJ","MWh","kWh","m3","Gcal"].map(u => `<option value="${u}" ${(selectedObject.energyUnit||"GJ")===u?"selected":""}>${u==="m3"?"m³":u}</option>`).join("")}
+          </select>
+        </div>
+        <div class="tym-field">
+          <label>Waluta</label>
+          <select name="currency" style="width:100%;">
+            ${["PLN","EUR","CZK","GBP"].map(c => `<option value="${c}" ${(selectedObject.currency||"PLN")===c?"selected":""}>${c}</option>`).join("")}
+          </select>
+        </div>
+        <div class="tym-field">
+          <label>Cena energii (za jednostkę)</label>
+          <input name="energyPrice" type="number" step="0.01" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.00" style="width:100%;box-sizing:border-box;" />
+        </div>
+        <div class="tym-field">
+          <label>Udział WaterAI / ESCO (%)</label>
+          <input name="waterAiShare" type="number" step="0.01" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
+        </div>
       </div>
+    </div>
 
-      <div>
-        <label>Data protokołu</label>
-        <input name="protocolDate" type="date" required />
+    <!-- ═══ OKRES ROZLICZENIOWY — niebieski ═══ -->
+    <div class="tym-section" style="border:1px solid #B5D4F4;">
+      <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;color:#185FA5;">📅</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Okres rozliczeniowy</h3>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#B5D4F4;color:#0C447C;">bieżący</span>
       </div>
-
-      <div>
-        <label>Opracował / Energy Analyst</label>
-        <input name="preparedBy" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko analityka" />
-      </div>
-
-      <!-- DANE KLIMATYCZNE -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane klimatyczne</h3>
-      </div>
-
-      <div>
-        <label>Stacja meteorologiczna</label>
-        <input name="weatherStation" value="${escapeHtml(selectedObject.weatherStation || "")}" placeholder="np. Warszawa-Okęcie" />
-      </div>
-
-      <div>
-        <label>Źródło danych klimatycznych</label>
-        <input name="weatherSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
-        <input name="weatherSourceUrl" type="url" value="${escapeHtml(selectedObject.weatherSourceUrl || "")}" placeholder="https://..." />
-      </div>
-
-      <div>
-        <label>Data pobrania danych klimatycznych</label>
-        <input name="weatherDataDownloadDate" type="date" value="${escapeHtml(selectedObject.weatherDataDownloadDate || "")}" />
-      </div>
-
-      <div>
-        <label>Temperatura bazowa °C</label>
-        <input name="baseTemperature" type="number" step="0.1" value="${escapeHtml(String(selectedObject.baseTemperature ?? 21))}" />
-      </div>
-
-      <!-- DANE ENERGETYCZNE -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane energetyczne</h3>
-      </div>
-
-      <div>
-        <label>Jednostka energii</label>
-        <select name="energyUnit">
-          ${["GJ","MWh","kWh","m3","Gcal"].map(u => `
-            <option value="${u}" ${(selectedObject.energyUnit || "GJ") === u ? "selected" : ""}>${u === "m3" ? "m³" : u}</option>
-          `).join("")}
-        </select>
-      </div>
-
-      <div>
-        <label>Waluta</label>
-        <select name="currency">
-          ${["PLN","EUR","CZK","GBP"].map(c => `
-            <option value="${c}" ${(selectedObject.currency || "PLN") === c ? "selected" : ""}>${c}</option>
-          `).join("")}
-        </select>
-      </div>
-
-      <div>
-        <label>Cena energii (za jednostkę)</label>
-        <input name="energyPrice" type="number" step="0.01" min="0"
-          value="${escapeHtml(String(selectedObject.energyPrice || ""))}"
-          placeholder="np. 85.00" />
-      </div>
-
-      <div>
-        <label>Udział WaterAI / ESCO (%)</label>
-        <input name="waterAiShare" type="number" step="0.01" min="0" max="100"
-          placeholder="np. 50" />
-      </div>
-
-      <!-- OKRES ROZLICZENIOWY -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Okres rozliczeniowy</h3>
-      </div>
-
-      <div>
-        <label>Start — data</label>
-        <input name="billingPeriodStartDate" type="date" required />
-      </div>
-
-      <div>
-        <label>Start — odczyt</label>
-        <input name="billingPeriodStartReading" type="number" step="0.001" required />
-      </div>
-
-      <div>
-        <label>Koniec — data</label>
-        <input name="billingPeriodEndDate" type="date" required />
-      </div>
-
-      <div>
-        <label>Koniec — odczyt</label>
-        <input name="billingPeriodEndReading" type="number" step="0.001" required />
-      </div>
-
-      <!-- OKRES PORÓWNAWCZY -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Okres porównawczy</h3>
-      </div>
-
-      <div>
-        <label>Start — data</label>
-        <input name="comparisonPeriodStartDate" type="date" required />
-      </div>
-
-      <div>
-        <label>Start — odczyt</label>
-        <input name="comparisonPeriodStartReading" type="number" step="0.001" required />
-      </div>
-
-      <div>
-        <label>Koniec — data</label>
-        <input name="comparisonPeriodEndDate" type="date" required />
-      </div>
-
-      <div>
-        <label>Koniec — odczyt</label>
-        <input name="comparisonPeriodEndReading" type="number" step="0.001" required />
-      </div>
-
-      <!-- TABELA TYM -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Temperatury TYM (miesięczne)</h3>
-        <p class="reminder-meta">
-          Dane z WeatherOnline / Robot Klimatu — wpisz ręcznie. Dni uzupełniane automatycznie, ale można korygować.
-        </p>
-      </div>
-
-      ${MONTHS_PL.map((monthName, index) => {
-        const month = index + 1;
-        return `
-          <div>
-            <label>${monthName} — śr. temp. TYM (°C)</label>
-            <input name="tymTemp_${month}" type="number" step="0.01" placeholder="°C" />
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Data od</label>
+            <input name="billingPeriodStartDate" type="date" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshPeriodTable('billing')" />
           </div>
-          <div>
-            <label>${monthName} — dni TYM</label>
-            <input name="tymDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
+          <div class="tym-field">
+            <label>Data do</label>
+            <input name="billingPeriodEndDate" type="date" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshPeriodTable('billing')" />
           </div>
-        `;
-      }).join("")}
-
-      <!-- TABELA RZECZYWISTA -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Temperatury rzeczywiste (miesięczne)</h3>
-        <p class="reminder-meta">
-          Dane rzeczywiste z WeatherOnline / Robot Klimatu dla okresu rozliczeniowego.
-        </p>
-      </div>
-
-      ${MONTHS_PL.map((monthName, index) => {
-        const month = index + 1;
-        return `
-          <div>
-            <label>${monthName} — śr. temp. rzeczywista (°C)</label>
-            <input name="realTemp_${month}" type="number" step="0.01" placeholder="°C" />
+          <div class="tym-field">
+            <label>Odczyt startowy</label>
+            <input name="billingPeriodStartReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshConsumption('billing')" />
           </div>
-          <div>
-            <label>${monthName} — dni rzeczywiste</label>
-            <input name="realDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
+          <div class="tym-field">
+            <label>Odczyt końcowy</label>
+            <input name="billingPeriodEndReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshConsumption('billing')" />
           </div>
-        `;
-      }).join("")}
-
-      <!-- REGRESJA LINIOWA (opcja) -->
-      <div style="grid-column: 1 / -1;">
-        <h3>Regresja liniowa (opcjonalna)</h3>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input name="includeLinearRegression" type="checkbox" />
-          Dołącz analizę regresji liniowej jako załącznik do raportu
-        </label>
-        <p class="reminder-meta">
-          Regresja liniowa to moduł analityczny — nie jest podstawą rozliczenia ESCO.
-        </p>
+        </div>
+        <table class="tym-table">
+          <thead><tr>
+            <th style="width:30%;">Miesiąc</th>
+            <th style="width:22%;">Śr. temp. (°C)</th>
+            <th style="width:18%;">Dni</th>
+            <th style="width:30%;">HDD</th>
+          </tr></thead>
+          <tbody id="billing-months-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--color-text-tertiary);padding:14px;font-size:13px;">Wybierz daty aby zobaczyć miesiące</td></tr>
+          </tbody>
+        </table>
+        <div class="tym-summary">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#B5D4F4;color:#0C447C;">
+            🔥 HDD: <strong id="billing-hdd-display">—</strong>
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">
+            ⚡ Zużycie: <strong id="billing-consumption-display">—</strong>
+          </span>
+        </div>
       </div>
+    </div>
 
-      <!-- NOTATKA -->
-      <div style="grid-column: 1 / -1;">
-        <label>Notatka</label>
-        <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." />
+    <!-- ═══ OKRES PORÓWNAWCZY — zielony ═══ -->
+    <div class="tym-section" style="border:1px solid #C0DD97;">
+      <div style="background:#EAF3DE;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;color:#3B6D11;">📊</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy</h3>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy</span>
       </div>
-
-      <div class="calendar-actions">
-        <button class="primary-button" type="submit">
-          ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
-        </button>
-        ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Data od</label>
+            <input name="comparisonPeriodStartDate" type="date" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshPeriodTable('comparison')" />
+          </div>
+          <div class="tym-field">
+            <label>Data do</label>
+            <input name="comparisonPeriodEndDate" type="date" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshPeriodTable('comparison')" />
+          </div>
+          <div class="tym-field">
+            <label>Odczyt startowy</label>
+            <input name="comparisonPeriodStartReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshConsumption('comparison')" />
+          </div>
+          <div class="tym-field">
+            <label>Odczyt końcowy</label>
+            <input name="comparisonPeriodEndReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
+              oninput="refreshConsumption('comparison')" />
+          </div>
+        </div>
+        <table class="tym-table">
+          <thead><tr>
+            <th style="width:30%;">Miesiąc</th>
+            <th style="width:22%;">Śr. temp. (°C)</th>
+            <th style="width:18%;">Dni</th>
+            <th style="width:30%;">HDD</th>
+          </tr></thead>
+          <tbody id="comparison-months-tbody">
+            <tr><td colspan="4" style="text-align:center;color:var(--color-text-tertiary);padding:14px;font-size:13px;">Wybierz daty aby zobaczyć miesiące</td></tr>
+          </tbody>
+        </table>
+        <div class="tym-summary">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#C0DD97;color:#27500A;">
+            🔥 HDD: <strong id="comparison-hdd-display">—</strong>
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#EAF3DE;color:#27500A;">
+            ⚡ Zużycie: <strong id="comparison-consumption-display">—</strong>
+          </span>
+        </div>
       </div>
-    </form>
+    </div>
 
-    <div id="measurements-list"></div>
+    <!-- ═══ TYM — pomarańczowy ═══ -->
+    <div class="tym-section" style="border:1px solid #FAC775;">
+      <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;color:#854F0B;">❄️</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Typowy rok meteorologiczny (TYM)</h3>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FAC775;color:#633806;">długoletni</span>
+      </div>
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Okres TYM od (rok)</label>
+            <input name="tymPeriodStart" type="text" placeholder="np. 1991" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Okres TYM do (rok)</label>
+            <input name="tymPeriodEnd" type="text" placeholder="np. 2020" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field" style="grid-column:span 2;">
+            <label>Źródło danych TYM</label>
+            <input name="tymDataSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" style="width:100%;box-sizing:border-box;" />
+          </div>
+        </div>
+        <p class="tym-note">Wpisz ręcznie średnie temperatury miesięczne z WeatherOnline / Robot Klimatu. Dni uzupełniane automatycznie, można korygować.</p>
+        <table class="tym-table">
+          <thead><tr>
+            <th style="width:30%;">Miesiąc</th>
+            <th style="width:22%;">Śr. temp. TYM (°C)</th>
+            <th style="width:18%;">Dni</th>
+            <th style="width:30%;">HDD TYM</th>
+          </tr></thead>
+          <tbody>${tymMonthsRows}</tbody>
+        </table>
+        <div class="tym-summary">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#FAC775;color:#633806;">
+            🔥 HDD TYM: <strong id="tym-hdd-display">—</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGRESJA + NOTATKA + SUBMIT -->
+    <div style="margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+        <input name="includeLinearRegression" type="checkbox" />
+        Dołącz analizę regresji liniowej jako załącznik do raportu
+      </label>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin:4px 0 0 24px;">
+        Regresja liniowa to moduł analityczny — nie jest podstawą rozliczenia ESCO.
+      </p>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatka</label>
+      <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." style="width:100%;box-sizing:border-box;" />
+    </div>
+
+    <div style="display:flex;gap:12px;">
+      <button class="primary-button" type="submit">
+        ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
+      </button>
+      ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
+    </div>
+
+  </form>
+
+  <div id="measurements-list" style="margin-top:24px;"></div>
   `;
 
   renderMeasurementsList();
