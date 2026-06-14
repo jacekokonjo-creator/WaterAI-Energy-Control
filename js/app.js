@@ -1236,42 +1236,73 @@ function editMeasurement(id) {
   if (form.energyPrice) form.energyPrice.value = protocol.energyPrice || "";
   if (form.waterAiShare) form.waterAiShare.value = protocol.waterAiShare || "";
 
+  // Daty — najpierw wstaw, potem zbuduj tabelki
   form.billingPeriodStartDate.value = protocol.billingPeriodStartDate || "";
-  form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
   form.billingPeriodEndDate.value = protocol.billingPeriodEndDate || "";
+  form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
   form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
 
   form.comparisonPeriodStartDate.value = protocol.comparisonPeriodStartDate || "";
-  form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
   form.comparisonPeriodEndDate.value = protocol.comparisonPeriodEndDate || "";
+  form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
   form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
 
-  form.note.value = protocol.note || "";
+  if (form.tymPeriodStart) form.tymPeriodStart.value = protocol.tymPeriodStart || "";
+  if (form.tymPeriodEnd) form.tymPeriodEnd.value = protocol.tymPeriodEnd || "";
+  if (form.tymDataSource) form.tymDataSource.value = protocol.tymDataSource || "";
 
-  if (form.includeLinearRegression) {
-    form.includeLinearRegression.checked = !!protocol.includeLinearRegression;
-  }
+  // Zbuduj tabelki miesięczne z dat
+  refreshPeriodTable("billing");
+  refreshPeriodTable("comparison");
 
+  // Wstaw zapisane temperatury do tabelki rozliczeniowej (realMonthly)
+  const billingData = protocol.realMonthly || [];
+  billingData.forEach(item => {
+    const key = `${item.year || new Date(protocol.billingPeriodStartDate || "").getFullYear()}-${item.month}`;
+    const tbody = document.getElementById("billing-months-tbody");
+    if (!tbody) return;
+    const tr = tbody.querySelector(`tr[data-key="${key}"]`);
+    if (!tr) return;
+    const tInput = tr.querySelector("input.month-temp");
+    const dInput = tr.querySelector("input.month-days");
+    if (tInput) tInput.value = item.temperature ?? item.realTemperature ?? "";
+    if (dInput) dInput.value = item.days ?? "";
+  });
+
+  // Wstaw zapisane temperatury do tabelki porównawczej
+  const comparisonData = protocol.comparisonMonthly || [];
+  comparisonData.forEach(item => {
+    const key = `${item.year || new Date(protocol.comparisonPeriodStartDate || "").getFullYear()}-${item.month}`;
+    const tbody = document.getElementById("comparison-months-tbody");
+    if (!tbody) return;
+    const tr = tbody.querySelector(`tr[data-key="${key}"]`);
+    if (!tr) return;
+    const tInput = tr.querySelector("input.month-temp");
+    const dInput = tr.querySelector("input.month-days");
+    if (tInput) tInput.value = item.temperature ?? "";
+    if (dInput) dInput.value = item.days ?? "";
+  });
+
+  // Przelicz HDD po wstawieniu temperatur
+  refreshPeriodHDD("billing");
+  refreshPeriodHDD("comparison");
+  refreshConsumption("billing");
+  refreshConsumption("comparison");
+
+  // TYM — 12 stałych miesięcy
   if (protocol.tymMonthly && protocol.tymMonthly.length) {
     protocol.tymMonthly.forEach(item => {
-      if (form[`tymTemp_${item.month}`]) {
-        form[`tymTemp_${item.month}`].value = item.tymTemperature ?? "";
-      }
-      if (form[`tymDays_${item.month}`]) {
-        form[`tymDays_${item.month}`].value = item.tymDays || "";
-      }
+      const tInput = form[`tymTemp_${item.month}`];
+      const dInput = form[`tymDays_${item.month}`];
+      if (tInput) tInput.value = item.tymTemperature ?? item.temperature ?? "";
+      if (dInput) dInput.value = item.tymDays ?? item.days ?? "";
     });
+    refreshTymHDD();
   }
 
-  if (protocol.realMonthly && protocol.realMonthly.length) {
-    protocol.realMonthly.forEach(item => {
-      if (form[`realTemp_${item.month}`]) {
-        form[`realTemp_${item.month}`].value = item.realTemperature ?? "";
-      }
-      if (form[`realDays_${item.month}`]) {
-        form[`realDays_${item.month}`].value = item.realDays || "";
-      }
-    });
+  if (form.note) form.note.value = protocol.note || "";
+  if (form.includeLinearRegression) {
+    form.includeLinearRegression.checked = !!protocol.includeLinearRegression;
   }
 
   const submitButton = form.querySelector("button[type='submit']");
