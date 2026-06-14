@@ -62,14 +62,14 @@ const ObjectsModule = {
 
   findByClient(clientId) {
   return this.getAll().filter(object => Number(object.clientId) === Number(clientId));
-  }
+  },
 
   update(id, updatedObject) {
     const objects = this.getAll().map(object => {
       if (object.id !== Number(id)) return object;
 
       return {
-        ...object,
+       ...object,
        ...updatedObject,
     clientId: Number(updatedObject.clientId),
     updatedAt: new Date().toISOString()
