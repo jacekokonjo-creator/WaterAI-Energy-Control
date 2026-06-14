@@ -45,6 +45,18 @@ const ObjectsModule = {
       backOfficeOwner: object.backOfficeOwner || "",
       energyAnalystOwner: object.energyAnalystOwner || "",
 
+      // DANE KLIMATYCZNE TYM
+      weatherStation: object.weatherStation || "",
+      weatherSource: object.weatherSource || "WeatherOnline / Robot Klimatu",
+      weatherSourceUrl: object.weatherSourceUrl || "",
+      weatherDataDownloadDate: object.weatherDataDownloadDate || "",
+      baseTemperature: Number(object.baseTemperature || 21),
+
+      // DANE ENERGETYCZNE
+      energyUnit: object.energyUnit || "GJ",
+      currency: object.currency || "PLN",
+      energyPrice: Number(object.energyPrice || 0),
+
       heatSources: object.heatSources || []
     });
 

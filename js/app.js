@@ -300,7 +300,19 @@ function createObject(form) {
       : 14,
 
     backOfficeOwner: form.backOfficeOwner.value.trim(),
-    energyAnalystOwner: form.energyAnalystOwner.value.trim()
+    energyAnalystOwner: form.energyAnalystOwner.value.trim(),
+
+    // DANE KLIMATYCZNE TYM
+    weatherStation: form.weatherStation ? form.weatherStation.value.trim() : "",
+    weatherSource: form.weatherSource ? form.weatherSource.value.trim() : "WeatherOnline / Robot Klimatu",
+    weatherSourceUrl: form.weatherSourceUrl ? form.weatherSourceUrl.value.trim() : "",
+    weatherDataDownloadDate: form.weatherDataDownloadDate ? form.weatherDataDownloadDate.value : "",
+    baseTemperature: form.baseTemperature ? Number(form.baseTemperature.value || 21) : 21,
+
+    // DANE ENERGETYCZNE
+    energyUnit: form.energyUnit ? form.energyUnit.value : "GJ",
+    currency: form.currency ? form.currency.value : "PLN",
+    energyPrice: form.energyPrice ? Number(form.energyPrice.value || 0) : 0
   };
 
   console.log("TRYB EDYCJI?", !!editingObjectId);
@@ -366,6 +378,15 @@ function editObject(id) {
 
   form.backOfficeOwner.value = object.backOfficeOwner || "";
   form.energyAnalystOwner.value = object.energyAnalystOwner || "";
+
+  if (form.weatherStation) form.weatherStation.value = object.weatherStation || "";
+  if (form.weatherSource) form.weatherSource.value = object.weatherSource || "WeatherOnline / Robot Klimatu";
+  if (form.weatherSourceUrl) form.weatherSourceUrl.value = object.weatherSourceUrl || "";
+  if (form.weatherDataDownloadDate) form.weatherDataDownloadDate.value = object.weatherDataDownloadDate || "";
+  if (form.baseTemperature) form.baseTemperature.value = object.baseTemperature || 21;
+  if (form.energyUnit) form.energyUnit.value = object.energyUnit || "GJ";
+  if (form.currency) form.currency.value = object.currency || "PLN";
+  if (form.energyPrice) form.energyPrice.value = object.energyPrice || "";
 
   const submitButton = form.querySelector("button[type='submit']");
   if (submitButton) {
@@ -600,6 +621,67 @@ function renderObjectsModule() {
       <div>
         <label>Opiekun Energy Analyst</label>
         <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane klimatyczne (TYM)</h3>
+        <p class="reminder-meta">Dane źródła klimatycznego — zwykle stałe dla obiektu.</p>
+      </div>
+
+      <div>
+        <label>Stacja meteorologiczna</label>
+        <input name="weatherStation" placeholder="np. Warszawa-Okęcie" />
+      </div>
+
+      <div>
+        <label>Źródło danych klimatycznych</label>
+        <input name="weatherSource" value="WeatherOnline / Robot Klimatu" placeholder="np. WeatherOnline / Robot Klimatu" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
+        <input name="weatherSourceUrl" type="url" placeholder="https://..." />
+      </div>
+
+      <div>
+        <label>Data pobrania danych klimatycznych</label>
+        <input name="weatherDataDownloadDate" type="date" />
+      </div>
+
+      <div>
+        <label>Temperatura bazowa °C</label>
+        <input name="baseTemperature" type="number" step="0.1" value="21" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane energetyczne</h3>
+        <p class="reminder-meta">Jednostka, waluta i cena energii — zwykle stałe dla obiektu.</p>
+      </div>
+
+      <div>
+        <label>Jednostka energii</label>
+        <select name="energyUnit">
+          <option value="GJ">GJ</option>
+          <option value="MWh">MWh</option>
+          <option value="kWh">kWh</option>
+          <option value="m3">m³</option>
+          <option value="Gcal">Gcal</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Waluta</label>
+        <select name="currency">
+          <option value="PLN">PLN</option>
+          <option value="EUR">EUR</option>
+          <option value="CZK">CZK</option>
+          <option value="GBP">GBP</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Cena energii (za jednostkę)</label>
+        <input name="energyPrice" type="number" step="0.01" min="0" placeholder="np. 85.00" />
       </div>
 
       <div class="calendar-actions">
@@ -988,10 +1070,64 @@ function buildTymMonthlyFromForm(form) {
     return {
       month,
       monthName,
-      temperature: Number(form[`tymTemp_${month}`]?.value || 0),
-      days: Number(form[`tymDays_${month}`]?.value || 0)
+      tymTemperature: Number(form[`tymTemp_${month}`]?.value ?? ""),
+      tymDays: Number(form[`tymDays_${month}`]?.value || 0)
     };
   });
+}
+
+function buildRealMonthlyFromForm(form) {
+  return MONTHS_PL.map((monthName, index) => {
+    const month = index + 1;
+
+    return {
+      month,
+      monthName,
+      realTemperature: Number(form[`realTemp_${month}`]?.value ?? ""),
+      realDays: Number(form[`realDays_${month}`]?.value || 0)
+    };
+  });
+}
+
+function calcHDD(months, tempField, daysField, baseTemp) {
+  return months.reduce((sum, m) => {
+    const diff = baseTemp - Number(m[tempField]);
+    return sum + Math.max(0, diff) * Number(m[daysField]);
+  }, 0);
+}
+
+function calcESCOResults(protocol) {
+  const base = Number(protocol.baseTemperature || 21);
+  const tymMonthly = protocol.tymMonthly || [];
+  const realMonthly = protocol.realMonthly || [];
+
+  const hddTym = calcHDD(tymMonthly, "tymTemperature", "tymDays", base);
+  const hddReal = calcHDD(realMonthly, "realTemperature", "realDays", base);
+
+  const billingConsumption = Number(protocol.billingConsumption || 0);
+  const comparisonConsumption = Number(protocol.comparisonConsumption || 0);
+  const energyPrice = Number(protocol.energyPrice || 0);
+  const waterAiSharePct = Number(protocol.waterAiShare || 0);
+
+  const climateCorrectionFactor = hddReal > 0 ? hddTym / hddReal : 0;
+  const correctedComparisonConsumption = comparisonConsumption * climateCorrectionFactor;
+  const savedEnergy = correctedComparisonConsumption - billingConsumption;
+  const savedEnergyPercent = correctedComparisonConsumption > 0
+    ? (savedEnergy / correctedComparisonConsumption) * 100
+    : 0;
+  const savedMoney = savedEnergy * energyPrice;
+  const waterAiShare = savedMoney * (waterAiSharePct / 100);
+
+  return {
+    hddTym,
+    hddReal,
+    climateCorrectionFactor,
+    correctedComparisonConsumption,
+    savedEnergy,
+    savedEnergyPercent,
+    savedMoney,
+    waterAiShare
+  };
 }
 
 function createMeasurement(form) {
@@ -1007,13 +1143,26 @@ function createMeasurement(form) {
   const comparisonStart = Number(form.comparisonPeriodStartReading.value || 0);
   const comparisonEnd = Number(form.comparisonPeriodEndReading.value || 0);
 
+  const tymMonthly = buildTymMonthlyFromForm(form);
+  const realMonthly = buildRealMonthlyFromForm(form);
+
   const protocolData = {
     clientId: object.clientId,
     objectId: form.objectId.value,
 
-    weatherStation: form.weatherStation.value.trim(),
-    energyAnalystOwner: form.energyAnalystOwner.value.trim(),
     protocolDate: form.protocolDate.value,
+    preparedBy: form.preparedBy.value.trim(),
+
+    weatherStation: form.weatherStation.value.trim(),
+    weatherSource: form.weatherSource.value.trim(),
+    weatherSourceUrl: form.weatherSourceUrl.value.trim(),
+    weatherDataDownloadDate: form.weatherDataDownloadDate.value,
+    baseTemperature: Number(form.baseTemperature.value || 21),
+
+    energyUnit: form.energyUnit.value,
+    currency: form.currency.value,
+    energyPrice: Number(form.energyPrice.value || 0),
+    waterAiShare: Number(form.waterAiShare.value || 0),
 
     billingPeriodStartDate: form.billingPeriodStartDate.value,
     billingPeriodStartReading: billingStart,
@@ -1027,13 +1176,18 @@ function createMeasurement(form) {
     comparisonPeriodEndReading: comparisonEnd,
     comparisonConsumption: comparisonEnd - comparisonStart,
 
-    baseTemperature: Number(form.baseTemperature.value || 21),
-    realAverageTempBilling: Number(form.realAverageTempBilling.value || 0),
-    realAverageTempComparison: Number(form.realAverageTempComparison.value || 0),
+    tymMonthly,
+    realMonthly,
 
-    tymMonthly: buildTymMonthlyFromForm(form),
+    includeLinearRegression: form.includeLinearRegression
+      ? form.includeLinearRegression.checked
+      : false,
+
     note: form.note.value.trim()
   };
+
+  // automatyczne wyniki ESCO
+  protocolData.escoResults = calcESCOResults(protocolData);
 
   if (editingMeasurementId) {
     MeasurementsModule.update(editingMeasurementId, protocolData);
@@ -1062,9 +1216,19 @@ function editMeasurement(id) {
   updateMeasurementObjectOptions(protocol.clientId);
   form.objectId.value = String(protocol.objectId || "");
 
-  form.weatherStation.value = protocol.weatherStation || "";
-  form.energyAnalystOwner.value = protocol.energyAnalystOwner || "";
   form.protocolDate.value = protocol.protocolDate || "";
+  if (form.preparedBy) form.preparedBy.value = protocol.preparedBy || "";
+
+  form.weatherStation.value = protocol.weatherStation || "";
+  if (form.weatherSource) form.weatherSource.value = protocol.weatherSource || "WeatherOnline / Robot Klimatu";
+  if (form.weatherSourceUrl) form.weatherSourceUrl.value = protocol.weatherSourceUrl || "";
+  if (form.weatherDataDownloadDate) form.weatherDataDownloadDate.value = protocol.weatherDataDownloadDate || "";
+  form.baseTemperature.value = protocol.baseTemperature || 21;
+
+  if (form.energyUnit) form.energyUnit.value = protocol.energyUnit || "GJ";
+  if (form.currency) form.currency.value = protocol.currency || "PLN";
+  if (form.energyPrice) form.energyPrice.value = protocol.energyPrice || "";
+  if (form.waterAiShare) form.waterAiShare.value = protocol.waterAiShare || "";
 
   form.billingPeriodStartDate.value = protocol.billingPeriodStartDate || "";
   form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
@@ -1076,19 +1240,30 @@ function editMeasurement(id) {
   form.comparisonPeriodEndDate.value = protocol.comparisonPeriodEndDate || "";
   form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
 
-  form.baseTemperature.value = protocol.baseTemperature || 21;
-  form.realAverageTempBilling.value = protocol.realAverageTempBilling || "";
-  form.realAverageTempComparison.value = protocol.realAverageTempComparison || "";
   form.note.value = protocol.note || "";
+
+  if (form.includeLinearRegression) {
+    form.includeLinearRegression.checked = !!protocol.includeLinearRegression;
+  }
 
   if (protocol.tymMonthly && protocol.tymMonthly.length) {
     protocol.tymMonthly.forEach(item => {
       if (form[`tymTemp_${item.month}`]) {
-        form[`tymTemp_${item.month}`].value = item.temperature || "";
+        form[`tymTemp_${item.month}`].value = item.tymTemperature ?? "";
       }
-
       if (form[`tymDays_${item.month}`]) {
-        form[`tymDays_${item.month}`].value = item.days || "";
+        form[`tymDays_${item.month}`].value = item.tymDays || "";
+      }
+    });
+  }
+
+  if (protocol.realMonthly && protocol.realMonthly.length) {
+    protocol.realMonthly.forEach(item => {
+      if (form[`realTemp_${item.month}`]) {
+        form[`realTemp_${item.month}`].value = item.realTemperature ?? "";
+      }
+      if (form[`realDays_${item.month}`]) {
+        form[`realDays_${item.month}`].value = item.realDays || "";
       }
     });
   }
@@ -1122,7 +1297,7 @@ function renderMeasurementsModule() {
       <div class="reminder-card">
         <strong>Najpierw dodaj klienta i obiekt</strong>
         <div class="reminder-meta">
-          Protokół pomiarowy musi być przypisany do konkretnego obiektu.
+          Protokół TYM musi być przypisany do konkretnego obiektu.
         </div>
       </div>
     `;
@@ -1143,13 +1318,15 @@ function renderMeasurementsModule() {
 
   container.innerHTML = `
     <form onsubmit="createMeasurement(this); return false;" class="calendar-form">
+
       <div style="grid-column: 1 / -1;">
-        <h3>Protokół pomiarowy ESCO</h3>
+        <h3>Protokół TYM — Rozliczenie ESCO</h3>
         <p class="reminder-meta">
-          Dane z tego formularza będą później podstawą do raportu ESCO i wyliczenia oszczędności.
+          Protokół jest podstawą rozliczenia ESCO. Wypełnij dane podstawowe, energetyczne, okresy i temperatury.
         </p>
       </div>
 
+      <!-- DANE PODSTAWOWE -->
       <div>
         <label>Klient</label>
         <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)">
@@ -1173,106 +1350,188 @@ function renderMeasurementsModule() {
       </div>
 
       <div>
-        <label>Stacja meteorologiczna</label>
-        <input name="weatherStation" placeholder="np. Warszawa-Okęcie / Lublin-Radawiec" />
-      </div>
-
-      <div>
-        <label>Opracował / Energy Analyst</label>
-        <input name="energyAnalystOwner" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko analityka" />
-      </div>
-
-      <div>
         <label>Data protokołu</label>
         <input name="protocolDate" type="date" required />
       </div>
 
       <div>
-        <label>Temperatura bazowa °C</label>
-        <input name="baseTemperature" type="number" step="0.1" value="21" />
+        <label>Opracował / Energy Analyst</label>
+        <input name="preparedBy" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko analityka" />
       </div>
 
+      <!-- DANE KLIMATYCZNE -->
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane klimatyczne</h3>
+      </div>
+
+      <div>
+        <label>Stacja meteorologiczna</label>
+        <input name="weatherStation" value="${escapeHtml(selectedObject.weatherStation || "")}" placeholder="np. Warszawa-Okęcie" />
+      </div>
+
+      <div>
+        <label>Źródło danych klimatycznych</label>
+        <input name="weatherSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
+        <input name="weatherSourceUrl" type="url" value="${escapeHtml(selectedObject.weatherSourceUrl || "")}" placeholder="https://..." />
+      </div>
+
+      <div>
+        <label>Data pobrania danych klimatycznych</label>
+        <input name="weatherDataDownloadDate" type="date" value="${escapeHtml(selectedObject.weatherDataDownloadDate || "")}" />
+      </div>
+
+      <div>
+        <label>Temperatura bazowa °C</label>
+        <input name="baseTemperature" type="number" step="0.1" value="${escapeHtml(String(selectedObject.baseTemperature ?? 21))}" />
+      </div>
+
+      <!-- DANE ENERGETYCZNE -->
+      <div style="grid-column: 1 / -1;">
+        <h3>Dane energetyczne</h3>
+      </div>
+
+      <div>
+        <label>Jednostka energii</label>
+        <select name="energyUnit">
+          ${["GJ","MWh","kWh","m3","Gcal"].map(u => `
+            <option value="${u}" ${(selectedObject.energyUnit || "GJ") === u ? "selected" : ""}>${u === "m3" ? "m³" : u}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div>
+        <label>Waluta</label>
+        <select name="currency">
+          ${["PLN","EUR","CZK","GBP"].map(c => `
+            <option value="${c}" ${(selectedObject.currency || "PLN") === c ? "selected" : ""}>${c}</option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div>
+        <label>Cena energii (za jednostkę)</label>
+        <input name="energyPrice" type="number" step="0.01" min="0"
+          value="${escapeHtml(String(selectedObject.energyPrice || ""))}"
+          placeholder="np. 85.00" />
+      </div>
+
+      <div>
+        <label>Udział WaterAI / ESCO (%)</label>
+        <input name="waterAiShare" type="number" step="0.01" min="0" max="100"
+          placeholder="np. 50" />
+      </div>
+
+      <!-- OKRES ROZLICZENIOWY -->
       <div style="grid-column: 1 / -1;">
         <h3>Okres rozliczeniowy</h3>
       </div>
 
       <div>
-        <label>Start okresu rozliczeniowego — data</label>
+        <label>Start — data</label>
         <input name="billingPeriodStartDate" type="date" required />
       </div>
 
       <div>
-        <label>Start okresu rozliczeniowego — odczyt</label>
+        <label>Start — odczyt</label>
         <input name="billingPeriodStartReading" type="number" step="0.001" required />
       </div>
 
       <div>
-        <label>Koniec okresu rozliczeniowego — data</label>
+        <label>Koniec — data</label>
         <input name="billingPeriodEndDate" type="date" required />
       </div>
 
       <div>
-        <label>Koniec okresu rozliczeniowego — odczyt</label>
+        <label>Koniec — odczyt</label>
         <input name="billingPeriodEndReading" type="number" step="0.001" required />
       </div>
 
-      <div>
-        <label>Średnia temperatura rzeczywista w okresie rozliczeniowym</label>
-        <input name="realAverageTempBilling" type="number" step="0.01" />
-      </div>
-
+      <!-- OKRES PORÓWNAWCZY -->
       <div style="grid-column: 1 / -1;">
         <h3>Okres porównawczy</h3>
       </div>
 
       <div>
-        <label>Start okresu porównawczego — data</label>
+        <label>Start — data</label>
         <input name="comparisonPeriodStartDate" type="date" required />
       </div>
 
       <div>
-        <label>Start okresu porównawczego — odczyt</label>
+        <label>Start — odczyt</label>
         <input name="comparisonPeriodStartReading" type="number" step="0.001" required />
       </div>
 
       <div>
-        <label>Koniec okresu porównawczego — data</label>
+        <label>Koniec — data</label>
         <input name="comparisonPeriodEndDate" type="date" required />
       </div>
 
       <div>
-        <label>Koniec okresu porównawczego — odczyt</label>
+        <label>Koniec — odczyt</label>
         <input name="comparisonPeriodEndReading" type="number" step="0.001" required />
       </div>
 
-      <div>
-        <label>Średnia temperatura rzeczywista w okresie porównawczym</label>
-        <input name="realAverageTempComparison" type="number" step="0.01" />
-      </div>
-
+      <!-- TABELA TYM -->
       <div style="grid-column: 1 / -1;">
-        <h3>Średnia temperatura TYM</h3>
+        <h3>Temperatury TYM (miesięczne)</h3>
         <p class="reminder-meta">
-          Dni kalendarzowe są uzupełnione automatycznie dla bieżącego roku, ale możesz je zmienić ręcznie.
+          Dane z WeatherOnline / Robot Klimatu — wpisz ręcznie. Dni uzupełniane automatycznie, ale można korygować.
         </p>
       </div>
 
       ${MONTHS_PL.map((monthName, index) => {
         const month = index + 1;
-
         return `
           <div>
-            <label>${monthName} — średnia temperatura TYM</label>
-            <input name="tymTemp_${month}" type="number" step="0.01" />
+            <label>${monthName} — śr. temp. TYM (°C)</label>
+            <input name="tymTemp_${month}" type="number" step="0.01" placeholder="°C" />
           </div>
-
           <div>
-            <label>${monthName} — dni kalendarzowe</label>
+            <label>${monthName} — dni TYM</label>
             <input name="tymDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
           </div>
         `;
       }).join("")}
 
+      <!-- TABELA RZECZYWISTA -->
+      <div style="grid-column: 1 / -1;">
+        <h3>Temperatury rzeczywiste (miesięczne)</h3>
+        <p class="reminder-meta">
+          Dane rzeczywiste z WeatherOnline / Robot Klimatu dla okresu rozliczeniowego.
+        </p>
+      </div>
+
+      ${MONTHS_PL.map((monthName, index) => {
+        const month = index + 1;
+        return `
+          <div>
+            <label>${monthName} — śr. temp. rzeczywista (°C)</label>
+            <input name="realTemp_${month}" type="number" step="0.01" placeholder="°C" />
+          </div>
+          <div>
+            <label>${monthName} — dni rzeczywiste</label>
+            <input name="realDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
+          </div>
+        `;
+      }).join("")}
+
+      <!-- REGRESJA LINIOWA (opcja) -->
+      <div style="grid-column: 1 / -1;">
+        <h3>Regresja liniowa (opcjonalna)</h3>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input name="includeLinearRegression" type="checkbox" />
+          Dołącz analizę regresji liniowej jako załącznik do raportu
+        </label>
+        <p class="reminder-meta">
+          Regresja liniowa to moduł analityczny — nie jest podstawą rozliczenia ESCO.
+        </p>
+      </div>
+
+      <!-- NOTATKA -->
       <div style="grid-column: 1 / -1;">
         <label>Notatka</label>
         <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." />
@@ -1280,7 +1539,7 @@ function renderMeasurementsModule() {
 
       <div class="calendar-actions">
         <button class="primary-button" type="submit">
-          ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół"}
+          ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
         </button>
         ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
       </div>
@@ -1311,38 +1570,64 @@ function renderMeasurementsList() {
   if (protocols.length === 0) {
     container.innerHTML = `
       <div class="reminder-card">
-        <strong>Brak protokołów</strong>
-        <div class="reminder-meta">Dodaj pierwszy protokół pomiarowy dla tego obiektu.</div>
+        <strong>Brak protokołów TYM</strong>
+        <div class="reminder-meta">Dodaj pierwszy protokół TYM dla tego obiektu.</div>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = protocols.map(item => `
+  container.innerHTML = protocols.map(item => {
+    const r = item.escoResults || calcESCOResults(item);
+    const unit = item.energyUnit || "GJ";
+    const currency = item.currency || "PLN";
+    const fmt2 = v => Number(v || 0).toFixed(2);
+    const fmt3 = v => Number(v || 0).toFixed(3);
+
+    return `
     <div class="reminder-card">
-      <strong>Protokół z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+      <strong>Protokół TYM z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
 
       <div class="reminder-meta">
         Klient: ${escapeHtml(getClientName(item.clientId))}<br />
         Obiekt: ${escapeHtml(getObjectName(item.objectId))}<br />
-        Stacja meteorologiczna: ${escapeHtml(item.weatherStation || "")}<br />
-        Opracował: ${escapeHtml(item.energyAnalystOwner || "")}<br /><br />
-
-        Okres rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
-        Zużycie rozliczeniowe: <strong>${Number(item.billingConsumption || 0).toFixed(3)}</strong><br />
-
-        Okres porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
-        Zużycie porównawcze: <strong>${Number(item.comparisonConsumption || 0).toFixed(3)}</strong><br />
-
-        Temperatura bazowa: ${escapeHtml(item.baseTemperature || 21)}°C<br />
-        Śr. temp. rzeczywista rozliczeniowa: ${escapeHtml(item.realAverageTempBilling || "")}°C<br />
-        Śr. temp. rzeczywista porównawcza: ${escapeHtml(item.realAverageTempComparison || "")}°C
+        Opracował: ${escapeHtml(item.preparedBy || item.energyAnalystOwner || "")}<br />
+        Stacja met.: ${escapeHtml(item.weatherStation || "")}<br />
+        Źródło danych: ${escapeHtml(item.weatherSource || "")}<br />
+        ${item.weatherSourceUrl ? `<a href="${escapeHtml(item.weatherSourceUrl)}" target="_blank" rel="noopener">Link do danych klimatycznych</a><br />` : ""}
+        Temperatura bazowa: ${escapeHtml(String(item.baseTemperature || 21))} °C
       </div>
+
+      <div class="reminder-meta" style="margin-top:8px;">
+        <strong>Okresy:</strong><br />
+        Rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
+        Zużycie rozliczeniowe: <strong>${fmt3(item.billingConsumption)} ${unit}</strong><br /><br />
+        Porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
+        Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${unit}</strong>
+      </div>
+
+      <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:8px;border-radius:4px;">
+        <strong>Wyniki ESCO:</strong><br />
+        HDD TYM: ${fmt2(r.hddTym)}<br />
+        HDD rzeczywiste: ${fmt2(r.hddReal)}<br />
+        Współczynnik korekcji klimatycznej: ${fmt2(r.climateCorrectionFactor)}<br />
+        Zużycie porównawcze po korekcji: <strong>${fmt3(r.correctedComparisonConsumption)} ${unit}</strong><br />
+        Oszczędność energii: <strong>${fmt3(r.savedEnergy)} ${unit}</strong><br />
+        Oszczędność energii: <strong>${fmt2(r.savedEnergyPercent)} %</strong><br />
+        Oszczędność finansowa: <strong>${fmt2(r.savedMoney)} ${currency}</strong><br />
+        Udział WaterAI / ESCO: <strong>${fmt2(r.waterAiShare)} ${currency}</strong>
+      </div>
+
+      ${item.includeLinearRegression ? `
+        <div class="reminder-meta" style="margin-top:6px;color:#666;">
+          ☑ Analiza regresji liniowej dołączona jako załącznik
+        </div>
+      ` : ""}
 
       <div style="margin-top: 12px;">
         <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
       </div>
     </div>
-  `).join("");
+  `}).join("");
 }
