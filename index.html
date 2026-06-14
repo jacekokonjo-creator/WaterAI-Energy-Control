@@ -987,8 +987,11 @@ else if (moduleName === "clients") {
   `;
   renderClientsList();
 }
-else if (moduleName === "objects") {
+else if (moduleName === "objects" || moduleName === "myObjects") {
   renderObjectsModule();
+}
+else if (moduleName === "measurements" || moduleName === "myMeasurements") {
+  renderMeasurementsModule();
 }
 else {
   document.getElementById("module-content").innerHTML = "";
@@ -1114,6 +1117,7 @@ else {
 <script src="js/modules/clients.js"></script>
 <script src="js/modules/objects.js"></script>
 <script src="js/modules/workflow.js"></script>
+<script src="js/modules/measurements.js"></script>
 <script src="js/app.js?v=0835"></script>
 </body>
 </html>
