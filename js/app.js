@@ -1066,12 +1066,13 @@ function updateMeasurementObjectOptions(clientId) {
 function buildTymMonthlyFromForm(form) {
   return MONTHS_PL.map((monthName, index) => {
     const month = index + 1;
-
+    const tVal = form[`tymTemp_${month}`]?.value;
+    const dVal = form[`tymDays_${month}`]?.value;
     return {
       month,
       monthName,
-      tymTemperature: Number(form[`tymTemp_${month}`]?.value ?? ""),
-      tymDays: Number(form[`tymDays_${month}`]?.value || 0)
+      tymTemperature: tVal !== "" && tVal !== undefined ? Number(tVal) : null,
+      tymDays: dVal !== "" && dVal !== undefined ? Number(dVal) : 0
     };
   });
 }
@@ -1097,36 +1098,125 @@ function calcHDD(months, tempField, daysField, baseTemp) {
 }
 
 function calcESCOResults(protocol) {
-  const base = Number(protocol.baseTemperature || 21);
-  const tymMonthly = protocol.tymMonthly || [];
-  const realMonthly = protocol.comparisonMonthly || protocol.realMonthly || [];
+  const base = Number(protocol.baseTemperature ?? 21);
 
-  const hddTym = calcHDD(tymMonthly, "tymTemperature", "tymDays", base);
-  const hddReal = calcHDD(realMonthly, "temperature", "days", base);
+  // TYM — 12 miesięcy stałych (hddTym per okres rozliczeniowy i porównawczy)
+  const tymMonthly        = protocol.tymMonthly        || [];
+  const billingMonthly    = protocol.realMonthly        || [];  // temp rzecz. okresu rozliczeniowego
+  const comparisonMonthly = protocol.comparisonMonthly  || [];  // temp rzecz. okresu porównawczego
 
-  const billingConsumption = Number(protocol.billingConsumption || 0);
-  const comparisonConsumption = Number(protocol.comparisonConsumption || 0);
-  const energyPrice = Number(protocol.energyPrice || 0);
-  const waterAiSharePct = Number(protocol.waterAiShare || 0);
+  // HDD liczone tylko dla miesięcy z przypisanymi dniami > 0
+  // calcHDD już obsługuje dni=0 (wynik 0 dla tego miesiąca) i temp ujemne (diff > base)
 
-  const climateCorrectionFactor = hddReal > 0 ? hddTym / hddReal : 0;
-  const correctedComparisonConsumption = comparisonConsumption * climateCorrectionFactor;
-  const savedEnergy = correctedComparisonConsumption - billingConsumption;
-  const savedEnergyPercent = correctedComparisonConsumption > 0
-    ? (savedEnergy / correctedComparisonConsumption) * 100
+  // HDD TYM dla okresu ROZLICZENIOWEGO — używamy dni z tabelki rozliczeniowej, temp z TYM
+  // Musimy dopasować miesiące: billingMonthly[month] × tymMonthly[month].tymTemperature
+  const hddTymBilling = billingMonthly.reduce((sum, bm) => {
+    // znajdź odpowiedni miesiąc TYM (1-based month)
+    const tym = tymMonthly.find(t => t.month === bm.month);
+    if (!tym) return sum;
+    const tymTemp = Number(tym.tymTemperature ?? tym.temperature ?? 0);
+    const days    = Number(bm.days ?? 0);
+    return sum + Math.max(0, base - tymTemp) * days;
+  }, 0);
+
+  // HDD rzeczywiste dla okresu ROZLICZENIOWEGO
+  const hddRealBilling = billingMonthly.reduce((sum, bm) => {
+    const temp = Number(bm.temperature ?? 0);
+    const days = Number(bm.days ?? 0);
+    return sum + Math.max(0, base - temp) * days;
+  }, 0);
+
+  // HDD TYM dla okresu PORÓWNAWCZEGO — dni z tabelki porównawczej, temp z TYM
+  const hddTymComparison = comparisonMonthly.reduce((sum, cm) => {
+    const tym = tymMonthly.find(t => t.month === cm.month);
+    if (!tym) return sum;
+    const tymTemp = Number(tym.tymTemperature ?? tym.temperature ?? 0);
+    const days    = Number(cm.days ?? 0);
+    return sum + Math.max(0, base - tymTemp) * days;
+  }, 0);
+
+  // HDD rzeczywiste dla okresu PORÓWNAWCZEGO
+  const hddRealComparison = comparisonMonthly.reduce((sum, cm) => {
+    const temp = Number(cm.temperature ?? 0);
+    const days = Number(cm.days ?? 0);
+    return sum + Math.max(0, base - temp) * days;
+  }, 0);
+
+  const billingConsumption    = Number(protocol.billingConsumption    ?? 0);
+  const comparisonConsumption = Number(protocol.comparisonConsumption ?? 0);
+  const energyPrice           = Number(protocol.energyPrice           ?? 0);
+  const waterAiSharePct       = Number(protocol.waterAiShare          ?? 0);
+
+  // Liczba dni każdego okresu
+  const billingDays    = billingMonthly.reduce((s, m) => s + Number(m.days ?? 0), 0);
+  const comparisonDays = comparisonMonthly.reduce((s, m) => s + Number(m.days ?? 0), 0);
+
+  // Współczynniki korekty klimatycznej k = HDD_TYM / HDD_rzecz  (per okres)
+  const kBilling    = hddRealBilling    > 0 ? hddTymBilling    / hddRealBilling    : 0;
+  const kComparison = hddRealComparison > 0 ? hddTymComparison / hddRealComparison : 0;
+
+  // Zużycie skorygowane do TYM
+  const billingCorrected    = billingConsumption    * kBilling;
+  const comparisonCorrected = comparisonConsumption * kComparison;
+
+  // Wskaźnik energetyczny E = zużycie_skor / HDD_TYM  [jednostka/HDD]
+  const eBilling    = hddTymBilling    > 0 ? billingCorrected    / hddTymBilling    : 0;
+  const eComparison = hddTymComparison > 0 ? comparisonCorrected / hddTymComparison : 0;
+
+  // Zużycie dobowe skorygowane = zużycie_TYM / liczba_dni
+  const dailyBilling    = billingDays    > 0 ? billingCorrected    / billingDays    : 0;
+  const dailyComparison = comparisonDays > 0 ? comparisonCorrected / comparisonDays : 0;
+
+  // OSZCZĘDNOŚĆ — porównawcze przeliczone proporcjonalnie na dni rozliczeniowego, oba skor. do TYM
+  // (jak w Excelu: E_porówn × HDD_TYM_rozlicz)
+  const comparisonCorrectedScaled = eComparison * hddTymBilling;
+  const savedEnergy       = comparisonCorrectedScaled - billingCorrected;
+  const savedEnergyPct    = comparisonCorrectedScaled > 0
+    ? (savedEnergy / comparisonCorrectedScaled) * 100
     : 0;
-  const savedMoney = savedEnergy * energyPrice;
-  const waterAiShare = savedMoney * (waterAiSharePct / 100);
+  const savedMoney        = savedEnergy * energyPrice;
+  const waterAiShare      = savedMoney * (waterAiSharePct / 100);
+
+  // PROGNOZA ROCZNA — wskaźnik z rozliczeniowego × HDD_TYM porównawczego (pełny rok)
+  const forecastConsumptionWith    = eBilling    * hddTymComparison;
+  const forecastConsumptionWithout = comparisonConsumption; // bazowe zużycie (bez technologii)
+  const forecastSavedEnergy        = forecastConsumptionWithout - forecastConsumptionWith;
+  const forecastSavedEnergyPct     = forecastConsumptionWithout > 0
+    ? (forecastSavedEnergy / forecastConsumptionWithout) * 100
+    : 0;
+  const forecastSavedMoney         = forecastSavedEnergy * energyPrice;
 
   return {
-    hddTym,
-    hddReal,
-    climateCorrectionFactor,
-    correctedComparisonConsumption,
+    // HDD
+    hddTymBilling,
+    hddRealBilling,
+    hddTymComparison,
+    hddRealComparison,
+    // Współczynniki
+    kBilling,
+    kComparison,
+    // Zużycie skorygowane
+    billingCorrected,
+    comparisonCorrected,
+    // Wskaźniki E
+    eBilling,
+    eComparison,
+    // Zużycie dobowe
+    dailyBilling,
+    dailyComparison,
+    // Oszczędności
+    comparisonCorrectedScaled,
     savedEnergy,
-    savedEnergyPercent,
+    savedEnergyPct,
     savedMoney,
-    waterAiShare
+    waterAiShare,
+    // Prognoza roczna
+    forecastDays: comparisonDays,
+    forecastConsumptionWith,
+    forecastConsumptionWithout,
+    forecastSavedEnergy,
+    forecastSavedEnergyPct,
+    forecastSavedMoney
   };
 }
 
@@ -1408,7 +1498,7 @@ function refreshPeriodTable(prefix) {
         name="${prefix}Temp_${m.year}_${m.month}" value="${tempVal}"
         style="width:90px;font-size:13px;padding:3px 6px;"
         oninput="refreshPeriodHDD('${prefix}')" /></td>
-      <td style="padding:3px 6px;"><input class="month-days" type="number" min="1" max="31"
+      <td style="padding:3px 6px;"><input class="month-days" type="number" min="0" max="31"
         name="${prefix}Days_${m.year}_${m.month}" value="${daysVal}"
         style="width:60px;font-size:13px;padding:3px 6px;"
         oninput="refreshPeriodHDD('${prefix}')" /></td>
@@ -1428,18 +1518,19 @@ function refreshPeriodHDD(prefix) {
   if (!tbody) return;
 
   const baseTempEl = document.querySelector("[name='baseTemperature']");
-  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+  const baseTemp   = baseTempEl ? Number(baseTempEl.value ?? 21) : 21;
 
   let total = 0;
   tbody.querySelectorAll("tr[data-key]").forEach(tr => {
-    const tInput = tr.querySelector("input.month-temp");
-    const dInput = tr.querySelector("input.month-days");
+    const tInput  = tr.querySelector("input.month-temp");
+    const dInput  = tr.querySelector("input.month-days");
     const hddCell = tr.querySelector(".hdd-cell");
     if (!tInput || tInput.value === "") {
       if (hddCell) hddCell.textContent = "—";
       return;
     }
-    const hdd = Math.max(0, baseTemp - Number(tInput.value)) * Number(dInput ? dInput.value : 0);
+    const days = Number(dInput ? dInput.value : 0);
+    const hdd  = Math.max(0, baseTemp - Number(tInput.value)) * days;
     total += hdd;
     if (hddCell) hddCell.textContent = hdd.toFixed(1);
   });
@@ -1464,19 +1555,20 @@ function refreshConsumption(prefix) {
 
 function refreshTymHDD() {
   const baseTempEl = document.querySelector("[name='baseTemperature']");
-  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+  const baseTemp   = baseTempEl ? Number(baseTempEl.value ?? 21) : 21;
   const hddEl      = document.getElementById("tym-hdd-display");
 
   let total = 0;
   for (let m = 1; m <= 12; m++) {
-    const tInput = document.querySelector(`[name="tymTemp_${m}"]`);
-    const dInput = document.querySelector(`[name="tymDays_${m}"]`);
+    const tInput  = document.querySelector(`[name="tymTemp_${m}"]`);
+    const dInput  = document.querySelector(`[name="tymDays_${m}"]`);
     const hddCell = document.getElementById(`tym-hdd-cell-${m}`);
     if (!tInput || tInput.value === "") {
       if (hddCell) hddCell.textContent = "—";
       continue;
     }
-    const hdd = Math.max(0, baseTemp - Number(tInput.value)) * Number(dInput ? dInput.value : 0);
+    const days = Number(dInput ? dInput.value : 0);
+    const hdd  = Math.max(0, baseTemp - Number(tInput.value)) * days;
     total += hdd;
     if (hddCell) hddCell.textContent = hdd.toFixed(1);
   }
@@ -1496,8 +1588,8 @@ function buildPeriodMonthlyFromForm(prefix) {
     rows.push({
       year, month,
       monthName: MONTHS_PL[month - 1] + " " + year,
-      temperature: tInput ? Number(tInput.value || 0) : 0,
-      days: dInput ? Number(dInput.value || 0) : 0
+      temperature: tInput && tInput.value !== "" ? Number(tInput.value) : null,
+      days: dInput ? Number(dInput.value) : 0
     });
   });
   return rows;
@@ -1554,7 +1646,7 @@ function renderMeasurementsModule() {
       <td style="padding:5px 8px;color:var(--color-text-secondary);">${monthName}</td>
       <td style="padding:3px 6px;"><input name="tymTemp_${m}" type="number" step="0.01" placeholder="°C"
         style="width:90px;font-size:13px;padding:3px 6px;" oninput="refreshTymHDD()" /></td>
-      <td style="padding:3px 6px;"><input name="tymDays_${m}" type="number" value="${days}"
+      <td style="padding:3px 6px;"><input name="tymDays_${m}" type="number" min="0" max="31" value="${days}"
         style="width:60px;font-size:13px;padding:3px 6px;" oninput="refreshTymHDD()" /></td>
       <td style="padding:5px 8px;color:var(--color-text-tertiary);" id="tym-hdd-cell-${m}">—</td>
     </tr>`;
@@ -1879,16 +1971,43 @@ function renderMeasurementsList() {
         Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${unit}</strong>
       </div>
 
-      <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:8px;border-radius:4px;">
-        <strong>Wyniki ESCO:</strong><br />
-        HDD TYM: ${fmt2(r.hddTym)}<br />
-        HDD rzeczywiste: ${fmt2(r.hddReal)}<br />
-        Współczynnik korekcji klimatycznej: ${fmt2(r.climateCorrectionFactor)}<br />
-        Zużycie porównawcze po korekcji: <strong>${fmt3(r.correctedComparisonConsumption)} ${unit}</strong><br />
+      <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:10px;border-radius:6px;">
+        <strong>Wyniki ESCO:</strong><br /><br />
+
+        <u>Stopniodni grzewcze (HDD):</u><br />
+        HDD TYM — rozliczeniowy: ${fmt2(r.hddTymBilling)} °C·dni<br />
+        HDD rzecz. — rozliczeniowy: ${fmt2(r.hddRealBilling)} °C·dni<br />
+        HDD TYM — porównawczy: ${fmt2(r.hddTymComparison)} °C·dni<br />
+        HDD rzecz. — porównawczy: ${fmt2(r.hddRealComparison)} °C·dni<br /><br />
+
+        <u>Korekta klimatyczna:</u><br />
+        k rozliczeniowy (HDD_TYM / HDD_rzecz): <strong>${fmt3(r.kBilling)}</strong>${r.kBilling > 1 ? " → rok cieplejszy od normy" : r.kBilling > 0 ? " → rok chłodniejszy od normy" : ""}<br />
+        k porównawczy (HDD_TYM / HDD_rzecz): <strong>${fmt3(r.kComparison)}</strong><br /><br />
+
+        <u>Zużycie skorygowane do TYM:</u><br />
+        Rozliczeniowe skor.: <strong>${fmt3(r.billingCorrected)} ${unit}</strong><br />
+        Porównawcze skor.: <strong>${fmt3(r.comparisonCorrected)} ${unit}</strong><br />
+        Porównawcze skor. przeliczone na dni rozliczeniowe: <strong>${fmt3(r.comparisonCorrectedScaled)} ${unit}</strong><br /><br />
+
+        <u>Wskaźnik energetyczny E = zużycie_TYM / HDD_TYM:</u><br />
+        E rozliczeniowy: <strong>${fmt3(r.eBilling)} ${unit}/HDD</strong><br />
+        E porównawczy: <strong>${fmt3(r.eComparison)} ${unit}/HDD</strong><br />
+        Zmiana E: <strong>${r.eComparison > 0 ? fmt2((r.eBilling - r.eComparison) / r.eComparison * 100) : "—"} %</strong><br /><br />
+
+        <u>Oszczędności (okres rozliczeniowy):</u><br />
         Oszczędność energii: <strong>${fmt3(r.savedEnergy)} ${unit}</strong><br />
-        Oszczędność energii: <strong>${fmt2(r.savedEnergyPercent)} %</strong><br />
+        Oszczędność energii: <strong>${fmt2(r.savedEnergyPct)} %</strong><br />
         Oszczędność finansowa: <strong>${fmt2(r.savedMoney)} ${currency}</strong><br />
-        Udział WaterAI / ESCO: <strong>${fmt2(r.waterAiShare)} ${currency}</strong>
+        Udział WaterAI: <strong>${fmt2(r.waterAiShare)} ${currency}</strong>
+      </div>
+
+      <div class="reminder-meta" style="margin-top:8px;background:#f5f0fa;padding:10px;border-radius:6px;">
+        <strong>Prognoza roczna (${r.forecastDays} dni — jak okres porównawczy):</strong><br /><br />
+        Prognoza z technologią: <strong>${fmt3(r.forecastConsumptionWith)} ${unit}</strong><br />
+        Prognoza bez technologii: <strong>${fmt3(r.forecastConsumptionWithout)} ${unit}</strong><br />
+        Prognoza oszczędności: <strong>${fmt3(r.forecastSavedEnergy)} ${unit}/rok</strong><br />
+        Prognoza oszczędności: <strong>${fmt2(r.forecastSavedEnergyPct)} %</strong><br />
+        Prognoza wartości: <strong>${fmt2(r.forecastSavedMoney)} ${currency}/rok</strong>
       </div>
 
       ${item.includeLinearRegression ? `
