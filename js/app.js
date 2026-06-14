@@ -939,398 +939,410 @@ let editingMeasurementId = null;
 let selectedMeasurementObjectId = null;
 
 const MONTHS_PL = [
-"Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-"Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+  "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+  "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
 ];
 
 function getMeasurements() {
-return MeasurementsModule.getAll();
+  return MeasurementsModule.getAll();
 }
 
 function getDaysInMonth(month, year) {
-return new Date(year, month, 0).getDate();
+  return new Date(year, month, 0).getDate();
 }
 
 function openObjectMeasurements(objectId) {
-selectedMeasurementObjectId = Number(objectId);
-openModule("measurements");
+  selectedMeasurementObjectId = Number(objectId);
+  openModule("measurements");
 }
 
 function updateMeasurementObjectOptions(clientId) {
-const select = document.getElementById("measurement-object-select");
-if (!select) return;
+  const select = document.getElementById("measurement-object-select");
+  if (!select) return;
 
-const objects = ObjectsModule.findByClient(Number(clientId));
+  const objects = ObjectsModule.findByClient(Number(clientId));
 
-if (objects.length === 0) {
-selectedMeasurementObjectId = null;
-select.innerHTML = `<option value="">Brak obiektów dla tego klienta</option>`;
-renderMeasurementsList();
-return;
-}
+  if (objects.length === 0) {
+    selectedMeasurementObjectId = null;
+    select.innerHTML = `<option value="">Brak obiektów dla tego klienta</option>`;
+    renderMeasurementsList();
+    return;
+  }
 
-selectedMeasurementObjectId = Number(objects[0].id);
+  selectedMeasurementObjectId = Number(objects[0].id);
 
-select.innerHTML = objects.map(object => `     <option value="${object.id}">
-      ${escapeHtml(object.name || "Obiekt bez nazwy")}     </option>
+  select.innerHTML = objects.map(object => `
+    <option value="${object.id}">
+      ${escapeHtml(object.name || "Obiekt bez nazwy")}
+    </option>
   `).join("");
 
-select.value = String(selectedMeasurementObjectId);
-renderMeasurementsList();
+  select.value = String(selectedMeasurementObjectId);
+  renderMeasurementsList();
 }
 
 function buildTymMonthlyFromForm(form) {
-return MONTHS_PL.map((monthName, index) => {
-const month = index + 1;
+  return MONTHS_PL.map((monthName, index) => {
+    const month = index + 1;
 
-```
-return {
-  month,
-  monthName,
-  temperature: Number(form[`tymTemp_${month}`]?.value || 0),
-  days: Number(form[`tymDays_${month}`]?.value || 0)
-};
-```
-
-});
+    return {
+      month,
+      monthName,
+      temperature: Number(form[`tymTemp_${month}`]?.value || 0),
+      days: Number(form[`tymDays_${month}`]?.value || 0)
+    };
+  });
 }
 
 function createMeasurement(form) {
-const object = ObjectsModule.find(Number(form.objectId.value));
+  const object = ObjectsModule.find(Number(form.objectId.value));
 
-if (!object) {
-alert("Wybierz obiekt dla protokołu.");
-return;
-}
+  if (!object) {
+    alert("Wybierz obiekt dla protokołu.");
+    return;
+  }
 
-const billingStart = Number(form.billingPeriodStartReading.value || 0);
-const billingEnd = Number(form.billingPeriodEndReading.value || 0);
-const comparisonStart = Number(form.comparisonPeriodStartReading.value || 0);
-const comparisonEnd = Number(form.comparisonPeriodEndReading.value || 0);
+  const billingStart = Number(form.billingPeriodStartReading.value || 0);
+  const billingEnd = Number(form.billingPeriodEndReading.value || 0);
+  const comparisonStart = Number(form.comparisonPeriodStartReading.value || 0);
+  const comparisonEnd = Number(form.comparisonPeriodEndReading.value || 0);
 
-const protocolData = {
-clientId: object.clientId,
-objectId: form.objectId.value,
+  const protocolData = {
+    clientId: object.clientId,
+    objectId: form.objectId.value,
 
-```
-weatherStation: form.weatherStation.value.trim(),
-energyAnalystOwner: form.energyAnalystOwner.value.trim(),
-protocolDate: form.protocolDate.value,
+    weatherStation: form.weatherStation.value.trim(),
+    energyAnalystOwner: form.energyAnalystOwner.value.trim(),
+    protocolDate: form.protocolDate.value,
 
-billingPeriodStartDate: form.billingPeriodStartDate.value,
-billingPeriodStartReading: billingStart,
-billingPeriodEndDate: form.billingPeriodEndDate.value,
-billingPeriodEndReading: billingEnd,
-billingConsumption: billingEnd - billingStart,
+    billingPeriodStartDate: form.billingPeriodStartDate.value,
+    billingPeriodStartReading: billingStart,
+    billingPeriodEndDate: form.billingPeriodEndDate.value,
+    billingPeriodEndReading: billingEnd,
+    billingConsumption: billingEnd - billingStart,
 
-comparisonPeriodStartDate: form.comparisonPeriodStartDate.value,
-comparisonPeriodStartReading: comparisonStart,
-comparisonPeriodEndDate: form.comparisonPeriodEndDate.value,
-comparisonPeriodEndReading: comparisonEnd,
-comparisonConsumption: comparisonEnd - comparisonStart,
+    comparisonPeriodStartDate: form.comparisonPeriodStartDate.value,
+    comparisonPeriodStartReading: comparisonStart,
+    comparisonPeriodEndDate: form.comparisonPeriodEndDate.value,
+    comparisonPeriodEndReading: comparisonEnd,
+    comparisonConsumption: comparisonEnd - comparisonStart,
 
-baseTemperature: Number(form.baseTemperature.value || 21),
-realAverageTempBilling: Number(form.realAverageTempBilling.value || 0),
-realAverageTempComparison: Number(form.realAverageTempComparison.value || 0),
+    baseTemperature: Number(form.baseTemperature.value || 21),
+    realAverageTempBilling: Number(form.realAverageTempBilling.value || 0),
+    realAverageTempComparison: Number(form.realAverageTempComparison.value || 0),
 
-tymMonthly: buildTymMonthlyFromForm(form),
-note: form.note.value.trim()
-```
+    tymMonthly: buildTymMonthlyFromForm(form),
+    note: form.note.value.trim()
+  };
 
-};
+  if (editingMeasurementId) {
+    MeasurementsModule.update(editingMeasurementId, protocolData);
+    editingMeasurementId = null;
+  } else {
+    MeasurementsModule.add(protocolData);
+  }
 
-if (editingMeasurementId) {
-MeasurementsModule.update(editingMeasurementId, protocolData);
-editingMeasurementId = null;
-} else {
-MeasurementsModule.add(protocolData);
-}
-
-selectedMeasurementObjectId = Number(form.objectId.value);
-renderMeasurementsModule();
+  selectedMeasurementObjectId = Number(form.objectId.value);
+  renderMeasurementsModule();
 }
 
 function editMeasurement(id) {
-const protocol = MeasurementsModule.find(id);
-if (!protocol) return;
+  const protocol = MeasurementsModule.find(id);
+  if (!protocol) return;
 
-editingMeasurementId = Number(id);
-selectedMeasurementObjectId = Number(protocol.objectId);
+  editingMeasurementId = Number(id);
+  selectedMeasurementObjectId = Number(protocol.objectId);
 
-renderMeasurementsModule();
+  renderMeasurementsModule();
 
-const form = document.querySelector("#module-content form");
-if (!form) return;
+  const form = document.querySelector("#module-content form");
+  if (!form) return;
 
-form.clientId.value = String(protocol.clientId || "");
-updateMeasurementObjectOptions(protocol.clientId);
-form.objectId.value = String(protocol.objectId || "");
+  form.clientId.value = String(protocol.clientId || "");
+  updateMeasurementObjectOptions(protocol.clientId);
+  form.objectId.value = String(protocol.objectId || "");
 
-form.weatherStation.value = protocol.weatherStation || "";
-form.energyAnalystOwner.value = protocol.energyAnalystOwner || "";
-form.protocolDate.value = protocol.protocolDate || "";
+  form.weatherStation.value = protocol.weatherStation || "";
+  form.energyAnalystOwner.value = protocol.energyAnalystOwner || "";
+  form.protocolDate.value = protocol.protocolDate || "";
 
-form.billingPeriodStartDate.value = protocol.billingPeriodStartDate || "";
-form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
-form.billingPeriodEndDate.value = protocol.billingPeriodEndDate || "";
-form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
+  form.billingPeriodStartDate.value = protocol.billingPeriodStartDate || "";
+  form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
+  form.billingPeriodEndDate.value = protocol.billingPeriodEndDate || "";
+  form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
 
-form.comparisonPeriodStartDate.value = protocol.comparisonPeriodStartDate || "";
-form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
-form.comparisonPeriodEndDate.value = protocol.comparisonPeriodEndDate || "";
-form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
+  form.comparisonPeriodStartDate.value = protocol.comparisonPeriodStartDate || "";
+  form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
+  form.comparisonPeriodEndDate.value = protocol.comparisonPeriodEndDate || "";
+  form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
 
-form.baseTemperature.value = protocol.baseTemperature || 21;
-form.realAverageTempBilling.value = protocol.realAverageTempBilling || "";
-form.realAverageTempComparison.value = protocol.realAverageTempComparison || "";
-form.note.value = protocol.note || "";
+  form.baseTemperature.value = protocol.baseTemperature || 21;
+  form.realAverageTempBilling.value = protocol.realAverageTempBilling || "";
+  form.realAverageTempComparison.value = protocol.realAverageTempComparison || "";
+  form.note.value = protocol.note || "";
 
-if (protocol.tymMonthly && protocol.tymMonthly.length) {
-protocol.tymMonthly.forEach(item => {
-if (form[`tymTemp_${item.month}`]) form[`tymTemp_${item.month}`].value = item.temperature || "";
-if (form[`tymDays_${item.month}`]) form[`tymDays_${item.month}`].value = item.days || "";
-});
-}
+  if (protocol.tymMonthly && protocol.tymMonthly.length) {
+    protocol.tymMonthly.forEach(item => {
+      if (form[`tymTemp_${item.month}`]) {
+        form[`tymTemp_${item.month}`].value = item.temperature || "";
+      }
 
-const submitButton = form.querySelector("button[type='submit']");
-if (submitButton) submitButton.textContent = "Zapisz protokół";
+      if (form[`tymDays_${item.month}`]) {
+        form[`tymDays_${item.month}`].value = item.days || "";
+      }
+    });
+  }
 
-window.scrollTo({ top: 0, behavior: "smooth" });
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) submitButton.textContent = "Zapisz protokół";
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function deleteMeasurement(id) {
-if (!confirm("Czy na pewno usunąć protokół pomiarowy?")) return;
-MeasurementsModule.remove(id);
-renderMeasurementsModule();
+  if (!confirm("Czy na pewno usunąć protokół pomiarowy?")) return;
+  MeasurementsModule.remove(id);
+  renderMeasurementsModule();
 }
 
 function cancelMeasurementEdit() {
-editingMeasurementId = null;
-renderMeasurementsModule();
+  editingMeasurementId = null;
+  renderMeasurementsModule();
 }
 
 function renderMeasurementsModule() {
-const container = document.getElementById("module-content");
-if (!container) return;
+  const container = document.getElementById("module-content");
+  if (!container) return;
 
-const clients = getClients();
-const objects = getObjects();
+  const clients = getClients();
+  const objects = getObjects();
 
-if (clients.length === 0 || objects.length === 0) {
-container.innerHTML = `       <div class="reminder-card">         <strong>Najpierw dodaj klienta i obiekt</strong>         <div class="reminder-meta">
-          Protokół pomiarowy musi być przypisany do konkretnego obiektu.         </div>       </div>
+  if (clients.length === 0 || objects.length === 0) {
+    container.innerHTML = `
+      <div class="reminder-card">
+        <strong>Najpierw dodaj klienta i obiekt</strong>
+        <div class="reminder-meta">
+          Protokół pomiarowy musi być przypisany do konkretnego obiektu.
+        </div>
+      </div>
     `;
-return;
-}
+    return;
+  }
 
-let selectedObject = selectedMeasurementObjectId
-? ObjectsModule.find(selectedMeasurementObjectId)
-: objects[0];
+  let selectedObject = selectedMeasurementObjectId
+    ? ObjectsModule.find(selectedMeasurementObjectId)
+    : objects[0];
 
-if (!selectedObject) selectedObject = objects[0];
+  if (!selectedObject) selectedObject = objects[0];
 
-const selectedClientId = Number(selectedObject.clientId);
-const objectsForClient = ObjectsModule.findByClient(selectedClientId);
-selectedMeasurementObjectId = Number(selectedObject.id);
+  const selectedClientId = Number(selectedObject.clientId);
+  const objectsForClient = ObjectsModule.findByClient(selectedClientId);
+  selectedMeasurementObjectId = Number(selectedObject.id);
 
-const currentYear = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
 
-container.innerHTML = ` <form onsubmit="createMeasurement(this); return false;" class="calendar-form">
-
-```
-  <div style="grid-column: 1 / -1;">
-    <h3>Protokół pomiarowy ESCO</h3>
-    <p class="reminder-meta">
-      Dane z tego formularza będą później podstawą do raportu ESCO i wyliczenia oszczędności.
-    </p>
-  </div>
-
-  <div>
-    <label>Klient</label>
-    <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)">
-      ${clients.map(client => `
-        <option value="${client.id}" ${Number(client.id) === Number(selectedClientId) ? "selected" : ""}>
-          ${escapeHtml(client.name)}
-        </option>
-      `).join("")}
-    </select>
-  </div>
-
-  <div>
-    <label>Obiekt</label>
-    <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId = Number(this.value); renderMeasurementsList();">
-      ${objectsForClient.map(object => `
-        <option value="${object.id}" ${Number(object.id) === Number(selectedObject.id) ? "selected" : ""}>
-          ${escapeHtml(object.name || "Obiekt bez nazwy")}
-        </option>
-      `).join("")}
-    </select>
-  </div>
-
-  <div>
-    <label>Stacja meteorologiczna</label>
-    <input name="weatherStation" placeholder="np. Warszawa-Okęcie / Lublin-Radawiec" />
-  </div>
-
-  <div>
-    <label>Opracował / Energy Analyst</label>
-    <input name="energyAnalystOwner" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko analityka" />
-  </div>
-
-  <div>
-    <label>Data protokołu</label>
-    <input name="protocolDate" type="date" required />
-  </div>
-
-  <div>
-    <label>Temperatura bazowa °C</label>
-    <input name="baseTemperature" type="number" step="0.1" value="21" />
-  </div>
-
-  <div style="grid-column: 1 / -1;">
-    <h3>Okres rozliczeniowy</h3>
-  </div>
-
-  <div>
-    <label>Start okresu rozliczeniowego — data</label>
-    <input name="billingPeriodStartDate" type="date" required />
-  </div>
-
-  <div>
-    <label>Start okresu rozliczeniowego — odczyt</label>
-    <input name="billingPeriodStartReading" type="number" step="0.001" required />
-  </div>
-
-  <div>
-    <label>Koniec okresu rozliczeniowego — data</label>
-    <input name="billingPeriodEndDate" type="date" required />
-  </div>
-
-  <div>
-    <label>Koniec okresu rozliczeniowego — odczyt</label>
-    <input name="billingPeriodEndReading" type="number" step="0.001" required />
-  </div>
-
-  <div>
-    <label>Średnia temperatura rzeczywista w okresie rozliczeniowym</label>
-    <input name="realAverageTempBilling" type="number" step="0.01" />
-  </div>
-
-  <div style="grid-column: 1 / -1;">
-    <h3>Okres porównawczy</h3>
-  </div>
-
-  <div>
-    <label>Start okresu porównawczego — data</label>
-    <input name="comparisonPeriodStartDate" type="date" required />
-  </div>
-
-  <div>
-    <label>Start okresu porównawczego — odczyt</label>
-    <input name="comparisonPeriodStartReading" type="number" step="0.001" required />
-  </div>
-
-  <div>
-    <label>Koniec okresu porównawczego — data</label>
-    <input name="comparisonPeriodEndDate" type="date" required />
-  </div>
-
-  <div>
-    <label>Koniec okresu porównawczego — odczyt</label>
-    <input name="comparisonPeriodEndReading" type="number" step="0.001" required />
-  </div>
-
-  <div>
-    <label>Średnia temperatura rzeczywista w okresie porównawczym</label>
-    <input name="realAverageTempComparison" type="number" step="0.01" />
-  </div>
-
-  <div style="grid-column: 1 / -1;">
-    <h3>Średnia temperatura TYM</h3>
-    <p class="reminder-meta">
-      Dni kalendarzowe są uzupełnione automatycznie dla bieżącego roku, ale możesz je zmienić ręcznie.
-    </p>
-  </div>
-
-  ${MONTHS_PL.map((monthName, index) => {
-    const month = index + 1;
-    return `
-      <div>
-        <label>${monthName} — średnia temperatura TYM</label>
-        <input name="tymTemp_${month}" type="number" step="0.01" />
+  container.innerHTML = `
+    <form onsubmit="createMeasurement(this); return false;" class="calendar-form">
+      <div style="grid-column: 1 / -1;">
+        <h3>Protokół pomiarowy ESCO</h3>
+        <p class="reminder-meta">
+          Dane z tego formularza będą później podstawą do raportu ESCO i wyliczenia oszczędności.
+        </p>
       </div>
 
       <div>
-        <label>${monthName} — dni kalendarzowe</label>
-        <input name="tymDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
+        <label>Klient</label>
+        <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)">
+          ${clients.map(client => `
+            <option value="${client.id}" ${Number(client.id) === Number(selectedClientId) ? "selected" : ""}>
+              ${escapeHtml(client.name)}
+            </option>
+          `).join("")}
+        </select>
       </div>
-    `;
-  }).join("")}
 
-  <div style="grid-column: 1 / -1;">
-    <label>Notatka</label>
-    <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." />
-  </div>
+      <div>
+        <label>Obiekt</label>
+        <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId = Number(this.value); renderMeasurementsList();">
+          ${objectsForClient.map(object => `
+            <option value="${object.id}" ${Number(object.id) === Number(selectedObject.id) ? "selected" : ""}>
+              ${escapeHtml(object.name || "Obiekt bez nazwy")}
+            </option>
+          `).join("")}
+        </select>
+      </div>
 
-  <div class="calendar-actions">
-    <button class="primary-button" type="submit">
-      ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół"}
-    </button>
-    ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
-  </div>
-</form>
+      <div>
+        <label>Stacja meteorologiczna</label>
+        <input name="weatherStation" placeholder="np. Warszawa-Okęcie / Lublin-Radawiec" />
+      </div>
 
-<div id="measurements-list"></div>
-```
+      <div>
+        <label>Opracował / Energy Analyst</label>
+        <input name="energyAnalystOwner" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko analityka" />
+      </div>
 
-`;
+      <div>
+        <label>Data protokołu</label>
+        <input name="protocolDate" type="date" required />
+      </div>
 
-renderMeasurementsList();
+      <div>
+        <label>Temperatura bazowa °C</label>
+        <input name="baseTemperature" type="number" step="0.1" value="21" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Okres rozliczeniowy</h3>
+      </div>
+
+      <div>
+        <label>Start okresu rozliczeniowego — data</label>
+        <input name="billingPeriodStartDate" type="date" required />
+      </div>
+
+      <div>
+        <label>Start okresu rozliczeniowego — odczyt</label>
+        <input name="billingPeriodStartReading" type="number" step="0.001" required />
+      </div>
+
+      <div>
+        <label>Koniec okresu rozliczeniowego — data</label>
+        <input name="billingPeriodEndDate" type="date" required />
+      </div>
+
+      <div>
+        <label>Koniec okresu rozliczeniowego — odczyt</label>
+        <input name="billingPeriodEndReading" type="number" step="0.001" required />
+      </div>
+
+      <div>
+        <label>Średnia temperatura rzeczywista w okresie rozliczeniowym</label>
+        <input name="realAverageTempBilling" type="number" step="0.01" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Okres porównawczy</h3>
+      </div>
+
+      <div>
+        <label>Start okresu porównawczego — data</label>
+        <input name="comparisonPeriodStartDate" type="date" required />
+      </div>
+
+      <div>
+        <label>Start okresu porównawczego — odczyt</label>
+        <input name="comparisonPeriodStartReading" type="number" step="0.001" required />
+      </div>
+
+      <div>
+        <label>Koniec okresu porównawczego — data</label>
+        <input name="comparisonPeriodEndDate" type="date" required />
+      </div>
+
+      <div>
+        <label>Koniec okresu porównawczego — odczyt</label>
+        <input name="comparisonPeriodEndReading" type="number" step="0.001" required />
+      </div>
+
+      <div>
+        <label>Średnia temperatura rzeczywista w okresie porównawczym</label>
+        <input name="realAverageTempComparison" type="number" step="0.01" />
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <h3>Średnia temperatura TYM</h3>
+        <p class="reminder-meta">
+          Dni kalendarzowe są uzupełnione automatycznie dla bieżącego roku, ale możesz je zmienić ręcznie.
+        </p>
+      </div>
+
+      ${MONTHS_PL.map((monthName, index) => {
+        const month = index + 1;
+
+        return `
+          <div>
+            <label>${monthName} — średnia temperatura TYM</label>
+            <input name="tymTemp_${month}" type="number" step="0.01" />
+          </div>
+
+          <div>
+            <label>${monthName} — dni kalendarzowe</label>
+            <input name="tymDays_${month}" type="number" value="${getDaysInMonth(month, currentYear)}" />
+          </div>
+        `;
+      }).join("")}
+
+      <div style="grid-column: 1 / -1;">
+        <label>Notatka</label>
+        <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." />
+      </div>
+
+      <div class="calendar-actions">
+        <button class="primary-button" type="submit">
+          ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół"}
+        </button>
+        ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
+      </div>
+    </form>
+
+    <div id="measurements-list"></div>
+  `;
+
+  renderMeasurementsList();
 }
 
 function renderMeasurementsList() {
-const container = document.getElementById("measurements-list");
-if (!container) return;
+  const container = document.getElementById("measurements-list");
+  if (!container) return;
 
-if (!selectedMeasurementObjectId) {
-container.innerHTML = `       <div class="reminder-card">         <strong>Brak wybranego obiektu</strong>         <div class="reminder-meta">Wybierz klienta i obiekt, aby zobaczyć protokoły.</div>       </div>
+  if (!selectedMeasurementObjectId) {
+    container.innerHTML = `
+      <div class="reminder-card">
+        <strong>Brak wybranego obiektu</strong>
+        <div class="reminder-meta">Wybierz klienta i obiekt, aby zobaczyć protokoły.</div>
+      </div>
     `;
-return;
-}
+    return;
+  }
 
-const protocols = MeasurementsModule.findByObject(selectedMeasurementObjectId);
+  const protocols = MeasurementsModule.findByObject(selectedMeasurementObjectId);
 
-if (protocols.length === 0) {
-container.innerHTML = `       <div class="reminder-card">         <strong>Brak protokołów</strong>         <div class="reminder-meta">Dodaj pierwszy protokół pomiarowy dla tego obiektu.</div>       </div>
+  if (protocols.length === 0) {
+    container.innerHTML = `
+      <div class="reminder-card">
+        <strong>Brak protokołów</strong>
+        <div class="reminder-meta">Dodaj pierwszy protokół pomiarowy dla tego obiektu.</div>
+      </div>
     `;
-return;
+    return;
+  }
+
+  container.innerHTML = protocols.map(item => `
+    <div class="reminder-card">
+      <strong>Protokół z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+
+      <div class="reminder-meta">
+        Klient: ${escapeHtml(getClientName(item.clientId))}<br />
+        Obiekt: ${escapeHtml(getObjectName(item.objectId))}<br />
+        Stacja meteorologiczna: ${escapeHtml(item.weatherStation || "")}<br />
+        Opracował: ${escapeHtml(item.energyAnalystOwner || "")}<br /><br />
+
+        Okres rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
+        Zużycie rozliczeniowe: <strong>${Number(item.billingConsumption || 0).toFixed(3)}</strong><br />
+
+        Okres porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
+        Zużycie porównawcze: <strong>${Number(item.comparisonConsumption || 0).toFixed(3)}</strong><br />
+
+        Temperatura bazowa: ${escapeHtml(item.baseTemperature || 21)}°C<br />
+        Śr. temp. rzeczywista rozliczeniowa: ${escapeHtml(item.realAverageTempBilling || "")}°C<br />
+        Śr. temp. rzeczywista porównawcza: ${escapeHtml(item.realAverageTempComparison || "")}°C
+      </div>
+
+      <div style="margin-top: 12px;">
+        <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
+        <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
+      </div>
+    </div>
+  `).join("");
 }
-
-container.innerHTML = protocols.map(item => ` <div class="reminder-card"> <strong>Protokół z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong> <div class="reminder-meta">
-Klient: ${escapeHtml(getClientName(item.clientId))}<br />
-Obiekt: ${escapeHtml(getObjectName(item.objectId))}<br />
-Stacja meteorologiczna: ${escapeHtml(item.weatherStation)}<br />
-Opracował: ${escapeHtml(item.energyAnalystOwner)}<br /><br />
-
-```
-    Okres rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate)} → ${escapeHtml(item.billingPeriodEndDate)}<br />
-    Zużycie rozliczeniowe: <strong>${Number(item.billingConsumption || 0).toFixed(3)}</strong><br />
-
-    Okres porównawczy: ${escapeHtml(item.comparisonPeriodStartDate)} → ${escapeHtml(item.comparisonPeriodEndDate)}<br />
-    Zużycie porównawcze: <strong>${Number(item.comparisonConsumption || 0).toFixed(3)}</strong><br />
-
-    Temperatura bazowa: ${escapeHtml(item.baseTemperature)}°C<br />
-    Śr. temp. rzeczywista rozliczeniowa: ${escapeHtml(item.realAverageTempBilling)}°C<br />
-    Śr. temp. rzeczywista porównawcza: ${escapeHtml(item.realAverageTempComparison)}°C
-  </div>
-
-  <div style="margin-top: 12px;">
-    <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
-    <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
-  </div>
-</div>
-```
-
-`).join("");
-}
-
