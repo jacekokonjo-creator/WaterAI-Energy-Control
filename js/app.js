@@ -1255,33 +1255,34 @@ function editMeasurement(id) {
   refreshPeriodTable("billing");
   refreshPeriodTable("comparison");
 
-  // Wstaw zapisane temperatury do tabelki rozliczeniowej (realMonthly)
-  const billingData = protocol.realMonthly || [];
-  billingData.forEach(item => {
-    const key = `${item.year || new Date(protocol.billingPeriodStartDate || "").getFullYear()}-${item.month}`;
-    const tbody = document.getElementById("billing-months-tbody");
+  // Wstaw zapisane temperatury — pomocnicza funkcja
+  function restoreTemps(tbodyId, data) {
+    if (!data || data.length === 0) return;
+    const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
-    const tr = tbody.querySelector(`tr[data-key="${key}"]`);
-    if (!tr) return;
-    const tInput = tr.querySelector("input.month-temp");
-    const dInput = tr.querySelector("input.month-days");
-    if (tInput) tInput.value = item.temperature ?? item.realTemperature ?? "";
-    if (dInput) dInput.value = item.days ?? "";
-  });
+    data.forEach(item => {
+      // szukaj po roku i miesiącu — jeśli brak roku szukaj tylko po miesiącu
+      let tr = null;
+      if (item.year) {
+        tr = tbody.querySelector(`tr[data-key="${item.year}-${item.month}"]`);
+      }
+      if (!tr) {
+        // fallback: znajdź pierwszy wiersz z tym miesiącem (dla danych bez roku)
+        tbody.querySelectorAll("tr[data-key]").forEach(row => {
+          const [, m] = row.dataset.key.split("-").map(Number);
+          if (m === item.month && !tr) tr = row;
+        });
+      }
+      if (!tr) return;
+      const tInput = tr.querySelector("input.month-temp");
+      const dInput = tr.querySelector("input.month-days");
+      if (tInput) tInput.value = item.temperature ?? item.realTemperature ?? "";
+      if (dInput && (item.days || item.realDays)) dInput.value = item.days ?? item.realDays ?? "";
+    });
+  }
 
-  // Wstaw zapisane temperatury do tabelki porównawczej
-  const comparisonData = protocol.comparisonMonthly || [];
-  comparisonData.forEach(item => {
-    const key = `${item.year || new Date(protocol.comparisonPeriodStartDate || "").getFullYear()}-${item.month}`;
-    const tbody = document.getElementById("comparison-months-tbody");
-    if (!tbody) return;
-    const tr = tbody.querySelector(`tr[data-key="${key}"]`);
-    if (!tr) return;
-    const tInput = tr.querySelector("input.month-temp");
-    const dInput = tr.querySelector("input.month-days");
-    if (tInput) tInput.value = item.temperature ?? "";
-    if (dInput) dInput.value = item.days ?? "";
-  });
+  restoreTemps("billing-months-tbody",    protocol.realMonthly       || []);
+  restoreTemps("comparison-months-tbody", protocol.comparisonMonthly || []);
 
   // Przelicz HDD po wstawieniu temperatur
   refreshPeriodHDD("billing");
@@ -1326,31 +1327,39 @@ function cancelMeasurementEdit() {
 
 function buildMonthsFromDates(startDate, endDate) {
   if (!startDate || !endDate) return [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+
+  // Parsuj jako lokalny czas (split na części) żeby uniknąć przesunięć UTC
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+  const [ey, em, ed] = endDate.split("-").map(Number);
+
+  const start = new Date(sy, sm - 1, sd);
+  const end   = new Date(ey, em - 1, ed);
+
   if (isNaN(start) || isNaN(end) || end < start) return [];
 
   const months = [];
-  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+  let curYear  = sy;
+  let curMonth = sm - 1; // 0-based
 
-  while (cur <= end) {
-    const year = cur.getFullYear();
-    const month = cur.getMonth(); // 0-based
-    const firstOfMonth = new Date(year, month, 1);
-    const lastOfMonth = new Date(year, month + 1, 0);
+  while (true) {
+    const firstOfMonth = new Date(curYear, curMonth, 1);
+    const lastOfMonth  = new Date(curYear, curMonth + 1, 0);
+
+    if (firstOfMonth > end) break;
 
     const dayFrom = (firstOfMonth < start) ? start.getDate() : 1;
-    const dayTo   = (lastOfMonth > end)    ? end.getDate()   : lastOfMonth.getDate();
+    const dayTo   = (lastOfMonth  > end)   ? end.getDate()   : lastOfMonth.getDate();
     const days    = dayTo - dayFrom + 1;
 
     months.push({
-      year,
-      month: month + 1, // 1-based
-      monthName: MONTHS_PL[month] + " " + year,
+      year:      curYear,
+      month:     curMonth + 1,
+      monthName: MONTHS_PL[curMonth] + " " + curYear,
       days
     });
 
-    cur = new Date(year, month + 1, 1);
+    curMonth++;
+    if (curMonth > 11) { curMonth = 0; curYear++; }
   }
 
   return months;
