@@ -986,14 +986,16 @@ function updateMeasurementObjectOptions(clientId) {
   }
 
   select.innerHTML = objects.map(object => `
-    <option value="${object.id}">${escapeHtml(object.name)}</option>
+    <option value="${object.id}">${escapeHtml(object.name || "Obiekt bez nazwy")}</option>
   `).join("");
 
   if (selectedMeasurementObjectId && objects.some(object => object.id === Number(selectedMeasurementObjectId))) {
     select.value = String(selectedMeasurementObjectId);
+  } else {
+    selectedMeasurementObjectId = Number(objects[0].id);
+    select.value = String(objects[0].id);
   }
 }
-
 function createMeasurement(form) {
   const object = ObjectsModule.find(Number(form.objectId.value));
 
@@ -1085,12 +1087,20 @@ function renderMeasurementsModule() {
     return;
   }
 
-  const selectedObject = selectedMeasurementObjectId
-    ? ObjectsModule.find(selectedMeasurementObjectId)
-    : objects[0];
+let selectedObject = selectedMeasurementObjectId
+  ? ObjectsModule.find(selectedMeasurementObjectId)
+  : null;
 
-  const selectedClientId = selectedObject ? selectedObject.clientId : clients[0].id;
-  const objectsForClient = ObjectsModule.findByClient(selectedClientId);
+let selectedClientId = selectedObject
+  ? Number(selectedObject.clientId)
+  : Number(clients[0].id);
+
+let objectsForClient = ObjectsModule.findByClient(selectedClientId);
+
+if (!selectedObject && objectsForClient.length > 0) {
+  selectedObject = objectsForClient[0];
+  selectedMeasurementObjectId = Number(selectedObject.id);
+}
 
   container.innerHTML = `
     <form onsubmit="createMeasurement(this); return false;" class="calendar-form">
@@ -1117,7 +1127,7 @@ function renderMeasurementsModule() {
         <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value); renderMeasurementsList();">
           ${objectsForClient.map(object => `
             <option value="${object.id}" ${Number(object.id) === Number(selectedObject?.id) ? "selected" : ""}>
-              ${escapeHtml(object.name)}
+             ${escapeHtml(object.name || "Obiekt bez nazwy")}
             </option>
           `).join("")}
         </select>
