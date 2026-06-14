@@ -836,172 +836,81 @@
     }
 
     function openModule(moduleName) {
-      const labels = getModuleLabels();
-      const item = labels[moduleName];
+  const labels = getModuleLabels();
+  const item = labels[moduleName];
 
-      document.getElementById("module-title").textContent = item[1];
-      document.getElementById("module-description").textContent =
-        moduleName === "calendar" ? t("calendarIntro") : t("moduleDefault");
+  document.getElementById("module-title").textContent = item[1];
 
-if (moduleName === "calendar") {
-  renderWorkflowModule();
-}
-else if (moduleName === "measurements" || moduleName === "myMeasurements") {
-  renderMeasurementsModule();
-}
-else if (moduleName === "clients") {
-  document.getElementById("module-content").innerHTML = `
-    <form onsubmit="createClient(this); return false;" class="calendar-form">
+  if (moduleName === "calendar") {
+    document.getElementById("module-description").textContent = t("calendarIntro");
+    renderWorkflowModule();
+  }
+  else if (moduleName === "clients") {
+    document.getElementById("module-description").textContent = t("moduleDefault");
 
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane podstawowe</h3>
-      </div>
-
-      <div>
-        <label>Nazwa klienta</label>
-        <input name="name" required placeholder="np. Hotel Group XYZ" />
-      </div>
-
-      <div>
-        <label>VAT ID</label>
-        <input name="vatId" placeholder="np. PL1234567890" />
-      </div>
-
-      <div>
-        <label>Kraj</label>
-        <select name="country">
-          <option value="PL">Polska</option>
-          <option value="CZ">Czechy</option>
-          <option value="SK">Słowacja</option>
-          <option value="DE">Niemcy</option>
-          <option value="EN">Inny / English</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Język klienta</label>
-        <select name="language">
-          <option value="pl">Polski</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="cs">Čeština</option>
-          <option value="GB">Anglia</option>
-        </select>
-      </div>
-
+    document.getElementById("module-content").innerHTML = `
+      <form onsubmit="createClient(this); return false;" class="calendar-form">
         <div style="grid-column: 1 / -1;">
-        <h3>Adres klienta</h3>
-      </div>
-
-      <div>
-        <label>Kod pocztowy</label>
-        <input name="postalCode" placeholder="np. 00-001" />
-      </div>
-
-      <div>
-        <label>Miasto</label>
-        <input name="city" placeholder="np. Warszawa" />
-      </div>
-
-      <div>
-        <label>Ulica</label>
-        <input name="street" placeholder="np. Prosta" />
-      </div>
-
-      <div>
-        <label>Nr budynku</label>
-        <input name="buildingNumber" placeholder="np. 10" />
-      </div>
-
-      <div>
-        <label>Nr lokalu</label>
-        <input name="apartmentNumber" placeholder="opcjonalnie" />
-      </div>
-
-      <div>
-        <label>Google Maps URL</label>
-        <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane finansowe</h3>
-      </div>
-
-      <div>
-        <label>Email do FV</label>
-        <input name="invoiceEmail" type="email" placeholder="faktury@firma.pl" />
-      </div>
-
-      <div>
-        <label>Termin płatności FV</label>
-        <input name="paymentDays" type="number" value="14" min="0" />
-      </div>
-
-      <div>
-        <label>Model rozliczeń</label>
-        <select name="settlementModel">
-          <option value="ESCO">ESCO</option>
-          <option value="SUBSCRIPTION">Abonament</option>
-          <option value="CUSTOM">Własny</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Udział WaterAI w oszczędności (%)</label>
-        <input name="escoShare" type="number" value="50" min="0" max="100" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane kontaktowe</h3>
-        <p class="reminder-meta">Możesz dodać wiele osób kontaktowych dla jednego klienta.</p>
-      </div>
-
-      <div id="contacts-container" style="grid-column: 1 / -1;">
-        <div class="contact-row calendar-form" style="grid-column: 1 / -1;">
-          <div>
-            <label>Osoba kontaktowa</label>
-            <input name="contactName" type="text" placeholder="Imię i nazwisko" />
-          </div>
-
-          <div>
-            <label>Funkcja</label>
-            <input name="contactRole" type="text" placeholder="np. Księgowość / Dyrektor techniczny" />
-          </div>
-
-          <div>
-            <label>Email</label>
-            <input name="contactEmail" type="email" />
-          </div>
-
-          <div>
-            <label>Telefon</label>
-            <input name="contactPhone" type="text" />
-          </div>
+          <h3>Dane podstawowe</h3>
         </div>
-      </div>
 
-      <div class="calendar-actions">
-        <button class="small-button" type="button" onclick="addContactRow()">Dodaj kolejną osobę</button>
-        <button class="primary-button" type="submit">Dodaj klienta</button>
-      </div>
-    </form>
+        <div>
+          <label>Nazwa klienta</label>
+          <input name="name" required placeholder="np. Hotel Group XYZ" />
+        </div>
 
-    <div id="clients-list"></div>
-  `;
-  renderClientsList();
-}
-else if (moduleName === "objects" || moduleName === "myObjects") {
-  renderObjectsModule();
-}
-else if (moduleName === "measurements" || moduleName === "myMeasurements") {
-  renderMeasurementsModule();
-}
-else {
-  document.getElementById("module-content").innerHTML = "";
-}
-      document.getElementById("module-view").classList.add("active");
-    }
+        <div>
+          <label>VAT ID</label>
+          <input name="vatId" placeholder="np. PL1234567890" />
+        </div>
 
+        <div>
+          <label>Kraj</label>
+          <select name="country">
+            <option value="PL">Polska</option>
+            <option value="CZ">Czechy</option>
+            <option value="SK">Słowacja</option>
+            <option value="DE">Niemcy</option>
+            <option value="EN">Inny / English</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Język klienta</label>
+          <select name="language">
+            <option value="pl">Polski</option>
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="cs">Čeština</option>
+            <option value="GB">Anglia</option>
+          </select>
+        </div>
+
+        <div class="calendar-actions">
+          <button class="primary-button" type="submit">Dodaj klienta</button>
+        </div>
+      </form>
+
+      <div id="clients-list"></div>
+    `;
+
+    renderClientsList();
+  }
+  else if (moduleName === "objects" || moduleName === "myObjects") {
+    document.getElementById("module-description").textContent = "";
+    renderObjectsModule();
+  }
+  else if (moduleName === "measurements" || moduleName === "myMeasurements") {
+    document.getElementById("module-description").textContent = "";
+    renderMeasurementsModule();
+  }
+  else {
+    document.getElementById("module-description").textContent = t("moduleDefault");
+    document.getElementById("module-content").innerHTML = "";
+  }
+
+  document.getElementById("module-view").classList.add("active");
+}
     function renderCalendarModule() {
       document.getElementById("module-content").innerHTML = `
         <div class="calendar-form">
