@@ -846,6 +846,9 @@
 if (moduleName === "calendar") {
   renderWorkflowModule();
 }
+else if (moduleName === "measurements" || moduleName === "myMeasurements") {
+  renderMeasurementsModule();
+}
 else if (moduleName === "clients") {
   document.getElementById("module-content").innerHTML = `
     <form onsubmit="createClient(this); return false;" class="calendar-form">
@@ -1118,6 +1121,6 @@ else {
 <script src="js/modules/objects.js"></script>
 <script src="js/modules/workflow.js"></script>
 <script src="js/modules/measurements.js"></script>
-<script src="js/app.js?v=0835"></script>
+<script src="js/app.js?v=0901"></script>
 </body>
 </html>
