@@ -1,83 +1,95 @@
 // WaterAI Energy Control
-// Objects Module v1.1.0
+// Objects Module v1.1.1
 
 const ObjectsModule = {
-  storageKey: "waterai_objects_v1",
+storageKey: "waterai_objects_v1",
 
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
-  },
+getAll() {
+return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+},
 
-  saveAll(objects) {
-    localStorage.setItem(this.storageKey, JSON.stringify(objects));
-  },
+saveAll(objects) {
+localStorage.setItem(this.storageKey, JSON.stringify(objects));
+},
 
-  add(object) {
-    const objects = this.getAll();
+add(object) {
+const objects = this.getAll();
 
-    objects.push({
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
+```
+objects.push({
+  id: Date.now(),
+  createdAt: new Date().toISOString(),
 
-      clientId: Number(object.clientId),
-      name: object.name || "",
-      objectType: object.objectType || "HOTEL",
-      status: object.status || "IMPLEMENTATION",
+  clientId: Number(object.clientId),
+  name: object.name || "",
+  objectType: object.objectType || "HOTEL",
+  status: object.status || "IMPLEMENTATION",
 
-      country: object.country || "PL",
-      postalCode: object.postalCode || "",
-      city: object.city || "",
-      street: object.street || "",
-      buildingNumber: object.buildingNumber || "",
-      apartmentNumber: object.apartmentNumber || "",
-      googleMapsUrl: object.googleMapsUrl || "",
+  country: object.country || "PL",
+  postalCode: object.postalCode || "",
+  city: object.city || "",
+  street: object.street || "",
+  buildingNumber: object.buildingNumber || "",
+  apartmentNumber: object.apartmentNumber || "",
+  googleMapsUrl: object.googleMapsUrl || "",
 
-      heatingSourceCO: object.heatingSourceCO || "NONE",
-      heatingSourceCWU: object.heatingSourceCWU || "NONE",
-      heatConsumptionReading: object.heatConsumptionReading || "INVOICE",
-      heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || "",
+  heatingSourceCO: object.heatingSourceCO || "NONE",
+  heatingSourceCWU: object.heatingSourceCWU || "NONE",
+  heatConsumptionReading: object.heatConsumptionReading || "INVOICE",
+  heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || "",
 
-      billingCycle: object.billingCycle || "MONTHLY",
-      billingStartDate: object.billingStartDate || "",
-      manualBillingDates: object.manualBillingDates || [],
-      reminderDaysBefore: Number(object.reminderDaysBefore || 14),
+  billingCycle: object.billingCycle || "MONTHLY",
+  billingStartDate: object.billingStartDate || "",
+  manualBillingDates: object.manualBillingDates || [],
+  reminderDaysBefore: Number(object.reminderDaysBefore || 14),
 
-      backOfficeOwner: object.backOfficeOwner || "",
-      energyAnalystOwner: object.energyAnalystOwner || "",
+  backOfficeOwner: object.backOfficeOwner || "",
+  energyAnalystOwner: object.energyAnalystOwner || "",
 
-      heatSources: object.heatSources || []
-    });
+  heatSources: object.heatSources || []
+});
 
-    this.saveAll(objects);
-  },
+this.saveAll(objects);
+```
 
-  remove(id) {
-    const objects = this.getAll().filter(object => object.id !== Number(id));
-    this.saveAll(objects);
-  },
+},
 
-  find(id) {
-    return this.getAll().find(object => object.id === Number(id));
-  },
+remove(id) {
+const objects = this.getAll().filter(
+object => object.id !== Number(id)
+);
+this.saveAll(objects);
+},
 
-  findByClient(clientId) {
-  return this.getAll().filter(object => Number(object.clientId) === Number(clientId));
-  },
+find(id) {
+return this.getAll().find(
+object => object.id === Number(id)
+);
+},
 
-  update(id, updatedObject) {
-    const objects = this.getAll().map(object => {
-      if (object.id !== Number(id)) return object;
+findByClient(clientId) {
+return this.getAll().filter(
+object => Number(object.clientId) === Number(clientId)
+);
+},
 
-      return {
-       ...object,
-       ...updatedObject,
+update(id, updatedObject) {
+const objects = this.getAll().map(object => {
+if (object.id !== Number(id)) return object;
+
+```
+  return {
+    ...object,
+    ...updatedObject,
     clientId: Number(updatedObject.clientId),
     updatedAt: new Date().toISOString()
-      };
-    });
+  };
+});
 
-    this.saveAll(objects);
-  }
+this.saveAll(objects);
+```
+
+}
 };
 
 window.ObjectsModule = ObjectsModule;
