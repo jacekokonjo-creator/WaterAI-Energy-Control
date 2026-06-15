@@ -67,6 +67,7 @@ function createClient(form) {
 }
 let editingClientId = null;
 let editingObjectId = null;
+let showObjectForm = false;
 
 function editClient(id) {
   const client = ClientsModule.find(id);
@@ -436,15 +437,9 @@ function createObject(form) {
   }
 
   form.reset();
-
-  const submitButton = form.querySelector("button[type='submit']");
-  if (submitButton) {
-    submitButton.textContent = "Dodaj obiekt";
-  }
-
-  if (typeof renderObjectsModule === "function") {
-    renderObjectsModule();
-  }
+  showObjectForm = false;
+  editingObjectId = null;
+  renderObjectsModule();
 }
 
 function editObject(id) {
@@ -452,6 +447,8 @@ function editObject(id) {
   if (!object) return;
 
   editingObjectId = id;
+  showObjectForm = true;
+  renderObjectsModule();
 
   const form = document.querySelector("#module-content form");
   if (!form) return;
@@ -497,17 +494,14 @@ function editObject(id) {
   if (form.currency) form.currency.value = object.currency || "PLN";
   if (form.energyPrice) form.energyPrice.value = object.energyPrice || "";
 
-  const submitButton = form.querySelector("button[type='submit']");
-  if (submitButton) {
-    submitButton.textContent = "Zapisz zmiany";
-  }
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function deleteObject(id) {
   if (!confirm("Czy na pewno usunąć obiekt?")) return;
   ObjectsModule.remove(id);
+  showObjectForm = false;
+  editingObjectId = null;
   renderObjectsModule();
 }
 function renderObjectsModule() {
@@ -528,6 +522,43 @@ function renderObjectsModule() {
     return;
   }
 
+  const allObjects = getObjects();
+  const objTypeLabel = {
+    HOTEL:"Hotel", SCHOOL:"Szkoła", KINDERGARTEN:"Przedszkole",
+    OFFICE:"Urząd/administracja", HOUSING_COMMUNITY:"Wspólnota mieszkaniowa",
+    COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
+    OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
+  };
+  const objStatusLabel = {
+    IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny",
+    PAUSED:"Wstrzymany", FINISHED:"Zakończony"
+  };
+  const objStatusColor = {
+    IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666"
+  };
+
+  const tableRows = allObjects.length === 0
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak obiektów — kliknij "+ Dodaj obiekt".</td></tr>`
+    : allObjects.map(obj => {
+        const statusColor = objStatusColor[obj.status] || "#666";
+        const protCount = MeasurementsModule.findByObject(obj.id).length;
+        return `<tr style="cursor:pointer;" onclick="openObjectMeasurements(${obj.id})">
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
+          <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
+          <td style="padding:10px 12px;">
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${statusColor}22;color:${statusColor};">
+              ${escapeHtml(objStatusLabel[obj.status] || obj.status || "—")}
+            </span>
+          </td>
+          <td style="padding:10px 12px;white-space:nowrap;">
+            <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="white-space:nowrap;">📋 Protokoły (${protCount})</button>
+            <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
+            <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">Usuń</button>
+          </td>
+        </tr>`;
+      }).join("");
+
   container.innerHTML = `
     <style>
       .obj-section { margin-bottom:20px; border-radius:10px; overflow:hidden; }
@@ -539,7 +570,39 @@ function renderObjectsModule() {
       .obj-field input, .obj-field select { width:100%; box-sizing:border-box; }
     </style>
 
-    <form onsubmit="createObject(this); return false;">
+    <!-- TABELA OBIEKTÓW -->
+    <div id="objects-table-view" style="${"display:" + (showObjectForm ? "none" : "block")}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
+          Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${allObjects.length})</span>
+        </h3>
+        <button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:7px 16px;">
+          + Dodaj obiekt
+        </button>
+      </div>
+      <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--color-background-secondary);">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa obiektu</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ obiektu</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FORMULARZ OBIEKTU -->
+    <div id="objects-form-view" style="${"display:" + (showObjectForm ? "block" : "none")}">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();" style="font-size:13px;">← Wróć do listy</button>
+        <h3 style="margin:0;font-size:16px;color:#0C447C;">${editingObjectId ? "Edytuj obiekt" : "Nowy obiekt"}</h3>
+      </div>
+      <form onsubmit="createObject(this); return false;">
 
       <!-- DANE PODSTAWOWE -->
       <div class="obj-section" style="border:1px solid #B5D4F4;">
@@ -798,62 +861,19 @@ function renderObjectsModule() {
         </div>
       </div>
 
-      <div style="margin-top:8px;">
-        <button class="primary-button" type="submit">Dodaj obiekt</button>
+      <div style="margin-top:8px;display:flex;gap:10px;">
+        <button class="primary-button" type="submit">${editingObjectId ? "Zapisz zmiany" : "Dodaj obiekt"}</button>
+        <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();">Anuluj</button>
       </div>
 
-    </form>
-
-    <div id="objects-list"></div>
+      </form>
+    </div>
   `;
-
-  renderObjectsList();
 }
 
 function renderObjectsList() {
-  const container = document.getElementById("objects-list");
-  if (!container) return;
-
-  const objects = getObjects();
-
-  if (objects.length === 0) {
-    container.innerHTML = `<p>Brak obiektów. Dodaj pierwszy obiekt dla wybranego klienta.</p>`;
-    return;
-  }
-
-  container.innerHTML = objects.map(object => `
-    <div class="reminder-card">
-      <strong>${escapeHtml(object.name)}</strong>
-
-      <div class="reminder-meta">
-        Klient: ${escapeHtml(getClientName(object.clientId))}<br />
-        Typ obiektu: ${escapeHtml(object.objectType)}<br />
-        Status: ${escapeHtml(object.status)}<br />
-        Adres: ${escapeHtml(object.postalCode)} ${escapeHtml(object.city)}, 
-        ${escapeHtml(object.street)} ${escapeHtml(object.buildingNumber)}
-        ${object.apartmentNumber ? "/" + escapeHtml(object.apartmentNumber) : ""}<br />
-        Google Maps: ${
-          object.googleMapsUrl
-            ? `<a href="${escapeHtml(object.googleMapsUrl)}" target="_blank">Otwórz lokalizację</a>`
-            : "brak"
-        }<br />
-        Źródło ciepła C.O.: ${escapeHtml(object.heatingSourceCO)}<br />
-        Źródło ciepła C.W.U.: ${escapeHtml(object.heatingSourceCWU)}<br />
-        Odczyt zużycia: ${escapeHtml(object.heatConsumptionReading)}<br />
-        Szczegóły odczytu:
-        ${escapeHtml(object.heatConsumptionReadingDetails)}<br />
-        Cykl rozliczeniowy: ${escapeHtml(object.billingCycle)}<br />
-        Back Office: ${escapeHtml(object.backOfficeOwner)}<br />
-        Energy Analyst: ${escapeHtml(object.energyAnalystOwner)}
-      </div>
-
-      <div style="margin-top: 12px;">
-       <button class="small-button" onclick="openObjectMeasurements(${object.id})">Pomiary</button>
-       <button class="small-button" onclick="editObject(${object.id})">Edytuj</button>
-       <button class="small-button" onclick="deleteObject(${object.id})">Usuń</button>
-      </div>
-    </div>
-  `).join("");
+  // Zastąpione przez tabelę w renderObjectsModule
+  renderObjectsModule();
 }
 function getWorkflowItems() {
   return WorkflowModule.getAll();
