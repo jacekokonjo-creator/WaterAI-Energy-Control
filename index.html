@@ -851,8 +851,8 @@
     document.getElementById("module-content").innerHTML = `
       <form onsubmit="createClient(this); return false;" class="calendar-form">
 
-        <div style="grid-column: 1 / -1;">
-          <h3>Dane podstawowe</h3>
+        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-bottom: 4px;">
+          <h3 style="margin:0;">Dane podstawowe</h3>
         </div>
 
         <div>
@@ -887,8 +887,8 @@
           </select>
         </div>
 
-        <div style="grid-column: 1 / -1;">
-          <h3>Adres klienta</h3>
+        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
+          <h3 style="margin:0;">Adres klienta</h3>
         </div>
 
         <div>
@@ -921,8 +921,8 @@
           <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
         </div>
 
-        <div style="grid-column: 1 / -1;">
-          <h3>Dane finansowe</h3>
+        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
+          <h3 style="margin:0;">Dane finansowe</h3>
         </div>
 
         <div>
@@ -949,9 +949,9 @@
           <input name="escoShare" type="number" value="50" min="0" max="100" />
         </div>
 
-        <div style="grid-column: 1 / -1;">
-          <h3>Dane kontaktowe</h3>
-          <p class="reminder-meta">Możesz dodać wiele osób kontaktowych dla jednego klienta.</p>
+        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
+          <h3 style="margin:0;">Dane kontaktowe</h3>
+          <p class="reminder-meta" style="margin: 6px 0 0 0;">Możesz dodać wiele osób kontaktowych dla jednego klienta.</p>
         </div>
 
         <div id="contacts-container" style="grid-column: 1 / -1;">
