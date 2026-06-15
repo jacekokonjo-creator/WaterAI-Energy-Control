@@ -849,142 +849,164 @@
     document.getElementById("module-description").textContent = "";
 
     document.getElementById("module-content").innerHTML = `
-      <form onsubmit="createClient(this); return false;" class="calendar-form">
+      <style>
+        .cli-section { margin-bottom:20px; border-radius:10px; overflow:hidden; }
+        .cli-body { padding:16px; background:var(--color-background-primary); }
+        .cli-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+        .cli-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+        .cli-field label { font-size:12px; color:var(--color-text-secondary); display:block; margin-bottom:4px; }
+        .cli-field input, .cli-field select { width:100%; box-sizing:border-box; }
+      </style>
 
-        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-bottom: 4px;">
-          <h3 style="margin:0;">Dane podstawowe</h3>
-        </div>
+      <form onsubmit="createClient(this); return false;">
 
-        <div>
-          <label>Nazwa klienta</label>
-          <input name="name" required placeholder="np. Hotel Group XYZ" />
-        </div>
-
-        <div>
-          <label>VAT ID</label>
-          <input name="vatId" placeholder="np. PL1234567890" />
-        </div>
-
-        <div>
-          <label>Kraj</label>
-          <select name="country">
-            <option value="PL">Polska</option>
-            <option value="CZ">Czechy</option>
-            <option value="SK">Słowacja</option>
-            <option value="DE">Niemcy</option>
-            <option value="EN">Inny / English</option>
-          </select>
-        </div>
-
-        <div>
-          <label>Język klienta</label>
-          <select name="language">
-            <option value="pl">Polski</option>
-            <option value="en">English</option>
-            <option value="de">Deutsch</option>
-            <option value="cs">Čeština</option>
-            <option value="sk">Slovenčina</option>
-          </select>
-        </div>
-
-        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
-          <h3 style="margin:0;">Adres klienta</h3>
-        </div>
-
-        <div>
-          <label>Kod pocztowy</label>
-          <input name="postalCode" placeholder="np. 00-001" />
-        </div>
-
-        <div>
-          <label>Miasto</label>
-          <input name="city" placeholder="np. Warszawa" />
-        </div>
-
-        <div>
-          <label>Ulica</label>
-          <input name="street" placeholder="np. Prosta" />
-        </div>
-
-        <div>
-          <label>Nr budynku</label>
-          <input name="buildingNumber" placeholder="np. 10" />
-        </div>
-
-        <div>
-          <label>Nr lokalu</label>
-          <input name="apartmentNumber" placeholder="opcjonalnie" />
-        </div>
-
-        <div>
-          <label>Google Maps URL</label>
-          <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
-        </div>
-
-        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
-          <h3 style="margin:0;">Dane finansowe</h3>
-        </div>
-
-        <div>
-          <label>Email do FV</label>
-          <input name="invoiceEmail" type="email" placeholder="faktury@firma.pl" />
-        </div>
-
-        <div>
-          <label>Termin płatności FV</label>
-          <input name="paymentDays" type="number" value="14" min="0" />
-        </div>
-
-        <div>
-          <label>Model rozliczeń</label>
-          <select name="settlementModel">
-            <option value="ESCO">ESCO</option>
-            <option value="SUBSCRIPTION">Abonament</option>
-            <option value="CUSTOM">Własny</option>
-          </select>
-        </div>
-
-        <div>
-          <label>Udział WaterAI w oszczędności (%)</label>
-          <input name="escoShare" type="number" value="50" min="0" max="100" />
-        </div>
-
-        <div style="grid-column: 1 / -1; border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 8px; margin-top: 8px; margin-bottom: 4px;">
-          <h3 style="margin:0;">Dane kontaktowe</h3>
-          <p class="reminder-meta" style="margin: 6px 0 0 0;">Możesz dodać wiele osób kontaktowych dla jednego klienta.</p>
-        </div>
-
-        <div id="contacts-container" style="grid-column: 1 / -1;">
-          <div class="contact-row calendar-form" style="grid-column: 1 / -1;">
-            <div>
-              <label>Osoba kontaktowa</label>
-              <input name="contactName" type="text" placeholder="Imię i nazwisko" />
-            </div>
-
-            <div>
-              <label>Funkcja</label>
-              <input name="contactRole" type="text" placeholder="np. Księgowość / Dyrektor techniczny" />
-            </div>
-
-            <div>
-              <label>Email</label>
-              <input name="contactEmail" type="email" />
-            </div>
-
-            <div>
-              <label>Telefon</label>
-              <input name="contactPhone" type="text" />
+        <!-- DANE PODSTAWOWE -->
+        <div class="cli-section" style="border:1px solid #B5D4F4;">
+          <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">🏢</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe</h3>
+          </div>
+          <div class="cli-body">
+            <div class="cli-grid2">
+              <div class="cli-field">
+                <label>Nazwa klienta</label>
+                <input name="name" required placeholder="np. Hotel Group XYZ" />
+              </div>
+              <div class="cli-field">
+                <label>VAT ID</label>
+                <input name="vatId" placeholder="np. PL1234567890" />
+              </div>
+              <div class="cli-field">
+                <label>Kraj</label>
+                <select name="country">
+                  <option value="PL">Polska</option>
+                  <option value="CZ">Czechy</option>
+                  <option value="SK">Słowacja</option>
+                  <option value="DE">Niemcy</option>
+                  <option value="EN">Inny / English</option>
+                </select>
+              </div>
+              <div class="cli-field">
+                <label>Język klienta</label>
+                <select name="language">
+                  <option value="pl">Polski</option>
+                  <option value="en">English</option>
+                  <option value="de">Deutsch</option>
+                  <option value="cs">Čeština</option>
+                  <option value="sk">Slovenčina</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="calendar-actions">
-          <button class="small-button" type="button" onclick="addContactRow()">Dodaj kolejną osobę</button>
+        <!-- ADRES -->
+        <div class="cli-section" style="border:1px solid #B8E0C8;">
+          <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">📍</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres klienta</h3>
+          </div>
+          <div class="cli-body">
+            <div class="cli-grid3">
+              <div class="cli-field">
+                <label>Kod pocztowy</label>
+                <input name="postalCode" placeholder="np. 00-001" />
+              </div>
+              <div class="cli-field">
+                <label>Miasto</label>
+                <input name="city" placeholder="np. Warszawa" />
+              </div>
+              <div class="cli-field">
+                <label>Ulica</label>
+                <input name="street" placeholder="np. Prosta" />
+              </div>
+              <div class="cli-field">
+                <label>Nr budynku</label>
+                <input name="buildingNumber" placeholder="np. 10" />
+              </div>
+              <div class="cli-field">
+                <label>Nr lokalu</label>
+                <input name="apartmentNumber" placeholder="opcjonalnie" />
+              </div>
+              <div class="cli-field">
+                <label>Google Maps URL</label>
+                <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DANE FINANSOWE -->
+        <div class="cli-section" style="border:1px solid #F4D4A0;">
+          <div style="background:#FDF3E0;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">💰</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#7A4A00;">Dane finansowe</h3>
+          </div>
+          <div class="cli-body">
+            <div class="cli-grid2">
+              <div class="cli-field">
+                <label>Email do FV</label>
+                <input name="invoiceEmail" type="email" placeholder="faktury@firma.pl" />
+              </div>
+              <div class="cli-field">
+                <label>Termin płatności FV (dni)</label>
+                <input name="paymentDays" type="number" value="14" min="0" />
+              </div>
+              <div class="cli-field">
+                <label>Model rozliczeń</label>
+                <select name="settlementModel">
+                  <option value="ESCO">ESCO</option>
+                  <option value="SUBSCRIPTION">Abonament</option>
+                  <option value="CUSTOM">Własny</option>
+                </select>
+              </div>
+              <div class="cli-field">
+                <label>Udział WaterAI w oszczędności (%)</label>
+                <input name="escoShare" type="number" value="50" min="0" max="100" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DANE KONTAKTOWE -->
+        <div class="cli-section" style="border:1px solid #D4B5F4;">
+          <div style="background:#F3E6FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">👤</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#5A0C7A;">Dane kontaktowe</h3>
+            <span style="font-size:11px;color:#5A0C7A;">Możesz dodać wiele osób</span>
+          </div>
+          <div class="cli-body">
+            <div id="contacts-container">
+              <div class="contact-row" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:8px;">
+                <div class="cli-field">
+                  <label>Osoba kontaktowa</label>
+                  <input name="contactName" type="text" placeholder="Imię i nazwisko" />
+                </div>
+                <div class="cli-field">
+                  <label>Funkcja</label>
+                  <input name="contactRole" type="text" placeholder="np. Dyrektor techniczny" />
+                </div>
+                <div class="cli-field">
+                  <label>Email</label>
+                  <input name="contactEmail" type="email" />
+                </div>
+                <div class="cli-field">
+                  <label>Telefon</label>
+                  <input name="contactPhone" type="text" />
+                </div>
+              </div>
+            </div>
+            <button class="small-button" type="button" onclick="addContactRow()" style="margin-top:4px;">+ Dodaj kolejną osobę</button>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;">
           <button class="primary-button" type="submit">Dodaj klienta</button>
         </div>
+
       </form>
 
-      <div id="clients-list"></div>
+      <div id="clients-list" style="margin-top:24px;"></div>
     `;
 
     renderClientsList();

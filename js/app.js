@@ -420,273 +420,279 @@ function renderObjectsModule() {
   }
 
   container.innerHTML = `
-    <form onsubmit="createObject(this); return false;" class="calendar-form">
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane podstawowe obiektu</h3>
+    <style>
+      .obj-section { margin-bottom:20px; border-radius:10px; overflow:hidden; }
+      .obj-body { padding:16px; background:var(--color-background-primary); }
+      .obj-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+      .obj-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+      .obj-grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+      .obj-field label { font-size:12px; color:var(--color-text-secondary); display:block; margin-bottom:4px; }
+      .obj-field input, .obj-field select { width:100%; box-sizing:border-box; }
+    </style>
+
+    <form onsubmit="createObject(this); return false;">
+
+      <!-- DANE PODSTAWOWE -->
+      <div class="obj-section" style="border:1px solid #B5D4F4;">
+        <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🏗️</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe obiektu</h3>
+        </div>
+        <div class="obj-body">
+          <div class="obj-grid4">
+            <div class="obj-field">
+              <label>Klient</label>
+              <select name="clientId" required>
+                ${clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Nazwa obiektu</label>
+              <input name="name" required placeholder="np. Hotel Warszawa" />
+            </div>
+            <div class="obj-field">
+              <label>Typ obiektu</label>
+              <select name="objectType">
+                <option value="HOTEL">Hotel</option>
+                <option value="SCHOOL">Szkoła</option>
+                <option value="KINDERGARTEN">Przedszkole</option>
+                <option value="OFFICE">Urząd / administracja</option>
+                <option value="HOUSING_COMMUNITY">Wspólnota mieszkaniowa</option>
+                <option value="COOPERATIVE">Spółdzielnia</option>
+                <option value="INDUSTRY">Zakład przemysłowy</option>
+                <option value="OFFICE_BUILDING">Biurowiec</option>
+                <option value="HOSPITAL">Szpital</option>
+                <option value="OTHER">Inne</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Status obiektu</label>
+              <select name="status">
+                <option value="IMPLEMENTATION">Wdrożenie</option>
+                <option value="ACTIVE">Aktywny</option>
+                <option value="PAUSED">Wstrzymany</option>
+                <option value="FINISHED">Zakończony</option>
+              </select>
+            </div>
+          </div>
+          <div class="obj-grid2">
+            <div class="obj-field">
+              <label>Opiekun Back Office</label>
+              <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
+            </div>
+            <div class="obj-field">
+              <label>Opiekun Energy Analyst</label>
+              <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label>Klient</label>
-        <select name="clientId" required>
-          ${clients.map(client => `
-            <option value="${client.id}">${escapeHtml(client.name)}</option>
-          `).join("")}
-        </select>
+      <!-- ADRES -->
+      <div class="obj-section" style="border:1px solid #B8E0C8;">
+        <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">📍</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres obiektu</h3>
+        </div>
+        <div class="obj-body">
+          <div class="obj-grid3">
+            <div class="obj-field">
+              <label>Kraj</label>
+              <select name="country">
+                <option value="PL">Polska</option>
+                <option value="CZ">Czechy</option>
+                <option value="SK">Słowacja</option>
+                <option value="AT">Austria</option>
+                <option value="DE">Niemcy</option>
+                <option value="GB">Wielka Brytania</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Kod pocztowy</label>
+              <input name="postalCode" placeholder="np. 00-001" />
+            </div>
+            <div class="obj-field">
+              <label>Miasto</label>
+              <input name="city" placeholder="np. Warszawa" />
+            </div>
+            <div class="obj-field">
+              <label>Ulica</label>
+              <input name="street" placeholder="np. Prosta" />
+            </div>
+            <div class="obj-field">
+              <label>Nr budynku</label>
+              <input name="buildingNumber" placeholder="np. 10" />
+            </div>
+            <div class="obj-field">
+              <label>Nr lokalu</label>
+              <input name="apartmentNumber" placeholder="opcjonalnie" />
+            </div>
+          </div>
+          <div class="obj-field">
+            <label>Google Maps URL</label>
+            <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." style="width:100%;box-sizing:border-box;" />
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label>Nazwa obiektu</label>
-        <input name="name" required placeholder="np. Hotel Warszawa" />
+      <!-- SYSTEM GRZEWCZY -->
+      <div class="obj-section" style="border:1px solid #F4D4A0;">
+        <div style="background:#FDF3E0;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🔥</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#7A4A00;">System grzewczy i rozliczeniowy</h3>
+        </div>
+        <div class="obj-body">
+          <div class="obj-grid3">
+            <div class="obj-field">
+              <label>Źródło ciepła C.O.</label>
+              <select name="heatingSourceCO">
+                <option value="NONE">Brak</option>
+                <option value="HEAT_PUMP">Pompa ciepła</option>
+                <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+                <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+                <option value="OIL_BOILER">Kocioł olejowy</option>
+                <option value="GAS_BOILER">Kocioł gazowy</option>
+                <option value="BIOMASS">Inna biomasa</option>
+                <option value="PELLET_BOILER">Kocioł na pellet</option>
+                <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+                <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+                <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Źródło ciepła C.W.U.</label>
+              <select name="heatingSourceCWU">
+                <option value="NONE">Brak</option>
+                <option value="HEAT_PUMP">Pompa ciepła</option>
+                <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+                <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+                <option value="OIL_BOILER">Kocioł olejowy</option>
+                <option value="GAS_BOILER">Kocioł gazowy</option>
+                <option value="BIOMASS">Inna biomasa</option>
+                <option value="PELLET_BOILER">Kocioł na pellet</option>
+                <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+                <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+                <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Odczyt zużycia ciepła</label>
+              <select name="heatConsumptionReading">
+                <option value="ONLINE">On-line</option>
+                <option value="CLIENT">Podawany przez Klienta</option>
+                <option value="WATERAI">Wykonywany przez WAI</option>
+                <option value="INVOICE">Z FV</option>
+              </select>
+            </div>
+          </div>
+          <div class="obj-field" style="margin-bottom:12px;">
+            <label>Szczegóły odczytu</label>
+            <input name="heatConsumptionReadingDetails" placeholder="np. SUPLA, Modbus TCP, licznik Kamstrup..." style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="obj-grid3">
+            <div class="obj-field">
+              <label>Cykl rozliczeniowy</label>
+              <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
+                <option value="MONTHLY">Miesięczny</option>
+                <option value="TWO_MONTHS">Co 2 miesiące</option>
+                <option value="QUARTERLY">Kwartalny</option>
+                <option value="HALF_YEAR">Półroczny</option>
+                <option value="YEARLY">Roczny</option>
+                <option value="MANUAL_DATES">Wg wskazanych dat</option>
+              </select>
+            </div>
+            <div class="obj-field" id="billingStartDateContainer">
+              <label>Data pierwszego rozliczenia</label>
+              <input name="billingStartDate" type="date" />
+            </div>
+            <div class="obj-field">
+              <label>Przypomnij przed terminem (dni)</label>
+              <input name="reminderDaysBefore" type="number" min="0" value="14" />
+            </div>
+          </div>
+          <div id="manualDatesContainer" style="display:none;">
+            <label style="font-size:12px;color:var(--color-text-secondary);">Daty rozliczeń</label>
+            <div id="manualDatesList"></div>
+            <button type="button" class="small-button" onclick="addManualBillingDate()">Dodaj datę</button>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label>Typ obiektu</label>
-        <select name="objectType">
-          <option value="HOTEL">Hotel</option>
-          <option value="SCHOOL">Szkoła</option>
-          <option value="KINDERGARTEN">Przedszkole</option>
-          <option value="OFFICE">Urząd / administracja</option>
-          <option value="HOUSING_COMMUNITY">Wspólnota mieszkaniowa</option>
-          <option value="COOPERATIVE">Spółdzielnia</option>
-          <option value="INDUSTRY">Zakład przemysłowy</option>
-          <option value="OFFICE_BUILDING">Biurowiec</option>
-          <option value="HOSPITAL">Szpital</option>
-          <option value="OTHER">Inne</option>
-        </select>
+      <!-- DANE KLIMATYCZNE -->
+      <div class="obj-section" style="border:1px solid #B5C8F4;">
+        <div style="background:#E8EDFB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🌡️</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C2C7C;">Dane klimatyczne (TYM)</h3>
+          <span style="font-size:11px;color:#0C2C7C;">zwykle stałe dla obiektu</span>
+        </div>
+        <div class="obj-body">
+          <div class="obj-grid3">
+            <div class="obj-field">
+              <label>Stacja meteorologiczna</label>
+              <input name="weatherStation" placeholder="np. Warszawa-Okęcie" />
+            </div>
+            <div class="obj-field">
+              <label>Źródło danych klimatycznych</label>
+              <input name="weatherSource" value="WeatherOnline / Robot Klimatu" />
+            </div>
+            <div class="obj-field">
+              <label>Temperatura bazowa (°C)</label>
+              <input name="baseTemperature" type="number" step="0.1" value="21" />
+            </div>
+          </div>
+          <div class="obj-grid2">
+            <div class="obj-field">
+              <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
+              <input name="weatherSourceUrl" type="url" placeholder="https://..." />
+            </div>
+            <div class="obj-field">
+              <label>Data pobrania danych klimatycznych</label>
+              <input name="weatherDataDownloadDate" type="date" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label>Status obiektu</label>
-        <select name="status">
-          <option value="IMPLEMENTATION">Wdrożenie</option>
-          <option value="ACTIVE">Aktywny</option>
-          <option value="PAUSED">Wstrzymany</option>
-          <option value="FINISHED">Zakończony</option>
-        </select>
+      <!-- DANE ENERGETYCZNE -->
+      <div class="obj-section" style="border:1px solid #C8B5F4;">
+        <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">⚡</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
+          <span style="font-size:11px;color:#3D0C7C;">zwykle stałe dla obiektu</span>
+        </div>
+        <div class="obj-body">
+          <div class="obj-grid3">
+            <div class="obj-field">
+              <label>Jednostka energii</label>
+              <select name="energyUnit">
+                <option value="GJ">GJ</option>
+                <option value="MWh">MWh</option>
+                <option value="kWh">kWh</option>
+                <option value="m3">m³</option>
+                <option value="Gcal">Gcal</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Waluta</label>
+              <select name="currency">
+                <option value="PLN">PLN</option>
+                <option value="EUR">EUR</option>
+                <option value="CZK">CZK</option>
+                <option value="GBP">GBP</option>
+              </select>
+            </div>
+            <div class="obj-field">
+              <label>Cena energii (za jednostkę)</label>
+              <input name="energyPrice" type="number" step="0.01" min="0" placeholder="np. 85.00" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style="grid-column: 1 / -1;">
-        <h3>Adres obiektu</h3>
-      </div>
-
-      <div>
-        <label>Kraj</label>
-        <select name="country">
-          <option value="PL">Polska</option>
-          <option value="CZ">Czechy</option>
-          <option value="SK">Słowacja</option>
-          <option value="AT">Austria</option>
-          <option value="DE">Niemcy</option>
-          <option value="GB">Anglia</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Kod pocztowy</label>
-        <input name="postalCode" placeholder="np. 00-001" />
-      </div>
-
-      <div>
-        <label>Miasto</label>
-        <input name="city" placeholder="np. Warszawa" />
-      </div>
-
-      <div>
-        <label>Ulica</label>
-        <input name="street" placeholder="np. Prosta" />
-      </div>
-
-      <div>
-        <label>Nr budynku</label>
-        <input name="buildingNumber" placeholder="np. 10" />
-      </div>
-
-      <div>
-        <label>Nr lokalu</label>
-        <input name="apartmentNumber" placeholder="opcjonalnie" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <label>Google Maps URL</label>
-        <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <h3>Parametry budynku</h3>
-      </div>
-
-<div style="grid-column: 1 / -1;">
-  <h3>System grzewczy</h3>
-</div>
-
-<div>
-  <label>Źródło ciepła</label>
-
- <select name="heatingSourceCO">
-    <option value="NONE">Brak</option>
-    <option value="HEAT_PUMP">Pompa ciepła</option>
-    <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
-    <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
-    <option value="OIL_BOILER">Kocioł olejowy</option>
-    <option value="GAS_BOILER">Kocioł gazowy</option>
-    <option value="BIOMASS">Inna biomasa</option>
-    <option value="PELLET_BOILER">Kocioł na pellet</option>
-    <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
-    <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
-    <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
-  </select>
-</div>
-
-<div>
-  <label>Źródło ciepła C.W.U.</label>
-  <select name="heatingSourceCWU">
-    <option value="NONE">Brak</option>
-    <option value="HEAT_PUMP">Pompa ciepła</option>
-    <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
-    <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
-    <option value="OIL_BOILER">Kocioł olejowy</option>
-    <option value="GAS_BOILER">Kocioł gazowy</option>
-    <option value="BIOMASS">Inna biomasa</option>
-    <option value="PELLET_BOILER">Kocioł na pellet</option>
-    <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
-    <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
-    <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
-  </select>
-</div>
-<div>
-  <label>Odczyt zużycia ciepła</label>
-
-  <select name="heatConsumptionReading">
-    <option value="ONLINE">On-line</option>
-    <option value="CLIENT">Podawany przez Klienta</option>
-    <option value="WATERAI">Wykonywany przez WAI</option>
-    <option value="INVOICE">Z FV</option>
-  </select>
-</div>
-
-<div style="grid-column: 1 / -1;">
-  <label>Szczegóły odczytu</label>
-
-  <input
-    name="heatConsumptionReadingDetails"
-    placeholder="np. SUPLA, Modbus TCP, licznik Kamstrup, aplikacja dostawcy ciepła..."
-    />
-    </div>
-  
-     <div>
-  <label>Cykl rozliczeniowy</label>
-  <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
-    <option value="MONTHLY">Miesięczny</option>
-    <option value="TWO_MONTHS">Co 2 miesiące</option>
-    <option value="QUARTERLY">Kwartalny</option>
-    <option value="HALF_YEAR">Półroczny</option>
-    <option value="YEARLY">Roczny</option>
-    <option value="MANUAL_DATES">Wg wskazanych dat</option>
-  </select>
-</div>
-
-<div id="billingStartDateContainer">
-  <label>Data pierwszego rozliczenia</label>
-  <input name="billingStartDate" type="date" />
-</div>
-
-<div id="manualDatesContainer" style="display:none;">
-  <label>Daty rozliczeń</label>
-
-  <div id="manualDatesList"></div>
-
-  <button
-    type="button"
-    class="small-button"
-    onclick="addManualBillingDate()">
-    Dodaj datę
-  </button>
-</div>
-
-<div>
-  <label>Przypomnij przed terminem (dni)</label>
-  <input
-    name="reminderDaysBefore"
-    type="number"
-    min="0"
-    value="14"
-  />
-</div>
-   
-      <div>
-        <label>Opiekun Back Office</label>
-        <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
-      </div>
-
-      <div>
-        <label>Opiekun Energy Analyst</label>
-        <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane klimatyczne (TYM)</h3>
-        <p class="reminder-meta">Dane źródła klimatycznego — zwykle stałe dla obiektu.</p>
-      </div>
-
-      <div>
-        <label>Stacja meteorologiczna</label>
-        <input name="weatherStation" placeholder="np. Warszawa-Okęcie" />
-      </div>
-
-      <div>
-        <label>Źródło danych klimatycznych</label>
-        <input name="weatherSource" value="WeatherOnline / Robot Klimatu" placeholder="np. WeatherOnline / Robot Klimatu" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
-        <input name="weatherSourceUrl" type="url" placeholder="https://..." />
-      </div>
-
-      <div>
-        <label>Data pobrania danych klimatycznych</label>
-        <input name="weatherDataDownloadDate" type="date" />
-      </div>
-
-      <div>
-        <label>Temperatura bazowa °C</label>
-        <input name="baseTemperature" type="number" step="0.1" value="21" />
-      </div>
-
-      <div style="grid-column: 1 / -1;">
-        <h3>Dane energetyczne</h3>
-        <p class="reminder-meta">Jednostka, waluta i cena energii — zwykle stałe dla obiektu.</p>
-      </div>
-
-      <div>
-        <label>Jednostka energii</label>
-        <select name="energyUnit">
-          <option value="GJ">GJ</option>
-          <option value="MWh">MWh</option>
-          <option value="kWh">kWh</option>
-          <option value="m3">m³</option>
-          <option value="Gcal">Gcal</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Waluta</label>
-        <select name="currency">
-          <option value="PLN">PLN</option>
-          <option value="EUR">EUR</option>
-          <option value="CZK">CZK</option>
-          <option value="GBP">GBP</option>
-        </select>
-      </div>
-
-      <div>
-        <label>Cena energii (za jednostkę)</label>
-        <input name="energyPrice" type="number" step="0.01" min="0" placeholder="np. 85.00" />
-      </div>
-
-      <div class="calendar-actions">
+      <div style="margin-top:8px;">
         <button class="primary-button" type="submit">Dodaj obiekt</button>
       </div>
+
     </form>
 
     <div id="objects-list"></div>
