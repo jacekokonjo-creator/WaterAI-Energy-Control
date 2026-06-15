@@ -236,20 +236,117 @@ function renderClientsList() {
       </div>
 
       <div style="margin-top: 12px;">
-       <button
-  class="small-button"
-  onclick="editClient(${client.id})">
-  Edytuj
-</button>
-
-<button
-  class="small-button"
-  onclick="deleteClient(${client.id})">
-  Usuń
-</button>
+        <button class="small-button" onclick="openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;">
+          🏗️ Obiekty
+        </button>
+        <button class="small-button" onclick="editClient(${client.id})">Edytuj</button>
+        <button class="small-button" onclick="deleteClient(${client.id})">Usuń</button>
       </div>
     </div>
   `).join("");
+}
+
+// ─── Widok obiektów konkretnego klienta (drill-down) ─────────────────────────
+
+let currentClientViewId = null;
+
+function openClientObjects(clientId) {
+  currentClientViewId = Number(clientId);
+  const client = ClientsModule.find(clientId);
+  const container = document.getElementById("clients-list");
+  if (!container) return;
+
+  const objects = ObjectsModule.findByClient(clientId);
+
+  const objectCards = objects.length === 0
+    ? `<div class="reminder-card"><strong>Brak obiektów</strong><div class="reminder-meta">Ten klient nie ma jeszcze żadnych obiektów. Dodaj obiekt w module Obiekty.</div></div>`
+    : objects.map(obj => {
+        const protocols = MeasurementsModule.findByObject(obj.id);
+        const protCount = protocols.length;
+        return \`
+        <div class="reminder-card" style="border-left:4px solid #185FA5;">
+          <strong>\${escapeHtml(obj.name || "Obiekt bez nazwy")}</strong>
+          <div class="reminder-meta">
+            Typ: \${escapeHtml(obj.objectType || "")}<br />
+            Status: \${escapeHtml(obj.status || "")}<br />
+            Adres: \${escapeHtml(obj.postalCode || "")} \${escapeHtml(obj.city || "")}, \${escapeHtml(obj.street || "")} \${escapeHtml(obj.buildingNumber || "")}<br />
+            Energy Analyst: \${escapeHtml(obj.energyAnalystOwner || "—")}<br />
+            Protokołów TYM: <strong>\${protCount}</strong>
+          </div>
+          <div style="margin-top:10px;">
+            <button class="small-button" onclick="openObjectProtocols(\${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;">
+              📋 Protokoły TYM (\${protCount})
+            </button>
+            <button class="small-button" onclick="editObject(\${obj.id});openModule('objects');">Edytuj obiekt</button>
+          </div>
+        </div>
+        \`;
+      }).join("");
+
+  container.innerHTML = \`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <button class="small-button" onclick="renderClientsList()" style="font-size:13px;">← Wszyscy klienci</button>
+      <h3 style="margin:0;font-size:16px;color:#0C447C;">🏢 \${escapeHtml(client ? client.name : "Klient")}</h3>
+    </div>
+    \${objectCards}
+  \`;
+}
+
+function openObjectProtocols(objectId) {
+  selectedMeasurementObjectId = Number(objectId);
+  const obj = ObjectsModule.find(objectId);
+  const clientId = obj ? obj.clientId : null;
+  const container = document.getElementById("clients-list");
+  if (!container) return;
+
+  const protocols = MeasurementsModule.findByObject(objectId);
+  const unit = (obj && obj.energyUnit) || "GJ";
+  const currency = (obj && obj.currency) || "PLN";
+  const fmt2 = v => Number(v || 0).toFixed(2);
+  const fmt3 = v => Number(v || 0).toFixed(3);
+
+  const protocolCards = protocols.length === 0
+    ? \`<div class="reminder-card"><strong>Brak protokołów TYM</strong><div class="reminder-meta">Dodaj pierwszy protokół w module Pomiary / Protokół TYM.</div></div>\`
+    : protocols.map(item => {
+        const r = item.escoResults || calcESCOResults(item);
+        const u = item.energyUnit || unit;
+        const cur = item.currency || currency;
+        return \`
+        <div class="reminder-card" style="border-left:4px solid #27500A;">
+          <strong>📋 Protokół TYM: \${escapeHtml(item.protocolDate || "brak daty")}</strong>
+          <div class="reminder-meta">
+            Opracował: \${escapeHtml(item.preparedBy || "")}<br />
+            Rozliczeniowy: \${escapeHtml(item.billingPeriodStartDate || "")} → \${escapeHtml(item.billingPeriodEndDate || "")}<br />
+            Zużycie rozliczeniowe: <strong>\${fmt3(item.billingConsumption)} \${u}</strong><br />
+            Porównawczy: \${escapeHtml(item.comparisonPeriodStartDate || "")} → \${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
+            Zużycie porównawcze: <strong>\${fmt3(item.comparisonConsumption)} \${u}</strong>
+          </div>
+          <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:10px;border-radius:6px;">
+            <strong>Wyniki ESCO:</strong><br />
+            Oszczędność energii: <strong>\${fmt3(r.savedEnergy)} \${u} (\${fmt2(r.savedEnergyPct)} %)</strong><br />
+            Oszczędność finansowa: <strong>\${fmt2(r.savedMoney)} \${cur}</strong><br />
+            Udział WaterAI: <strong>\${fmt2(r.waterAiShare)} \${cur}</strong>
+          </div>
+          <div style="margin-top:10px;">
+            <button class="small-button" onclick="editMeasurement(\${item.id});openModule('measurements');">Edytuj protokół</button>
+            <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(\${item.id});openObjectProtocols(\${objectId});}">Usuń</button>
+          </div>
+        </div>
+        \`;
+      }).join("");
+
+  container.innerHTML = \`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="small-button" onclick="openClientObjects(\${clientId})" style="font-size:13px;">← Obiekty klienta</button>
+      <h3 style="margin:0;font-size:16px;color:#27500A;">📋 \${escapeHtml(obj ? obj.name : "Obiekt")} — Protokoły TYM</h3>
+    </div>
+    <div style="margin-bottom:16px;">
+      <button class="primary-button" onclick="selectedMeasurementObjectId=\${objectId};openModule('measurements');" style="font-size:13px;">
+        + Dodaj nowy protokół TYM
+      </button>
+    </div>
+    \${protocolCards}
+  \`;
 }
 
 function createObject(form) {
