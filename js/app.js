@@ -1667,22 +1667,33 @@ function renderMeasurementsModule() {
 
   <form onsubmit="createMeasurement(this); return false;">
 
+    <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
+    <div style="border:2px solid var(--color-border-secondary);border-radius:10px;margin-bottom:20px;overflow:hidden;">
+      <div style="background:var(--color-background-secondary);padding:10px 16px;border-bottom:1px solid var(--color-border-tertiary);">
+        <h3 style="margin:0;font-size:14px;font-weight:600;">📋 Klient i obiekt</h3>
+      </div>
+      <div style="padding:16px;background:var(--color-background-primary);">
+        <div class="tym-grid2">
+          <div class="tym-field">
+            <label>Klient</label>
+            <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)" style="width:100%;">
+              ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === selectedClientId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="tym-field">
+            <label>Obiekt</label>
+            <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsList();" style="width:100%;">
+              ${objectsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ DANE PODSTAWOWE ═══ -->
     <div style="margin-bottom:20px;">
       <h3 style="font-size:16px;font-weight:500;margin-bottom:12px;">Protokół TYM — Rozliczenie ESCO</h3>
       <div class="tym-grid4">
-        <div class="tym-field">
-          <label>Klient</label>
-          <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)" style="width:100%;">
-            ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === selectedClientId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
-          </select>
-        </div>
-        <div class="tym-field">
-          <label>Obiekt</label>
-          <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsList();" style="width:100%;">
-            ${objectsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`).join("")}
-          </select>
-        </div>
         <div class="tym-field">
           <label>Data protokołu</label>
           <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
