@@ -63,13 +63,7 @@ function createClient(form) {
   }
 
   form.reset();
-
-  const submitButton = form.querySelector("button[type='submit']");
-  if (submitButton) {
-    submitButton.textContent = "Dodaj klienta";
-  }
-
-  renderClientsList();
+  hideClientForm();
 }
 let editingClientId = null;
 let editingObjectId = null;
@@ -136,17 +130,8 @@ function editClient(id) {
     addContactRow();
   }
 
-  const submitButton =
-    form.querySelector("button[type='submit']");
-
-  if (submitButton) {
-    submitButton.textContent = "Zapisz zmiany";
-  }
-
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  showClientForm(true);
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 
@@ -190,60 +175,87 @@ function addContactRow() {
   container.appendChild(row);
 }
 
+function showClientForm(editing) {
+  const fc = document.getElementById("client-form-container");
+  const cl = document.getElementById("clients-list");
+  const title = document.getElementById("client-form-title");
+  if (!fc) return;
+  fc.style.display = "block";
+  if (cl) cl.style.display = "none";
+  if (title) title.textContent = editing ? "Edytuj klienta" : "Nowy klient";
+  const btn = document.getElementById("client-submit-btn");
+  if (btn) btn.textContent = editing ? "Zapisz zmiany" : "Dodaj klienta";
+}
+
+function hideClientForm() {
+  const fc = document.getElementById("client-form-container");
+  const cl = document.getElementById("clients-list");
+  if (fc) fc.style.display = "none";
+  if (cl) cl.style.display = "block";
+  editingClientId = null;
+  const form = document.querySelector("#client-form-container form");
+  if (form) form.reset();
+  const btn = document.getElementById("client-submit-btn");
+  if (btn) btn.textContent = "Dodaj klienta";
+  const title = document.getElementById("client-form-title");
+  if (title) title.textContent = "Nowy klient";
+  // re-render list
+  renderClientsList();
+}
+
 function renderClientsList() {
   const container = document.getElementById("clients-list");
   if (!container) return;
 
   const clients = getClients();
 
-  if (clients.length === 0) {
-    container.innerHTML = `<p>Brak klientów. Dodaj pierwszego klienta.</p>`;
-    return;
-  }
+  // Always show Add button + table
+  const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny" };
 
-  container.innerHTML = clients.map(client => `
-    <div class="reminder-card">
-      <strong>${escapeHtml(client.name)}</strong>
+  const tableRows = clients.length === 0
+    ? `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak klientów — dodaj pierwszego.</td></tr>`
+    : clients.map(client => {
+        const objCount = ObjectsModule.findByClient(client.id).length;
+        return `<tr style="cursor:pointer;" onclick="openClientObjects(${client.id})">
+          <td class="td-name" style="padding:10px 12px;">
+            ${escapeHtml(client.name)}
+            <div class="td-sub">${escapeHtml(client.city || "")}${client.city && client.postalCode ? ", " : ""}${escapeHtml(client.postalCode || "")}</div>
+          </td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(countryLabel[client.country] || client.country || "—")}</td>
+          <td style="padding:10px 12px;">
+            <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">
+              🏗️ Obiekty (${objCount})
+            </button>
+            <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
+            <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">Usuń</button>
+          </td>
+        </tr>`;
+      }).join("");
 
-      <div class="reminder-meta">
-        VAT ID: ${escapeHtml(client.vatId)}<br />
-        Kraj: ${escapeHtml(client.country)}<br />
-        Język: ${escapeHtml(client.language)}<br />
-        Adres: ${escapeHtml(client.postalCode)} ${escapeHtml(client.city)}, 
-        ${escapeHtml(client.street)} ${escapeHtml(client.buildingNumber)}
-        ${client.apartmentNumber ? "/" + escapeHtml(client.apartmentNumber) : ""}<br />
-        Google Maps: ${
-          client.googleMapsUrl
-            ? `<a href="${escapeHtml(client.googleMapsUrl)}" target="_blank">Otwórz lokalizację</a>`
-            : "brak"
-        }<br />
-        Email FV: ${escapeHtml(client.invoiceEmail)}<br />
-        Termin płatności: ${escapeHtml(client.paymentDays)} dni<br />
-        Model rozliczeń: ${escapeHtml(client.settlementModel)}<br />
-        Udział WaterAI: ${escapeHtml(client.escoShare)}%<br />
-      </div>
-
-      <div class="reminder-meta" style="margin-top: 12px;">
-        <strong>Kontakty:</strong><br />
-        ${
-          client.contacts && client.contacts.length
-            ? client.contacts.map(contact => `
-                ${escapeHtml(contact.name)} — ${escapeHtml(contact.role)}<br />
-                ${escapeHtml(contact.email)} | ${escapeHtml(contact.phone)}<br />
-              `).join("")
-            : "brak"
-        }
-      </div>
-
-      <div style="margin-top: 12px;">
-        <button class="small-button" onclick="openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;">
-          🏗️ Obiekty
-        </button>
-        <button class="small-button" onclick="editClient(${client.id})">Edytuj</button>
-        <button class="small-button" onclick="deleteClient(${client.id})">Usuń</button>
-      </div>
+  container.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
+        Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length})</span>
+      </h3>
+      <button class="primary-button" onclick="showClientForm(false)" style="font-size:13px;padding:7px 16px;">
+        + Dodaj klienta
+      </button>
     </div>
-  `).join("");
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+      <table class="cli-table">
+        <thead>
+          <tr>
+            <th>Nazwa klienta</th>
+            <th>VAT ID</th>
+            <th>Kraj</th>
+            <th style="width:220px;">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 // ─── Widok obiektów konkretnego klienta (drill-down) ─────────────────────────
@@ -1123,6 +1135,7 @@ function updateWorkflowObjectOptions(clientId) {
 let editingMeasurementId = null;
 let selectedMeasurementObjectId = null;
 let activeMeasurementsTab = "tym"; // "tym" | "regression"
+let showMeasurementForm = false;
 
 const MONTHS_PL = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -1397,6 +1410,7 @@ function createMeasurement(form) {
   }
 
   selectedMeasurementObjectId = Number(form.objectId.value);
+  showMeasurementForm = false;
   renderMeasurementsModule();
 }
 
@@ -1406,6 +1420,7 @@ function editMeasurement(id) {
 
   editingMeasurementId = Number(id);
   selectedMeasurementObjectId = Number(protocol.objectId);
+  showMeasurementForm = true;
 
   renderMeasurementsModule();
 
@@ -1509,11 +1524,13 @@ function editMeasurement(id) {
 function deleteMeasurement(id) {
   if (!confirm("Czy na pewno usunąć protokół pomiarowy?")) return;
   MeasurementsModule.remove(id);
+  showMeasurementForm = false;
   renderMeasurementsModule();
 }
 
 function cancelMeasurementEdit() {
   editingMeasurementId = null;
+  showMeasurementForm = false;
   renderMeasurementsModule();
 }
 
@@ -1794,7 +1811,7 @@ function renderMeasurementsModule() {
     </button>` : ''}
   </div>
 
-  ${activeMeasurementsTab === 'regression' ? '' : `<form onsubmit="createMeasurement(this); return false;">
+  ${activeMeasurementsTab === 'regression' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="createMeasurement(this); return false;">
 
     <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
     <div class="tym-section" style="border:1px solid #B5D4F4;">
@@ -2065,22 +2082,91 @@ function renderMeasurementsModule() {
       <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." style="width:100%;box-sizing:border-box;" />
     </div>
 
-    <div style="display:flex;gap:12px;">
+    <div style="display:flex;gap:12px;align-items:center;">
       <button class="primary-button" type="submit">
         ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
       </button>
-      ${editingMeasurementId ? `<button class="small-button" type="button" onclick="cancelMeasurementEdit()">Anuluj edycję</button>` : ""}
+      <button class="small-button" type="button" onclick="cancelMeasurementEdit()">
+        ${editingMeasurementId ? "Anuluj edycję" : "← Wróć do listy"}
+      </button>
     </div>
 
   </form>
 
   <div id="measurements-list" style="margin-top:24px;"></div>
-  `}
+  `)}
 
   ${activeMeasurementsTab === 'regression' ? renderRegressionTab(protocolsForTabs) : ''}
+  ${(activeMeasurementsTab === 'tym' && !showMeasurementForm) ? renderProtocolsTable(protocolsForTabs, selectedMeasurementObjectId) : ''}
   `;
 
-  if (activeMeasurementsTab === 'tym') renderMeasurementsList();
+  if (activeMeasurementsTab === 'tym' && showMeasurementForm) renderMeasurementsList();
+}
+
+function renderProtocolsTable(protocols, objectId) {
+  const obj = objectId ? ObjectsModule.find(objectId) : null;
+  const unit = (obj && obj.energyUnit) || "GJ";
+
+  const headerHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;margin-top:8px;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
+        Protokoły TYM
+        <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${protocols.length})</span>
+      </h3>
+      <button class="primary-button" onclick="showMeasurementForm=true;editingMeasurementId=null;renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;">
+        + Dodaj protokół TYM
+      </button>
+    </div>`;
+
+  if (protocols.length === 0) {
+    return headerHtml + `<div class="reminder-card"><strong>Brak protokołów TYM</strong>
+      <div class="reminder-meta">Kliknij "+ Dodaj protokół TYM" aby rozpocząć rozliczenie ESCO.</div>
+    </div>`;
+  }
+
+  const fmt2 = v => Number(v || 0).toFixed(2);
+  const fmt3 = v => Number(v || 0).toFixed(3);
+
+  const rows = protocols.map(item => {
+    const r = item.escoResults || calcESCOResults(item);
+    const u = item.energyUnit || unit;
+    const cur = item.currency || "PLN";
+    const savedPct = fmt2(r.savedEnergyPct);
+    const savedMoney = fmt2(r.savedMoney);
+    const pctColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
+    return `<tr>
+      <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(item.protocolDate || "—")}</td>
+      <td style="padding:10px 12px;font-size:13px;">${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}</td>
+      <td style="padding:10px 12px;font-size:13px;text-align:right;">${fmt3(item.billingConsumption)} ${escapeHtml(u)}</td>
+      <td style="padding:10px 12px;font-size:13px;text-align:right;font-weight:600;color:${pctColor};">${savedPct} %</td>
+      <td style="padding:10px 12px;font-size:13px;text-align:right;">${savedMoney} ${escapeHtml(cur)}</td>
+      <td style="padding:10px 12px;">
+        ${item.includeLinearRegression ? '<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:2px 7px;border-radius:10px;">📈 Regresja</span>' : ''}
+      </td>
+      <td style="padding:10px 12px;white-space:nowrap;">
+        <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
+        <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  return headerHtml + `
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--color-background-secondary);">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data protokołu</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres rozliczeniowy</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Oszczędność %</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Oszczędność fin.</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Załączniki</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderRegressionTab(protocols) {
