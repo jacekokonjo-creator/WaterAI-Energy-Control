@@ -1122,6 +1122,7 @@ function updateWorkflowObjectOptions(clientId) {
 
 let editingMeasurementId = null;
 let selectedMeasurementObjectId = null;
+let activeMeasurementsTab = "tym"; // "tym" | "regression"
 
 const MONTHS_PL = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -1755,9 +1756,23 @@ function renderMeasurementsModule() {
     </tr>`;
   }).join("");
 
+  // Check if any protocol for this object has regression enabled
+  const protocolsForTabs = MeasurementsModule.findByObject(selectedMeasurementObjectId);
+  const hasRegression = protocolsForTabs.some(p => p.includeLinearRegression);
+
   container.innerHTML = `
   <style>
     .tym-section { margin-bottom:20px; border-radius:10px; overflow:hidden; }
+    .meas-tabs { display:flex; gap:0; margin-bottom:20px; border-bottom:2px solid var(--color-border-tertiary); }
+    .meas-tab {
+      padding:10px 22px; font-size:14px; font-weight:500; cursor:pointer;
+      border:none; background:transparent; color:var(--color-text-secondary);
+      border-bottom:3px solid transparent; margin-bottom:-2px; transition:all 0.15s;
+    }
+    .meas-tab.active { color:#0C447C; border-bottom-color:#0C447C; }
+    .meas-tab:hover:not(.active) { color:var(--color-text-primary); background:var(--color-background-secondary); }
+    .meas-tab-reg { color:#633806 !important; }
+    .meas-tab-reg.active { color:#633806 !important; border-bottom-color:#FAC775 !important; }
     .tym-field label { font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px; }
     .tym-grid2 { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px; }
     .tym-grid4 { display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px; }
@@ -1768,7 +1783,18 @@ function renderMeasurementsModule() {
     .tym-summary { display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;align-items:center; }
   </style>
 
-  <form onsubmit="createMeasurement(this); return false;">
+  <div class="meas-tabs">
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'tym' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='tym'; renderMeasurementsModule();">
+      📋 Protokół TYM
+    </button>
+    ${hasRegression ? `<button type="button" class="meas-tab meas-tab-reg ${activeMeasurementsTab === 'regression' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='regression'; renderMeasurementsModule();">
+      📈 Regresja liniowa
+    </button>` : ''}
+  </div>
+
+  ${activeMeasurementsTab === 'regression' ? '' : `<form onsubmit="createMeasurement(this); return false;">
 
     <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
     <div class="tym-section" style="border:1px solid #B5D4F4;">
@@ -2049,9 +2075,194 @@ function renderMeasurementsModule() {
   </form>
 
   <div id="measurements-list" style="margin-top:24px;"></div>
+  `}
+
+  ${activeMeasurementsTab === 'regression' ? renderRegressionTab(protocolsForTabs) : ''}
   `;
 
-  renderMeasurementsList();
+  if (activeMeasurementsTab === 'tym') renderMeasurementsList();
+}
+
+function renderRegressionTab(protocols) {
+  const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
+
+  if (regressionProtocols.length === 0) {
+    return `<div class="reminder-card"><strong>Brak protokołów z regresją</strong>
+      <div class="reminder-meta">Zaznacz "Dołącz analizę regresji liniowej" w protokole TYM aby aktywować ten moduł.</div>
+    </div>`;
+  }
+
+  return regressionProtocols.map(p => {
+    const unit = p.energyUnit || "GJ";
+    const rows = buildRegressionData(p);
+    if (rows.length < 2) {
+      return `<div class="reminder-card" style="border-left:4px solid #FAC775;">
+        <strong>📈 Regresja — Protokół z dnia ${escapeHtml(p.protocolDate || "")}</strong>
+        <div class="reminder-meta">Za mało danych (min. 2 miesiące z temperaturą i zużyciem) aby wyliczyć regresję.</div>
+      </div>`;
+    }
+
+    const lr = calcLinearRegression(rows);
+    const fmt3 = v => Number(v || 0).toFixed(3);
+    const fmt4 = v => Number(v || 0).toFixed(4);
+    const fmt2 = v => Number(v || 0).toFixed(2);
+
+    const tableRows = rows.map(r => {
+      const yPred = lr.a * r.hdd + lr.b;
+      const resid = r.consumption - yPred;
+      return `<tr>
+        <td style="padding:4px 8px;font-size:12px;">${escapeHtml(r.monthName)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt2(r.avgTemp)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${r.days}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt2(r.hdd)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt3(r.consumption)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmt3(yPred)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;color:${Math.abs(resid) > 0.5 * r.consumption ? '#c00' : '#666'};">${fmt3(resid)}</td>
+      </tr>`;
+    }).join("");
+
+    const chartId = "reg-chart-" + p.id;
+
+    const chartScript = `
+    (function() {
+      const canvas = document.getElementById('${chartId}');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const pts = ${JSON.stringify(rows.map(r => ({ x: r.hdd, y: r.consumption, label: r.monthName })))};
+      const a = ${lr.a}, b = ${lr.b};
+      if (!pts.length) return;
+      const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+      const xMin = Math.min(...xs), xMax = Math.max(...xs);
+      const yMin = Math.min(...ys, a*xMin+b, a*xMax+b), yMax = Math.max(...ys, a*xMin+b, a*xMax+b);
+      const pad = { l:52, r:16, t:16, b:36 };
+      const scX = x => pad.l + (x - xMin) / (xMax - xMin || 1) * (W - pad.l - pad.r);
+      const scY = y => H - pad.b - (y - yMin) / (yMax - yMin || 1) * (H - pad.t - pad.b);
+      ctx.clearRect(0, 0, W, H);
+      // grid
+      ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 4; i++) {
+        const y = yMin + i*(yMax-yMin)/4;
+        ctx.beginPath(); ctx.moveTo(pad.l, scY(y)); ctx.lineTo(W-pad.r, scY(y)); ctx.stroke();
+        ctx.fillStyle='#999'; ctx.font='10px sans-serif'; ctx.textAlign='right';
+        ctx.fillText(y.toFixed(2), pad.l-4, scY(y)+4);
+      }
+      for (let i = 0; i <= 4; i++) {
+        const x = xMin + i*(xMax-xMin)/4;
+        ctx.beginPath(); ctx.moveTo(scX(x), pad.t); ctx.lineTo(scX(x), H-pad.b); ctx.stroke();
+        ctx.fillStyle='#999'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(x.toFixed(0), scX(x), H-pad.b+14);
+      }
+      // regression line
+      ctx.strokeStyle='#FAC775'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(scX(xMin), scY(a*xMin+b)); ctx.lineTo(scX(xMax), scY(a*xMax+b)); ctx.stroke();
+      // points
+      pts.forEach(pt => {
+        ctx.beginPath(); ctx.arc(scX(pt.x), scY(pt.y), 5, 0, 2*Math.PI);
+        ctx.fillStyle='#185FA5'; ctx.fill();
+        ctx.fillStyle='#333'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+        ctx.fillText(pt.label.slice(0,3), scX(pt.x)+7, scY(pt.y)+4);
+      });
+      // axes labels
+      ctx.fillStyle='#666'; ctx.font='11px sans-serif';
+      ctx.textAlign='center'; ctx.fillText('HDD (°C·dni)', W/2, H-2);
+      ctx.save(); ctx.translate(14, H/2); ctx.rotate(-Math.PI/2);
+      ctx.fillText('Zużycie (${unit})', 0, 0); ctx.restore();
+    })();`;
+
+    return `
+    <div class="reminder-card" style="border-left:4px solid #FAC775;margin-bottom:20px;">
+      <strong>📈 Regresja liniowa — Protokół z dnia ${escapeHtml(p.protocolDate || "")}</strong>
+      <div class="reminder-meta">
+        Obiekt: ${escapeHtml(getObjectName(p.objectId))}<br />
+        Okres porównawczy: ${escapeHtml(p.comparisonPeriodStartDate || "")} → ${escapeHtml(p.comparisonPeriodEndDate || "")}<br />
+        Temperatura bazowa: ${p.baseTemperature || 21} °C
+      </div>
+
+      <div style="margin-top:12px;padding:12px;background:#FAEEDA;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+        <div style="font-size:15px;font-weight:600;color:#633806;">
+          y = <strong>${fmt4(lr.a)}</strong> · x + <strong>${fmt4(lr.b)}</strong>
+        </div>
+        <div style="font-size:13px;color:#633806;">
+          R² = <strong>${fmt4(lr.r2)}</strong>
+          ${lr.r2 >= 0.9 ? ' ✅ bardzo dobra korelacja' : lr.r2 >= 0.75 ? ' 🟡 dobra korelacja' : ' 🔴 słaba korelacja'}
+        </div>
+        <div style="font-size:12px;color:#856030;">
+          n = ${rows.length} miesięcy
+        </div>
+      </div>
+
+      <div style="margin-top:12px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#FDF3E0;">
+              <th style="padding:6px 8px;text-align:left;font-weight:500;border-bottom:1px solid #FAC775;">Miesiąc</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">Śr. temp (°C)</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">Dni</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">HDD</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">Zużycie (${unit})</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">y prognoza</th>
+              <th style="padding:6px 8px;text-align:right;font-weight:500;border-bottom:1px solid #FAC775;">Odchyłka</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:16px;">
+        <canvas id="${chartId}" width="560" height="280"
+          style="max-width:100%;border:1px solid #FAC775;border-radius:8px;background:#fff;display:block;"></canvas>
+      </div>
+
+      <div class="reminder-meta" style="margin-top:10px;font-size:11px;color:#856030;">
+        Dane wejściowe: temperatury i dni z okresu porównawczego protokołu TYM.<br />
+        x = HDD miesięczny, y = zużycie miesięczne (proporcjonalne do HDD okresu).
+      </div>
+    </div>
+    <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
+  }).join("");
+}
+
+function buildRegressionData(protocol) {
+  const base = Number(protocol.baseTemperature || 21);
+  const compMonthly = protocol.comparisonMonthly || [];
+  const totalDays = compMonthly.reduce((s, m) => s + Number(m.days || 0), 0);
+  const totalCons = Number(protocol.comparisonConsumption || 0);
+  if (totalDays === 0 || totalCons === 0) return [];
+
+  return compMonthly
+    .filter(m => m.temperature !== null && m.temperature !== undefined && Number(m.days || 0) > 0)
+    .map(m => {
+      const days = Number(m.days);
+      const avgTemp = Number(m.temperature);
+      const hdd = Math.max(0, base - avgTemp) * days;
+      // allocate consumption proportionally by days
+      const consumption = (days / totalDays) * totalCons;
+      return {
+        monthName: m.monthName || ("M" + m.month),
+        avgTemp,
+        days,
+        hdd,
+        consumption
+      };
+    })
+    .filter(r => r.hdd > 0 || r.consumption > 0);
+}
+
+function calcLinearRegression(rows) {
+  const n = rows.length;
+  const xs = rows.map(r => r.hdd);
+  const ys = rows.map(r => r.consumption);
+  const xMean = xs.reduce((s, v) => s + v, 0) / n;
+  const yMean = ys.reduce((s, v) => s + v, 0) / n;
+  const ssXY = xs.reduce((s, x, i) => s + (x - xMean) * (ys[i] - yMean), 0);
+  const ssXX = xs.reduce((s, x) => s + (x - xMean) ** 2, 0);
+  const a = ssXX !== 0 ? ssXY / ssXX : 0;
+  const b = yMean - a * xMean;
+  const ssRes = ys.reduce((s, y, i) => s + (y - (a * xs[i] + b)) ** 2, 0);
+  const ssTot = ys.reduce((s, y) => s + (y - yMean) ** 2, 0);
+  const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+  return { a, b, r2 };
 }
 
 function renderMeasurementsList() {
