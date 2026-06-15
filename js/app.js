@@ -1674,11 +1674,12 @@ function renderMeasurementsModule() {
   <form onsubmit="createMeasurement(this); return false;">
 
     <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
-    <div style="border:2px solid var(--color-border-secondary);border-radius:10px;margin-bottom:20px;overflow:hidden;">
-      <div style="background:var(--color-background-secondary);padding:10px 16px;border-bottom:1px solid var(--color-border-tertiary);">
-        <h3 style="margin:0;font-size:14px;font-weight:600;">📋 Klient i obiekt</h3>
+    <div class="tym-section" style="border:1px solid #B5D4F4;">
+      <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🏢</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Klient i obiekt</h3>
       </div>
-      <div style="padding:16px;background:var(--color-background-primary);">
+      <div class="tym-body">
         <div class="tym-grid2">
           <div class="tym-field">
             <label>Klient</label>
@@ -1696,64 +1697,87 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
-    <!-- ═══ DANE PODSTAWOWE ═══ -->
-    <div style="margin-bottom:20px;">
-      <h3 style="font-size:16px;font-weight:500;margin-bottom:12px;">Protokół TYM — Rozliczenie ESCO</h3>
-      <div class="tym-grid4">
-        <div class="tym-field">
-          <label>Data protokołu</label>
-          <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
-        </div>
-        <div class="tym-field">
-          <label>Opracował / Energy Analyst</label>
-          <input name="preparedBy" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko" style="width:100%;box-sizing:border-box;" />
+    <!-- ═══ DANE PODSTAWOWE PROTOKOŁU ═══ -->
+    <div class="tym-section" style="border:1px solid #C8C8C8;">
+      <div style="background:#F2F2F2;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📋</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#333;">Dane podstawowe protokołu</h3>
+      </div>
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Data protokołu</label>
+            <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Opracował / Energy Analyst</label>
+            <input name="preparedBy" value="${escapeHtml(selectedObject.energyAnalystOwner || "")}" placeholder="Imię i nazwisko" style="width:100%;box-sizing:border-box;" />
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="tym-grid4">
-        <div class="tym-field">
-          <label>Stacja meteorologiczna</label>
-          <input name="weatherStation" value="${escapeHtml(selectedObject.weatherStation || "")}" placeholder="np. Warszawa-Okęcie" style="width:100%;box-sizing:border-box;" />
+    <!-- ═══ DANE KLIMATYCZNE PROTOKOŁU ═══ -->
+    <div class="tym-section" style="border:1px solid #B5C8F4;">
+      <div style="background:#E8EDFB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🌡️</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C2C7C;">Dane klimatyczne</h3>
+      </div>
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Stacja meteorologiczna</label>
+            <input name="weatherStation" value="${escapeHtml(selectedObject.weatherStation || "")}" placeholder="np. Warszawa-Okęcie" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Źródło danych</label>
+            <input name="weatherSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Data pobrania danych</label>
+            <input name="weatherDataDownloadDate" type="date" value="${escapeHtml(selectedObject.weatherDataDownloadDate || "")}" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Temperatura bazowa °C</label>
+            <input name="baseTemperature" type="number" step="0.1" value="${escapeHtml(String(selectedObject.baseTemperature ?? 21))}"
+              style="width:100%;box-sizing:border-box;" oninput="refreshPeriodHDD('billing');refreshPeriodHDD('comparison');refreshTymHDD();" />
+          </div>
         </div>
         <div class="tym-field">
-          <label>Źródło danych</label>
-          <input name="weatherSource" value="${escapeHtml(selectedObject.weatherSource || "WeatherOnline / Robot Klimatu")}" style="width:100%;box-sizing:border-box;" />
-        </div>
-        <div class="tym-field">
-          <label>Data pobrania danych</label>
-          <input name="weatherDataDownloadDate" type="date" value="${escapeHtml(selectedObject.weatherDataDownloadDate || "")}" style="width:100%;box-sizing:border-box;" />
-        </div>
-        <div class="tym-field">
-          <label>Temperatura bazowa °C</label>
-          <input name="baseTemperature" type="number" step="0.1" value="${escapeHtml(String(selectedObject.baseTemperature ?? 21))}"
-            style="width:100%;box-sizing:border-box;" oninput="refreshPeriodHDD('billing');refreshPeriodHDD('comparison');refreshTymHDD();" />
+          <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
+          <input name="weatherSourceUrl" type="url" value="${escapeHtml(selectedObject.weatherSourceUrl || "")}" placeholder="https://..." style="width:100%;box-sizing:border-box;" />
         </div>
       </div>
-      <div class="tym-field" style="margin-bottom:12px;">
-        <label>Link do źródła danych</label>
-        <input name="weatherSourceUrl" type="url" value="${escapeHtml(selectedObject.weatherSourceUrl || "")}" placeholder="https://..." style="width:100%;box-sizing:border-box;" />
-      </div>
+    </div>
 
-      <div class="tym-grid4">
-        <div class="tym-field">
-          <label>Jednostka energii</label>
-          <select name="energyUnit" style="width:100%;">
-            ${["GJ","MWh","kWh","m3","Gcal"].map(u => `<option value="${u}" ${(selectedObject.energyUnit||"GJ")===u?"selected":""}>${u==="m3"?"m³":u}</option>`).join("")}
-          </select>
-        </div>
-        <div class="tym-field">
-          <label>Waluta</label>
-          <select name="currency" style="width:100%;">
-            ${["PLN","EUR","CZK","GBP"].map(c => `<option value="${c}" ${(selectedObject.currency||"PLN")===c?"selected":""}>${c}</option>`).join("")}
-          </select>
-        </div>
-        <div class="tym-field">
-          <label>Cena energii (za jednostkę)</label>
-          <input name="energyPrice" type="number" step="0.01" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.00" style="width:100%;box-sizing:border-box;" />
-        </div>
-        <div class="tym-field">
-          <label>Udział WaterAI / ESCO (%)</label>
-          <input name="waterAiShare" type="number" step="0.01" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
+    <!-- ═══ DANE ENERGETYCZNE PROTOKOŁU ═══ -->
+    <div class="tym-section" style="border:1px solid #C8B5F4;">
+      <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">⚡</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
+      </div>
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Jednostka energii</label>
+            <select name="energyUnit" style="width:100%;">
+              ${["GJ","MWh","kWh","m3","Gcal"].map(u => `<option value="${u}" ${(selectedObject.energyUnit||"GJ")===u?"selected":""}>${u==="m3"?"m³":u}</option>`).join("")}
+            </select>
+          </div>
+          <div class="tym-field">
+            <label>Waluta</label>
+            <select name="currency" style="width:100%;">
+              ${["PLN","EUR","CZK","GBP"].map(c => `<option value="${c}" ${(selectedObject.currency||"PLN")===c?"selected":""}>${c}</option>`).join("")}
+            </select>
+          </div>
+          <div class="tym-field">
+            <label>Cena energii (za jednostkę)</label>
+            <input name="energyPrice" type="number" step="0.01" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.00" style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Udział WaterAI / ESCO (%)</label>
+            <input name="waterAiShare" type="number" step="0.01" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
+          </div>
         </div>
       </div>
     </div>
