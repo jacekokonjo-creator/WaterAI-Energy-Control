@@ -357,9 +357,9 @@ function renderClientsList() {
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">Podgląd</button>
-              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;color:#c00;border-color:#c00;">Usuń</button>
+              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" class="icon-btn" title="Podgląd">👁</button>
+              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" class="icon-btn" title="Edytuj">✏️</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -545,9 +545,9 @@ function openClientObjects(clientId) {
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">👁 Podgląd</button>
-              <button class="small-button" onclick="editObject(${obj.id});openModule('objects');" style="white-space:nowrap;">✏️ Edytuj</button>
-              <button class="small-button" onclick="if(confirm('Usunąć obiekt?')){ObjectsModule.remove(${obj.id});openClientObjects(${clientId});}" style="white-space:nowrap;">🗑 Usuń</button>
+              <button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))" class="icon-btn" title="Podgląd">👁</button>
+              <button class="small-button" onclick="editObject(${obj.id});openModule('objects');" class="icon-btn" title="Edytuj">✏️</button>
+              <button class="small-button" onclick="if(confirm('Usunąć obiekt?')){ObjectsModule.remove(${obj.id});openClientObjects(${clientId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
               <button class="small-button" onclick="openObjectProtocols(${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;">📋 Protokoły (${protCount})</button>
             </div>
           </td>
@@ -609,8 +609,8 @@ function openObjectProtocols(objectId) {
           </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
-            <button class="small-button" onclick="editMeasurement(${item.id});openModule('measurements');">Edytuj protokół</button>
-            <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}">Usuń</button>
+            <button class="small-button" onclick="editMeasurement(${item.id});openModule('measurements');" class="icon-btn" title="Edytuj protokół">✏️</button>
+            <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
           </div>
         </div>
         `;
@@ -752,8 +752,8 @@ function viewObject(id) {
         ${fmt2(r.savedEnergyPct)} %
       </td>
       <td style="padding:7px 10px;white-space:nowrap;">
-        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${p.id}))">Podgląd</button>
-        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">Edytuj</button>
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${p.id}))" class="icon-btn" title="Podgląd">👁</button>
+        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')" class="icon-btn" title="Edytuj">✏️</button>
       </td>
     </tr>`;
   }).join("");
@@ -1000,9 +1000,9 @@ function renderObjectsModule() {
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">Podgląd</button>
-              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;color:#c00;border-color:#c00;">Usuń</button>
+              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" class="icon-btn" title="Podgląd">👁</button>
+              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" class="icon-btn" title="Edytuj">✏️</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -1558,7 +1558,7 @@ function renderWorkflowList() {
 
       <div style="margin-top: 12px;">
         <button class="small-button" onclick="markWorkflowDone(${item.id})">Oznacz jako wykonane</button>
-        <button class="small-button" onclick="deleteWorkflowItem(${item.id})">Usuń</button>
+        <button class="small-button" onclick="deleteWorkflowItem(${item.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
       </div>
     </div>
   `).join("");
@@ -3034,9 +3034,9 @@ function renderProtocolsTable(protocols, objectId) {
       <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.billingPeriodStartDate || '')} → ${escapeHtml(item.billingPeriodEndDate || '')}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
-          <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});">Edytuj</button>
-          <button class="small-button" onclick="deleteMeasurement(${item.id})" style="color:#c00;border-color:#c00;">Usuń</button>
+          <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" class="icon-btn" title="Podgląd">👁</button>
+          <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" class="icon-btn" title="Edytuj">✏️</button>
+          <button class="small-button" onclick="deleteMeasurement(${item.id})" style="color:#c00;border-color:#c00;" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -3532,9 +3532,9 @@ function renderMeasurementsList() {
 
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
-        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
-        <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
-        <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" class="icon-btn" title="Podgląd">👁</button>
+        <button class="small-button" onclick="editMeasurement(${item.id})" class="icon-btn" title="Edytuj">✏️</button>
+        <button class="small-button" onclick="deleteMeasurement(${item.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
       </div>
     </div>
   `}).join("");
