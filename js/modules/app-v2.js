@@ -25,12 +25,12 @@ function statusBadge(label, color, bg) {
 // MODUŁ DOKUMENTÓW
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function renderDocumentsModule(clientId, objectId) {
+function renderDocumentsModule(clientId, _objectId) {
   const container = document.getElementById('module-content');
   if (!container) return;
 
   const clients = ClientsModule.getAll();
-  const filterClientId = clientId || (clients[0] ? clients[0].id : null);
+  const filterClientId = clientId ? Number(clientId) : (clients[0] ? Number(clients[0].id) : null);
 
   if (!filterClientId) {
     container.innerHTML = `<div class="reminder-card"><strong>Brak klientów</strong><div class="reminder-meta">Najpierw dodaj klienta.</div></div>`;
@@ -38,83 +38,91 @@ function renderDocumentsModule(clientId, objectId) {
   }
 
   const client = ClientsModule.find(filterClientId);
-  const objects = ObjectsModule.findByClient(filterClientId);
-  const clientOptions = clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(filterClientId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
-  const catOptions = Object.entries(DocumentsModule.CATEGORIES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
-  const objectOptions = objects.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
-
-  // Selected folder: null = all, objectId = specific object, 'client' = client-level
-  const selectedFolder = window._docFolder !== undefined ? window._docFolder : null;
-
-  // Get docs based on folder
-  let folderDocs;
-  let folderTitle;
-  if (selectedFolder === 'client') {
-    folderDocs = DocumentsModule.findByClient(filterClientId).filter(d => !d.objectId);
-    folderTitle = `📁 ${escapeHtml(client ? client.name : '')} — dokumenty ogólne`;
-  } else if (selectedFolder) {
-    folderDocs = DocumentsModule.findByObject(selectedFolder);
-    const obj = ObjectsModule.find(selectedFolder);
-    folderTitle = `📁 ${escapeHtml(obj ? obj.name : 'Obiekt')}`;
-  } else {
-    folderDocs = DocumentsModule.findByClient(filterClientId);
-    folderTitle = null;
+  if (typeof DocFoldersModule !== 'undefined' && client) {
+    DocFoldersModule.ensureClientFolder(filterClientId, client.name);
   }
 
-  // Search filter
+  const clientOptions = clients.map(c =>
+    `<option value="${c.id}" ${Number(c.id) === filterClientId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+  ).join('');
+  const catOptions = Object.entries(DocumentsModule.CATEGORIES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+  const objects = ObjectsModule.findByClient(filterClientId);
+  const objectOptions = objects.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+
+  const tree = (typeof DocFoldersModule !== 'undefined') ? DocFoldersModule.buildTree(filterClientId) : null;
+
+  if (window._docFolderClientId !== filterClientId) {
+    window._docFolderClientId = filterClientId;
+    window._docSelectedFolderId = tree ? tree.id : null;
+  }
+  const selectedFolderId = window._docSelectedFolderId !== undefined ? window._docSelectedFolderId : (tree ? tree.id : null);
+
+  const allClientDocs = DocumentsModule.findByClient(filterClientId);
+
+  let folderDocs;
+  if (selectedFolderId === null) {
+    folderDocs = allClientDocs;
+  } else {
+    const selFolder = typeof DocFoldersModule !== 'undefined' ? DocFoldersModule.find(selectedFolderId) : null;
+    if (selFolder && selFolder.type === 'client' && !selFolder.parentId) {
+      folderDocs = allClientDocs.filter(d => Number(d.folderId) === selectedFolderId || (!d.folderId && !d.objectId));
+    } else {
+      folderDocs = allClientDocs.filter(d => Number(d.folderId) === selectedFolderId);
+    }
+  }
+
   const q = (window._docSearch || '').toLowerCase();
   const displayDocs = q ? folderDocs.filter(d =>
     (d.name||'').toLowerCase().includes(q) ||
     ((DocumentsModule.CATEGORIES[d.category]||{}).label||'').toLowerCase().includes(q) ||
-    ((d.objectId && (ObjectsModule.find(d.objectId)||{}).name)||'').toLowerCase().includes(q) ||
     (d.documentDate||'').includes(q)
   ) : folderDocs;
 
-  // Folder list: client-level + each object
-  const clientDocCount = DocumentsModule.findByClient(filterClientId).filter(d => !d.objectId).length;
-  const allForClient = DocumentsModule.findByClient(filterClientId);
-  const foldersHtml = `
-    <div style="display:grid;gap:6px;margin-bottom:20px;">
-      <div onclick="window._docFolder=null;window._docSearch='';renderDocumentsModule(${filterClientId});"
-        style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${selectedFolder===null?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${selectedFolder===null?'#E6F1FB':'var(--color-background-secondary)'};">
-        <span style="font-size:18px;">🗂️</span>
-        <span style="font-size:13px;font-weight:500;color:${selectedFolder===null?'#0C447C':'var(--color-text-primary)'};">Wszystkie dokumenty</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${allForClient.length}</span>
-      </div>
-      <div onclick="window._docFolder='client';window._docSearch='';renderDocumentsModule(${filterClientId});"
-        style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${selectedFolder==='client'?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${selectedFolder==='client'?'#E6F1FB':'var(--color-background-secondary)'};">
-        <span style="font-size:18px;">👤</span>
-        <span style="font-size:13px;font-weight:500;color:${selectedFolder==='client'?'#0C447C':'var(--color-text-primary)'};">${escapeHtml(client ? client.name : '')} (ogólne)</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${clientDocCount}</span>
-      </div>
-      ${objects.map(o => {
-        const cnt = DocumentsModule.findByObject(o.id).length;
-        const active = selectedFolder === o.id || selectedFolder === String(o.id);
-        return `<div onclick="window._docFolder=${o.id};window._docSearch='';renderDocumentsModule(${filterClientId});"
-          style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${active?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${active?'#E6F1FB':'var(--color-background-secondary)'};">
-          <span style="font-size:18px;">🏗️</span>
-          <span style="font-size:13px;font-weight:500;color:${active?'#0C447C':'var(--color-text-primary)'};">${escapeHtml(o.name)}</span>
-          <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${cnt}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
+  const countDocsInFolder = (fid) => {
+    const f = typeof DocFoldersModule !== 'undefined' ? DocFoldersModule.find(fid) : null;
+    if (f && f.type === 'client' && !f.parentId) return allClientDocs.filter(d => Number(d.folderId) === fid || (!d.folderId && !d.objectId)).length;
+    return allClientDocs.filter(d => Number(d.folderId) === fid).length;
+  };
 
-  // Table of docs in selected folder
+  const renderNode = (node, depth = 0) => {
+    const isSelected = Number(node.id) === Number(selectedFolderId);
+    const cnt = countDocsInFolder(node.id);
+    const canEdit = node.type === 'custom';
+    const pad = depth * 16;
+    const children = (node.children || []).map(ch => renderNode(ch, depth + 1)).join('');
+    return `<div>
+      <div class="doc-tree-node ${isSelected ? 'doc-tree-selected' : ''}" style="padding-left:${12+pad}px;"
+        onclick="window._docSelectedFolderId=${node.id};window._docSearch='';renderDocumentsModule(${filterClientId});">
+        <span style="font-size:14px;flex-shrink:0;">${node.icon||'📁'}</span>
+        <span class="doc-tree-label">${escapeHtml(node.name)}</span>
+        <span class="doc-tree-count">${cnt}</span>
+        <span class="doc-tree-actions" onclick="event.stopPropagation();">
+          <button class="doc-tree-btn" title="Nowy podfolder" onclick="addDocSubfolder(${node.id},${filterClientId})">+</button>
+          ${canEdit ? `<button class="doc-tree-btn" title="Zmień nazwę" onclick="renameDocFolder(${node.id},${filterClientId})">✏</button>
+          <button class="doc-tree-btn doc-tree-btn-del" title="Usuń" onclick="deleteDocFolder(${node.id},${filterClientId})">✕</button>` : ''}
+        </span>
+      </div>
+      ${children ? `<div>${children}</div>` : ''}
+    </div>`;
+  };
+
+  const treeHtml = tree ? renderNode(tree) : `<div style="padding:12px;font-size:13px;color:var(--color-text-secondary);">Brak folderów</div>`;
+  const selFolderObj = (typeof DocFoldersModule !== 'undefined' && selectedFolderId) ? DocFoldersModule.find(selectedFolderId) : null;
+  const selFolderName = selFolderObj ? selFolderObj.name : '—';
+
   const docRows = displayDocs.map(d => {
     const cat = DocumentsModule.CATEGORIES[d.category];
-    const objName = d.objectId ? ((ObjectsModule.find(d.objectId)||{}).name||'—') : '—';
     const sizeLabel = d.fileSize > 1048576 ? (d.fileSize/1048576).toFixed(1)+' MB' : d.fileSize > 0 ? Math.round(d.fileSize/1024)+' KB' : '';
+    const allFolders = typeof DocFoldersModule !== 'undefined' ? DocFoldersModule.findByClient(filterClientId).filter(f => Number(f.id) !== Number(d.folderId)) : [];
+    const moveOptions = allFolders.map(f => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join('');
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:9px 12px;font-size:13px;font-weight:500;">
-        ${cat ? cat.icon : '📁'} ${escapeHtml(d.name)}
-        ${sizeLabel ? `<span style="font-size:10px;color:var(--color-text-secondary);margin-left:4px;">${sizeLabel}</span>` : ''}
-      </td>
-      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${cat ? cat.label : '—'}</td>
-      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(objName)}</td>
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${cat?cat.icon:'📄'} ${escapeHtml(d.name)}${sizeLabel?`<span style="font-size:10px;color:var(--color-text-secondary);margin-left:4px;">${sizeLabel}</span>`:''}</td>
+      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${cat?cat.label:'—'}</td>
       <td style="padding:9px 12px;font-size:12px;white-space:nowrap;">${fmtDate(d.documentDate)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
-        <div style="display:flex;gap:4px;">
-          ${d.fileUrl ? `<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>` : ''}
+        <div style="display:flex;gap:4px;align-items:center;">
+          ${d.fileUrl?`<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>`:''}
+          ${allFolders.length?`<select style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--color-border-tertiary);" onchange="moveDocToFolder(${d.id},this.value,${filterClientId});this.value=''"><option value="">Przenieś →</option>${moveOptions}</select>`:''}
           <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId});}" style="color:#c00;border-color:#c00;">Usuń</button>
         </div>
       </td>
@@ -123,19 +131,26 @@ function renderDocumentsModule(clientId, objectId) {
 
   container.innerHTML = `
     <style>
-      .doc-drop-active { border-color:#0C447C !important; background:#E6F1FB !important; }
-      .doc-drop-active div { color:#0C447C !important; }
+      .doc-drop-active{border-color:#0C447C!important;background:#E6F1FB!important;}
+      .doc-tree-node{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:background 0.1s;font-size:13px;color:var(--color-text-primary);}
+      .doc-tree-node:hover{background:var(--color-background-secondary);}
+      .doc-tree-selected{background:#E6F1FB!important;color:#0C447C;font-weight:500;}
+      .doc-tree-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .doc-tree-count{font-size:11px;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:1px 7px;border-radius:20px;flex-shrink:0;}
+      .doc-tree-selected .doc-tree-count{background:#C8DDF4;color:#0C447C;}
+      .doc-tree-actions{display:none;gap:2px;}
+      .doc-tree-node:hover .doc-tree-actions,.doc-tree-selected .doc-tree-actions{display:flex;}
+      .doc-tree-btn{font-size:11px;padding:1px 5px;border:1px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);cursor:pointer;color:var(--color-text-secondary);}
+      .doc-tree-btn:hover{background:var(--color-background-secondary);color:var(--color-text-primary);}
+      .doc-tree-btn-del:hover{background:#fee;color:#c00;border-color:#c00;}
     </style>
-
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
       <h3 style="margin:0;font-size:16px;font-weight:600;">🗂️ Dokumenty</h3>
       <div style="display:flex;gap:8px;align-items:center;">
-        <select onchange="window._docFolder=null;renderDocumentsModule(this.value);" style="padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">${clientOptions}</select>
+        <select onchange="window._docSelectedFolderId=null;window._docFolderClientId=null;renderDocumentsModule(this.value);" style="padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">${clientOptions}</select>
         <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('doc-form-area').style.display='block';">+ Dodaj dokument</button>
       </div>
     </div>
-
-    <!-- FORMULARZ DODAWANIA -->
     <div id="doc-form-area" style="display:none;border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h4 style="margin:0;font-size:15px;color:#0C447C;">Nowy dokument</h4>
@@ -147,47 +162,36 @@ function renderDocumentsModule(clientId, objectId) {
         <div><label>Obiekt (opcjonalnie)</label><select id="doc-object"><option value="">— Dokument klienta —</option>${objectOptions}</select></div>
         <div><label>Data dokumentu</label><input id="doc-date" type="date" /></div>
         <div style="grid-column:1/-1;"><label>Opis</label><input id="doc-description" placeholder="opcjonalny opis" /></div>
-        <div style="grid-column:1/-1;"><label>Tagi (oddzielone przecinkami)</label><input id="doc-tags" placeholder="np. faktura, styczeń, ciepło" /></div>
+        <div style="grid-column:1/-1;"><label>Tagi</label><input id="doc-tags" placeholder="np. faktura, styczeń, ciepło" /></div>
         <div style="grid-column:1/-1;">
           <label>Plik</label>
-          <div id="doc-dropzone"
-            ondragover="event.preventDefault();this.classList.add('doc-drop-active');"
-            ondragleave="this.classList.remove('doc-drop-active');"
-            ondrop="handleDocFileDrop(event)"
-            onclick="document.getElementById('doc-file-input').click()"
-            style="border:2px dashed var(--color-border-tertiary);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--color-background-secondary);">
+          <div id="doc-dropzone" ondragover="event.preventDefault();this.classList.add('doc-drop-active');" ondragleave="this.classList.remove('doc-drop-active');" ondrop="handleDocFileDrop(event)" onclick="document.getElementById('doc-file-input').click()" style="border:2px dashed var(--color-border-tertiary);border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:var(--color-background-secondary);">
             <div style="font-size:28px;margin-bottom:6px;">📂</div>
             <div id="doc-drop-label" style="font-size:13px;color:var(--color-text-secondary);">Przeciągnij plik tutaj lub <span style="color:#0C447C;text-decoration:underline;">kliknij aby wybrać</span></div>
             <div id="doc-file-info" style="display:none;margin-top:8px;font-size:12px;color:#27500A;font-weight:500;"></div>
           </div>
           <input id="doc-file-input" type="file" style="display:none;" onchange="handleDocFileSelect(this)" />
-          <input id="doc-fileurl" type="hidden" value="" />
-          <input id="doc-filename" type="hidden" value="" />
-          <input id="doc-filesize" type="hidden" value="" />
-          <input id="doc-filetype" type="hidden" value="" />
+          <input id="doc-fileurl" type="hidden" value="" /><input id="doc-filename" type="hidden" value="" /><input id="doc-filesize" type="hidden" value="" /><input id="doc-filetype" type="hidden" value="" />
         </div>
-        <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveDocument(${filterClientId})" style="width:auto;padding:10px 24px;margin:0;">Zapisz dokument</button></div>
+        <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveDocument(${filterClientId})" style="width:auto;padding:10px 24px;">Zapisz dokument</button></div>
       </div>
     </div>
-
-    <!-- UKŁAD: foldery po lewej, lista po prawej -->
-    <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start;">
-      <div>${foldersHtml}</div>
+    <div style="display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start;">
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;">
+        <div style="padding:10px 14px;background:var(--color-background-secondary);font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;">Foldery</div>
+        <div style="padding:8px 4px;">${treeHtml}</div>
+      </div>
       <div>
-        ${folderTitle ? `<div style="font-size:13px;font-weight:600;color:#0C447C;margin-bottom:10px;">${folderTitle}</div>` : ''}
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <input type="search" placeholder="Szukaj dokumentu..." value="${escapeHtml(window._docSearch||'')}"
-            oninput="window._docSearch=this.value;renderDocumentsModule(${filterClientId});"
-            style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;flex:1;" />
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
+          <div style="font-size:13px;font-weight:600;color:#0C447C;">📁 ${escapeHtml(selFolderName)} <span style="font-size:11px;font-weight:400;color:var(--color-text-secondary);">(${displayDocs.length} dok.)</span></div>
+          <input type="search" placeholder="Szukaj w folderze..." value="${escapeHtml(window._docSearch||'')}" oninput="window._docSearch=this.value;renderDocumentsModule(${filterClientId});" style="font-size:13px;padding:5px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:180px;" />
         </div>
-        ${displayDocs.length === 0 ? `
-          <div class="reminder-card"><strong>Brak dokumentów</strong><div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Dodaj pierwszy dokument klikając „+ Dodaj dokument".'}</div></div>` : `
+        ${displayDocs.length === 0 ? `<div class="reminder-card"><strong>Brak dokumentów w tym folderze</strong><div class="reminder-meta">${q?'Spróbuj innej frazy.':'Dodaj dokument lub przenieś tu istniejący.'}</div></div>` : `
         <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="background:var(--color-background-secondary);">
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa dokumentu</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Kategoria</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data</th>
               <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
             </tr></thead>
@@ -195,9 +199,44 @@ function renderDocumentsModule(clientId, objectId) {
           </table>
         </div>`}
       </div>
-    </div>
-  `;
+    </div>`;
 }
+
+function addDocSubfolder(parentFolderId, clientId) {
+  const name = prompt('Nazwa nowego folderu:');
+  if (!name || !name.trim()) return;
+  const newId = DocFoldersModule.add({ clientId: Number(clientId), parentId: Number(parentFolderId), type: 'custom', name: name.trim(), icon: '📁' });
+  window._docSelectedFolderId = newId;
+  renderDocumentsModule(clientId);
+}
+
+function renameDocFolder(folderId, clientId) {
+  const folder = DocFoldersModule.find(folderId);
+  if (!folder) return;
+  const name = prompt('Nowa nazwa folderu:', folder.name);
+  if (!name || !name.trim()) return;
+  DocFoldersModule.update(folderId, { name: name.trim() });
+  renderDocumentsModule(clientId);
+}
+
+function deleteDocFolder(folderId, clientId) {
+  const cnt = DocumentsModule.findByClient(clientId).filter(d => Number(d.folderId) === Number(folderId)).length;
+  if (!confirm(cnt > 0 ? `Usunąć folder i przenieść ${cnt} dokumentów do folderu głównego?` : 'Usunąć pusty folder?')) return;
+  if (cnt > 0) {
+    const root = DocFoldersModule.getAll().find(f => Number(f.clientId) === Number(clientId) && f.type === 'client' && !f.parentId);
+    DocumentsModule.getAll().filter(d => Number(d.folderId) === Number(folderId)).forEach(d => DocumentsModule.update(d.id, { folderId: root ? root.id : null }));
+  }
+  DocFoldersModule.remove(folderId);
+  window._docSelectedFolderId = null;
+  renderDocumentsModule(clientId);
+}
+
+function moveDocToFolder(docId, targetFolderId, clientId) {
+  if (!targetFolderId) return;
+  DocumentsModule.update(docId, { folderId: Number(targetFolderId) });
+  renderDocumentsModule(clientId);
+}
+
 
 function handleDocFileDrop(event) {
   event.preventDefault();
@@ -255,13 +294,31 @@ function saveDocument(clientId) {
   const fileName = document.getElementById('doc-filename').value || name;
   const fileSize = Number(document.getElementById('doc-filesize').value || 0);
   const fileType = document.getElementById('doc-filetype').value || '';
+  const objectId = document.getElementById('doc-object').value || null;
+  const tagsRaw  = document.getElementById('doc-tags').value;
+  const tags     = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
 
-  const tagsRaw = document.getElementById('doc-tags').value;
-  const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
+  // Determine folderId
+  let folderId = null;
+  if (typeof DocFoldersModule !== 'undefined') {
+    // Ensure client root exists
+    const client = ClientsModule.find(clientId);
+    const clientFolderId = DocFoldersModule.ensureClientFolder(clientId, client ? client.name : '');
+
+    if (objectId) {
+      // Ensure object folder exists
+      const obj = ObjectsModule.find(objectId);
+      folderId = DocFoldersModule.ensureObjectFolder(clientId, objectId, obj ? obj.name : 'Obiekt');
+    } else {
+      // Goes into client root folder
+      folderId = clientFolderId;
+    }
+  }
 
   DocumentsModule.add({
     clientId,
-    objectId: document.getElementById('doc-object').value || null,
+    objectId,
+    folderId,
     name,
     category: document.getElementById('doc-category').value,
     documentDate: document.getElementById('doc-date').value,

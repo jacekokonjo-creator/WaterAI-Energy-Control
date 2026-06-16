@@ -41,6 +41,7 @@ const DocumentsModule = {
 
       clientId: Number(doc.clientId),
       objectId: doc.objectId ? Number(doc.objectId) : null,
+      folderId: doc.folderId ? Number(doc.folderId) : null,
 
       name: doc.name || '',
       category: doc.category || 'OTHER',
@@ -58,6 +59,17 @@ const DocumentsModule = {
       uploadedBy: doc.uploadedBy || ''
     });
     this.saveAll(items);
+  },
+
+  move(docId, targetFolderId) {
+    this.update(docId, { folderId: targetFolderId ? Number(targetFolderId) : null });
+  },
+
+  findByFolder(folderId) {
+    if (folderId === null || folderId === undefined) {
+      return this.getAll().filter(d => !d.folderId);
+    }
+    return this.getAll().filter(d => Number(d.folderId) === Number(folderId));
   },
 
   remove(id) {

@@ -73,9 +73,22 @@ function createClient(form) {
 
   if (editingClientId) {
     ClientsModule.update(editingClientId, clientData);
+    // Update folder name if client name changed
+    if (typeof DocFoldersModule !== 'undefined') {
+      const folder = DocFoldersModule.getAll().find(f =>
+        Number(f.clientId) === Number(editingClientId) && f.type === 'client' && !f.parentId
+      );
+      if (folder) DocFoldersModule.update(folder.id, { name: clientData.name });
+    }
     editingClientId = null;
   } else {
     ClientsModule.add(clientData);
+    // Auto-create root folder for new client
+    if (typeof DocFoldersModule !== 'undefined') {
+      const allClients = ClientsModule.getAll();
+      const newClient = allClients[allClients.length - 1];
+      if (newClient) DocFoldersModule.ensureClientFolder(newClient.id, newClient.name);
+    }
   }
 
   form.reset();
