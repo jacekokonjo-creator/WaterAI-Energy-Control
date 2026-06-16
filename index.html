@@ -309,7 +309,14 @@
 
     .module-view h3 {
       margin-top: 0;
+      margin-bottom: 0;
       color: var(--blue-dark);
+    }
+
+    .module-header-divider {
+      height: 1px;
+      background: linear-gradient(90deg, rgba(11,116,201,0.2), transparent);
+      margin: 14px 0 20px;
     }
 
     .calendar-form {
@@ -514,6 +521,7 @@
           <section class="content-area">
             <div id="module-view" class="module-view active">
           <h3 id="module-title">Moduł</h3>
+          <div class="module-header-divider"></div>
           <p id="module-description">Ten moduł zostanie rozwinięty w kolejnym etapie.</p>
           <div id="module-content"></div>
             </div>
