@@ -344,10 +344,9 @@ function renderClientsList() {
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">👁 Podgląd</button>
-              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">✏️ Edytuj</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">🗑 Usuń</button>
-              <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">🏗️ Obiekty (${objCount})</button>
+              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">Podgląd</button>
+              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;color:#c00;border-color:#c00;">Usuń</button>
             </div>
           </td>
         </tr>`;
@@ -988,10 +987,9 @@ function renderObjectsModule() {
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">👁 Podgląd</button>
-              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">✏️ Edytuj</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">🗑 Usuń</button>
-              <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;">📋 Protokoły (${protCount})</button>
+              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">Podgląd</button>
+              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;color:#c00;border-color:#c00;">Usuń</button>
             </div>
           </td>
         </tr>`;
@@ -3024,7 +3022,6 @@ function renderProtocolsTable(protocols, objectId) {
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
-          <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport</button>
           <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});">Edytuj</button>
           <button class="small-button" onclick="deleteMeasurement(${item.id})" style="color:#c00;border-color:#c00;">Usuń</button>
         </div>

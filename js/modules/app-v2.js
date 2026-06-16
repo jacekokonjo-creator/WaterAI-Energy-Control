@@ -39,92 +39,100 @@ function renderDocumentsModule(clientId, objectId) {
 
   const client = ClientsModule.find(filterClientId);
   const objects = ObjectsModule.findByClient(filterClientId);
-  const allDocs = objectId
-    ? DocumentsModule.findByObject(objectId)
-    : DocumentsModule.findByClient(filterClientId);
+  const clientOptions = clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(filterClientId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+  const catOptions = Object.entries(DocumentsModule.CATEGORIES).map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+  const objectOptions = objects.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
 
-  const grouped = {};
-  allDocs.forEach(d => {
+  // Selected folder: null = all, objectId = specific object, 'client' = client-level
+  const selectedFolder = window._docFolder !== undefined ? window._docFolder : null;
+
+  // Get docs based on folder
+  let folderDocs;
+  let folderTitle;
+  if (selectedFolder === 'client') {
+    folderDocs = DocumentsModule.findByClient(filterClientId).filter(d => !d.objectId);
+    folderTitle = `📁 ${escapeHtml(client ? client.name : '')} — dokumenty ogólne`;
+  } else if (selectedFolder) {
+    folderDocs = DocumentsModule.findByObject(selectedFolder);
+    const obj = ObjectsModule.find(selectedFolder);
+    folderTitle = `📁 ${escapeHtml(obj ? obj.name : 'Obiekt')}`;
+  } else {
+    folderDocs = DocumentsModule.findByClient(filterClientId);
+    folderTitle = null;
+  }
+
+  // Search filter
+  const q = (window._docSearch || '').toLowerCase();
+  const displayDocs = q ? folderDocs.filter(d =>
+    (d.name||'').toLowerCase().includes(q) ||
+    ((DocumentsModule.CATEGORIES[d.category]||{}).label||'').toLowerCase().includes(q) ||
+    ((d.objectId && (ObjectsModule.find(d.objectId)||{}).name)||'').toLowerCase().includes(q) ||
+    (d.documentDate||'').includes(q)
+  ) : folderDocs;
+
+  // Folder list: client-level + each object
+  const clientDocCount = DocumentsModule.findByClient(filterClientId).filter(d => !d.objectId).length;
+  const allForClient = DocumentsModule.findByClient(filterClientId);
+  const foldersHtml = `
+    <div style="display:grid;gap:6px;margin-bottom:20px;">
+      <div onclick="window._docFolder=null;window._docSearch='';renderDocumentsModule(${filterClientId});"
+        style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${selectedFolder===null?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${selectedFolder===null?'#E6F1FB':'var(--color-background-secondary)'};">
+        <span style="font-size:18px;">🗂️</span>
+        <span style="font-size:13px;font-weight:500;color:${selectedFolder===null?'#0C447C':'var(--color-text-primary)'};">Wszystkie dokumenty</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${allForClient.length}</span>
+      </div>
+      <div onclick="window._docFolder='client';window._docSearch='';renderDocumentsModule(${filterClientId});"
+        style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${selectedFolder==='client'?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${selectedFolder==='client'?'#E6F1FB':'var(--color-background-secondary)'};">
+        <span style="font-size:18px;">👤</span>
+        <span style="font-size:13px;font-weight:500;color:${selectedFolder==='client'?'#0C447C':'var(--color-text-primary)'};">${escapeHtml(client ? client.name : '')} (ogólne)</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${clientDocCount}</span>
+      </div>
+      ${objects.map(o => {
+        const cnt = DocumentsModule.findByObject(o.id).length;
+        const active = selectedFolder === o.id || selectedFolder === String(o.id);
+        return `<div onclick="window._docFolder=${o.id};window._docSearch='';renderDocumentsModule(${filterClientId});"
+          style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid ${active?'#0C447C':'var(--color-border-tertiary)'};border-radius:8px;cursor:pointer;background:${active?'#E6F1FB':'var(--color-background-secondary)'};">
+          <span style="font-size:18px;">🏗️</span>
+          <span style="font-size:13px;font-weight:500;color:${active?'#0C447C':'var(--color-text-primary)'};">${escapeHtml(o.name)}</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--color-text-secondary);">${cnt}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Table of docs in selected folder
+  const docRows = displayDocs.map(d => {
     const cat = DocumentsModule.CATEGORIES[d.category];
-    const group = cat ? cat.group : 'Inne';
-    if (!grouped[group]) grouped[group] = [];
-    grouped[group].push(d);
-  });
-
-  const catOptions = Object.entries(DocumentsModule.CATEGORIES)
-    .map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`)
-    .join('');
-
-  const objectOptions = objects
-    .map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`)
-    .join('');
-
-  const clientOptions = clients
-    .map(c => `<option value="${c.id}" ${Number(c.id) === Number(filterClientId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
-    .join('');
-
-  const groupsHtml = Object.entries(grouped).map(([groupName, docs]) => `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--color-border-tertiary);">
-        ${groupName} (${docs.length})
-      </div>
-      <div style="display:grid;gap:8px;">
-        ${docs.map(d => {
-          const cat = DocumentsModule.CATEGORIES[d.category];
-          const icon = cat ? cat.icon : '📁';
-          const objName = d.objectId ? (ObjectsModule.find(d.objectId) || {}).name || '—' : 'Klient ogólnie';
-          return `
-          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--color-border-tertiary);border-radius:10px;background:var(--color-background-secondary);">
-            <span style="font-size:22px;flex-shrink:0;">${icon}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);">${escapeHtml(d.name)}</div>
-              <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">
-                ${fmtDate(d.documentDate)} · ${escapeHtml(objName)}
-                ${d.fileName ? ` · <span style="opacity:0.8;">${escapeHtml(d.fileName)}</span>` : ''}
-                ${d.fileSize ? ` · ${d.fileSize > 1048576 ? (d.fileSize/1048576).toFixed(1)+' MB' : Math.round(d.fileSize/1024)+' KB'}` : ''}
-                ${d.tags && d.tags.length ? ' · ' + d.tags.map(t => `<span style="background:#eee;padding:1px 5px;border-radius:4px;">${escapeHtml(t)}</span>`).join(' ') : ''}
-              </div>
-              ${d.description ? `<div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${escapeHtml(d.description)}</div>` : ''}
-            </div>
-            <div style="display:flex;gap:6px;flex-shrink:0;">
-              ${d.fileUrl ? `<button class="small-button" onclick="downloadDoc('${d.id}')">⬇ Pobierz</button>` : ''}
-              <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId},${objectId||'null'});}">🗑</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-  `).join('');
+    const objName = d.objectId ? ((ObjectsModule.find(d.objectId)||{}).name||'—') : '—';
+    const sizeLabel = d.fileSize > 1048576 ? (d.fileSize/1048576).toFixed(1)+' MB' : d.fileSize > 0 ? Math.round(d.fileSize/1024)+' KB' : '';
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;">
+        ${cat ? cat.icon : '📁'} ${escapeHtml(d.name)}
+        ${sizeLabel ? `<span style="font-size:10px;color:var(--color-text-secondary);margin-left:4px;">${sizeLabel}</span>` : ''}
+      </td>
+      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${cat ? cat.label : '—'}</td>
+      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(objName)}</td>
+      <td style="padding:9px 12px;font-size:12px;white-space:nowrap;">${fmtDate(d.documentDate)}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">
+        <div style="display:flex;gap:4px;">
+          ${d.fileUrl ? `<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>` : ''}
+          <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId});}" style="color:#c00;border-color:#c00;">Usuń</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 
   container.innerHTML = `
     <style>
-      .doc-search { display:flex;gap:8px;align-items:center;margin-bottom:16px; }
-      .doc-search input { flex:1;padding:8px 12px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px; }
       .doc-drop-active { border-color:#0C447C !important; background:#E6F1FB !important; }
       .doc-drop-active div { color:#0C447C !important; }
     </style>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-      <div>
-        <h3 style="margin:0;font-size:16px;font-weight:600;">🗂️ Dokumenty</h3>
-        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">
-          ${escapeHtml(client ? client.name : '')}
-          ${objectId && ObjectsModule.find(objectId) ? ' / ' + escapeHtml(ObjectsModule.find(objectId).name) : ''}
-        </div>
-      </div>
+      <h3 style="margin:0;font-size:16px;font-weight:600;">🗂️ Dokumenty</h3>
       <div style="display:flex;gap:8px;align-items:center;">
-        <select onchange="renderDocumentsModule(this.value,null)" style="padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">
-          ${clientOptions}
-        </select>
-        <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('doc-form-area').style.display='block';">
-          + Dodaj dokument
-        </button>
+        <select onchange="window._docFolder=null;renderDocumentsModule(this.value);" style="padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">${clientOptions}</select>
+        <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('doc-form-area').style.display='block';">+ Dodaj dokument</button>
       </div>
-    </div>
-
-    <!-- WYSZUKIWARKA -->
-    <div class="doc-search">
-      <input id="doc-search-input" placeholder="🔍 Szukaj dokumentów..." oninput="searchDocuments(${filterClientId}, this.value)" />
     </div>
 
     <!-- FORMULARZ DODAWANIA -->
@@ -134,33 +142,12 @@ function renderDocumentsModule(clientId, objectId) {
         <button class="small-button" onclick="document.getElementById('doc-form-area').style.display='none'">✕</button>
       </div>
       <div class="calendar-form">
-        <div>
-          <label>Nazwa dokumentu</label>
-          <input id="doc-name" required placeholder="np. Faktura za ciepło 01/2026" />
-        </div>
-        <div>
-          <label>Kategoria</label>
-          <select id="doc-category">${catOptions}</select>
-        </div>
-        <div>
-          <label>Obiekt (opcjonalnie)</label>
-          <select id="doc-object">
-            <option value="">— Dokument klienta —</option>
-            ${objectOptions}
-          </select>
-        </div>
-        <div>
-          <label>Data dokumentu</label>
-          <input id="doc-date" type="date" />
-        </div>
-        <div style="grid-column:1/-1;">
-          <label>Opis</label>
-          <input id="doc-description" placeholder="opcjonalny opis" />
-        </div>
-        <div style="grid-column:1/-1;">
-          <label>Tagi (oddzielone przecinkami)</label>
-          <input id="doc-tags" placeholder="np. faktura, styczeń, ciepło" />
-        </div>
+        <div><label>Nazwa dokumentu</label><input id="doc-name" required placeholder="np. Faktura za ciepło 01/2026" /></div>
+        <div><label>Kategoria</label><select id="doc-category">${catOptions}</select></div>
+        <div><label>Obiekt (opcjonalnie)</label><select id="doc-object"><option value="">— Dokument klienta —</option>${objectOptions}</select></div>
+        <div><label>Data dokumentu</label><input id="doc-date" type="date" /></div>
+        <div style="grid-column:1/-1;"><label>Opis</label><input id="doc-description" placeholder="opcjonalny opis" /></div>
+        <div style="grid-column:1/-1;"><label>Tagi (oddzielone przecinkami)</label><input id="doc-tags" placeholder="np. faktura, styczeń, ciepło" /></div>
         <div style="grid-column:1/-1;">
           <label>Plik</label>
           <div id="doc-dropzone"
@@ -170,9 +157,7 @@ function renderDocumentsModule(clientId, objectId) {
             onclick="document.getElementById('doc-file-input').click()"
             style="border:2px dashed var(--color-border-tertiary);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--color-background-secondary);">
             <div style="font-size:28px;margin-bottom:6px;">📂</div>
-            <div id="doc-drop-label" style="font-size:13px;color:var(--color-text-secondary);">
-              Przeciągnij plik tutaj lub <span style="color:#0C447C;text-decoration:underline;">kliknij aby wybrać</span>
-            </div>
+            <div id="doc-drop-label" style="font-size:13px;color:var(--color-text-secondary);">Przeciągnij plik tutaj lub <span style="color:#0C447C;text-decoration:underline;">kliknij aby wybrać</span></div>
             <div id="doc-file-info" style="display:none;margin-top:8px;font-size:12px;color:#27500A;font-weight:500;"></div>
           </div>
           <input id="doc-file-input" type="file" style="display:none;" onchange="handleDocFileSelect(this)" />
@@ -181,18 +166,35 @@ function renderDocumentsModule(clientId, objectId) {
           <input id="doc-filesize" type="hidden" value="" />
           <input id="doc-filetype" type="hidden" value="" />
         </div>
-        <div style="grid-column:1/-1;">
-          <button class="primary-button" type="button" onclick="saveDocument(${filterClientId})" style="width:auto;padding:10px 24px;margin:0;">Zapisz dokument</button>
-        </div>
+        <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveDocument(${filterClientId})" style="width:auto;padding:10px 24px;margin:0;">Zapisz dokument</button></div>
       </div>
     </div>
 
-    <!-- LISTA DOKUMENTÓW -->
-    <div id="doc-list-area">
-      ${allDocs.length === 0
-        ? `<div class="reminder-card"><strong>Brak dokumentów</strong><div class="reminder-meta">Dodaj pierwszy dokument klikając "Dodaj dokument".</div></div>`
-        : groupsHtml
-      }
+    <!-- UKŁAD: foldery po lewej, lista po prawej -->
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start;">
+      <div>${foldersHtml}</div>
+      <div>
+        ${folderTitle ? `<div style="font-size:13px;font-weight:600;color:#0C447C;margin-bottom:10px;">${folderTitle}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input type="search" placeholder="Szukaj dokumentu..." value="${escapeHtml(window._docSearch||'')}"
+            oninput="window._docSearch=this.value;renderDocumentsModule(${filterClientId});"
+            style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;flex:1;" />
+        </div>
+        ${displayDocs.length === 0 ? `
+          <div class="reminder-card"><strong>Brak dokumentów</strong><div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Dodaj pierwszy dokument klikając „+ Dodaj dokument".'}</div></div>` : `
+        <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:var(--color-background-secondary);">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa dokumentu</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Kategoria</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data</th>
+              <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+            </tr></thead>
+            <tbody>${docRows}</tbody>
+          </table>
+        </div>`}
+      </div>
     </div>
   `;
 }
@@ -368,18 +370,20 @@ function renderInvoicingModule() {
   const invoiceRows = invoices.map(inv => {
     const client = ClientsModule.find(inv.clientId);
     const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+    const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber)}</td>
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
-      <td style="padding:9px 12px;font-size:13px;">${fmtDate(inv.issueDate)}</td>
-      <td style="padding:9px 12px;font-size:13px;">${fmtDate(inv.dueDate)}</td>
-      <td style="padding:9px 12px;font-size:13px;text-align:right;font-weight:600;">${fmtMoney(inv.grossAmount, inv.currency)}</td>
+      <td style="padding:9px 12px;font-size:13px;">${typeInfo.icon} ${typeInfo.label}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.issueDate)}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.dueDate)}</td>
       <td style="padding:9px 12px;">${statusHtml(inv.status)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          ${inv.status !== 'PAID' ? `<button class="small-button" onclick="markInvoicePaid(${inv.id})" style="background:#27500A;color:#fff;border-color:#27500A;">✓ Opłacona</button>` : ''}
-          <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}">🗑</button>
+          <button class="small-button" onclick="viewInvoice(${inv.id})">Podgląd</button>
+          <button class="small-button" onclick="editInvoice(${inv.id})">Edytuj</button>
+          <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
         </div>
       </td>
     </tr>`;
@@ -412,7 +416,7 @@ function renderInvoicingModule() {
       </div>
       <div class="calendar-form">
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
-        <div><label>Obiekt (opcjonalnie)</label><select id="inv-object"><option value="">— ogólnie —</option></select></div>
+        <div><label>Obiekt (opcjonalnie)</label><select id="inv-object"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
         <div><label>Typ faktury</label><select id="inv-type">${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
         <div><label>Numer faktury</label><input id="inv-number" placeholder="FV/2026/001" /></div>
         <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
@@ -444,9 +448,9 @@ function renderInvoicingModule() {
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
               ${thS('client','Klient')}
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ faktury</th>
               ${thS('date','Data wyst.')}
               ${thS('due','Termin płat.')}
-              ${thS('amount','Brutto','right')}
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
               <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
             </tr></thead>
@@ -512,6 +516,92 @@ function saveInvoice() {
   }
 
   document.getElementById('inv-form-area').style.display = 'none';
+  renderInvoicingModule();
+}
+
+function viewInvoice(id) {
+  const inv = InvoicingModule.find(id);
+  if (!inv) return;
+  const client = ClientsModule.find(inv.clientId);
+  const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+  const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
+  const s = InvoicingModule.STATUSES[inv.status] || { label: inv.status, color: '#666', bg: '#eee' };
+  const container = document.getElementById('module-content');
+  if (!container) return;
+  container.innerHTML = `
+    <button class="small-button" onclick="renderInvoicingModule()" style="margin-bottom:16px;">← Lista faktur</button>
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:24px;max-width:600px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+          <h3 style="margin:0;font-size:18px;font-weight:700;">${escapeHtml(inv.invoiceNumber || '—')}</h3>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px;">${typeInfo.icon} ${typeInfo.label}</div>
+        </div>
+        <span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Klient</span><strong>${escapeHtml((client && client.name) || '—')}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Obiekt</span><strong>${escapeHtml((obj && obj.name) || '—')}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Data wystawienia</span><strong>${fmtDate(inv.issueDate)}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Termin płatności</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Netto</span><strong>${fmtMoney(inv.netAmount, inv.currency)}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">VAT ${inv.vatRate}%</span><strong>${fmtMoney(inv.vatAmount, inv.currency)}</strong></div>
+        <div style="grid-column:1/-1;border-top:1px solid var(--color-border-tertiary);padding-top:12px;margin-top:4px;">
+          <span style="color:var(--color-text-secondary);font-size:11px;display:block;">Brutto</span>
+          <strong style="font-size:18px;">${fmtMoney(inv.grossAmount, inv.currency)}</strong>
+        </div>
+        ${inv.notes ? `<div style="grid-column:1/-1;"><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Uwagi</span>${escapeHtml(inv.notes)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:20px;">
+        ${inv.status !== 'PAID' ? `<button class="primary-button" style="background:#27500A;border-color:#27500A;" onclick="markInvoicePaid(${inv.id})">✓ Oznacz jako opłaconą</button>` : ''}
+        <button class="small-button" onclick="editInvoice(${inv.id})">Edytuj</button>
+      </div>
+    </div>`;
+}
+
+function editInvoice(id) {
+  const inv = InvoicingModule.find(id);
+  if (!inv) return;
+  renderInvoicingModule();
+  setTimeout(() => {
+    const form = document.getElementById('inv-form-area');
+    if (!form) return;
+    form.style.display = 'block';
+    form.querySelector('h4').textContent = 'Edytuj fakturę';
+    const btn = form.querySelector('button[onclick="saveInvoice()"]');
+    if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveInvoiceEdit(${id})`); }
+    document.getElementById('inv-client').value = inv.clientId || '';
+    updateInvObjects(inv.clientId);
+    setTimeout(() => { if (document.getElementById('inv-object')) document.getElementById('inv-object').value = inv.objectId || ''; }, 50);
+    document.getElementById('inv-number').value = inv.invoiceNumber || '';
+    document.getElementById('inv-type').value = inv.invoiceType || 'INVOICE';
+    document.getElementById('inv-issue-date').value = inv.issueDate || '';
+    document.getElementById('inv-due-date').value = inv.dueDate || '';
+    document.getElementById('inv-net').value = inv.netAmount || '';
+    document.getElementById('inv-vat').value = inv.vatRate || '23';
+    document.getElementById('inv-currency').value = inv.currency || 'PLN';
+    document.getElementById('inv-status').value = inv.status || 'DRAFT';
+    document.getElementById('inv-notes').value = inv.notes || '';
+    form.scrollIntoView({ behavior: 'smooth' });
+  }, 80);
+}
+
+function saveInvoiceEdit(id) {
+  const net = parseFloat(document.getElementById('inv-net').value || '0');
+  if (!net) { alert('Podaj kwotę netto.'); return; }
+  const vatRate = Number(document.getElementById('inv-vat').value || 23);
+  const vatAmount = net * vatRate / 100;
+  InvoicingModule.update(id, {
+    clientId: document.getElementById('inv-client').value,
+    objectId: document.getElementById('inv-object').value || null,
+    invoiceNumber: document.getElementById('inv-number').value.trim(),
+    invoiceType: document.getElementById('inv-type').value,
+    issueDate: document.getElementById('inv-issue-date').value,
+    dueDate: document.getElementById('inv-due-date').value,
+    netAmount: net, vatRate, vatAmount, grossAmount: net + vatAmount,
+    currency: document.getElementById('inv-currency').value,
+    status: document.getElementById('inv-status').value,
+    notes: document.getElementById('inv-notes').value.trim()
+  });
   renderInvoicingModule();
 }
 
@@ -862,7 +952,9 @@ function renderAnalysesModule() {
       <td style="padding:9px 12px;">${statusBadge(status.label, status.color, status.color + '22')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(a.author)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
-        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}">🗑</button>
+        <button class="small-button" onclick="viewAnalysis(${a.id})">Podgląd</button>
+        <button class="small-button" onclick="editAnalysis(${a.id})">Edytuj</button>
+        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
       </td>
     </tr>`;
   }).join('');
@@ -953,6 +1045,80 @@ function renderAnalysesModule() {
         </div>`
     }
   `;
+}
+
+function viewAnalysis(id) {
+  const a = AnalysesModule.find(id);
+  if (!a) return;
+  const client = ClientsModule.find(a.clientId);
+  const obj = ObjectsModule.find(a.objectId);
+  const type = AnalysesModule.TYPES[a.analysisType] || { icon: '🔬', label: a.analysisType };
+  const status = AnalysesModule.STATUSES[a.status] || { label: a.status, color: '#666' };
+  const container = document.getElementById('module-content');
+  if (!container) return;
+  container.innerHTML = `
+    <button class="small-button" onclick="renderAnalysesModule()" style="margin-bottom:16px;">← Lista analiz</button>
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:24px;max-width:600px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+          <h3 style="margin:0;font-size:17px;font-weight:700;">${escapeHtml(a.name)}</h3>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px;">${type.icon} ${type.label}</div>
+        </div>
+        ${statusBadge(status.label, status.color, status.color+'22')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Klient</span><strong>${escapeHtml((client && client.name) || '—')}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Obiekt</span><strong>${escapeHtml((obj && obj.name) || '—')}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Data wykonania</span><strong>${fmtDate(a.executedAt)}</strong></div>
+        <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Autor</span><strong>${escapeHtml(a.author || '—')}</strong></div>
+        ${a.comments ? `<div style="grid-column:1/-1;"><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Komentarze</span>${escapeHtml(a.comments)}</div>` : ''}
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;">
+        <button class="small-button" onclick="editAnalysis(${a.id})">Edytuj</button>
+        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
+      </div>
+    </div>`;
+}
+
+function editAnalysis(id) {
+  const a = AnalysesModule.find(id);
+  if (!a) return;
+  renderAnalysesModule();
+  setTimeout(() => {
+    const form = document.getElementById('anal-form-area');
+    if (!form) return;
+    form.style.display = 'block';
+    form.querySelector('h4').textContent = 'Edytuj analizę';
+    const btn = form.querySelector('button[onclick="saveAnalysis()"]');
+    if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveAnalysisEdit(${id})`); }
+    document.getElementById('anal-client').value = a.clientId || '';
+    updateAnalObjects(a.clientId);
+    setTimeout(() => { if (document.getElementById('anal-object')) document.getElementById('anal-object').value = a.objectId || ''; }, 50);
+    document.getElementById('anal-name').value = a.name || '';
+    document.getElementById('anal-type').value = a.analysisType || 'TYM';
+    document.getElementById('anal-date').value = a.executedAt || '';
+    document.getElementById('anal-author').value = a.author || '';
+    document.getElementById('anal-status').value = a.status || 'DRAFT';
+    document.getElementById('anal-comments').value = a.comments || '';
+    form.scrollIntoView({ behavior: 'smooth' });
+  }, 80);
+}
+
+function saveAnalysisEdit(id) {
+  const name = document.getElementById('anal-name').value.trim();
+  if (!name) { alert('Podaj nazwę analizy.'); return; }
+  AnalysesModule.update(id, {
+    clientId: document.getElementById('anal-client').value,
+    objectId: document.getElementById('anal-object').value,
+    name,
+    analysisType: document.getElementById('anal-type').value,
+    executedAt: document.getElementById('anal-date').value,
+    author: document.getElementById('anal-author').value.trim(),
+    status: document.getElementById('anal-status').value,
+    comments: document.getElementById('anal-comments').value.trim()
+  });
+  document.getElementById('anal-form-area').style.display = 'none';
+  renderAnalysesModule();
 }
 
 function updateAnalObjects(clientId) {
