@@ -87,15 +87,22 @@ let showObjectForm = false;
 
 function editClient(id) {
   const client = ClientsModule.find(id);
-
   if (!client) return;
 
   editingClientId = id;
 
-  const form = document.querySelector(
-    "#module-content form"
-  );
+  // Najpierw renderuj listę (żeby formularz był w DOM)
+  renderClientsList();
 
+  // Pokaż formularz
+  const fc = document.getElementById("client-form-container");
+  if (fc) fc.style.display = "block";
+  const title = document.getElementById("client-form-title");
+  if (title) title.textContent = "Edytuj klienta";
+  const btn = document.getElementById("client-submit-btn");
+  if (btn) btn.textContent = "Zapisz zmiany";
+
+  const form = document.querySelector("#client-form-container form");
   if (!form) return;
 
   form.name.value = client.name || "";
@@ -115,9 +122,7 @@ function editClient(id) {
   form.settlementModel.value = client.settlementModel || "ESCO";
   form.escoShare.value = client.escoShare || 50;
 
-  const contactsContainer =
-    document.getElementById("contacts-container");
-
+  const contactsContainer = document.getElementById("contacts-container");
   if (contactsContainer) {
     contactsContainer.innerHTML = "";
   }
@@ -125,30 +130,18 @@ function editClient(id) {
   if (client.contacts && client.contacts.length) {
     client.contacts.forEach(contact => {
       addContactRow();
-
-      const rows =
-        document.querySelectorAll(".contact-row");
-
+      const rows = document.querySelectorAll(".contact-row");
       const row = rows[rows.length - 1];
-
-      row.querySelector("[name='contactName']").value =
-        contact.name || "";
-
-      row.querySelector("[name='contactRole']").value =
-        contact.role || "";
-
-      row.querySelector("[name='contactEmail']").value =
-        contact.email || "";
-
-      row.querySelector("[name='contactPhone']").value =
-        contact.phone || "";
+      row.querySelector("[name='contactName']").value = contact.name || "";
+      row.querySelector("[name='contactRole']").value = contact.role || "";
+      row.querySelector("[name='contactEmail']").value = contact.email || "";
+      row.querySelector("[name='contactPhone']").value = contact.phone || "";
     });
   } else {
     addContactRow();
   }
 
-  showClientForm(true);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  fc.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 
@@ -287,21 +280,18 @@ function viewClient(id) {
 
 function showClientForm(editing) {
   const fc = document.getElementById("client-form-container");
-  const cl = document.getElementById("clients-list");
   const title = document.getElementById("client-form-title");
   if (!fc) return;
   fc.style.display = "block";
-  if (cl) cl.style.display = "none";
   if (title) title.textContent = editing ? "Edytuj klienta" : "Nowy klient";
   const btn = document.getElementById("client-submit-btn");
   if (btn) btn.textContent = editing ? "Zapisz zmiany" : "Dodaj klienta";
+  fc.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function hideClientForm() {
   const fc = document.getElementById("client-form-container");
-  const cl = document.getElementById("clients-list");
   if (fc) fc.style.display = "none";
-  if (cl) cl.style.display = "block";
   editingClientId = null;
   const form = document.querySelector("#client-form-container form");
   if (form) form.reset();
@@ -309,7 +299,6 @@ function hideClientForm() {
   if (btn) btn.textContent = "Dodaj klienta";
   const title = document.getElementById("client-form-title");
   if (title) title.textContent = "Nowy klient";
-  // re-render list
   renderClientsList();
 }
 
@@ -318,15 +307,13 @@ function renderClientsList() {
   if (!container) return;
 
   const clients = getClients();
-
-  // Always show Add button + table
-  const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny" };
+  const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny", AT:"Austria", GB:"W. Brytania" };
 
   const tableRows = clients.length === 0
-    ? `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak klientów — dodaj pierwszego.</td></tr>`
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak klientów — dodaj pierwszego poniżej.</td></tr>`
     : clients.map(client => {
         const objCount = ObjectsModule.findByClient(client.id).length;
-        return `<tr style="cursor:pointer;" onclick="openClientObjects(${client.id})">
+        return `<tr>
           <td class="td-name" style="padding:10px 12px;">
             ${escapeHtml(client.name)}
             <div class="td-sub">${escapeHtml(client.city || "")}${client.city && client.postalCode ? ", " : ""}${escapeHtml(client.postalCode || "")}</div>
@@ -334,37 +321,150 @@ function renderClientsList() {
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(countryLabel[client.country] || client.country || "—")}</td>
           <td style="padding:10px 12px;">
-            <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">
-              🏗️ Obiekty (${objCount})
-            </button>
-            <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">Podgląd</button>
-            <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
-            <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">Usuń</button>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">👁 Podgląd</button>
+              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">✏️ Edytuj</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">🗑 Usuń</button>
+              <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">🏗️ Obiekty (${objCount})</button>
+            </div>
           </td>
         </tr>`;
       }).join("");
 
+  // Sprawdź czy formularz jest aktualnie otwarty
+  const formContainer = document.getElementById("client-form-container");
+  const formIsOpen = formContainer && formContainer.style.display !== "none";
+  const formTitle = editingClientId ? "Edytuj klienta" : "Nowy klient";
+  const formBtnLabel = editingClientId ? "Zapisz zmiany" : "Dodaj klienta";
+
   container.innerHTML = `
+    <!-- TABELA KLIENTÓW -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
         Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length})</span>
       </h3>
-      <button class="primary-button" onclick="showClientForm(false)" style="font-size:13px;padding:7px 16px;">
-        + Dodaj klienta
-      </button>
     </div>
-    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
       <table class="cli-table">
         <thead>
           <tr>
             <th>Nazwa klienta</th>
             <th>VAT ID</th>
             <th>Kraj</th>
-            <th style="width:220px;">Akcje</th>
+            <th>Akcje</th>
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
       </table>
+    </div>
+
+    <!-- FORMULARZ DODAJ/EDYTUJ KLIENTA — zawsze pod tabelą -->
+    <div id="client-form-container" style="display:${formIsOpen ? "block" : "none"};">
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 id="client-form-title" style="margin:0;font-size:16px;color:#0C447C;">${formTitle}</h3>
+          <button class="small-button" type="button" onclick="hideClientForm()">✕ Zamknij</button>
+        </div>
+        <form onsubmit="createClient(this); return false;" class="calendar-form">
+          <!-- Dane podstawowe -->
+          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Dane podstawowe</div>
+          <div>
+            <label>Nazwa klienta</label>
+            <input name="name" required placeholder="np. ABC Sp. z o.o." />
+          </div>
+          <div>
+            <label>VAT ID / NIP</label>
+            <input name="vatId" placeholder="np. PL1234567890" />
+          </div>
+          <div>
+            <label>Kraj</label>
+            <select name="country">
+              <option value="PL">Polska</option>
+              <option value="CZ">Czechy</option>
+              <option value="SK">Słowacja</option>
+              <option value="AT">Austria</option>
+              <option value="DE">Niemcy</option>
+              <option value="GB">Wielka Brytania</option>
+              <option value="EN">Inny</option>
+            </select>
+          </div>
+          <div>
+            <label>Język</label>
+            <select name="language">
+              <option value="pl">Polski</option>
+              <option value="en">Angielski</option>
+              <option value="cs">Czeski</option>
+              <option value="sk">Słowacki</option>
+              <option value="de">Niemiecki</option>
+            </select>
+          </div>
+          <!-- Adres -->
+          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Adres</div>
+          <div>
+            <label>Kod pocztowy</label>
+            <input name="postalCode" placeholder="np. 00-001" />
+          </div>
+          <div>
+            <label>Miasto</label>
+            <input name="city" placeholder="np. Warszawa" />
+          </div>
+          <div>
+            <label>Ulica</label>
+            <input name="street" placeholder="np. Prosta" />
+          </div>
+          <div>
+            <label>Nr budynku</label>
+            <input name="buildingNumber" placeholder="np. 10" />
+          </div>
+          <div>
+            <label>Nr lokalu</label>
+            <input name="apartmentNumber" placeholder="opcjonalnie" />
+          </div>
+          <div>
+            <label>Google Maps URL</label>
+            <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+          </div>
+          <!-- Rozliczenia -->
+          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Rozliczenia</div>
+          <div>
+            <label>E-mail do faktur</label>
+            <input name="invoiceEmail" type="email" placeholder="np. ksiegowosc@firma.pl" />
+          </div>
+          <div>
+            <label>Termin płatności (dni)</label>
+            <input name="paymentDays" type="number" min="0" value="14" />
+          </div>
+          <div>
+            <label>Model rozliczenia</label>
+            <select name="settlementModel">
+              <option value="ESCO">ESCO</option>
+              <option value="FLAT">Abonament</option>
+              <option value="PROJECT">Projekt</option>
+            </select>
+          </div>
+          <div>
+            <label>Udział ESCO (%)</label>
+            <input name="escoShare" type="number" min="0" max="100" value="50" />
+          </div>
+          <!-- Kontakty -->
+          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Osoby kontaktowe</div>
+          <div style="grid-column:1/-1;" id="contacts-container"></div>
+          <div style="grid-column:1/-1;">
+            <button type="button" class="small-button" onclick="addContactRow()">+ Dodaj osobę kontaktową</button>
+          </div>
+          <div class="calendar-actions" style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
+            <button class="primary-button" type="submit" id="client-submit-btn">${formBtnLabel}</button>
+            <button class="small-button" type="button" onclick="hideClientForm()">Anuluj</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- PRZYCISK DODAJ — pod formularzem lub pod tabelą gdy formularz zamknięty -->
+    <div id="add-client-btn-container" style="margin-top:${formIsOpen ? "0" : "0"};">
+      <button class="primary-button" onclick="showClientForm(false)" style="font-size:13px;padding:10px 20px;" ${formIsOpen ? 'style="display:none"' : ""}>
+        + Dodaj klienta
+      </button>
     </div>
   `;
 }
