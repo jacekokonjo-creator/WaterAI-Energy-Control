@@ -817,7 +817,7 @@ function renderAnalysesModule() {
     </div>
 
     ${allAnalyses.length === 0
-      ? `<div class="reminder-card"><strong>Brak analiz</strong><div class="reminder-meta">Analizy są tworzone automatycznie przy generowaniu Raportów ESCO lub można je dodać ręcznie.</div></div>`
+      ? `<div class="reminder-card"><strong>Brak analiz</strong><div class="reminder-meta">Dodaj pierwszą analizę klikając „+ Nowa analiza". Na podstawie analiz tworzone są następnie Raporty ESCO.</div></div>`
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead>
