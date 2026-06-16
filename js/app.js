@@ -314,13 +314,14 @@ function renderClientsList() {
   let clients = allClients.filter(c => !q ||
     (c.name||'').toLowerCase().includes(q) ||
     (c.vatId||'').toLowerCase().includes(q) ||
-    (c.city||'').toLowerCase().includes(q)
+    (c.city||'').toLowerCase().includes(q) ||
+    (countryLabel[c.country]||c.country||'').toLowerCase().includes(q)
   );
   clients = [...clients].sort((a,b) => {
     if (sort === 'name_asc')  return (a.name||'').localeCompare(b.name||'');
     if (sort === 'name_desc') return (b.name||'').localeCompare(a.name||'');
-    if (sort === 'city_asc')  return (a.city||'').localeCompare(b.city||'');
-    if (sort === 'city_desc') return (b.city||'').localeCompare(a.city||'');
+    if (sort === 'city_asc')  return ((countryLabel[a.country]||a.country||'')).localeCompare((countryLabel[b.country]||b.country||''));
+    if (sort === 'city_desc') return ((countryLabel[b.country]||b.country||'')).localeCompare((countryLabel[a.country]||a.country||''));
     return 0;
   });
 
@@ -337,10 +338,10 @@ function renderClientsList() {
         return `<tr>
           <td class="td-name" style="padding:10px 12px;">
             ${escapeHtml(client.name)}
-            <div class="td-sub">${escapeHtml(client.city || "")}${client.city && client.postalCode ? ", " : ""}${escapeHtml(client.postalCode || "")}</div>
           </td>
-          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(countryLabel[client.country] || client.country || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.city || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">👁 Podgląd</button>
@@ -364,17 +365,18 @@ function renderClientsList() {
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
         Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length}${q ? ' z '+allClients.length : ''})</span>
       </h3>
-      <input type="search" placeholder="Szukaj klienta..." value="${escapeHtml(window._cliSearch||'')}"
+      <input type="search" placeholder="Szukaj po nazwie, kraju, mieście, VAT ID..." value="${escapeHtml(window._cliSearch||'')}"
         oninput="window._cliSearch=this.value;renderClientsList();"
-        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:220px;" />
+        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:280px;" />
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
       <table class="cli-table">
         <thead>
           <tr>
             ${thS('name','Nazwa klienta')}
+            ${thS('city','Kraj')}
+            <th>Miasto</th>
             <th>VAT ID</th>
-            ${thS('city','Kraj/Miasto')}
             <th>Akcje</th>
           </tr>
         </thead>
