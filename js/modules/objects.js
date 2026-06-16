@@ -1,5 +1,5 @@
 // WaterAI Energy Control
-// Objects Module v2.0.0
+// Objects Module v2.1.0
 
 const ObjectsModule = {
   storageKey: 'waterai_objects_v2',
@@ -53,6 +53,7 @@ const ObjectsModule = {
       // Właściciele
       backOfficeOwner: object.backOfficeOwner || '',
       energyAnalystOwner: object.energyAnalystOwner || '',
+      salesRepresentative: object.salesRepresentative || '',
 
       // Dane klimatyczne
       weatherStation: object.weatherStation || '',
@@ -66,7 +67,17 @@ const ObjectsModule = {
       currency: object.currency || 'PLN',
       energyPrice: Number(object.energyPrice || 0),
 
-      heatSources: object.heatSources || []
+      heatSources: object.heatSources || [],
+
+      // Dane umowne i rozliczeniowe
+      contractStartDate: object.contractStartDate || '',
+      contractEndDate: object.contractEndDate || '',
+      installationDate: object.installationDate || '',
+      commissioningDate: object.commissioningDate || '',
+      settlementModel: object.settlementModel || 'ESCO',
+      escoShare: Number(object.escoShare || 50),
+      paymentDays: Number(object.paymentDays || 14),
+      invoiceEmail: object.invoiceEmail || ''
     });
     this.saveAll(objects);
   },
