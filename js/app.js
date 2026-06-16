@@ -444,7 +444,7 @@ function openObjectProtocols(objectId) {
             Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${u}</strong>
           </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="switchToView('clients',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
+            <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
             <button class="small-button" onclick="editMeasurement(${item.id});openModule('measurements');">Edytuj protokół</button>
             <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}">Usuń</button>
           </div>
@@ -1929,7 +1929,8 @@ function viewProtocol(id) {
         <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.note)}</div>
       </div>` : ""}
 
-      <div style="display:flex;gap:8px;margin-top:8px;">
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="primary-button" style="background:#27500A;border-color:#27500A;" onclick="generateESCOReport(${p.id})">⚡ Generuj Raport ESCO</button>
         <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj protokół</button>
         ${obj ? `<button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))">🏗️ Podgląd obiektu</button>` : ""}
       </div>
@@ -2663,7 +2664,7 @@ function renderProtocolsTable(protocols, objectId) {
       </td>
       <td style="padding:10px 12px;white-space:nowrap;">
         <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" style="white-space:nowrap;">Podgląd</button>
-        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;" onclick="switchToView('measurements',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
+        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
         <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
       </td>
@@ -2931,7 +2932,7 @@ function renderMeasurementsList() {
       ` : ""}
 
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="switchToView('measurements',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
+        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
         <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
         <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
@@ -2947,6 +2948,14 @@ function renderMeasurementsList() {
 function generateESCOReport(protocolId) {
   const p = MeasurementsModule.find(protocolId);
   if (!p) { alert("Nie znaleziono protokołu."); return; }
+
+  // Upewnij się że panel modułu jest widoczny
+  const modView = document.getElementById("module-view");
+  if (modView) modView.classList.add("active");
+  const descEl = document.getElementById("module-description");
+  if (descEl) descEl.textContent = "";
+  const titleEl = document.getElementById("module-title");
+  if (titleEl) titleEl.textContent = "Raport ESCO";
 
   const client = ClientsModule.find(p.clientId);
   const obj    = ObjectsModule.find(p.objectId);
