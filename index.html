@@ -452,17 +452,24 @@
         <h2 class="dashboard-title" data-i18n="dashboardTitle">Panel główny</h2>
         <p class="dashboard-desc" data-i18n="dashboardDesc">Wybierz moduł, z którym chcesz pracować.</p>
 
-        <div class="role-box">
-          <div class="role-title" data-i18n="roleModeTitle">Tryb testowy roli</div>
+        <div class="role-box" id="role-test-panel" style="display:none;">
+          <div class="role-title">🔑 Tryb testowy roli <span style="font-size:10px;opacity:0.7;">(tylko Admin)</span></div>
           <div class="role-switcher">
-            <button id="role-superAdmin" class="active" onclick="setRole('superAdmin')" data-i18n="roleSuperAdmin">Super Admin</button>
+            <button id="role-admin" class="active" onclick="setRole('admin')">Admin</button>
             <button id="role-backOffice" onclick="setRole('backOffice')" data-i18n="roleBackOffice">Back Office</button>
             <button id="role-energyAnalyst" onclick="setRole('energyAnalyst')" data-i18n="roleEnergyAnalyst">Energy Analyst</button>
             <button id="role-salesRepresentative" onclick="setRole('salesRepresentative')">Sales Representative</button>
             <button id="role-client" onclick="setRole('client')" data-i18n="roleClient">Client</button>
           </div>
+          <div id="client-role-selector" style="display:none;margin-top:10px;">
+            <label style="font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Podgląd jako klient:</label>
+            <select id="preview-client-select" onchange="setPreviewClient(this.value)"
+              style="font-size:12px;padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;width:100%;">
+              <option value="">— wybierz klienta —</option>
+            </select>
+          </div>
           <div class="role-note" data-i18n="roleModeNote">
-            To jest tryb testowy. Docelowo rola będzie pobierana automatycznie z Supabase po zalogowaniu.
+            Tryb testowy — widoczny tylko dla Admina. Docelowo rola pobierana z systemu logowania.
           </div>
         </div>
 
@@ -750,18 +757,19 @@
     };
 
     const roleModules = {
-      superAdmin: ["calendar", "clients", "objects", "documents", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
-      backOffice: ["calendar", "clients", "objects", "documents", "invoicing", "reports"],
-      energyAnalyst: ["calendar", "objects", "documents", "measurements", "analyses", "reports"],
-      salesRepresentative: ["calendar", "clients", "objects", "reports"],
-      client: ["myObjects", "myMeasurements", "myReports"]
+      admin:              ["calendar", "clients", "objects", "documents", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
+      backOffice:         ["calendar", "clients", "objects", "documents", "invoicing", "reports"],
+      energyAnalyst:      ["calendar", "objects", "documents", "measurements", "analyses", "reports"],
+      salesRepresentative:["calendar", "clients", "objects", "reports"],
+      client:             ["myObjects", "myMeasurements", "myReports"]
     };
 
     const taskRoles = ["BACK_OFFICE", "ENERGY_ANALYST", "CLIENT"];
     const storageKey = "waterai_reminders_v1";
 
     let currentLanguage = "pl";
-    let currentRole = "superAdmin";
+    let currentRole = "admin";
+    let previewClientId = null;
     let reminders = JSON.parse(localStorage.getItem(storageKey) || "[]");
 
     function t(key) {
@@ -788,12 +796,39 @@
 
     function setRole(role) {
       currentRole = role;
+      previewClientId = null;
 
-      ["superAdmin", "backOffice", "energyAnalyst", "client"].forEach((roleName) => {
-        document.getElementById("role-" + roleName).classList.remove("active");
+      // Update active button
+      ["admin","backOffice","energyAnalyst","salesRepresentative","client"].forEach(r => {
+        const btn = document.getElementById("role-" + r);
+        if (btn) btn.classList.remove("active");
       });
+      const activeBtn = document.getElementById("role-" + role);
+      if (activeBtn) activeBtn.classList.add("active");
 
-      document.getElementById("role-" + role).classList.add("active");
+      // Show/hide client selector for client role
+      const clientSelector = document.getElementById("client-role-selector");
+      if (clientSelector) {
+        if (role === "client") {
+          clientSelector.style.display = "block";
+          // Populate client list
+          const sel = document.getElementById("preview-client-select");
+          if (sel && typeof ClientsModule !== "undefined") {
+            const clients = ClientsModule.getAll();
+            sel.innerHTML = `<option value="">— wybierz klienta —</option>` +
+              clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+          }
+        } else {
+          clientSelector.style.display = "none";
+        }
+      }
+
+      closeModule();
+      renderDashboard();
+    }
+
+    function setPreviewClient(clientId) {
+      previewClientId = clientId ? Number(clientId) : null;
       closeModule();
       renderDashboard();
     }
@@ -803,10 +838,15 @@
       const modules = roleModules[currentRole];
       const tilesContainer = document.getElementById("tiles");
 
+      // Show role test panel only for admin
+      const rolePanel = document.getElementById("role-test-panel");
+      if (rolePanel) rolePanel.style.display = currentRole === "admin" ? "block" : "none";
+
       tilesContainer.innerHTML = "";
 
       modules.forEach((moduleName) => {
         const item = labels[moduleName];
+        if (!item) return;
         const tile = document.createElement("div");
 
         tile.className = "tile";
@@ -885,11 +925,23 @@
   }
   else if (moduleName === "objects" || moduleName === "myObjects") {
     document.getElementById("module-description").textContent = "";
-    renderObjectsModule();
+    if (moduleName === "myObjects" && currentRole === "client") {
+      renderClientView("objects", previewClientId);
+    } else {
+      renderObjectsModule();
+    }
   }
   else if (moduleName === "measurements" || moduleName === "myMeasurements") {
     document.getElementById("module-description").textContent = "";
-    renderMeasurementsModule();
+    if (moduleName === "myMeasurements" && currentRole === "client") {
+      renderClientView("measurements", previewClientId);
+    } else {
+      renderMeasurementsModule();
+    }
+  }
+  else if (moduleName === "myReports") {
+    document.getElementById("module-description").textContent = "";
+    renderClientView("reports", previewClientId);
   }
   else {
     document.getElementById("module-description").textContent = t("moduleDefault");
@@ -898,6 +950,120 @@
 
   document.getElementById("module-view").classList.add("active");
 }
+
+    function renderClientView(section, clientId) {
+      const container = document.getElementById("module-content");
+      if (!container) return;
+
+      const client = clientId ? (typeof ClientsModule !== "undefined" ? ClientsModule.find(clientId) : null) : null;
+
+      if (!clientId || !client) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;">
+            <div style="font-size:40px;margin-bottom:12px;">👤</div>
+            <p style="font-size:15px;font-weight:500;color:var(--color-text-primary);margin:0 0 8px;">Wybierz klienta w panelu testowym roli</p>
+            <p style="font-size:13px;color:var(--color-text-secondary);">Aby podejrzeć widok klienta, wybierz go z listy w panelu „Tryb testowy roli" po lewej stronie.</p>
+          </div>`;
+        return;
+      }
+
+      const objects = typeof ObjectsModule !== "undefined" ? ObjectsModule.findByClient(clientId) : [];
+      const protocols = typeof MeasurementsModule !== "undefined"
+        ? objects.flatMap(o => MeasurementsModule.findByObject(o.id))
+        : [];
+
+      if (section === "objects") {
+        const rows = objects.map(o => `
+          <tr style="border-bottom:1px solid var(--color-border-tertiary);">
+            <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(o.name||'—')}</td>
+            <td style="padding:10px 12px;font-size:13px;">${escapeHtml(o.city||'—')}</td>
+            <td style="padding:10px 12px;font-size:13px;">${escapeHtml(o.status||'—')}</td>
+          </tr>`).join('');
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:22px;">👤</span>
+            <div>
+              <h3 style="margin:0;font-size:16px;">Moje obiekty</h3>
+              <p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client.name)}</p>
+            </div>
+          </div>
+          ${objects.length === 0 ? '<div class="reminder-card"><strong>Brak obiektów</strong></div>' : `
+          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--color-background-secondary);">
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Miasto</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Status</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`}`;
+      } else if (section === "measurements") {
+        const rows = protocols.map(p => {
+          const obj = objects.find(o => Number(o.id) === Number(p.objectId));
+          return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(p.protocolDate||'—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(p.billingPeriodStartDate||'')} → ${escapeHtml(p.billingPeriodEndDate||'')}</td>
+          </tr>`;
+        }).join('');
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:22px;">📊</span>
+            <div>
+              <h3 style="margin:0;font-size:16px;">Moje pomiary</h3>
+              <p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client.name)}</p>
+            </div>
+          </div>
+          ${protocols.length === 0 ? '<div class="reminder-card"><strong>Brak pomiarów</strong></div>' : `
+          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--color-background-secondary);">
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Data protokołu</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Okres rozliczeniowy</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`}`;
+      } else if (section === "reports") {
+        const withResults = protocols.filter(p => p.escoResults || p.billingConsumption);
+        const rows = withResults.map(p => {
+          const r = p.escoResults || {};
+          const obj = objects.find(o => Number(o.id) === Number(p.objectId));
+          const saved = Number(r.savedEnergyPct || 0).toFixed(1);
+          const color = r.savedEnergyPct >= 0 ? '#27500A' : '#c00';
+          return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(p.protocolDate||'—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
+            <td style="padding:9px 12px;font-size:13px;text-align:right;font-weight:600;color:${color};">${saved}%</td>
+            <td style="padding:9px 12px;">
+              <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${p.id})">⚡ Raport</button>
+            </td>
+          </tr>`;
+        }).join('');
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:22px;">📈</span>
+            <div>
+              <h3 style="margin:0;font-size:16px;">Moje raporty ESCO</h3>
+              <p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client.name)}</p>
+            </div>
+          </div>
+          ${withResults.length === 0 ? '<div class="reminder-card"><strong>Brak raportów</strong></div>' : `
+          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--color-background-secondary);">
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Data</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:right;">Oszczędność</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Raport</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`}`;
+      }
+    }
     
     function renderCalendarModule() {
       document.getElementById("module-content").innerHTML = `
@@ -1012,7 +1178,7 @@
     }
 
     setLanguage("pl");
-    setRole("superAdmin");
+    setRole("admin");
   </script>
 <script src="js/modules/migration.js"></script>
 <script src="js/modules/clients.js"></script>
