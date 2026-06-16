@@ -414,94 +414,108 @@ function renderClientsList() {
           <button class="icon-btn" type="button" onclick="hideClientForm()" title="Zamknij">✕</button>
         </div>
         <div style="padding:20px;">
-          <form onsubmit="createClient(this); return false;" class="calendar-form">
-            <!-- Dane podstawowe -->
-            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Dane podstawowe</div>
-            <div>
-              <label>Nazwa klienta</label>
-              <input name="name" required placeholder="np. ABC Sp. z o.o." />
+          <style>
+            .cli-section { margin-bottom:16px; border-radius:10px; overflow:hidden; }
+            .cli-body { padding:16px; background:var(--color-background-primary); }
+            .cli-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+            .cli-grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+            .cli-grid4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+            .cli-field label { font-size:12px; color:var(--color-text-secondary); display:block; margin-bottom:4px; }
+            .cli-field input, .cli-field select { width:100%; box-sizing:border-box; }
+          </style>
+          <form onsubmit="createClient(this); return false;">
+
+            <!-- DANE PODSTAWOWE -->
+            <div class="cli-section" style="border:1px solid #B5D4F4;">
+              <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">👤</span>
+                <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe</h3>
+              </div>
+              <div class="cli-body">
+                <div class="cli-grid4">
+                  <div class="cli-field">
+                    <label>Nazwa klienta</label>
+                    <input name="name" required placeholder="np. ABC Sp. z o.o." />
+                  </div>
+                  <div class="cli-field">
+                    <label>VAT ID / NIP</label>
+                    <input name="vatId" placeholder="np. PL1234567890" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Kraj</label>
+                    <select name="country">
+                      <option value="PL">Polska</option>
+                      <option value="CZ">Czechy</option>
+                      <option value="SK">Słowacja</option>
+                      <option value="AT">Austria</option>
+                      <option value="DE">Niemcy</option>
+                      <option value="GB">Wielka Brytania</option>
+                      <option value="EN">Inny</option>
+                    </select>
+                  </div>
+                  <div class="cli-field">
+                    <label>Język</label>
+                    <select name="language">
+                      <option value="pl">Polski</option>
+                      <option value="en">Angielski</option>
+                      <option value="cs">Czeski</option>
+                      <option value="sk">Słowacki</option>
+                      <option value="de">Niemiecki</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label>VAT ID / NIP</label>
-              <input name="vatId" placeholder="np. PL1234567890" />
+
+            <!-- ADRES -->
+            <div class="cli-section" style="border:1px solid #B8E0C8;">
+              <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">📍</span>
+                <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres</h3>
+              </div>
+              <div class="cli-body">
+                <div class="cli-grid3">
+                  <div class="cli-field">
+                    <label>Kod pocztowy</label>
+                    <input name="postalCode" placeholder="np. 00-001" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Miasto</label>
+                    <input name="city" placeholder="np. Warszawa" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Ulica</label>
+                    <input name="street" placeholder="np. Prosta" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Nr budynku</label>
+                    <input name="buildingNumber" placeholder="np. 10" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Nr lokalu</label>
+                    <input name="apartmentNumber" placeholder="opcjonalnie" />
+                  </div>
+                  <div class="cli-field">
+                    <label>Google Maps URL</label>
+                    <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label>Kraj</label>
-              <select name="country">
-                <option value="PL">Polska</option>
-                <option value="CZ">Czechy</option>
-                <option value="SK">Słowacja</option>
-                <option value="AT">Austria</option>
-                <option value="DE">Niemcy</option>
-                <option value="GB">Wielka Brytania</option>
-                <option value="EN">Inny</option>
-              </select>
+
+            <!-- OSOBY KONTAKTOWE -->
+            <div class="cli-section" style="border:1px solid #C8B5F4;">
+              <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">👥</span>
+                <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Osoby kontaktowe</h3>
+              </div>
+              <div class="cli-body">
+                <div id="contacts-container"></div>
+                <button type="button" class="small-button" onclick="addContactRow()" style="margin-top:4px;">+ Dodaj osobę kontaktową</button>
+              </div>
             </div>
-            <div>
-              <label>Język</label>
-              <select name="language">
-                <option value="pl">Polski</option>
-                <option value="en">Angielski</option>
-                <option value="cs">Czeski</option>
-                <option value="sk">Słowacki</option>
-                <option value="de">Niemiecki</option>
-              </select>
-            </div>
-            <!-- Adres -->
-            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Adres</div>
-            <div>
-              <label>Kod pocztowy</label>
-              <input name="postalCode" placeholder="np. 00-001" />
-            </div>
-            <div>
-              <label>Miasto</label>
-              <input name="city" placeholder="np. Warszawa" />
-            </div>
-            <div>
-              <label>Ulica</label>
-              <input name="street" placeholder="np. Prosta" />
-            </div>
-            <div>
-              <label>Nr budynku</label>
-              <input name="buildingNumber" placeholder="np. 10" />
-            </div>
-            <div>
-              <label>Nr lokalu</label>
-              <input name="apartmentNumber" placeholder="opcjonalnie" />
-            </div>
-            <div>
-              <label>Google Maps URL</label>
-              <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
-            </div>
-            <!-- Rozliczenia -->
-            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Rozliczenia</div>
-            <div>
-              <label>E-mail do faktur</label>
-              <input name="invoiceEmail" type="email" placeholder="np. ksiegowosc@firma.pl" />
-            </div>
-            <div>
-              <label>Termin płatności (dni)</label>
-              <input name="paymentDays" type="number" min="0" value="14" />
-            </div>
-            <div>
-              <label>Model rozliczenia</label>
-              <select name="settlementModel">
-                <option value="ESCO">ESCO</option>
-                <option value="FLAT">Abonament</option>
-                <option value="PROJECT">Projekt</option>
-              </select>
-            </div>
-            <div>
-              <label>Udział ESCO (%)</label>
-              <input name="escoShare" type="number" min="0" max="100" value="50" />
-            </div>
-            <!-- Kontakty -->
-            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Osoby kontaktowe</div>
-            <div style="grid-column:1/-1;" id="contacts-container"></div>
-            <div style="grid-column:1/-1;">
-              <button type="button" class="small-button" onclick="addContactRow()">+ Dodaj osobę kontaktową</button>
-            </div>
-            <div class="calendar-actions" style="grid-column:1/-1;margin-top:12px;display:flex;gap:8px;">
+
+            <div style="display:flex;gap:10px;margin-top:8px;">
               <button class="primary-button" type="submit" id="client-submit-btn">${formBtnLabel}</button>
               <button class="small-button" type="button" onclick="hideClientForm()">Anuluj</button>
             </div>
@@ -691,6 +705,14 @@ function createObject(form) {
     backOfficeOwner: form.backOfficeOwner.value.trim(),
     energyAnalystOwner: form.energyAnalystOwner.value.trim(),
     salesRepresentative: form.salesRepresentative ? form.salesRepresentative.value.trim() : "",
+    contractStartDate: form.contractStartDate ? form.contractStartDate.value : "",
+    contractEndDate: form.contractEndDate ? form.contractEndDate.value : "",
+    installationDate: form.installationDate ? form.installationDate.value : "",
+    commissioningDate: form.commissioningDate ? form.commissioningDate.value : "",
+    settlementModel: form.settlementModel ? form.settlementModel.value : "ESCO",
+    escoShare: form.escoShare ? Number(form.escoShare.value) : 50,
+    paymentDays: form.paymentDays ? Number(form.paymentDays.value) : 14,
+    invoiceEmail: form.invoiceEmail ? form.invoiceEmail.value.trim() : "",
 
     // DANE KLIMATYCZNE TYM
     weatherStation: form.weatherStation ? form.weatherStation.value.trim() : "",
@@ -935,6 +957,16 @@ function editObject(id) {
   if (form.currency) form.currency.value = object.currency || "PLN";
   if (form.energyPrice) form.energyPrice.value = object.energyPrice || "";
 
+  // Dane umowne i rozliczeniowe
+  if (form.contractStartDate) form.contractStartDate.value = object.contractStartDate || "";
+  if (form.contractEndDate) form.contractEndDate.value = object.contractEndDate || "";
+  if (form.installationDate) form.installationDate.value = object.installationDate || "";
+  if (form.commissioningDate) form.commissioningDate.value = object.commissioningDate || "";
+  if (form.settlementModel) form.settlementModel.value = object.settlementModel || "ESCO";
+  if (form.escoShare) form.escoShare.value = object.escoShare || 50;
+  if (form.paymentDays) form.paymentDays.value = object.paymentDays || 14;
+  if (form.invoiceEmail) form.invoiceEmail.value = object.invoiceEmail || "";
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -981,10 +1013,14 @@ function renderObjectsModule() {
     (objStatusLabel[obj.status]||'').toLowerCase().includes(qObj)
   );
   displayObjects = [...displayObjects].sort((a,b) => {
-    if (sortObj === 'name_asc')   return (a.name||'').localeCompare(b.name||'');
-    if (sortObj === 'name_desc')  return (b.name||'').localeCompare(a.name||'');
-    if (sortObj === 'client_asc') return (getClientName(a.clientId)||'').localeCompare(getClientName(b.clientId)||'');
-    if (sortObj === 'status_asc') return (a.status||'').localeCompare(b.status||'');
+    if (sortObj === 'name_asc')    return (a.name||'').localeCompare(b.name||'');
+    if (sortObj === 'name_desc')   return (b.name||'').localeCompare(a.name||'');
+    if (sortObj === 'client_asc')  return (getClientName(a.clientId)||'').localeCompare(getClientName(b.clientId)||'');
+    if (sortObj === 'client_desc') return (getClientName(b.clientId)||'').localeCompare(getClientName(a.clientId)||'');
+    if (sortObj === 'type_asc')    return (objTypeLabel[a.objectType]||a.objectType||'').localeCompare(objTypeLabel[b.objectType]||b.objectType||'');
+    if (sortObj === 'type_desc')   return (objTypeLabel[b.objectType]||b.objectType||'').localeCompare(objTypeLabel[a.objectType]||a.objectType||'');
+    if (sortObj === 'status_asc')  return (a.status||'').localeCompare(b.status||'');
+    if (sortObj === 'status_desc') return (b.status||'').localeCompare(a.status||'');
     return 0;
   });
 
@@ -996,19 +1032,22 @@ function renderObjectsModule() {
   };
 
   const tableRows = displayObjects.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${qObj ? 'Brak wyników wyszukiwania.' : 'Brak obiektów — dodaj pierwszy poniżej.'}</td></tr>`
+    ? `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${qObj ? 'Brak wyników wyszukiwania.' : 'Brak obiektów — dodaj pierwszy poniżej.'}</td></tr>`
     : displayObjects.map(obj => {
         const statusColor = objStatusColor[obj.status] || "#666";
         const protCount = MeasurementsModule.findByObject(obj.id).length;
         return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
           <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
-          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
           <td style="padding:10px 12px;">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${statusColor}22;color:${statusColor};">
               ${escapeHtml(objStatusLabel[obj.status] || obj.status || "—")}
             </span>
           </td>
+          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.backOfficeOwner || "—")}</td>
+          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.salesRepresentative || "—")}</td>
+          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.energyAnalystOwner || "—")}</td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <div style="display:flex;gap:4px;flex-wrap:wrap;">
               <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" class="icon-btn" title="Podgląd">👁</button>
@@ -1044,9 +1083,12 @@ function renderObjectsModule() {
         <thead>
           <tr style="background:var(--color-background-secondary);">
             ${thObj('name','Nazwa obiektu')}
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ</th>
             ${thObj('client','Klient')}
+            ${thObj('type','Typ')}
             ${thObj('status','Status')}
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Back Office</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Sales Representative</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Energy Analyst</th>
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
         </thead>
@@ -1106,7 +1148,7 @@ function renderObjectsModule() {
                 </select>
               </div>
             </div>
-            <div class="obj-grid2">
+            <div class="obj-grid3">
               <div class="obj-field">
                 <label>Back Office</label>
                 <select name="backOfficeOwner">
@@ -1114,6 +1156,15 @@ function renderObjectsModule() {
                   ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('backOffice') : [])
                     .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
                   ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.backOfficeOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('backOffice').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Sales Representative</label>
+                <select name="salesRepresentative">
+                  <option value="">— wybierz —</option>
+                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('salesRepresentative') : [])
+                    .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
+                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.salesRepresentative; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('salesRepresentative').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
               <div class="obj-field">
@@ -1125,14 +1176,55 @@ function renderObjectsModule() {
                   ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.energyAnalystOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('energyAnalyst').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DANE UMOWNE I ROZLICZENIOWE -->
+        <div class="obj-section" style="border:1px solid #F4D4F4;">
+          <div style="background:#FBE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">📋</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#6B0C7C;">Dane umowne i rozliczeniowe</h3>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid4">
               <div class="obj-field">
-                <label>Sales Representative</label>
-                <select name="salesRepresentative">
-                  <option value="">— wybierz —</option>
-                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('salesRepresentative') : [])
-                    .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
-                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.salesRepresentative; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('salesRepresentative').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                <label>Od kiedy umowa</label>
+                <input name="contractStartDate" type="date" />
+              </div>
+              <div class="obj-field">
+                <label>Do kiedy umowa</label>
+                <input name="contractEndDate" type="date" />
+              </div>
+              <div class="obj-field">
+                <label>Kiedy instalacja</label>
+                <input name="installationDate" type="date" />
+              </div>
+              <div class="obj-field">
+                <label>Kiedy uruchomienie</label>
+                <input name="commissioningDate" type="date" />
+              </div>
+            </div>
+            <div class="obj-grid4">
+              <div class="obj-field">
+                <label>Model rozliczenia</label>
+                <select name="settlementModel">
+                  <option value="ESCO">ESCO</option>
+                  <option value="FLAT">Abonament</option>
+                  <option value="PROJECT">Projekt</option>
                 </select>
+              </div>
+              <div class="obj-field">
+                <label>Udział ESCO (%)</label>
+                <input name="escoShare" type="number" min="0" max="100" value="50" />
+              </div>
+              <div class="obj-field">
+                <label>Termin płatności (dni)</label>
+                <input name="paymentDays" type="number" min="0" value="14" />
+              </div>
+              <div class="obj-field">
+                <label>E-mail do faktur</label>
+                <input name="invoiceEmail" type="email" placeholder="np. ksiegowosc@firma.pl" />
               </div>
             </div>
           </div>
@@ -1349,7 +1441,7 @@ function renderObjectsModule() {
     </div>
 
     <!-- PRZYCISK DODAJ — pod formularzem gdy zamknięty -->
-    ${!showObjectForm ? `<button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:10px 20px;">+ Dodaj obiekt</button>` : ""}
+
   `;
 }
 
