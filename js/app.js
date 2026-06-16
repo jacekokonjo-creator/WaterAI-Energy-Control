@@ -1087,15 +1087,30 @@ function renderObjectsModule() {
             <div class="obj-grid2">
               <div class="obj-field">
                 <label>Back Office</label>
-                <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
+                <select name="backOfficeOwner">
+                  <option value="">— wybierz —</option>
+                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('backOffice') : [])
+                    .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
+                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.backOfficeOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('backOffice').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                </select>
               </div>
               <div class="obj-field">
                 <label>Energy Analyst</label>
-                <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
+                <select name="energyAnalystOwner">
+                  <option value="">— wybierz —</option>
+                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('energyAnalyst') : [])
+                    .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
+                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.energyAnalystOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('energyAnalyst').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                </select>
               </div>
               <div class="obj-field">
                 <label>Sales Representative</label>
-                <input name="salesRepresentative" placeholder="np. Jan Nowak" />
+                <select name="salesRepresentative">
+                  <option value="">— wybierz —</option>
+                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('salesRepresentative') : [])
+                    .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
+                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.salesRepresentative; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('salesRepresentative').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                </select>
               </div>
             </div>
           </div>
