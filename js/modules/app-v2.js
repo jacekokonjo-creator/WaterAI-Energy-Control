@@ -1011,7 +1011,7 @@ function renderDashboardSummary() {
 
 const _origOpenModule = window.openModule;
 window.openModule = function(moduleName) {
-  const newModules = ['documents', 'invoicing', 'analyses', 'dashboard'];
+  const newModules = ['documents', 'invoicing', 'analyses', 'dashboard', 'users'];
   if (newModules.includes(moduleName)) {
     const labels = (typeof getModuleLabels === 'function') ? getModuleLabels() : {};
     const item = labels[moduleName];
@@ -1028,6 +1028,7 @@ window.openModule = function(moduleName) {
     else if (moduleName === 'invoicing') renderInvoicingModule();
     else if (moduleName === 'analyses') renderAnalysesModule();
     else if (moduleName === 'dashboard') renderDashboardSummary();
+    else if (moduleName === 'users') renderUsersModule();
     return;
   }
 

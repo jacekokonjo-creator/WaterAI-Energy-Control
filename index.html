@@ -458,6 +458,7 @@
             <button id="role-superAdmin" class="active" onclick="setRole('superAdmin')" data-i18n="roleSuperAdmin">Super Admin</button>
             <button id="role-backOffice" onclick="setRole('backOffice')" data-i18n="roleBackOffice">Back Office</button>
             <button id="role-energyAnalyst" onclick="setRole('energyAnalyst')" data-i18n="roleEnergyAnalyst">Energy Analyst</button>
+            <button id="role-salesRepresentative" onclick="setRole('salesRepresentative')">Sales Representative</button>
             <button id="role-client" onclick="setRole('client')" data-i18n="roleClient">Client</button>
           </div>
           <div class="role-note" data-i18n="roleModeNote">
@@ -752,6 +753,7 @@
       superAdmin: ["calendar", "clients", "objects", "documents", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
       backOffice: ["calendar", "clients", "objects", "documents", "invoicing", "reports"],
       energyAnalyst: ["calendar", "objects", "documents", "measurements", "analyses", "reports"],
+      salesRepresentative: ["calendar", "clients", "objects", "reports"],
       client: ["myObjects", "myMeasurements", "myReports"]
     };
 
@@ -1021,6 +1023,7 @@
 <script src="js/modules/documents.js"></script>
 <script src="js/modules/invoicing.js"></script>
 <script src="js/modules/calendar.js"></script>
+<script src="js/modules/users.js"></script>
 <script src="js/app.js"></script>
 <script src="js/modules/app-v2.js"></script>
 </body>
