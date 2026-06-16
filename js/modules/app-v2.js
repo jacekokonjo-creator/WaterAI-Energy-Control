@@ -80,12 +80,14 @@ function renderDocumentsModule(clientId, objectId) {
               <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);">${escapeHtml(d.name)}</div>
               <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">
                 ${fmtDate(d.documentDate)} · ${escapeHtml(objName)}
+                ${d.fileName ? ` · <span style="opacity:0.8;">${escapeHtml(d.fileName)}</span>` : ''}
+                ${d.fileSize ? ` · ${d.fileSize > 1048576 ? (d.fileSize/1048576).toFixed(1)+' MB' : Math.round(d.fileSize/1024)+' KB'}` : ''}
                 ${d.tags && d.tags.length ? ' · ' + d.tags.map(t => `<span style="background:#eee;padding:1px 5px;border-radius:4px;">${escapeHtml(t)}</span>`).join(' ') : ''}
               </div>
               ${d.description ? `<div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${escapeHtml(d.description)}</div>` : ''}
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0;">
-              ${d.fileUrl ? `<button class="small-button" onclick="window.open('${escapeHtml(d.fileUrl)}','_blank')">⬇ Pobierz</button>` : ''}
+              ${d.fileUrl ? `<button class="small-button" onclick="downloadDoc('${d.id}')">⬇ Pobierz</button>` : ''}
               <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId},${objectId||'null'});}">🗑</button>
             </div>
           </div>`;
@@ -98,6 +100,8 @@ function renderDocumentsModule(clientId, objectId) {
     <style>
       .doc-search { display:flex;gap:8px;align-items:center;margin-bottom:16px; }
       .doc-search input { flex:1;padding:8px 12px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px; }
+      .doc-drop-active { border-color:#0C447C !important; background:#E6F1FB !important; }
+      .doc-drop-active div { color:#0C447C !important; }
     </style>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
@@ -158,8 +162,24 @@ function renderDocumentsModule(clientId, objectId) {
           <input id="doc-tags" placeholder="np. faktura, styczeń, ciepło" />
         </div>
         <div style="grid-column:1/-1;">
-          <label>Plik (URL lub ścieżka)</label>
-          <input id="doc-fileurl" placeholder="https://... lub ścieżka do pliku" />
+          <label>Plik</label>
+          <div id="doc-dropzone"
+            ondragover="event.preventDefault();this.classList.add('doc-drop-active');"
+            ondragleave="this.classList.remove('doc-drop-active');"
+            ondrop="handleDocFileDrop(event)"
+            onclick="document.getElementById('doc-file-input').click()"
+            style="border:2px dashed var(--color-border-tertiary);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--color-background-secondary);">
+            <div style="font-size:28px;margin-bottom:6px;">📂</div>
+            <div id="doc-drop-label" style="font-size:13px;color:var(--color-text-secondary);">
+              Przeciągnij plik tutaj lub <span style="color:#0C447C;text-decoration:underline;">kliknij aby wybrać</span>
+            </div>
+            <div id="doc-file-info" style="display:none;margin-top:8px;font-size:12px;color:#27500A;font-weight:500;"></div>
+          </div>
+          <input id="doc-file-input" type="file" style="display:none;" onchange="handleDocFileSelect(this)" />
+          <input id="doc-fileurl" type="hidden" value="" />
+          <input id="doc-filename" type="hidden" value="" />
+          <input id="doc-filesize" type="hidden" value="" />
+          <input id="doc-filetype" type="hidden" value="" />
         </div>
         <div style="grid-column:1/-1;">
           <button class="primary-button" type="button" onclick="saveDocument(${filterClientId})" style="width:auto;padding:10px 24px;margin:0;">Zapisz dokument</button>
@@ -177,9 +197,62 @@ function renderDocumentsModule(clientId, objectId) {
   `;
 }
 
+function handleDocFileDrop(event) {
+  event.preventDefault();
+  const dz = document.getElementById('doc-dropzone');
+  if (dz) dz.classList.remove('doc-drop-active');
+  const file = event.dataTransfer.files[0];
+  if (file) readDocFile(file);
+}
+
+function handleDocFileSelect(input) {
+  const file = input.files[0];
+  if (file) readDocFile(file);
+}
+
+function readDocFile(file) {
+  const MAX_MB = 5;
+  if (file.size > MAX_MB * 1024 * 1024) {
+    alert(`Plik jest za duży (max ${MAX_MB} MB). Wybierz mniejszy plik.`);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('doc-fileurl').value = e.target.result;
+    document.getElementById('doc-filename').value = file.name;
+    document.getElementById('doc-filesize').value = file.size;
+    document.getElementById('doc-filetype').value = file.type;
+
+    const sizeLabel = file.size > 1024 * 1024
+      ? (file.size / 1024 / 1024).toFixed(1) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+
+    const info = document.getElementById('doc-file-info');
+    if (info) {
+      info.style.display = 'block';
+      info.innerHTML = `✅ ${escapeHtml(file.name)} <span style="color:#666;font-weight:400;">(${sizeLabel})</span>`;
+    }
+    const label = document.getElementById('doc-drop-label');
+    if (label) label.style.display = 'none';
+
+    // Auto-fill name if empty
+    const nameEl = document.getElementById('doc-name');
+    if (nameEl && !nameEl.value.trim()) {
+      nameEl.value = file.name.replace(/\.[^/.]+$/, '');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 function saveDocument(clientId) {
   const name = document.getElementById('doc-name').value.trim();
   if (!name) { alert('Podaj nazwę dokumentu.'); return; }
+
+  const fileUrl  = document.getElementById('doc-fileurl').value;
+  const fileName = document.getElementById('doc-filename').value || name;
+  const fileSize = Number(document.getElementById('doc-filesize').value || 0);
+  const fileType = document.getElementById('doc-filetype').value || '';
 
   const tagsRaw = document.getElementById('doc-tags').value;
   const tags = tagsRaw.split(',').map(t => t.trim()).filter(Boolean);
@@ -192,11 +265,30 @@ function saveDocument(clientId) {
     documentDate: document.getElementById('doc-date').value,
     description: document.getElementById('doc-description').value.trim(),
     tags,
-    fileUrl: document.getElementById('doc-fileurl').value.trim(),
-    fileName: document.getElementById('doc-fileurl').value.trim().split('/').pop() || name
+    fileUrl,
+    fileName,
+    fileSize,
+    fileType
   });
 
   renderDocumentsModule(clientId);
+}
+
+function downloadDoc(docId) {
+  const d = DocumentsModule.find(Number(docId));
+  if (!d || !d.fileUrl) return;
+
+  if (d.fileUrl.startsWith('data:')) {
+    // base64 — trigger download
+    const a = document.createElement('a');
+    a.href = d.fileUrl;
+    a.download = d.fileName || d.name || 'dokument';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } else {
+    window.open(d.fileUrl, '_blank');
+  }
 }
 
 function searchDocuments(clientId, query) {
