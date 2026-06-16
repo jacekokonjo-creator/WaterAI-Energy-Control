@@ -2731,17 +2731,6 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
-    <!-- REGRESJA + NOTATKA + SUBMIT -->
-    <div style="margin-bottom:16px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
-        <input name="includeLinearRegression" type="checkbox" />
-        Dołącz analizę regresji liniowej jako załącznik do raportu
-      </label>
-      <p style="font-size:11px;color:var(--color-text-tertiary);margin:4px 0 0 24px;">
-        Regresja liniowa to moduł analityczny — nie jest podstawą rozliczenia ESCO.
-      </p>
-    </div>
-
     <div style="margin-bottom:16px;">
       <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatka</label>
       <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." style="width:100%;box-sizing:border-box;" />
