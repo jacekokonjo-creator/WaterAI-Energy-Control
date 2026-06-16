@@ -64,10 +64,6 @@ function createClient(form) {
     buildingNumber: form.buildingNumber.value.trim(),
     apartmentNumber: form.apartmentNumber.value.trim(),
     googleMapsUrl: form.googleMapsUrl.value.trim(),
-    invoiceEmail: form.invoiceEmail.value.trim(),
-    paymentDays: Number(form.paymentDays.value),
-    settlementModel: form.settlementModel.value,
-    escoShare: Number(form.escoShare.value),
     contacts
   };
 
@@ -129,11 +125,6 @@ function editClient(id) {
   form.buildingNumber.value = client.buildingNumber || "";
   form.apartmentNumber.value = client.apartmentNumber || "";
   form.googleMapsUrl.value = client.googleMapsUrl || "";
-
-  form.invoiceEmail.value = client.invoiceEmail || "";
-  form.paymentDays.value = client.paymentDays || 14;
-  form.settlementModel.value = client.settlementModel || "ESCO";
-  form.escoShare.value = client.escoShare || 50;
 
   const contactsContainer = document.getElementById("contacts-container");
   if (contactsContainer) {
