@@ -1000,7 +1000,7 @@ function copyPeriodFromProtocol(type) {
       refreshPeriodHDD('comparison');
       refreshConsumption('comparison');
       // Flash button
-      const btn = document.querySelector('[onclick="copyPeriodFromProtocol('comparison')"]');
+      const btn = document.querySelector('[onclick*="comparison"]');
       if (btn) { btn.textContent = '✅ Skopiowano!'; btn.style.background = '#EAF3DE'; setTimeout(() => { btn.textContent = '📋 Kopiuj z poprzedniego protokołu'; btn.style.background = 'white'; }, 2000); }
     }, 50);
 
@@ -1021,7 +1021,7 @@ function copyPeriodFromProtocol(type) {
       if (dInput && days !== undefined) dInput.value = days;
     });
     refreshTymHDD();
-    const btn = document.querySelector('[onclick="copyPeriodFromProtocol('tym')"]');
+    const btn = document.querySelector('[onclick*="tym"]');
     if (btn) { btn.textContent = '✅ Skopiowano!'; btn.style.background = '#FAEEDA'; setTimeout(() => { btn.textContent = '📋 Kopiuj TYM z poprzedniego protokołu'; btn.style.background = 'white'; }, 2000); }
   }
 }
@@ -3061,7 +3061,7 @@ function renderMeasurementsModule() {
         <span style="font-size:18px;color:#3B6D11;">📊</span>
         <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy</h3>
         <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy</span>
-        ${prevProtocol ? `<button type="button" onclick="copyPeriodFromProtocol('comparison')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #27500A;border-radius:6px;background:white;color:#27500A;cursor:pointer;white-space:nowrap;">📋 Kopiuj z poprzedniego protokołu</button>` : ''}
+        ${prevProtocol ? '<button type="button" onclick="copyPeriodFromProtocol(\'comparison\')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #27500A;border-radius:6px;background:white;color:#27500A;cursor:pointer;white-space:nowrap;">📋 Kopiuj z poprzedniego protokołu</button>' : ''}
       </div>
       <div class="tym-body">
         <div class="tym-grid4">
@@ -3117,7 +3117,7 @@ function renderMeasurementsModule() {
         <span style="font-size:18px;color:#854F0B;">❄️</span>
         <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Typowy rok meteorologiczny (TYM)</h3>
         <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FAC775;color:#633806;">długoletni</span>
-        ${prevProtocol ? `<button type="button" onclick="copyPeriodFromProtocol('tym')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;white-space:nowrap;">📋 Kopiuj TYM z poprzedniego protokołu</button>` : ''}
+        ${prevProtocol ? '<button type="button" onclick="copyPeriodFromProtocol(\'tym\')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;white-space:nowrap;">📋 Kopiuj TYM z poprzedniego protokołu</button>' : ''}
       </div>
       <div class="tym-body">
         <div class="tym-grid4">
