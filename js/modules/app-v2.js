@@ -726,7 +726,8 @@ function renderAnalysesModule() {
   const clients = ClientsModule.getAll();
   const allAnalyses = AnalysesModule.getAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const firstClientId = clients.length ? String(clients[0].id) : '';
+  const clientOptions = clients.map((c, i) => `<option value="${c.id}" ${i === 0 ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 
   const typeOptions = Object.entries(AnalysesModule.TYPES)
     .map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`)
@@ -810,7 +811,7 @@ function renderAnalysesModule() {
     <!-- TABELA -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <h3 style="margin:0;font-size:15px;font-weight:500;">Analizy (${allAnalyses.length})</h3>
-      <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('anal-form-area').style.display='block';if(clients.length)updateAnalObjects(document.getElementById('anal-client').value)">
+      <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('anal-form-area').style.display='block';updateAnalObjects(document.getElementById('anal-client').value||'${firstClientId}')">
         + Nowa analiza
       </button>
     </div>
