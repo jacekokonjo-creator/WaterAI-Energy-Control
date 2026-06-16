@@ -1797,8 +1797,10 @@ function viewProtocol(id) {
           <div style="padding:14px;">
             <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
             <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.billingPeriodStartDate||"?")} → ${escapeHtml(p.billingPeriodEndDate||"?")}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Liczba dni okresu</div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#0C447C;">${billingTotalDays} dni</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodStartReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodStartReading??0)} ${escapeHtml(u)}</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
             <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodEndReading||0)} ${escapeHtml(u)}</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
@@ -1813,8 +1815,10 @@ function viewProtocol(id) {
           <div style="padding:14px;">
             <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
             <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.comparisonPeriodStartDate||"?")} → ${escapeHtml(p.comparisonPeriodEndDate||"?")}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Liczba dni okresu</div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#27500A;">${compTotalDays} dni</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodStartReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodStartReading??0)} ${escapeHtml(u)}</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
             <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodEndReading||0)} ${escapeHtml(u)}</div>
             <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
