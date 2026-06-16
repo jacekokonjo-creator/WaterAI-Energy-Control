@@ -723,6 +723,7 @@
         calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
         invoicing: ["🧾", "Faktury", "Wystawione faktury, należności i rozliczenia."],
         analyses: ["📐", "Analizy", "TYM, regresja, obłożenie, powierzchnia i inne."],
+        escoReports: ["📄", "Raporty ESCO", "Szczegółowe raporty oszczędności ESCO."],
         documents: ["🗂️", "Dokumenty", "Faktury klienta, umowy, dokumentacja, zdjęcia."],
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
@@ -740,6 +741,7 @@
         calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
         invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
         analyses: ["📐", "Analyses", "TYM, regression, occupancy, area and more."],
+        escoReports: ["📄", "ESCO Reports", "Detailed ESCO savings reports."],
         documents: ["🗂️", "Documents", "Client invoices, contracts, documentation, photos."],
         users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."]
@@ -757,6 +759,7 @@
         calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
         invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
         analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
+        escoReports: ["📄", "ESCO-Berichte", "Detaillierte ESCO-Berichte."],
         documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."]
@@ -774,6 +777,7 @@
         calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
         invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
         analyses: ["📐", "Analýzy", "TYM, regrese, obsazenost, plocha a další."],
+        escoReports: ["📄", "ESCO reporty", "Podrobné ESCO reporty."],
         documents: ["🗂️", "Dokumenty", "Faktury klientů, smlouvy, dokumentace, fotografie."],
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
         settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."]
@@ -791,6 +795,7 @@
         calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
         invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
         analyses: ["📐", "Analýzy", "TYM, regresia, obsadenosť, plocha a ďalšie."],
+        escoReports: ["📄", "ESCO reporty", "Podrobné ESCO reporty."],
         documents: ["🗂️", "Dokumenty", "Faktúry klientov, zmluvy, dokumentácia, fotografie."],
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
         settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."]
@@ -798,9 +803,9 @@
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "documents", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
+      admin:              ["calendar", "clients", "objects", "documents", "measurements", "analyses", "escoReports", "reports", "invoicing", "users", "settings"],
       backOffice:         ["calendar", "clients", "objects", "documents", "invoicing", "reports"],
-      energyAnalyst:      ["calendar", "objects", "documents", "measurements", "analyses", "reports"],
+      energyAnalyst:      ["calendar", "objects", "documents", "measurements", "analyses", "escoReports", "reports"],
       salesRepresentative:["calendar", "clients", "objects", "reports"],
       client:             ["myObjects", "myMeasurements", "myReports"]
     };
