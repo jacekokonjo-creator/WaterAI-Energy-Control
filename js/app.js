@@ -3159,15 +3159,8 @@ function renderRegressionTab(protocols) {
     })();`;
 
     return `
-    <div class="reminder-card" style="border-left:4px solid #FAC775;margin-bottom:20px;">
-      <strong>📈 Regresja liniowa — Protokół z dnia ${escapeHtml(p.protocolDate || "")}</strong>
-      <div class="reminder-meta">
-        Obiekt: ${escapeHtml(getObjectName(p.objectId))}<br />
-        Okres porównawczy: ${escapeHtml(p.comparisonPeriodStartDate || "")} → ${escapeHtml(p.comparisonPeriodEndDate || "")}<br />
-        Temperatura bazowa: ${p.baseTemperature || 21} °C
-      </div>
-
-      <div style="margin-top:12px;padding:12px;background:#FAEEDA;border-radius:8px;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
+    <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:20px;">
+      <div style="padding:12px;background:#FAEEDA;display:flex;gap:24px;flex-wrap:wrap;align-items:center;">
         <div style="font-size:15px;font-weight:600;color:#633806;">
           y = <strong>${fmt4(lr.a)}</strong> · x + <strong>${fmt4(lr.b)}</strong>
         </div>
@@ -3180,7 +3173,8 @@ function renderRegressionTab(protocols) {
         </div>
       </div>
 
-      <div style="margin-top:12px;overflow-x:auto;">
+      <div style="padding:12px 16px;background:var(--color-background-primary);">
+      <div style="margin-top:0;overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead>
             <tr style="background:#FDF3E0;">
@@ -3205,6 +3199,7 @@ function renderRegressionTab(protocols) {
       <div class="reminder-meta" style="margin-top:10px;font-size:11px;color:#856030;">
         Dane wejściowe: temperatury i dni z okresu porównawczego protokołu TYM.<br />
         x = HDD miesięczny, y = zużycie miesięczne (proporcjonalne do HDD okresu).
+      </div>
       </div>
     </div>
     <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
