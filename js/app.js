@@ -1378,13 +1378,13 @@ function createMeasurement(form) {
     clientId: object.clientId,
     objectId: form.objectId.value,
 
-    protocolDate: form.protocolDate.value,
+    protocolDate: form.elements["protocolDate"] ? form.elements["protocolDate"].value : "",
     preparedBy: form.preparedBy ? form.preparedBy.value.trim() : "",
 
-    weatherStation: form.weatherStation.value.trim(),
-    weatherSource: form.weatherSource.value.trim(),
-    weatherSourceUrl: form.weatherSourceUrl.value.trim(),
-    weatherDataDownloadDate: form.weatherDataDownloadDate.value,
+    weatherStation: form.weatherStation ? form.weatherStation.value.trim() : "",
+    weatherSource: form.weatherSource ? form.weatherSource.value.trim() : "",
+    weatherSourceUrl: form.weatherSourceUrl ? form.weatherSourceUrl.value.trim() : "",
+    weatherDataDownloadDate: form.elements["weatherDataDownloadDate"] ? form.elements["weatherDataDownloadDate"].value : "",
     baseTemperature: Number(form.baseTemperature.value || 21),
 
     energyUnit: form.energyUnit.value,
@@ -1392,15 +1392,15 @@ function createMeasurement(form) {
     energyPrice: Number(form.energyPrice.value || 0),
     waterAiShare: Number(form.waterAiShare.value || 0),
 
-    billingPeriodStartDate: form.billingPeriodStartDate.value,
+    billingPeriodStartDate: (form.elements["billingPeriodStartDate"] ? form.elements["billingPeriodStartDate"].value : "") || "",
     billingPeriodStartReading: billingStart,
-    billingPeriodEndDate: form.billingPeriodEndDate.value,
+    billingPeriodEndDate: (form.elements["billingPeriodEndDate"] ? form.elements["billingPeriodEndDate"].value : "") || "",
     billingPeriodEndReading: billingEnd,
     billingConsumption: billingEnd - billingStart,
 
-    comparisonPeriodStartDate: form.comparisonPeriodStartDate.value,
+    comparisonPeriodStartDate: (form.elements["comparisonPeriodStartDate"] ? form.elements["comparisonPeriodStartDate"].value : "") || "",
     comparisonPeriodStartReading: comparisonStart,
-    comparisonPeriodEndDate: form.comparisonPeriodEndDate.value,
+    comparisonPeriodEndDate: (form.elements["comparisonPeriodEndDate"] ? form.elements["comparisonPeriodEndDate"].value : "") || "",
     comparisonPeriodEndReading: comparisonEnd,
     comparisonConsumption: comparisonEnd - comparisonStart,
 
@@ -1466,15 +1466,15 @@ function editMeasurement(id) {
   if (form.waterAiShare) form.waterAiShare.value = protocol.waterAiShare || "";
 
   // Daty — najpierw wstaw, potem zbuduj tabelki
-  form.billingPeriodStartDate.value = protocol.billingPeriodStartDate || "";
-  form.billingPeriodEndDate.value = protocol.billingPeriodEndDate || "";
-  form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
-  form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
+  if (form.elements["billingPeriodStartDate"]) form.elements["billingPeriodStartDate"].value = protocol.billingPeriodStartDate || "";
+  if (form.elements["billingPeriodEndDate"]) form.elements["billingPeriodEndDate"].value = protocol.billingPeriodEndDate || "";
+  if (form.billingPeriodStartReading) form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
+  if (form.billingPeriodEndReading) form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
 
-  form.comparisonPeriodStartDate.value = protocol.comparisonPeriodStartDate || "";
-  form.comparisonPeriodEndDate.value = protocol.comparisonPeriodEndDate || "";
-  form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
-  form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
+  if (form.elements["comparisonPeriodStartDate"]) form.elements["comparisonPeriodStartDate"].value = protocol.comparisonPeriodStartDate || "";
+  if (form.elements["comparisonPeriodEndDate"]) form.elements["comparisonPeriodEndDate"].value = protocol.comparisonPeriodEndDate || "";
+  if (form.comparisonPeriodStartReading) form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
+  if (form.comparisonPeriodEndReading) form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
 
   if (form.tymPeriodStart) form.tymPeriodStart.value = protocol.tymPeriodStart || "";
   if (form.tymPeriodEnd) form.tymPeriodEnd.value = protocol.tymPeriodEnd || "";
