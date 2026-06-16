@@ -1518,7 +1518,7 @@ function updateWorkflowObjectOptions(clientId) {
 
 let editingMeasurementId = null;
 let selectedMeasurementObjectId = null;
-let activeMeasurementsTab = "tym"; // "tym" | "regression"
+let activeMeasurementsTab = "tym"; // "tym" | "regression" | "occupancy" | "area" | "volume" | "schedule" | "custom"
 let showMeasurementForm = false;
 
 const MONTHS_PL = [
@@ -2447,16 +2447,36 @@ function renderMeasurementsModule() {
 
   <div class="meas-tabs">
     <button type="button" class="meas-tab ${activeMeasurementsTab === 'tym' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='tym'; renderMeasurementsModule();">
-      📋 Protokół TYM
+      onclick="activeMeasurementsTab='tym'; showMeasurementForm=false; renderMeasurementsModule();">
+      🌡️ Korekta TYM
     </button>
-    ${hasRegression ? `<button type="button" class="meas-tab meas-tab-reg ${activeMeasurementsTab === 'regression' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='regression'; renderMeasurementsModule();">
+    <button type="button" class="meas-tab meas-tab-reg ${activeMeasurementsTab === 'regression' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='regression'; showMeasurementForm=false; renderMeasurementsModule();">
       📈 Regresja liniowa
-    </button>` : ''}
+    </button>
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'occupancy' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='occupancy'; showMeasurementForm=false; renderMeasurementsModule();">
+      🏨 Korekta obłożenia
+    </button>
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'area' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='area'; showMeasurementForm=false; renderMeasurementsModule();">
+      📐 Korekta powierzchni
+    </button>
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'volume' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='volume'; showMeasurementForm=false; renderMeasurementsModule();">
+      ⚙️ Korekta intensywności
+    </button>
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'schedule' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='schedule'; showMeasurementForm=false; renderMeasurementsModule();">
+      📅 Harmonogram
+    </button>
+    <button type="button" class="meas-tab ${activeMeasurementsTab === 'custom' ? 'active' : ''}"
+      onclick="activeMeasurementsTab='custom'; showMeasurementForm=false; renderMeasurementsModule();">
+      🔬 Własna
+    </button>
   </div>
 
-  ${activeMeasurementsTab === 'regression' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="createMeasurement(this); return false;">
+  ${activeMeasurementsTab === 'regression' ? '' : activeMeasurementsTab !== 'tym' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="createMeasurement(this); return false;">
 
     <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
     <div class="tym-section" style="border:1px solid #B5D4F4;">
@@ -2742,6 +2762,11 @@ function renderMeasurementsModule() {
   `)}
 
   ${activeMeasurementsTab === 'regression' ? renderRegressionTab(protocolsForTabs) : ''}
+  ${activeMeasurementsTab === 'occupancy' ? renderPlaceholderMeasTab('🏨', 'Korekta obłożenia', 'occupancy', 'Zbieranie danych o obłożeniu (osobonoce, % wypełnienia, liczba użytkowników) do korekty zużycia energii.', '#E6F1FB', '#B5D4F4', '#0C447C') : ''}
+  ${activeMeasurementsTab === 'area' ? renderPlaceholderMeasTab('📐', 'Korekta powierzchni', 'area', 'Dane o powierzchni ogrzewanej/chłodzonej w poszczególnych okresach — podstawa korekty przy zmianach układu budynku.', '#E8F5E9', '#A5D6A7', '#2E7D32') : ''}
+  ${activeMeasurementsTab === 'volume' ? renderPlaceholderMeasTab('⚙️', 'Korekta intensywności', 'volume', 'Dane produkcyjne, wolumen usług, godziny pracy — do normalizacji zużycia względem aktywności obiektu.', '#FFF3E0', '#FFCC80', '#E65100') : ''}
+  ${activeMeasurementsTab === 'schedule' ? renderPlaceholderMeasTab('📅', 'Harmonogram', 'schedule', 'Planowane terminy odczytów, analiz i protokołów dla tego obiektu.', '#F3E5F5', '#CE93D8', '#6A1B9A') : ''}
+  ${activeMeasurementsTab === 'custom' ? renderPlaceholderMeasTab('🔬', 'Własna analiza', 'custom', 'Dowolne dane pomiarowe i wskaźniki definiowane przez analityka energetycznego.', '#FCE4EC', '#F48FB1', '#880E4F') : ''}
   ${(activeMeasurementsTab === 'tym' && !showMeasurementForm) ? renderProtocolsTable(protocolsForTabs, selectedMeasurementObjectId) : ''}
   `;
 
@@ -2811,13 +2836,248 @@ function renderProtocolsTable(protocols, objectId) {
     </div>`;
 }
 
+function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
+  return `
+  <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">${icon}</span>
+      <div>
+        <h3 style="margin:0;font-size:15px;font-weight:600;color:${textColor};">${title}</h3>
+        <p style="margin:4px 0 0;font-size:12px;color:${textColor};opacity:0.75;">${description}</p>
+      </div>
+    </div>
+    <div style="padding:32px 20px;background:var(--color-background-primary);text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🚧</div>
+      <p style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin:0 0 8px;">Moduł w przygotowaniu</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);max-width:400px;margin:0 auto;">
+        Zbieranie danych dla analizy <strong>${title}</strong> zostanie uruchomione w kolejnej wersji WaterAI.
+      </p>
+    </div>
+  </div>`;
+}
+
+function renderRegressionSensorData(objectId) {
+  const storageKey = 'waterai_regression_sensors_' + objectId;
+  const rawRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+  // Pagination state
+  const pageSize = 50;
+  window._regPage = window._regPage || 0;
+  const totalPages = Math.max(1, Math.ceil(rawRows.length / pageSize));
+  if (window._regPage >= totalPages) window._regPage = totalPages - 1;
+  const page = window._regPage;
+  const rows = rawRows.slice(page * pageSize, (page + 1) * pageSize);
+
+  const fmtVal = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+
+  const tableRows = rows.map((r, i) => {
+    const absIdx = page * pageSize + i;
+    return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
+      <td style="padding:4px 8px;font-size:11px;color:var(--color-text-tertiary);">${escapeHtml(r.readTime || '—')}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tOutdoor)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tSupply)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tReturn)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.vFlow)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatPower)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatConsumption)}</td>
+      <td style="padding:4px 8px;">
+        <button class="small-button" onclick="deleteRegressionRow(${objectId}, ${absIdx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const paginationHtml = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;">
+      <button class="small-button" onclick="window._regPage=Math.max(0,window._regPage-1);renderMeasurementsModule();" ${page === 0 ? 'disabled' : ''}>← Poprzednia</button>
+      <span style="color:var(--color-text-secondary);">Strona ${page + 1} / ${totalPages} (${rawRows.length} wierszy)</span>
+      <button class="small-button" onclick="window._regPage=Math.min(${totalPages-1},window._regPage+1);renderMeasurementsModule();" ${page === totalPages - 1 ? 'disabled' : ''}>Następna →</button>
+    </div>` : rawRows.length > 0 ? `<p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;">${rawRows.length} wierszy danych</p>` : '';
+
+  return `
+  <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-top:24px;">
+    <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📡</span>
+        <h3 style="margin:0;font-size:14px;font-weight:600;color:#0C447C;">Dane z czujników — dane czasowe</h3>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:12px;color:#0C447C;background:#fff;border:1px solid #B5D4F4;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:500;">
+          📂 Importuj CSV/Excel
+          <input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importRegressionSensorFile(this, ${objectId})" />
+        </label>
+        <button class="small-button" onclick="clearRegressionSensorData(${objectId})" style="font-size:11px;color:#c00;border-color:#c00;" ${rawRows.length === 0 ? 'disabled' : ''}>🗑 Wyczyść wszystko</button>
+      </div>
+    </div>
+
+    <!-- Formularz dodawania wiersza -->
+    <div style="padding:14px 16px;background:#F7FAFE;border-bottom:1px solid #B5D4F4;">
+      <div style="font-size:11px;font-weight:600;color:#0C447C;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Dodaj wiersz ręcznie</div>
+      <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr 1.2fr 1.4fr auto;gap:6px;align-items:end;">
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Data i czas odczytu</label>
+          <input id="reg-readTime" type="datetime-local" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">T zewn. [°C]</label>
+          <input id="reg-tOutdoor" type="number" step="0.01" placeholder="np. 0.4" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">T zasilania [°C]</label>
+          <input id="reg-tSupply" type="number" step="0.01" placeholder="np. 54.2" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">T powrotu [°C]</label>
+          <input id="reg-tReturn" type="number" step="0.01" placeholder="np. 43.7" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Przepływ [m³/h]</label>
+          <input id="reg-vFlow" type="number" step="1" placeholder="np. 3827" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Moc cieplna [W]</label>
+          <input id="reg-heatPower" type="number" step="0.01" placeholder="np. 46012" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Zużycie ciepła [kWh]</label>
+          <input id="reg-heatConsumption" type="number" step="0.01" placeholder="np. 28263" style="width:100%;font-size:12px;box-sizing:border-box;" />
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button class="primary-button" onclick="addRegressionSensorRow(${objectId})" style="font-size:12px;padding:6px 14px;white-space:nowrap;">+ Dodaj</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela danych -->
+    <div style="padding:12px 16px;background:var(--color-background-primary);">
+      ${rawRows.length === 0 ? `
+        <div style="text-align:center;padding:28px;color:var(--color-text-secondary);font-size:13px;">
+          <div style="font-size:32px;margin-bottom:8px;">📊</div>
+          Brak danych. Dodaj wiersze ręcznie lub zaimportuj plik CSV/Excel.
+          <div style="font-size:11px;margin-top:8px;color:var(--color-text-tertiary);">
+            Wymagane kolumny: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>
+          </div>
+        </div>` : `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+            <thead>
+              <tr style="background:var(--color-background-secondary);">
+                <th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Data odczytu</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T zewn. [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T zasil. [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T powrotu [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Przepływ [m³/h]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Moc cieplna [W]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Zużycie ciepła [kWh]</th>
+                <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        ${paginationHtml}
+      `}
+    </div>
+  </div>`;
+}
+
+function addRegressionSensorRow(objectId) {
+  const readTime = document.getElementById('reg-readTime').value;
+  const tOutdoor = document.getElementById('reg-tOutdoor').value;
+  const tSupply = document.getElementById('reg-tSupply').value;
+  const tReturn = document.getElementById('reg-tReturn').value;
+  const vFlow = document.getElementById('reg-vFlow').value;
+  const heatPower = document.getElementById('reg-heatPower').value;
+  const heatConsumption = document.getElementById('reg-heatConsumption').value;
+
+  if (!readTime && !tOutdoor && !tSupply) {
+    alert('Podaj przynajmniej datę odczytu i temperaturę zewnętrzną.');
+    return;
+  }
+
+  const storageKey = 'waterai_regression_sensors_' + objectId;
+  const rows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  rows.push({
+    readTime: readTime || null,
+    tOutdoor: tOutdoor !== '' ? Number(tOutdoor) : null,
+    tSupply: tSupply !== '' ? Number(tSupply) : null,
+    tReturn: tReturn !== '' ? Number(tReturn) : null,
+    vFlow: vFlow !== '' ? Number(vFlow) : null,
+    heatPower: heatPower !== '' ? Number(heatPower) : null,
+    heatConsumption: heatConsumption !== '' ? Number(heatConsumption) : null,
+  });
+  localStorage.setItem(storageKey, JSON.stringify(rows));
+  window._regPage = Math.floor((rows.length - 1) / 50);
+  renderMeasurementsModule();
+}
+
+function deleteRegressionRow(objectId, index) {
+  const storageKey = 'waterai_regression_sensors_' + objectId;
+  const rows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  rows.splice(index, 1);
+  localStorage.setItem(storageKey, JSON.stringify(rows));
+  renderMeasurementsModule();
+}
+
+function clearRegressionSensorData(objectId) {
+  if (!confirm('Czy na pewno chcesz usunąć wszystkie dane z czujników dla tego obiektu?')) return;
+  localStorage.removeItem('waterai_regression_sensors_' + objectId);
+  window._regPage = 0;
+  renderMeasurementsModule();
+}
+
+function importRegressionSensorFile(input, objectId) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  const storageKey = 'waterai_regression_sensors_' + objectId;
+
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) { alert('Plik CSV jest pusty lub nie zawiera nagłówka.'); return; }
+
+      const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+      const colMap = { readtime: 'readTime', toutdoor: 'tOutdoor', tsupply: 'tSupply', treturn: 'tReturn', vflow: 'vFlow', heatpower: 'heatPower', heatconsumption: 'heatConsumption' };
+
+      const existingRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      let added = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(/[,;\t]/);
+        if (cells.length < 2) continue;
+        const row = {};
+        header.forEach((h, idx) => {
+          const key = colMap[h];
+          if (!key) return;
+          const val = (cells[idx] || '').trim().replace(',', '.');
+          if (key === 'readTime') row[key] = val || null;
+          else row[key] = val !== '' && !isNaN(Number(val)) ? Number(val) : null;
+        });
+        if (Object.keys(row).length > 0) { existingRows.push(row); added++; }
+      }
+
+      localStorage.setItem(storageKey, JSON.stringify(existingRows));
+      window._regPage = Math.floor((existingRows.length - 1) / 50);
+      renderMeasurementsModule();
+      alert(`Zaimportowano ${added} wierszy z pliku CSV.`);
+    };
+    reader.readAsText(file);
+  } else {
+    alert('Import plików Excel (.xlsx) wymaga biblioteki SheetJS — aktualnie wspierany format to CSV. Zapisz plik Excel jako CSV i spróbuj ponownie.');
+  }
+  input.value = '';
+}
+
 function renderRegressionTab(protocols) {
   const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
 
   if (regressionProtocols.length === 0) {
     return `<div class="reminder-card"><strong>Brak protokołów z regresją</strong>
       <div class="reminder-meta">Zaznacz "Dołącz analizę regresji liniowej" w protokole TYM aby aktywować ten moduł.</div>
-    </div>`;
+    </div>` + renderRegressionSensorData(selectedMeasurementObjectId);
   }
 
   return regressionProtocols.map(p => {
@@ -2948,7 +3208,7 @@ function renderRegressionTab(protocols) {
       </div>
     </div>
     <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
-  }).join("");
+  }).join("") + renderRegressionSensorData(selectedMeasurementObjectId);
 }
 
 function buildRegressionData(protocol) {
