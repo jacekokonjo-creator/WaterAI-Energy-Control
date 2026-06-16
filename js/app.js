@@ -1010,8 +1010,14 @@ function renderObjectsModule() {
     if (sortObj === 'client_desc') return (getClientName(b.clientId)||'').localeCompare(getClientName(a.clientId)||'');
     if (sortObj === 'type_asc')    return (objTypeLabel[a.objectType]||a.objectType||'').localeCompare(objTypeLabel[b.objectType]||b.objectType||'');
     if (sortObj === 'type_desc')   return (objTypeLabel[b.objectType]||b.objectType||'').localeCompare(objTypeLabel[a.objectType]||a.objectType||'');
-    if (sortObj === 'status_asc')  return (a.status||'').localeCompare(b.status||'');
-    if (sortObj === 'status_desc') return (b.status||'').localeCompare(a.status||'');
+    if (sortObj === 'status_asc')     return (a.status||'').localeCompare(b.status||'');
+    if (sortObj === 'status_desc')    return (b.status||'').localeCompare(a.status||'');
+    if (sortObj === 'backoffice_asc') return (a.backOfficeOwner||'').localeCompare(b.backOfficeOwner||'');
+    if (sortObj === 'backoffice_desc')return (b.backOfficeOwner||'').localeCompare(a.backOfficeOwner||'');
+    if (sortObj === 'sales_asc')      return (a.salesRepresentative||'').localeCompare(b.salesRepresentative||'');
+    if (sortObj === 'sales_desc')     return (b.salesRepresentative||'').localeCompare(a.salesRepresentative||'');
+    if (sortObj === 'analyst_asc')    return (a.energyAnalystOwner||'').localeCompare(b.energyAnalystOwner||'');
+    if (sortObj === 'analyst_desc')   return (b.energyAnalystOwner||'').localeCompare(a.energyAnalystOwner||'');
     return 0;
   });
 
@@ -1039,11 +1045,11 @@ function renderObjectsModule() {
           <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.backOfficeOwner || "—")}</td>
           <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.salesRepresentative || "—")}</td>
           <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(obj.energyAnalystOwner || "—")}</td>
-          <td style="padding:10px 12px;white-space:nowrap;">
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" class="icon-btn" title="Podgląd">👁</button>
-              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" class="icon-btn" title="Edytuj">✏️</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
+          <td style="padding:6px 12px;white-space:nowrap;">
+            <div style="display:flex;gap:4px;align-items:center;">
+              <button class="icon-btn" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" title="Podgląd">👁</button>
+              <button class="icon-btn" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" title="Edytuj">✏️</button>
+              <button class="icon-btn icon-btn-del" onclick="event.stopPropagation();deleteObject(${obj.id})" title="Usuń">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -1061,13 +1067,16 @@ function renderObjectsModule() {
     </style>
 
     <!-- TABELA OBIEKTÓW — zawsze widoczna -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
-      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-        Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${displayObjects.length}${qObj ? ' z '+allObjects.length : ''})</span>
-      </h3>
-      <input type="search" placeholder="Szukaj obiektu..." value="${escapeHtml(window._objSearch||'')}"
-        oninput="window._objSearch=this.value;renderObjectsModule();"
-        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:220px;" />
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:13px;color:var(--color-text-secondary);">
+        ${displayObjects.length}${qObj ? ' z '+allObjects.length : ''} obiekt${allObjects.length===1?'':allObjects.length<5?'y':'ów'}
+      </span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="obj-search-input" type="search" placeholder="Szukaj po nazwie, kliencie, typie..." value="${escapeHtml(window._objSearch||'')}"
+          oninput="window._objSearch=this.value;renderObjectsModule();setTimeout(()=>{const s=document.getElementById('obj-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:260px;" />
+        ${!showObjectForm ? '<button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:8px 18px;white-space:nowrap;">+ Dodaj obiekt</button>' : ''}
+      </div>
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -1077,9 +1086,9 @@ function renderObjectsModule() {
             ${thObj('client','Klient')}
             ${thObj('type','Typ')}
             ${thObj('status','Status')}
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Back Office</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Sales Representative</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Energy Analyst</th>
+            ${thObj('backoffice','Back Office')}
+            ${thObj('sales','Sales Rep')}
+            ${thObj('analyst','Energy Analyst')}
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
         </thead>
