@@ -673,6 +673,8 @@
         myReports: ["📈", "Moje raporty", "Raporty oszczędności dostępne dla klienta."],
         calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
         invoicing: ["🧾", "Fakturowanie", "Podsumowanie oszczędności i dane do FV."],
+        analyses: ["📐", "Analizy", "TYM, regresja, obłożenie, powierzchnia i inne."],
+        documents: ["🗂️", "Dokumenty", "Faktury klienta, umowy, dokumentacja, zdjęcia."],
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
       },
@@ -688,6 +690,8 @@
         myReports: ["📈", "My reports", "Savings reports available for the client."],
         calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
         invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
+        analyses: ["📐", "Analyses", "TYM, regression, occupancy, area and more."],
+        documents: ["🗂️", "Documents", "Client invoices, contracts, documentation, photos."],
         users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."]
       },
@@ -703,6 +707,8 @@
         myReports: ["📈", "Meine Berichte", "Für den Kunden verfügbare Einsparberichte."],
         calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
         invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
+        analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
+        documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."]
       },
@@ -718,6 +724,8 @@
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
         calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
         invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
+        analyses: ["📐", "Analýzy", "TYM, regrese, obsazenost, plocha a další."],
+        documents: ["🗂️", "Dokumenty", "Faktury klientů, smlouvy, dokumentace, fotografie."],
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
         settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."]
       },
@@ -733,15 +741,17 @@
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
         calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
         invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
+        analyses: ["📐", "Analýzy", "TYM, regresia, obsadenosť, plocha a ďalšie."],
+        documents: ["🗂️", "Dokumenty", "Faktúry klientov, zmluvy, dokumentácia, fotografie."],
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
         settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."]
       }
     };
 
     const roleModules = {
-      superAdmin: ["clients", "objects", "measurements", "calendar", "excel", "pdf", "reports", "invoicing", "users", "settings"],
-      backOffice: ["clients", "objects", "calendar", "pdf", "reports", "invoicing"],
-      energyAnalyst: ["objects", "measurements", "calendar", "excel", "pdf", "reports"],
+      superAdmin: ["clients", "objects", "measurements", "analyses", "documents", "invoicing", "calendar", "excel", "pdf", "reports", "users", "settings"],
+      backOffice: ["clients", "objects", "documents", "invoicing", "calendar", "pdf", "reports"],
+      energyAnalyst: ["objects", "measurements", "analyses", "calendar", "excel", "pdf", "reports"],
       client: ["myObjects", "myMeasurements", "myReports"]
     };
 
@@ -1002,11 +1012,17 @@
     setLanguage("pl");
     setRole("superAdmin");
   </script>
+<script src="js/modules/migration.js"></script>
 <script src="js/modules/clients.js"></script>
-<script src="js/modules/objects.js?v=0905"></script>
+<script src="js/modules/objects.js"></script>
 <script src="js/modules/workflow.js"></script>
-<script src="js/modules/measurements.js?v=3001"></script>
-<script src="js/app.js?v=3002"></script>
+<script src="js/modules/measurements.js"></script>
+<script src="js/modules/analyses.js"></script>
+<script src="js/modules/documents.js"></script>
+<script src="js/modules/invoicing.js"></script>
+<script src="js/modules/calendar.js"></script>
+<script src="js/app.js"></script>
+<script src="js/modules/app-v2.js"></script>
 </body>
 </html>
 
