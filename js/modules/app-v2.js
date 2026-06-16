@@ -1946,7 +1946,7 @@ function viewRegAnalysis(id) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function generateESCOReport(analysisId) {
-  openModule('escoReports');
+  openModule('reports');
   setTimeout(()=>{ window._prefillESCOAnalysisId=analysisId; renderESCOReports(); }, 100);
 }
 
@@ -2431,7 +2431,7 @@ function renderDashboardSummary() {
 
 const _origOpenModule = window.openModule;
 window.openModule = function(moduleName) {
-  const newModules = ['documents', 'invoicing', 'analyses', 'dashboard', 'users', 'escoReports'];
+  const newModules = ['documents', 'invoicing', 'analyses', 'dashboard', 'users', 'reports', 'escoReports'];
   if (newModules.includes(moduleName)) {
     const labels = (typeof getModuleLabels === 'function') ? getModuleLabels() : {};
     const item = labels[moduleName];
@@ -2449,6 +2449,7 @@ window.openModule = function(moduleName) {
     else if (moduleName === 'analyses') renderAnalysesModule();
     else if (moduleName === 'dashboard') renderDashboardSummary();
     else if (moduleName === 'users') renderUsersModule();
+    else if (moduleName === 'reports') renderESCOReports();
     else if (moduleName === 'escoReports') renderESCOReports();
     return;
   }
