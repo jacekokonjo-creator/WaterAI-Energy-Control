@@ -1,11 +1,11 @@
 // WaterAI Energy Control
-// Objects Module v1.1.1
+// Objects Module v2.0.0
 
 const ObjectsModule = {
-  storageKey: "waterai_objects_v1",
+  storageKey: 'waterai_objects_v2',
 
   getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
   },
 
   saveAll(objects) {
@@ -14,81 +14,84 @@ const ObjectsModule = {
 
   add(object) {
     const objects = this.getAll();
-
     objects.push({
       id: Date.now(),
       createdAt: new Date().toISOString(),
 
       clientId: Number(object.clientId),
-      name: object.name || "",
-      objectType: object.objectType || "HOTEL",
-      status: object.status || "IMPLEMENTATION",
+      name: object.name || '',
+      objectType: object.objectType || 'HOTEL',
+      status: object.status || 'IMPLEMENTATION',
 
-      country: object.country || "PL",
-      postalCode: object.postalCode || "",
-      city: object.city || "",
-      street: object.street || "",
-      buildingNumber: object.buildingNumber || "",
-      apartmentNumber: object.apartmentNumber || "",
-      googleMapsUrl: object.googleMapsUrl || "",
+      country: object.country || 'PL',
+      postalCode: object.postalCode || '',
+      city: object.city || '',
+      street: object.street || '',
+      buildingNumber: object.buildingNumber || '',
+      apartmentNumber: object.apartmentNumber || '',
+      googleMapsUrl: object.googleMapsUrl || '',
 
-      heatingSourceCO: object.heatingSourceCO || "NONE",
-      heatingSourceCWU: object.heatingSourceCWU || "NONE",
-      heatConsumptionReading: object.heatConsumptionReading || "INVOICE",
-      heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || "",
+      // Parametry budynku
+      totalArea: Number(object.totalArea || 0),
+      heatedArea: Number(object.heatedArea || 0),
+      cooledArea: Number(object.cooledArea || 0),
+      yearBuilt: object.yearBuilt ? Number(object.yearBuilt) : null,
+      description: object.description || '',
 
-      billingCycle: object.billingCycle || "MONTHLY",
-      billingStartDate: object.billingStartDate || "",
+      // Ogrzewanie
+      heatingSourceCO: object.heatingSourceCO || 'NONE',
+      heatingSourceCWU: object.heatingSourceCWU || 'NONE',
+      heatConsumptionReading: object.heatConsumptionReading || 'INVOICE',
+      heatConsumptionReadingDetails: object.heatConsumptionReadingDetails || '',
+
+      // Harmonogram
+      billingCycle: object.billingCycle || 'MONTHLY',
+      billingStartDate: object.billingStartDate || '',
       manualBillingDates: object.manualBillingDates || [],
       reminderDaysBefore: Number(object.reminderDaysBefore || 14),
 
-      backOfficeOwner: object.backOfficeOwner || "",
-      energyAnalystOwner: object.energyAnalystOwner || "",
+      // Właściciele
+      backOfficeOwner: object.backOfficeOwner || '',
+      energyAnalystOwner: object.energyAnalystOwner || '',
 
-      // DANE KLIMATYCZNE TYM
-      weatherStation: object.weatherStation || "",
-      weatherSource: object.weatherSource || "WeatherOnline / Robot Klimatu",
-      weatherSourceUrl: object.weatherSourceUrl || "",
-      weatherDataDownloadDate: object.weatherDataDownloadDate || "",
+      // Dane klimatyczne
+      weatherStation: object.weatherStation || '',
+      weatherSource: object.weatherSource || 'WeatherOnline / Robot Klimatu',
+      weatherSourceUrl: object.weatherSourceUrl || '',
+      weatherDataDownloadDate: object.weatherDataDownloadDate || '',
       baseTemperature: Number(object.baseTemperature || 21),
 
-      // DANE ENERGETYCZNE
-      energyUnit: object.energyUnit || "GJ",
-      currency: object.currency || "PLN",
+      // Dane energetyczne
+      energyUnit: object.energyUnit || 'GJ',
+      currency: object.currency || 'PLN',
       energyPrice: Number(object.energyPrice || 0),
 
       heatSources: object.heatSources || []
     });
-
     this.saveAll(objects);
   },
 
   remove(id) {
-    const objects = this.getAll().filter(object => Number(object.id) !== Number(id));
-    this.saveAll(objects);
+    this.saveAll(this.getAll().filter(o => Number(o.id) !== Number(id)));
   },
 
   find(id) {
-    return this.getAll().find(object => Number(object.id) === Number(id));
+    return this.getAll().find(o => Number(o.id) === Number(id));
   },
 
   findByClient(clientId) {
-    return this.getAll().filter(object => Number(object.clientId) === Number(clientId));
+    return this.getAll().filter(o => Number(o.clientId) === Number(clientId));
   },
 
-  update(id, updatedObject) {
-    const objects = this.getAll().map(object => {
-      if (Number(object.id) !== Number(id)) return object;
-
+  update(id, data) {
+    this.saveAll(this.getAll().map(o => {
+      if (Number(o.id) !== Number(id)) return o;
       return {
-        ...object,
-        ...updatedObject,
-        clientId: Number(updatedObject.clientId),
+        ...o, ...data,
+        clientId: Number(data.clientId || o.clientId),
         updatedAt: new Date().toISOString()
       };
-    });
-
-    this.saveAll(objects);
+    }));
   }
 };
 
