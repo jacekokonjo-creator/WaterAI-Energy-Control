@@ -123,7 +123,7 @@ function renderDocumentsModule(clientId, _objectId) {
         <div style="display:flex;gap:4px;align-items:center;">
           ${d.fileUrl?`<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>`:''}
           ${allFolders.length?`<select style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--color-border-tertiary);" onchange="moveDocToFolder(${d.id},this.value,${filterClientId});this.value=''"><option value="">Przenieś →</option>${moveOptions}</select>`:''}
-          <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId});}" style="color:#c00;border-color:#c00;">Usuń</button>
+          <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -438,9 +438,9 @@ function renderInvoicingModule() {
       <td style="padding:9px 12px;">${statusHtml(inv.status)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="small-button" onclick="viewInvoice(${inv.id})">Podgląd</button>
-          <button class="small-button" onclick="editInvoice(${inv.id})">Edytuj</button>
-          <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
+          <button class="small-button" onclick="viewInvoice(${inv.id})" class="icon-btn" title="Podgląd">👁</button>
+          <button class="small-button" onclick="editInvoice(${inv.id})" class="icon-btn" title="Edytuj">✏️</button>
+          <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -610,7 +610,7 @@ function viewInvoice(id) {
       </div>
       <div style="display:flex;gap:8px;margin-top:20px;">
         ${inv.status !== 'PAID' ? `<button class="primary-button" style="background:#27500A;border-color:#27500A;" onclick="markInvoicePaid(${inv.id})">✓ Oznacz jako opłaconą</button>` : ''}
-        <button class="small-button" onclick="editInvoice(${inv.id})">Edytuj</button>
+        <button class="small-button" onclick="editInvoice(${inv.id})" class="icon-btn" title="Edytuj">✏️</button>
       </div>
     </div>`;
 }
@@ -1009,9 +1009,9 @@ function renderAnalysesModule() {
       <td style="padding:9px 12px;">${statusBadge(status.label, status.color, status.color + '22')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(a.author)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
-        <button class="small-button" onclick="viewAnalysis(${a.id})">Podgląd</button>
-        <button class="small-button" onclick="editAnalysis(${a.id})">Edytuj</button>
-        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
+        <button class="small-button" onclick="viewAnalysis(${a.id})" class="icon-btn" title="Podgląd">👁</button>
+        <button class="small-button" onclick="editAnalysis(${a.id})" class="icon-btn" title="Edytuj">✏️</button>
+        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -1131,8 +1131,8 @@ function viewAnalysis(id) {
         ${a.comments ? `<div style="grid-column:1/-1;"><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Komentarze</span>${escapeHtml(a.comments)}</div>` : ''}
       </div>
       <div style="margin-top:16px;display:flex;gap:8px;">
-        <button class="small-button" onclick="editAnalysis(${a.id})">Edytuj</button>
-        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
+        <button class="small-button" onclick="editAnalysis(${a.id})" class="icon-btn" title="Edytuj">✏️</button>
+        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
       </div>
     </div>`;
 }
