@@ -1,6 +1,5 @@
 // WaterAI Energy Control
-// Migration Module v1.0.0
-// Jednorazowa migracja danych przy starcie aplikacji
+// Migration Module v1.1.0
 
 const MigrationModule = {
 
@@ -12,34 +11,55 @@ const MigrationModule = {
   },
 
   migrateClients() {
-    if (localStorage.getItem('waterai_clients_v2')) return; // już migrowano
-    const old = JSON.parse(localStorage.getItem('waterai_clients_v1') || '[]');
-    if (!old.length) return;
-    const migrated = old.map(c => ({
+    const v2 = JSON.parse(localStorage.getItem('waterai_clients_v2') || '[]');
+    const v1 = JSON.parse(localStorage.getItem('waterai_clients_v1') || '[]');
+    if (!v1.length) return;
+
+    // Merge: add any v1 entries not already in v2 (by id)
+    const v2ids = new Set(v2.map(c => Number(c.id)));
+    const toAdd = v1.filter(c => !v2ids.has(Number(c.id))).map(c => ({
       ...c,
       regon: c.regon || '',
       status: c.status || 'ACTIVE',
       cooperationStartDate: c.cooperationStartDate || '',
       notes: c.notes || ''
     }));
-    localStorage.setItem('waterai_clients_v2', JSON.stringify(migrated));
-    console.log(`[WaterAI] Migrated ${migrated.length} clients v1→v2`);
+    if (toAdd.length) {
+      const merged = [...v2, ...toAdd];
+      localStorage.setItem('waterai_clients_v2', JSON.stringify(merged));
+      console.log('[WaterAI] Merged ' + toAdd.length + ' clients v1→v2');
+    }
   },
 
   migrateObjects() {
-    if (localStorage.getItem('waterai_objects_v2')) return;
-    const old = JSON.parse(localStorage.getItem('waterai_objects_v1') || '[]');
-    if (!old.length) return;
-    const migrated = old.map(o => ({
+    const v2 = JSON.parse(localStorage.getItem('waterai_objects_v2') || '[]');
+    const v1 = JSON.parse(localStorage.getItem('waterai_objects_v1') || '[]');
+    if (!v1.length) return;
+
+    // Merge: add any v1 entries not already in v2 (by id)
+    const v2ids = new Set(v2.map(o => Number(o.id)));
+    const toAdd = v1.filter(o => !v2ids.has(Number(o.id))).map(o => ({
       ...o,
       totalArea: o.totalArea || 0,
       heatedArea: o.heatedArea || 0,
       cooledArea: o.cooledArea || 0,
       yearBuilt: o.yearBuilt || null,
-      description: o.description || ''
+      description: o.description || '',
+      contractStartDate: o.contractStartDate || '',
+      contractEndDate: o.contractEndDate || '',
+      installationDate: o.installationDate || '',
+      commissioningDate: o.commissioningDate || '',
+      settlementModel: o.settlementModel || 'ESCO',
+      escoShare: o.escoShare || 50,
+      paymentDays: o.paymentDays || 14,
+      invoiceEmail: o.invoiceEmail || '',
+      salesRepresentative: o.salesRepresentative || ''
     }));
-    localStorage.setItem('waterai_objects_v2', JSON.stringify(migrated));
-    console.log(`[WaterAI] Migrated ${migrated.length} objects v1→v2`);
+    if (toAdd.length) {
+      const merged = [...v2, ...toAdd];
+      localStorage.setItem('waterai_objects_v2', JSON.stringify(merged));
+      console.log('[WaterAI] Merged ' + toAdd.length + ' objects v1→v2');
+    }
   },
 
   migrateWorkflowToCalendar() {
@@ -73,7 +93,7 @@ const MigrationModule = {
       syncStatus: w.syncStatus || 'NOT_SYNCED'
     }));
     localStorage.setItem('waterai_calendar_v1', JSON.stringify(migrated));
-    console.log(`[WaterAI] Migrated ${migrated.length} workflow items → calendar`);
+    console.log('[WaterAI] Migrated ' + migrated.length + ' workflow items → calendar');
   }
 };
 
