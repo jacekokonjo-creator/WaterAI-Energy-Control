@@ -331,35 +331,38 @@ function renderClientsList() {
     (countryLabel[c.country]||c.country||'').toLowerCase().includes(q)
   );
   clients = [...clients].sort((a,b) => {
-    if (sort === 'name_asc')  return (a.name||'').localeCompare(b.name||'');
-    if (sort === 'name_desc') return (b.name||'').localeCompare(a.name||'');
-    if (sort === 'city_asc')  return ((countryLabel[a.country]||a.country||'')).localeCompare((countryLabel[b.country]||b.country||''));
-    if (sort === 'city_desc') return ((countryLabel[b.country]||b.country||'')).localeCompare((countryLabel[a.country]||a.country||''));
+    if (sort === 'name_asc')    return (a.name||'').localeCompare(b.name||'');
+    if (sort === 'name_desc')   return (b.name||'').localeCompare(a.name||'');
+    if (sort === 'country_asc') return (countryLabel[a.country]||a.country||'').localeCompare(countryLabel[b.country]||b.country||'');
+    if (sort === 'country_desc')return (countryLabel[b.country]||b.country||'').localeCompare(countryLabel[a.country]||a.country||'');
+    if (sort === 'city_asc')    return (a.city||'').localeCompare(b.city||'');
+    if (sort === 'city_desc')   return (b.city||'').localeCompare(a.city||'');
+    if (sort === 'vat_asc')     return (a.vatId||'').localeCompare(b.vatId||'');
+    if (sort === 'vat_desc')    return (b.vatId||'').localeCompare(a.vatId||'');
     return 0;
   });
 
   const thS = (col, label) => {
     const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
     const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
-    return `<th class="cli-table th" style="cursor:pointer;" onclick="window._cliSort='${next}';renderClientsList();">${label}${arrow}</th>`;
+    return `<th style="cursor:pointer;text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);white-space:nowrap;" onclick="window._cliSort='${next}';renderClientsList();">${label}${arrow}</th>`;
   };
+  const thN = (label) =>
+    `<th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);">${label}</th>`;
 
   const tableRows = clients.length === 0
     ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${q ? 'Brak wyników wyszukiwania.' : 'Brak klientów — dodaj pierwszego poniżej.'}</td></tr>`
     : clients.map(client => {
-        const objCount = ObjectsModule.findByClient(client.id).length;
         return `<tr>
-          <td class="td-name" style="padding:10px 12px;">
-            ${escapeHtml(client.name)}
-          </td>
+          <td style="padding:10px 12px;font-weight:500;color:var(--color-text-primary);">${escapeHtml(client.name)}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(countryLabel[client.country] || client.country || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.city || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.vatId || "—")}</td>
           <td style="padding:10px 12px;">
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" class="icon-btn" title="Podgląd">👁</button>
-              <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" class="icon-btn" title="Edytuj">✏️</button>
-              <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
+            <div class="action-icons">
+              <button class="icon-btn" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" title="Podgląd">👁</button>
+              <button class="icon-btn" onclick="event.stopPropagation();editClient(${client.id})" title="Edytuj">✏️</button>
+              <button class="icon-btn icon-btn-del" onclick="event.stopPropagation();deleteClient(${client.id})" title="Usuń">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -372,139 +375,147 @@ function renderClientsList() {
   const formBtnLabel = editingClientId ? "Zapisz zmiany" : "Dodaj klienta";
 
   container.innerHTML = `
-    <!-- TABELA KLIENTÓW -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
-      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-        Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length}${q ? ' z '+allClients.length : ''})</span>
-      </h3>
-      <input type="search" placeholder="Szukaj po nazwie, kraju, mieście, VAT ID..." value="${escapeHtml(window._cliSearch||'')}"
-        oninput="window._cliSearch=this.value;renderClientsList();"
-        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:280px;" />
+    <!-- TOOLBAR: licznik + szukaj + dodaj -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:13px;color:var(--color-text-secondary);">
+        ${clients.length}${q ? ' z '+allClients.length : ''} klient${allClients.length === 1 ? '' : (allClients.length < 5 ? 'ów' : 'ów')}
+      </span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="cli-search-input" type="search" placeholder="Szukaj po nazwie, kraju, mieście, VAT ID..."
+          value="${escapeHtml(window._cliSearch||'')}"
+          oninput="window._cliSearch=this.value;renderClientsList();document.getElementById('cli-search-input')&&document.getElementById('cli-search-input').focus();"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:280px;" />
+        ${!formIsOpen ? `<button class="primary-button" onclick="showClientForm(false)" style="font-size:13px;padding:8px 18px;white-space:nowrap;">+ Dodaj klienta</button>` : ''}
+      </div>
     </div>
+
+    <!-- TABELA KLIENTÓW -->
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
-      <table class="cli-table">
+      <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
             ${thS('name','Nazwa klienta')}
-            ${thS('city','Kraj')}
-            <th>Miasto</th>
-            <th>VAT ID</th>
-            <th>Akcje</th>
+            ${thS('country','Kraj')}
+            ${thS('city','Miasto')}
+            ${thS('vat','VAT ID')}
+            ${thN('Akcje')}
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
       </table>
     </div>
 
-    <!-- FORMULARZ DODAJ/EDYTUJ KLIENTA — zawsze pod tabelą -->
+    <!-- FORMULARZ DODAJ/EDYTUJ KLIENTA -->
     <div id="client-form-container" style="display:${formIsOpen ? "block" : "none"};">
-      <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h3 id="client-form-title" style="margin:0;font-size:16px;color:#0C447C;">${formTitle}</h3>
-          <button class="small-button" type="button" onclick="hideClientForm()">✕ Zamknij</button>
+      <div style="border:2px solid rgba(11,116,201,0.25);border-radius:16px;background:rgba(11,116,201,0.03);overflow:hidden;">
+        <!-- Nagłówek formularza -->
+        <div style="background:rgba(11,116,201,0.08);border-bottom:1px solid rgba(11,116,201,0.15);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+          <h3 id="client-form-title" style="margin:0;font-size:15px;font-weight:700;color:#0C447C;">👤 ${formTitle}</h3>
+          <button class="icon-btn" type="button" onclick="hideClientForm()" title="Zamknij">✕</button>
         </div>
-        <form onsubmit="createClient(this); return false;" class="calendar-form">
-          <!-- Dane podstawowe -->
-          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Dane podstawowe</div>
-          <div>
-            <label>Nazwa klienta</label>
-            <input name="name" required placeholder="np. ABC Sp. z o.o." />
-          </div>
-          <div>
-            <label>VAT ID / NIP</label>
-            <input name="vatId" placeholder="np. PL1234567890" />
-          </div>
-          <div>
-            <label>Kraj</label>
-            <select name="country">
-              <option value="PL">Polska</option>
-              <option value="CZ">Czechy</option>
-              <option value="SK">Słowacja</option>
-              <option value="AT">Austria</option>
-              <option value="DE">Niemcy</option>
-              <option value="GB">Wielka Brytania</option>
-              <option value="EN">Inny</option>
-            </select>
-          </div>
-          <div>
-            <label>Język</label>
-            <select name="language">
-              <option value="pl">Polski</option>
-              <option value="en">Angielski</option>
-              <option value="cs">Czeski</option>
-              <option value="sk">Słowacki</option>
-              <option value="de">Niemiecki</option>
-            </select>
-          </div>
-          <!-- Adres -->
-          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Adres</div>
-          <div>
-            <label>Kod pocztowy</label>
-            <input name="postalCode" placeholder="np. 00-001" />
-          </div>
-          <div>
-            <label>Miasto</label>
-            <input name="city" placeholder="np. Warszawa" />
-          </div>
-          <div>
-            <label>Ulica</label>
-            <input name="street" placeholder="np. Prosta" />
-          </div>
-          <div>
-            <label>Nr budynku</label>
-            <input name="buildingNumber" placeholder="np. 10" />
-          </div>
-          <div>
-            <label>Nr lokalu</label>
-            <input name="apartmentNumber" placeholder="opcjonalnie" />
-          </div>
-          <div>
-            <label>Google Maps URL</label>
-            <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
-          </div>
-          <!-- Rozliczenia -->
-          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Rozliczenia</div>
-          <div>
-            <label>E-mail do faktur</label>
-            <input name="invoiceEmail" type="email" placeholder="np. ksiegowosc@firma.pl" />
-          </div>
-          <div>
-            <label>Termin płatności (dni)</label>
-            <input name="paymentDays" type="number" min="0" value="14" />
-          </div>
-          <div>
-            <label>Model rozliczenia</label>
-            <select name="settlementModel">
-              <option value="ESCO">ESCO</option>
-              <option value="FLAT">Abonament</option>
-              <option value="PROJECT">Projekt</option>
-            </select>
-          </div>
-          <div>
-            <label>Udział ESCO (%)</label>
-            <input name="escoShare" type="number" min="0" max="100" value="50" />
-          </div>
-          <!-- Kontakty -->
-          <div style="grid-column:1/-1;font-size:12px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:8px;margin-bottom:4px;">Osoby kontaktowe</div>
-          <div style="grid-column:1/-1;" id="contacts-container"></div>
-          <div style="grid-column:1/-1;">
-            <button type="button" class="small-button" onclick="addContactRow()">+ Dodaj osobę kontaktową</button>
-          </div>
-          <div class="calendar-actions" style="grid-column:1/-1;margin-top:8px;display:flex;gap:8px;">
-            <button class="primary-button" type="submit" id="client-submit-btn">${formBtnLabel}</button>
-            <button class="small-button" type="button" onclick="hideClientForm()">Anuluj</button>
-          </div>
-        </form>
+        <div style="padding:20px;">
+          <form onsubmit="createClient(this); return false;" class="calendar-form">
+            <!-- Dane podstawowe -->
+            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Dane podstawowe</div>
+            <div>
+              <label>Nazwa klienta</label>
+              <input name="name" required placeholder="np. ABC Sp. z o.o." />
+            </div>
+            <div>
+              <label>VAT ID / NIP</label>
+              <input name="vatId" placeholder="np. PL1234567890" />
+            </div>
+            <div>
+              <label>Kraj</label>
+              <select name="country">
+                <option value="PL">Polska</option>
+                <option value="CZ">Czechy</option>
+                <option value="SK">Słowacja</option>
+                <option value="AT">Austria</option>
+                <option value="DE">Niemcy</option>
+                <option value="GB">Wielka Brytania</option>
+                <option value="EN">Inny</option>
+              </select>
+            </div>
+            <div>
+              <label>Język</label>
+              <select name="language">
+                <option value="pl">Polski</option>
+                <option value="en">Angielski</option>
+                <option value="cs">Czeski</option>
+                <option value="sk">Słowacki</option>
+                <option value="de">Niemiecki</option>
+              </select>
+            </div>
+            <!-- Adres -->
+            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Adres</div>
+            <div>
+              <label>Kod pocztowy</label>
+              <input name="postalCode" placeholder="np. 00-001" />
+            </div>
+            <div>
+              <label>Miasto</label>
+              <input name="city" placeholder="np. Warszawa" />
+            </div>
+            <div>
+              <label>Ulica</label>
+              <input name="street" placeholder="np. Prosta" />
+            </div>
+            <div>
+              <label>Nr budynku</label>
+              <input name="buildingNumber" placeholder="np. 10" />
+            </div>
+            <div>
+              <label>Nr lokalu</label>
+              <input name="apartmentNumber" placeholder="opcjonalnie" />
+            </div>
+            <div>
+              <label>Google Maps URL</label>
+              <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." />
+            </div>
+            <!-- Rozliczenia -->
+            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Rozliczenia</div>
+            <div>
+              <label>E-mail do faktur</label>
+              <input name="invoiceEmail" type="email" placeholder="np. ksiegowosc@firma.pl" />
+            </div>
+            <div>
+              <label>Termin płatności (dni)</label>
+              <input name="paymentDays" type="number" min="0" value="14" />
+            </div>
+            <div>
+              <label>Model rozliczenia</label>
+              <select name="settlementModel">
+                <option value="ESCO">ESCO</option>
+                <option value="FLAT">Abonament</option>
+                <option value="PROJECT">Projekt</option>
+              </select>
+            </div>
+            <div>
+              <label>Udział ESCO (%)</label>
+              <input name="escoShare" type="number" min="0" max="100" value="50" />
+            </div>
+            <!-- Kontakty -->
+            <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-top:8px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--color-border-tertiary);">Osoby kontaktowe</div>
+            <div style="grid-column:1/-1;" id="contacts-container"></div>
+            <div style="grid-column:1/-1;">
+              <button type="button" class="small-button" onclick="addContactRow()">+ Dodaj osobę kontaktową</button>
+            </div>
+            <div class="calendar-actions" style="grid-column:1/-1;margin-top:12px;display:flex;gap:8px;">
+              <button class="primary-button" type="submit" id="client-submit-btn">${formBtnLabel}</button>
+              <button class="small-button" type="button" onclick="hideClientForm()">Anuluj</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
-
-    <!-- PRZYCISK DODAJ — pod formularzem lub pod tabelą gdy formularz zamknięty -->
-    <div id="add-client-btn-container" style="margin-top:${formIsOpen ? "0" : "0"};">
-      <button class="primary-button" onclick="showClientForm(false)" style="font-size:13px;padding:10px 20px;" ${formIsOpen ? 'style="display:none"' : ""}>
-        + Dodaj klienta
-      </button>
-    </div>
   `;
+
+  // Przywróć focus w polu wyszukiwania jeśli był aktywny przed rerenderem
+  if (q || document.activeElement && document.activeElement.type === 'search') {
+    const inp = document.getElementById('cli-search-input');
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
 }
 
 // ─── Widok obiektów konkretnego klienta (drill-down) ─────────────────────────
