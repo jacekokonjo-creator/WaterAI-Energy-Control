@@ -1,11 +1,11 @@
 // WaterAI Energy Control
-// Clients Module v0.8.1
+// Clients Module v2.0.0
 
 const ClientsModule = {
-  storageKey: "waterai_clients_v1",
+  storageKey: 'waterai_clients_v2',
 
   getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
+    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
   },
 
   saveAll(clients) {
@@ -14,55 +14,49 @@ const ClientsModule = {
 
   add(client) {
     const clients = this.getAll();
-
     clients.push({
       id: Date.now(),
       createdAt: new Date().toISOString(),
 
-      name: client.name || "",
-      vatId: client.vatId || "",
-      country: client.country || "PL",
-      language: client.language || "pl",
+      name: client.name || '',
+      vatId: client.vatId || '',
+      regon: client.regon || '',
+      status: client.status || 'ACTIVE',
+      cooperationStartDate: client.cooperationStartDate || '',
+      notes: client.notes || '',
 
-      postalCode: client.postalCode || "",
-      city: client.city || "",
-      street: client.street || "",
-      buildingNumber: client.buildingNumber || "",
-      apartmentNumber: client.apartmentNumber || "",
-      googleMapsUrl: client.googleMapsUrl || "",
+      country: client.country || 'PL',
+      language: client.language || 'pl',
+      postalCode: client.postalCode || '',
+      city: client.city || '',
+      street: client.street || '',
+      buildingNumber: client.buildingNumber || '',
+      apartmentNumber: client.apartmentNumber || '',
+      googleMapsUrl: client.googleMapsUrl || '',
 
-      invoiceEmail: client.invoiceEmail || "",
+      invoiceEmail: client.invoiceEmail || '',
       paymentDays: Number(client.paymentDays || 14),
-      settlementModel: client.settlementModel || "ESCO",
+      settlementModel: client.settlementModel || 'ESCO',
       escoShare: Number(client.escoShare || 50),
 
-      contacts: client.contacts || [],
-        });
-
+      contacts: client.contacts || []
+    });
     this.saveAll(clients);
   },
 
   remove(id) {
-    const clients = this.getAll().filter(client => client.id !== Number(id));
-    this.saveAll(clients);
+    this.saveAll(this.getAll().filter(c => c.id !== Number(id)));
   },
 
   find(id) {
-    return this.getAll().find(client => client.id === Number(id));
+    return this.getAll().find(c => c.id === Number(id));
   },
 
-  update(id, updatedClient) {
-    const clients = this.getAll().map(client => {
-      if (client.id !== Number(id)) return client;
-
-      return {
-        ...client,
-        ...updatedClient,
-        updatedAt: new Date().toISOString()
-      };
-    });
-
-    this.saveAll(clients);
+  update(id, data) {
+    this.saveAll(this.getAll().map(c => {
+      if (c.id !== Number(id)) return c;
+      return { ...c, ...data, updatedAt: new Date().toISOString() };
+    }));
   }
 };
 
