@@ -1,4 +1,20 @@
 // WaterAI Energy Control
+
+// ─── helper: przełącz widok bez resetowania module-content ───────────────────
+function switchToView(moduleName, viewFn) {
+  const labels = typeof getModuleLabels === "function" ? getModuleLabels() : {};
+  const item = labels[moduleName];
+  if (item) {
+    const titleEl = document.getElementById("module-title");
+    if (titleEl) titleEl.textContent = item[1];
+  }
+  const modView = document.getElementById("module-view");
+  if (modView) modView.classList.add("active");
+  const descEl = document.getElementById("module-description");
+  if (descEl) descEl.textContent = "";
+  viewFn();
+}
+
 // Main Application v1.0.0
 
 function escapeHtml(value) {
@@ -321,7 +337,7 @@ function renderClientsList() {
             <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">
               🏗️ Obiekty (${objCount})
             </button>
-            <button class="small-button" onclick="event.stopPropagation();viewClient(${client.id});openModule('clients')" style="white-space:nowrap;">Podgląd</button>
+            <button class="small-button" onclick="event.stopPropagation();switchToView('clients',()=>viewClient(${client.id}))" style="white-space:nowrap;">Podgląd</button>
             <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
             <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">Usuń</button>
           </td>
@@ -568,7 +584,7 @@ function viewObject(id) {
         ${fmt2(r.savedEnergyPct)} %
       </td>
       <td style="padding:7px 10px;white-space:nowrap;">
-        <button class="small-button" onclick="viewProtocol(${p.id})">Podgląd</button>
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${p.id}))">Podgląd</button>
         <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">Edytuj</button>
       </td>
     </tr>`;
@@ -668,7 +684,7 @@ function viewObject(id) {
 
       <div style="display:flex;gap:8px;">
         <button class="small-button" onclick="showObjectForm=true;editingObjectId=null;editObject(${obj.id})">✏️ Edytuj obiekt</button>
-        <button class="small-button" onclick="viewClient(${obj.clientId});openModule('clients')">👤 Podgląd klienta</button>
+        <button class="small-button" onclick="switchToView('clients',()=>viewClient(${obj.clientId}))">👤 Podgląd klienta</button>
       </div>
     </div>
   `;
@@ -785,7 +801,7 @@ function renderObjectsModule() {
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="white-space:nowrap;">📋 Protokoły (${protCount})</button>
-            <button class="small-button" onclick="event.stopPropagation();viewObject(${obj.id});openModule('objects')" style="white-space:nowrap;">Podgląd</button>
+            <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">Podgląd</button>
             <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
             <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">Usuń</button>
           </td>
@@ -1681,29 +1697,47 @@ function viewProtocol(id) {
   const fmt3 = v => Number(v||0).toFixed(3);
   const fmt4 = v => Number(v||0).toFixed(4);
 
-  const tymRows = (p.tymMonthly||[]).map(m => `
-    <tr>
+  const tymMonthly = p.tymMonthly || [];
+  const tymTotalDays = tymMonthly.reduce((s,m) => s + Number(m.tymDays ?? m.days ?? 0), 0);
+  const tymRows = tymMonthly.map(m => {
+    const days = m.tymDays ?? m.days ?? "";
+    const temp = m.tymTemperature ?? m.temperature;
+    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
+    return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.tymTemperature!==null&&m.tymTemperature!==undefined?fmt2(m.tymTemperature):"—"}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.tymDays||m.days||""))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.tymTemperature||m.temperature||0))*Number(m.tymDays||m.days||0)))}</td>
-    </tr>`).join("");
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
+    </tr>`;
+  }).join("");
 
-  const billingRows = (p.realMonthly||[]).map(m => `
-    <tr>
+  const billingMonthly = p.realMonthly || [];
+  const billingTotalDays = billingMonthly.reduce((s,m) => s + Number(m.days ?? 0), 0);
+  const billingRows = billingMonthly.map(m => {
+    const days = m.days ?? "";
+    const temp = m.temperature;
+    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
+    return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.temperature!==null&&m.temperature!==undefined?fmt2(m.temperature):"—"}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.days||""))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.temperature||0))*Number(m.days||0)))}</td>
-    </tr>`).join("");
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
+    </tr>`;
+  }).join("");
 
-  const compRows = (p.comparisonMonthly||[]).map(m => `
-    <tr>
+  const compMonthly = p.comparisonMonthly || [];
+  const compTotalDays = compMonthly.reduce((s,m) => s + Number(m.days ?? 0), 0);
+  const compRows = compMonthly.map(m => {
+    const days = m.days ?? "";
+    const temp = m.temperature;
+    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
+    return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.temperature!==null&&m.temperature!==undefined?fmt2(m.temperature):"—"}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.days||""))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.temperature||0))*Number(m.days||0)))}</td>
-    </tr>`).join("");
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
+    </tr>`;
+  }).join("");
 
   const savedColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
 
@@ -1806,7 +1840,9 @@ function viewProtocol(id) {
             </tr></thead>
             <tbody>${tymRows}</tbody>
             <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD TYM (rozlicz.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${tymTotalDays}</td>
               <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddTymBilling)}</td>
             </tr></tfoot>
           </table>
@@ -1828,7 +1864,9 @@ function viewProtocol(id) {
             </tr></thead>
             <tbody>${billingRows}</tbody>
             <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD rzecz. (rozlicz.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${billingTotalDays}</td>
               <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealBilling)}</td>
             </tr></tfoot>
           </table>
@@ -1850,7 +1888,9 @@ function viewProtocol(id) {
             </tr></thead>
             <tbody>${compRows}</tbody>
             <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD rzecz. (porówn.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${compTotalDays}</td>
               <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealComparison)}</td>
             </tr></tfoot>
           </table>
@@ -1893,7 +1933,7 @@ function viewProtocol(id) {
 
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj protokół</button>
-        ${obj ? `<button class="small-button" onclick="viewObject(${obj.id});openModule('objects')">🏗️ Podgląd obiektu</button>` : ""}
+        ${obj ? `<button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))">🏗️ Podgląd obiektu</button>` : ""}
       </div>
     </div>
   `;
@@ -1933,13 +1973,13 @@ function editMeasurement(id) {
   // Daty — najpierw wstaw, potem zbuduj tabelki
   if (form.elements["billingPeriodStartDate"]) form.elements["billingPeriodStartDate"].value = protocol.billingPeriodStartDate || "";
   if (form.elements["billingPeriodEndDate"]) form.elements["billingPeriodEndDate"].value = protocol.billingPeriodEndDate || "";
-  if (form.billingPeriodStartReading) form.billingPeriodStartReading.value = protocol.billingPeriodStartReading || "";
-  if (form.billingPeriodEndReading) form.billingPeriodEndReading.value = protocol.billingPeriodEndReading || "";
+  if (form.billingPeriodStartReading) form.billingPeriodStartReading.value = protocol.billingPeriodStartReading ?? "";
+  if (form.billingPeriodEndReading) form.billingPeriodEndReading.value = protocol.billingPeriodEndReading ?? "";
 
   if (form.elements["comparisonPeriodStartDate"]) form.elements["comparisonPeriodStartDate"].value = protocol.comparisonPeriodStartDate || "";
   if (form.elements["comparisonPeriodEndDate"]) form.elements["comparisonPeriodEndDate"].value = protocol.comparisonPeriodEndDate || "";
-  if (form.comparisonPeriodStartReading) form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading || "";
-  if (form.comparisonPeriodEndReading) form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading || "";
+  if (form.comparisonPeriodStartReading) form.comparisonPeriodStartReading.value = protocol.comparisonPeriodStartReading ?? "";
+  if (form.comparisonPeriodEndReading) form.comparisonPeriodEndReading.value = protocol.comparisonPeriodEndReading ?? "";
 
   if (form.tymPeriodStart) form.tymPeriodStart.value = protocol.tymPeriodStart || "";
   if (form.tymPeriodEnd) form.tymPeriodEnd.value = protocol.tymPeriodEnd || "";
@@ -2629,7 +2669,7 @@ function renderProtocolsTable(protocols, objectId) {
         ${item.includeLinearRegression ? '<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:2px 7px;border-radius:10px;">📈 Regresja</span>' : ''}
       </td>
       <td style="padding:10px 12px;white-space:nowrap;">
-        <button class="small-button" onclick="viewProtocol(${item.id})" style="white-space:nowrap;">Podgląd</button>
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" style="white-space:nowrap;">Podgląd</button>
         <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
       </td>
@@ -2938,7 +2978,7 @@ function renderMeasurementsList() {
       ` : ""}
 
       <div style="margin-top: 12px;">
-        <button class="small-button" onclick="viewProtocol(${item.id})">Podgląd</button>
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
         <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
       </div>
