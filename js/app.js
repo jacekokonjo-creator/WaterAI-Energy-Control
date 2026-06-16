@@ -431,9 +431,8 @@ function openObjectProtocols(objectId) {
   const protocolCards = protocols.length === 0
     ? `<div class="reminder-card"><strong>Brak protokołów TYM</strong><div class="reminder-meta">Dodaj pierwszy protokół w module Pomiary / Protokół TYM.</div></div>`
     : protocols.map(item => {
-        const r = item.escoResults || calcESCOResults(item);
         const u = item.energyUnit || unit;
-        const cur = item.currency || currency;
+        const fmt3 = v => Number(v || 0).toFixed(3);
         return `
         <div class="reminder-card" style="border-left:4px solid #27500A;">
           <strong>📋 Protokół TYM: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
@@ -444,13 +443,8 @@ function openObjectProtocols(objectId) {
             Porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
             Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${u}</strong>
           </div>
-          <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:10px;border-radius:6px;">
-            <strong>Wyniki ESCO:</strong><br />
-            Oszczędność energii: <strong>${fmt3(r.savedEnergy)} ${u} (${fmt2(r.savedEnergyPct)} %)</strong><br />
-            Oszczędność finansowa: <strong>${fmt2(r.savedMoney)} ${cur}</strong><br />
-            Udział WaterAI: <strong>${fmt2(r.waterAiShare)} ${cur}</strong>
-          </div>
-          <div style="margin-top:10px;">
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="switchToView('clients',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
             <button class="small-button" onclick="editMeasurement(${item.id});openModule('measurements');">Edytuj protokół</button>
             <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}">Usuń</button>
           </div>
@@ -2657,23 +2651,19 @@ function renderProtocolsTable(protocols, objectId) {
   const fmt3 = v => Number(v || 0).toFixed(3);
 
   const rows = protocols.map(item => {
-    const r = item.escoResults || calcESCOResults(item);
     const u = item.energyUnit || unit;
-    const cur = item.currency || "PLN";
-    const savedPct = fmt2(r.savedEnergyPct);
-    const savedMoney = fmt2(r.savedMoney);
-    const pctColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
     return `<tr>
       <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(item.protocolDate || "—")}</td>
       <td style="padding:10px 12px;font-size:13px;">${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}</td>
       <td style="padding:10px 12px;font-size:13px;text-align:right;">${fmt3(item.billingConsumption)} ${escapeHtml(u)}</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:right;font-weight:600;color:${pctColor};">${savedPct} %</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:right;">${savedMoney} ${escapeHtml(cur)}</td>
+      <td style="padding:10px 12px;font-size:13px;">${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}</td>
+      <td style="padding:10px 12px;font-size:13px;text-align:right;">${fmt3(item.comparisonConsumption)} ${escapeHtml(u)}</td>
       <td style="padding:10px 12px;">
         ${item.includeLinearRegression ? '<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:2px 7px;border-radius:10px;">📈 Regresja</span>' : ''}
       </td>
       <td style="padding:10px 12px;white-space:nowrap;">
         <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" style="white-space:nowrap;">Podgląd</button>
+        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;" onclick="switchToView('measurements',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
         <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
       </td>
@@ -2687,9 +2677,9 @@ function renderProtocolsTable(protocols, objectId) {
           <tr style="background:var(--color-background-secondary);">
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data protokołu</th>
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres rozliczeniowy</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Oszczędność %</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Oszczędność fin.</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie rozlicz.</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres porównawczy</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie porówn.</th>
             <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Załączniki</th>
             <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
@@ -2908,10 +2898,7 @@ function renderMeasurementsList() {
   }
 
   container.innerHTML = protocols.map(item => {
-    const r = item.escoResults || calcESCOResults(item);
     const unit = item.energyUnit || "GJ";
-    const currency = item.currency || "PLN";
-    const fmt2 = v => Number(v || 0).toFixed(2);
     const fmt3 = v => Number(v || 0).toFixed(3);
 
     return `
@@ -2929,50 +2916,12 @@ function renderMeasurementsList() {
       </div>
 
       <div class="reminder-meta" style="margin-top:8px;">
-        <strong>Okresy:</strong><br />
-        Rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
-        Zużycie rozliczeniowe: <strong>${fmt3(item.billingConsumption)} ${unit}</strong><br /><br />
-        Porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
-        Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${unit}</strong>
-      </div>
-
-      <div class="reminder-meta" style="margin-top:8px;background:#f0f7f0;padding:10px;border-radius:6px;">
-        <strong>Wyniki ESCO:</strong><br /><br />
-
-        <u>Stopniodni grzewcze (HDD):</u><br />
-        HDD TYM — rozliczeniowy: ${fmt2(r.hddTymBilling)} °C·dni<br />
-        HDD rzecz. — rozliczeniowy: ${fmt2(r.hddRealBilling)} °C·dni<br />
-        HDD TYM — porównawczy: ${fmt2(r.hddTymComparison)} °C·dni<br />
-        HDD rzecz. — porównawczy: ${fmt2(r.hddRealComparison)} °C·dni<br /><br />
-
-        <u>Korekta klimatyczna:</u><br />
-        k rozliczeniowy (HDD_TYM / HDD_rzecz): <strong>${fmt3(r.kBilling)}</strong>${r.kBilling > 1 ? " → rok cieplejszy od normy" : r.kBilling > 0 ? " → rok chłodniejszy od normy" : ""}<br />
-        k porównawczy (HDD_TYM / HDD_rzecz): <strong>${fmt3(r.kComparison)}</strong><br /><br />
-
-        <u>Zużycie skorygowane do TYM:</u><br />
-        Rozliczeniowe skor.: <strong>${fmt3(r.billingCorrected)} ${unit}</strong><br />
-        Porównawcze skor.: <strong>${fmt3(r.comparisonCorrected)} ${unit}</strong><br />
-        Porównawcze skor. przeliczone na dni rozliczeniowe: <strong>${fmt3(r.comparisonCorrectedScaled)} ${unit}</strong><br /><br />
-
-        <u>Wskaźnik energetyczny E = zużycie_TYM / HDD_TYM:</u><br />
-        E rozliczeniowy: <strong>${fmt3(r.eBilling)} ${unit}/HDD</strong><br />
-        E porównawczy: <strong>${fmt3(r.eComparison)} ${unit}/HDD</strong><br />
-        Zmiana E: <strong>${r.eComparison > 0 ? fmt2((r.eBilling - r.eComparison) / r.eComparison * 100) : "—"} %</strong><br /><br />
-
-        <u>Oszczędności (okres rozliczeniowy):</u><br />
-        Oszczędność energii: <strong>${fmt3(r.savedEnergy)} ${unit}</strong><br />
-        Oszczędność energii: <strong>${fmt2(r.savedEnergyPct)} %</strong><br />
-        Oszczędność finansowa: <strong>${fmt2(r.savedMoney)} ${currency}</strong><br />
-        Udział WaterAI: <strong>${fmt2(r.waterAiShare)} ${currency}</strong>
-      </div>
-
-      <div class="reminder-meta" style="margin-top:8px;background:#f5f0fa;padding:10px;border-radius:6px;">
-        <strong>Prognoza roczna (${r.forecastDays} dni — jak okres porównawczy):</strong><br /><br />
-        Prognoza z technologią: <strong>${fmt3(r.forecastConsumptionWith)} ${unit}</strong><br />
-        Prognoza bez technologii: <strong>${fmt3(r.forecastConsumptionWithout)} ${unit}</strong><br />
-        Prognoza oszczędności: <strong>${fmt3(r.forecastSavedEnergy)} ${unit}/rok</strong><br />
-        Prognoza oszczędności: <strong>${fmt2(r.forecastSavedEnergyPct)} %</strong><br />
-        Prognoza wartości: <strong>${fmt2(r.forecastSavedMoney)} ${currency}/rok</strong>
+        <strong>Okres rozliczeniowy:</strong><br />
+        ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
+        Zużycie: <strong>${fmt3(item.billingConsumption)} ${unit}</strong><br /><br />
+        <strong>Okres porównawczy:</strong><br />
+        ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
+        Zużycie: <strong>${fmt3(item.comparisonConsumption)} ${unit}</strong>
       </div>
 
       ${item.includeLinearRegression ? `
@@ -2981,11 +2930,639 @@ function renderMeasurementsList() {
         </div>
       ` : ""}
 
-      <div style="margin-top: 12px;">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="switchToView('measurements',()=>generateESCOReport(${item.id}))">⚡ Raport ESCO</button>
         <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
         <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
       </div>
     </div>
   `}).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RAPORT ESCO — pełna logika krok po kroku z wykresami
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function generateESCOReport(protocolId) {
+  const p = MeasurementsModule.find(protocolId);
+  if (!p) { alert("Nie znaleziono protokołu."); return; }
+
+  const client = ClientsModule.find(p.clientId);
+  const obj    = ObjectsModule.find(p.objectId);
+  const r      = calcESCOResults(p);
+  const u      = p.energyUnit  || "GJ";
+  const cur    = p.currency    || "PLN";
+  const base   = Number(p.baseTemperature || 21);
+
+  const fmt2 = v => Number(v ?? 0).toFixed(2);
+  const fmt3 = v => Number(v ?? 0).toFixed(3);
+  const fmt4 = v => Number(v ?? 0).toFixed(4);
+
+  const savedColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
+
+  // ── Tabelka TYM ──
+  const tymRows = (p.tymMonthly || []).map(m => {
+    const temp = m.tymTemperature ?? m.temperature;
+    const days = m.tymDays ?? m.days ?? 0;
+    const hdd  = Math.max(0, base - Number(temp || 0)) * Number(days);
+    return `<tr>
+      <td style="padding:5px 8px;">${escapeHtml(m.monthName || "M"+m.month)}</td>
+      <td style="padding:5px 8px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
+      <td style="padding:5px 8px;text-align:right;">${days}</td>
+      <td style="padding:5px 8px;text-align:right;font-weight:500;">${fmt2(hdd)}</td>
+    </tr>`;
+  }).join("");
+
+  // ── Tabelka rozliczeniowa ──
+  const billRows = (p.realMonthly || []).map(m => {
+    const temp   = m.temperature;
+    const days   = Number(m.days ?? 0);
+    const hddR   = Math.max(0, base - Number(temp || 0)) * days;
+    const tym    = (p.tymMonthly || []).find(t => t.month === m.month);
+    const tymT   = tym ? Number(tym.tymTemperature ?? tym.temperature ?? 0) : 0;
+    const hddT   = Math.max(0, base - tymT) * days;
+    return `<tr>
+      <td style="padding:5px 8px;">${escapeHtml(m.monthName || "M"+m.month)}</td>
+      <td style="padding:5px 8px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
+      <td style="padding:5px 8px;text-align:right;">${days}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmt2(hddR)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#633806;">${fmt2(hddT)}</td>
+    </tr>`;
+  }).join("");
+
+  // ── Tabelka porównawcza ──
+  const compRows = (p.comparisonMonthly || []).map(m => {
+    const temp = m.temperature;
+    const days = Number(m.days ?? 0);
+    const hddR = Math.max(0, base - Number(temp || 0)) * days;
+    const tym  = (p.tymMonthly || []).find(t => t.month === m.month);
+    const tymT = tym ? Number(tym.tymTemperature ?? tym.temperature ?? 0) : 0;
+    const hddT = Math.max(0, base - tymT) * days;
+    return `<tr>
+      <td style="padding:5px 8px;">${escapeHtml(m.monthName || "M"+m.month)}</td>
+      <td style="padding:5px 8px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
+      <td style="padding:5px 8px;text-align:right;">${days}</td>
+      <td style="padding:5px 8px;text-align:right;">${fmt2(hddR)}</td>
+      <td style="padding:5px 8px;text-align:right;color:#633806;">${fmt2(hddT)}</td>
+    </tr>`;
+  }).join("");
+
+  // ── Dane do wykresów (JSON) ──
+  const tymData     = JSON.stringify((p.tymMonthly || []).map(m => ({
+    name: (m.monthName || "M"+m.month).slice(0,6),
+    temp: Number(m.tymTemperature ?? m.temperature ?? 0)
+  })));
+  const billData    = JSON.stringify((p.realMonthly || []).map(m => ({
+    name: (m.monthName || "M"+m.month).slice(0,6),
+    temp: Number(m.temperature ?? 0)
+  })));
+  const compData    = JSON.stringify((p.comparisonMonthly || []).map(m => ({
+    name: (m.monthName || "M"+m.month).slice(0,6),
+    temp: Number(m.temperature ?? 0)
+  })));
+
+  // HDD per miesiąc dla wykresów
+  const billHDDData = JSON.stringify((p.realMonthly || []).map(m => {
+    const days = Number(m.days ?? 0);
+    const tym  = (p.tymMonthly || []).find(t => t.month === m.month);
+    const tymT = tym ? Number(tym.tymTemperature ?? tym.temperature ?? 0) : 0;
+    return {
+      name: (m.monthName || "M"+m.month).slice(0,6),
+      hddReal: Math.max(0, base - Number(m.temperature ?? 0)) * days,
+      hddTym:  Math.max(0, base - tymT) * days
+    };
+  }));
+  const compHDDData = JSON.stringify((p.comparisonMonthly || []).map(m => {
+    const days = Number(m.days ?? 0);
+    const tym  = (p.tymMonthly || []).find(t => t.month === m.month);
+    const tymT = tym ? Number(tym.tymTemperature ?? tym.temperature ?? 0) : 0;
+    return {
+      name: (m.monthName || "M"+m.month).slice(0,6),
+      hddReal: Math.max(0, base - Number(m.temperature ?? 0)) * days,
+      hddTym:  Math.max(0, base - tymT) * days
+    };
+  }));
+
+  const container = document.getElementById("module-content");
+  if (!container) return;
+
+  container.innerHTML = `
+  <style>
+    .esco-section { border:1px solid var(--color-border-tertiary); border-radius:10px; margin-bottom:20px; overflow:hidden; }
+    .esco-section-head { padding:12px 16px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; }
+    .esco-section-body { padding:16px; background:var(--color-background-primary); }
+    .esco-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .esco-table th { text-align:left; padding:6px 8px; font-weight:500; font-size:11px; color:var(--color-text-secondary); border-bottom:1px solid var(--color-border-tertiary); }
+    .esco-table td { padding:5px 8px; border-bottom:0.5px solid var(--color-border-tertiary); }
+    .esco-table tfoot td { font-weight:600; border-top:2px solid var(--color-border-tertiary); border-bottom:none; }
+    .esco-kv { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .esco-kv-item { background:var(--color-background-secondary); border-radius:8px; padding:12px; }
+    .esco-kv-label { font-size:11px; color:var(--color-text-secondary); margin-bottom:4px; }
+    .esco-kv-value { font-size:15px; font-weight:600; }
+    .esco-formula { background:#f7f7f7; border-left:3px solid #B5D4F4; border-radius:4px; padding:10px 14px; font-family:monospace; font-size:13px; margin:8px 0; color:#333; }
+    .esco-step-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:#0C447C; color:#fff; font-size:12px; font-weight:700; flex-shrink:0; }
+    canvas.esco-chart { width:100%; height:220px; display:block; }
+  </style>
+
+  <div style="max-width:820px;">
+
+    <!-- NAGŁÓWEK -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
+      <div>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">
+          ${escapeHtml(client ? client.name : "")} / ${escapeHtml(obj ? obj.name : "")}
+        </div>
+        <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;color:var(--color-text-primary);">
+          ⚡ Raport ESCO
+        </h2>
+        <div style="font-size:13px;color:var(--color-text-secondary);">
+          Protokół TYM z dnia ${escapeHtml(p.protocolDate || "—")} &nbsp;·&nbsp;
+          Opracował: ${escapeHtml(p.preparedBy || "—")} &nbsp;·&nbsp;
+          Temperatura bazowa: ${base} °C
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${p.id}))">← Pomiary</button>
+        <button class="small-button" onclick="renderMeasurementsModule()">← Lista protokołów</button>
+      </div>
+    </div>
+
+    <!-- DANE ŹRÓDŁOWE -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#E6F1FB;color:#0C447C;">
+        <span class="esco-step-num">0</span> Dane źródłowe protokołu
+      </div>
+      <div class="esco-section-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;">Okres rozliczeniowy (bieżący)</div>
+            <div style="font-size:13px;line-height:1.8;">
+              Daty: <strong>${escapeHtml(p.billingPeriodStartDate||"?")} → ${escapeHtml(p.billingPeriodEndDate||"?")}</strong><br/>
+              Odczyt startowy: ${fmt3(p.billingPeriodStartReading ?? 0)} ${u}<br/>
+              Odczyt końcowy: ${fmt3(p.billingPeriodEndReading || 0)} ${u}<br/>
+              <strong>Zużycie E_R = ${fmt3(p.billingConsumption || 0)} ${u}</strong>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;">Okres porównawczy (bazowy)</div>
+            <div style="font-size:13px;line-height:1.8;">
+              Daty: <strong>${escapeHtml(p.comparisonPeriodStartDate||"?")} → ${escapeHtml(p.comparisonPeriodEndDate||"?")}</strong><br/>
+              Odczyt startowy: ${fmt3(p.comparisonPeriodStartReading ?? 0)} ${u}<br/>
+              Odczyt końcowy: ${fmt3(p.comparisonPeriodEndReading || 0)} ${u}<br/>
+              <strong>Zużycie E_P = ${fmt3(p.comparisonConsumption || 0)} ${u}</strong>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--color-text-secondary);">
+          Źródło danych klimatycznych: ${escapeHtml(p.weatherSource || "—")} &nbsp;|&nbsp; Stacja: ${escapeHtml(p.weatherStation || "—")}
+          ${p.weatherSourceUrl ? ` &nbsp;|&nbsp; <a href="${escapeHtml(p.weatherSourceUrl)}" target="_blank" rel="noopener">🔗 Link</a>` : ""}
+          &nbsp;|&nbsp; Data pobrania: ${escapeHtml(p.weatherDataDownloadDate || "—")}
+        </div>
+      </div>
+    </div>
+
+    <!-- KROK 1 — TYM -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#FEF3DC;color:#633806;">
+        <span class="esco-step-num" style="background:#633806;">1</span> Temperatury TYM — rok standardowy
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 12px;">
+          TYM (Typowy Meteorologiczny Rok) to uśrednione wieloletnie dane temperaturowe dla danej stacji.
+          Służą jako punkt odniesienia — niezmienny dla każdego protokołu tego obiektu.
+        </p>
+        ${tymRows ? `
+        <table class="esco-table">
+          <thead><tr>
+            <th>Miesiąc</th><th style="text-align:right;">Temp TYM (°C)</th>
+            <th style="text-align:right;">Dni</th><th style="text-align:right;">HDD TYM</th>
+          </tr></thead>
+          <tbody>${tymRows}</tbody>
+          <tfoot><tr>
+            <td>Suma</td><td></td>
+            <td style="text-align:right;">${(p.tymMonthly||[]).reduce((s,m)=>s+Number(m.tymDays??m.days??0),0)}</td>
+            <td style="text-align:right;">${fmt2(r.hddTymBilling + r.hddTymComparison > 0 ? (p.realMonthly||[]).reduce((s,m)=>{const t=(p.tymMonthly||[]).find(x=>x.month===m.month);return s+Math.max(0,base-Number(t?.(t.tymTemperature??t.temperature)??0))*Number(m.days??0);},0) : 0)}</td>
+          </tr></tfoot>
+        </table>
+        <canvas class="esco-chart" id="chart-tym" style="margin-top:16px;height:180px;"></canvas>` : '<p style="color:var(--color-text-secondary);font-size:13px;">Brak danych TYM.</p>'}
+      </div>
+    </div>
+
+    <!-- KROK 2 — HDD -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#E6F1FB;color:#0C447C;">
+        <span class="esco-step-num">2</span> Stopniodni grzewcze (HDD)
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          HDD (Heating Degree Days) mierzy zapotrzebowanie na ogrzewanie. Dla każdego miesiąca:
+        </p>
+        <div class="esco-formula">HDD = max(0, T_baza − T_średnia) × liczba_dni &nbsp;&nbsp; [T_baza = ${base} °C]</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#0C447C;margin-bottom:8px;">📅 Okres rozliczeniowy</div>
+            ${billRows ? `<table class="esco-table">
+              <thead><tr>
+                <th>Miesiąc</th><th style="text-align:right;">T rzecz.</th>
+                <th style="text-align:right;">Dni</th>
+                <th style="text-align:right;">HDD rzecz.</th>
+                <th style="text-align:right;color:#633806;">HDD TYM</th>
+              </tr></thead>
+              <tbody>${billRows}</tbody>
+              <tfoot><tr>
+                <td>Suma</td><td></td>
+                <td style="text-align:right;">${(p.realMonthly||[]).reduce((s,m)=>s+Number(m.days??0),0)}</td>
+                <td style="text-align:right;">${fmt2(r.hddRealBilling)}</td>
+                <td style="text-align:right;color:#633806;">${fmt2(r.hddTymBilling)}</td>
+              </tr></tfoot>
+            </table>` : "—"}
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#27500A;margin-bottom:8px;">📊 Okres porównawczy</div>
+            ${compRows ? `<table class="esco-table">
+              <thead><tr>
+                <th>Miesiąc</th><th style="text-align:right;">T rzecz.</th>
+                <th style="text-align:right;">Dni</th>
+                <th style="text-align:right;">HDD rzecz.</th>
+                <th style="text-align:right;color:#633806;">HDD TYM</th>
+              </tr></thead>
+              <tbody>${compRows}</tbody>
+              <tfoot><tr>
+                <td>Suma</td><td></td>
+                <td style="text-align:right;">${(p.comparisonMonthly||[]).reduce((s,m)=>s+Number(m.days??0),0)}</td>
+                <td style="text-align:right;">${fmt2(r.hddRealComparison)}</td>
+                <td style="text-align:right;color:#633806;">${fmt2(r.hddTymComparison)}</td>
+              </tr></tfoot>
+            </table>` : "—"}
+          </div>
+        </div>
+
+        <canvas class="esco-chart" id="chart-hdd" style="margin-top:16px;"></canvas>
+        <canvas class="esco-chart" id="chart-temp" style="margin-top:16px;"></canvas>
+      </div>
+    </div>
+
+    <!-- KROK 3 — KOREKTA KLIMATYCZNA -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#EAF3DE;color:#27500A;">
+        <span class="esco-step-num" style="background:#27500A;">3</span> Korekta klimatyczna
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          Współczynnik k normalizuje zużycie do warunków roku standardowego TYM,
+          eliminując wpływ wyjątkowo ciepłej lub zimnej pogody.
+        </p>
+        <div class="esco-formula">k = HDD_TYM / HDD_rzeczywiste</div>
+        <div class="esco-kv" style="margin-top:14px;">
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">k rozliczeniowy</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt2(r.hddTymBilling)} / ${fmt2(r.hddRealBilling)} = <strong>${fmt4(r.kBilling)}</strong>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">
+              ${r.kBilling > 1.01 ? "↑ Rok cieplejszy od normy — zużycie zostanie podwyższone" : r.kBilling < 0.99 && r.kBilling > 0 ? "↓ Rok chłodniejszy od normy — zużycie zostanie obniżone" : r.kBilling === 0 ? "Brak danych HDD" : "≈ Rok zbliżony do normy"}
+            </div>
+          </div>
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">k porównawczy</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt2(r.hddTymComparison)} / ${fmt2(r.hddRealComparison)} = <strong>${fmt4(r.kComparison)}</strong>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-secondary);">
+              ${r.kComparison > 1.01 ? "↑ Rok cieplejszy od normy" : r.kComparison < 0.99 && r.kComparison > 0 ? "↓ Rok chłodniejszy od normy" : r.kComparison === 0 ? "Brak danych HDD" : "≈ Rok zbliżony do normy"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KROK 4 — ZUŻYCIE SKORYGOWANE -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#FEF3DC;color:#633806;">
+        <span class="esco-step-num" style="background:#633806;">4</span> Zużycie skorygowane do TYM
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          Mnoży zmierzone zużycie przez współczynnik korekty — otrzymujemy ile energii zużyto by przy normalnej pogodzie.
+        </p>
+        <div class="esco-formula">E_skor = E_zmierzone × k</div>
+        <div class="esco-kv" style="margin-top:14px;">
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">Rozliczeniowe skorygowane</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt3(p.billingConsumption||0)} × ${fmt4(r.kBilling)} = <strong>${fmt3(r.billingCorrected)}</strong> ${u}
+            </div>
+          </div>
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">Porównawcze skorygowane</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt3(p.comparisonConsumption||0)} × ${fmt4(r.kComparison)} = <strong>${fmt3(r.comparisonCorrected)}</strong> ${u}
+            </div>
+          </div>
+        </div>
+
+        <canvas class="esco-chart" id="chart-consumption" style="margin-top:16px;"></canvas>
+      </div>
+    </div>
+
+    <!-- KROK 5 — WSKAŹNIK E -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#E6F1FB;color:#0C447C;">
+        <span class="esco-step-num">5</span> Wskaźnik energetyczny E
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          E pokazuje ile energii obiekt zużywa na każdy stopniodzień grzewczy.
+          Niższy E po wdrożeniu technologii = lepsza efektywność.
+        </p>
+        <div class="esco-formula">E = E_skor / HDD_TYM &nbsp;&nbsp; [${u}/HDD]</div>
+        <div class="esco-kv" style="margin-top:14px;">
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">E rozliczeniowy (po wdrożeniu)</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt3(r.billingCorrected)} / ${fmt2(r.hddTymBilling)} = <strong>${fmt4(r.eBilling)}</strong> ${u}/HDD
+            </div>
+          </div>
+          <div class="esco-kv-item">
+            <div class="esco-kv-label">E porównawczy (przed wdrożeniem)</div>
+            <div class="esco-formula" style="margin:4px 0;font-size:12px;">
+              ${fmt3(r.comparisonCorrected)} / ${fmt2(r.hddTymComparison)} = <strong>${fmt4(r.eComparison)}</strong> ${u}/HDD
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:#f0f7f0;border-radius:8px;font-size:13px;">
+          Zmiana wskaźnika E: <strong style="color:${r.eBilling < r.eComparison ? '#27500A' : '#c00'};">
+            ${r.eComparison > 0 ? fmt2((r.eBilling - r.eComparison) / r.eComparison * 100) : "—"} %
+          </strong>
+          &nbsp;(${r.eBilling < r.eComparison ? "poprawa efektywności ✓" : "brak poprawy"})
+        </div>
+      </div>
+    </div>
+
+    <!-- KROK 6 — OSZCZĘDNOŚĆ -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#EAF3DE;color:#27500A;">
+        <span class="esco-step-num" style="background:#27500A;">6</span> Obliczenie oszczędności
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          Przeliczamy zużycie porównawcze na ten sam okres co rozliczeniowy (przez HDD_TYM_R),
+          a następnie odejmujemy faktyczne zużycie rozliczeniowe.
+        </p>
+        <div class="esco-formula">E_P_skalowane = E_porówn × HDD_TYM_rozlicz = ${fmt4(r.eComparison)} × ${fmt2(r.hddTymBilling)} = <strong>${fmt3(r.comparisonCorrectedScaled)}</strong> ${u}</div>
+        <div class="esco-formula">Oszczędność = E_P_skalowane − E_R_skor = ${fmt3(r.comparisonCorrectedScaled)} − ${fmt3(r.billingCorrected)} = <strong>${fmt3(r.savedEnergy)}</strong> ${u}</div>
+        <div class="esco-formula">Oszczędność % = Oszczędność / E_P_skalowane × 100 = <strong>${fmt2(r.savedEnergyPct)}</strong> %</div>
+
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div style="text-align:center;padding:16px;border-radius:10px;border:2px solid ${r.savedEnergyPct>=0?'#C0DD97':'#fcc'};">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px;">OSZCZĘDNOŚĆ ENERGII</div>
+            <div style="font-size:24px;font-weight:800;color:${savedColor};">${fmt3(r.savedEnergy)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">${u}</div>
+          </div>
+          <div style="text-align:center;padding:16px;border-radius:10px;border:2px solid ${r.savedEnergyPct>=0?'#C0DD97':'#fcc'};">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px;">OSZCZĘDNOŚĆ %</div>
+            <div style="font-size:24px;font-weight:800;color:${savedColor};">${fmt2(r.savedEnergyPct)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">%</div>
+          </div>
+          <div style="text-align:center;padding:16px;border-radius:10px;border:2px solid ${r.savedEnergyPct>=0?'#C0DD97':'#fcc'};">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px;">OSZCZĘDNOŚĆ FINANSOWA</div>
+            <div style="font-size:24px;font-weight:800;color:${savedColor};">${fmt2(r.savedMoney)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">${cur}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;padding:10px 14px;background:#f7f7f7;border-radius:8px;font-size:13px;">
+          Udział WaterAI (${p.waterAiShare || 0} %): &nbsp;
+          <strong>${fmt2(r.waterAiShare)} ${cur}</strong>
+          &nbsp;·&nbsp; Cena energii: ${fmt2(p.energyPrice || 0)} ${cur}/${u}
+        </div>
+
+        <canvas class="esco-chart" id="chart-savings" style="margin-top:16px;"></canvas>
+      </div>
+    </div>
+
+    <!-- KROK 7 — PROGNOZA -->
+    <div class="esco-section">
+      <div class="esco-section-head" style="background:#E6F1FB;color:#0C447C;">
+        <span class="esco-step-num">7</span> Prognoza roczna
+      </div>
+      <div class="esco-section-body">
+        <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">
+          Stosujemy wskaźnik E z okresu rozliczeniowego (po wdrożeniu) do HDD całego roku porównawczego —
+          otrzymujemy prognozę rocznego zużycia z technologią.
+        </p>
+        <div class="esco-formula">Prognoza_z = E_R × HDD_TYM_P = ${fmt4(r.eBilling)} × ${fmt2(r.hddTymComparison)} = <strong>${fmt3(r.forecastConsumptionWith)}</strong> ${u}/rok</div>
+        <div class="esco-formula">Prognoza_bez = E_P (bazowe zużycie) = <strong>${fmt3(r.forecastConsumptionWithout)}</strong> ${u}/rok</div>
+        <div class="esco-formula">Prognoza oszczędności = ${fmt3(r.forecastConsumptionWithout)} − ${fmt3(r.forecastConsumptionWith)} = <strong>${fmt3(r.forecastSavedEnergy)}</strong> ${u}/rok</div>
+
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div style="text-align:center;padding:14px;border-radius:10px;background:#E6F1FB;">
+            <div style="font-size:11px;color:#0C447C;margin-bottom:6px;">ZUŻYCIE Z TECHNOLOGIĄ</div>
+            <div style="font-size:20px;font-weight:700;color:#0C447C;">${fmt3(r.forecastConsumptionWith)}</div>
+            <div style="font-size:12px;color:#0C447C;">${u}/rok</div>
+          </div>
+          <div style="text-align:center;padding:14px;border-radius:10px;background:#f5f5f5;">
+            <div style="font-size:11px;color:#666;margin-bottom:6px;">ZUŻYCIE BEZ TECHNOLOGII</div>
+            <div style="font-size:20px;font-weight:700;color:#666;">${fmt3(r.forecastConsumptionWithout)}</div>
+            <div style="font-size:12px;color:#666;">${u}/rok</div>
+          </div>
+          <div style="text-align:center;padding:14px;border-radius:10px;background:#EAF3DE;">
+            <div style="font-size:11px;color:#27500A;margin-bottom:6px;">PROGNOZA OSZCZĘDNOŚCI</div>
+            <div style="font-size:20px;font-weight:700;color:#27500A;">${fmt2(r.forecastSavedEnergyPct)} %</div>
+            <div style="font-size:12px;color:#27500A;">${fmt2(r.forecastSavedMoney)} ${cur}/rok</div>
+          </div>
+        </div>
+
+        <canvas class="esco-chart" id="chart-forecast" style="margin-top:16px;"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  (function() {
+    const MONTHS_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+
+    function drawBarChart(canvasId, labels, datasets, opts) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.offsetWidth || 700;
+      const H = 220;
+      canvas.width = W;
+      canvas.height = H;
+      const pad = { l: 52, r: 16, t: 28, b: 40 };
+      const allVals = datasets.flatMap(d => d.data);
+      const maxVal = Math.max(...allVals, 0.001);
+      const minVal = Math.min(...allVals, 0);
+      const range = maxVal - minVal || 1;
+      const bw = opts.barWidth || (((W - pad.l - pad.r) / labels.length) * 0.8 / datasets.length);
+      const gap = ((W - pad.l - pad.r) / labels.length);
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'var(--color-background-primary, #fff)';
+      ctx.fillRect(0, 0, W, H);
+
+      // grid
+      for (let i = 0; i <= 4; i++) {
+        const v = minVal + (range * i / 4);
+        const y = H - pad.b - ((v - minVal) / range) * (H - pad.t - pad.b);
+        ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        ctx.fillStyle = '#999'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(v.toFixed(opts.decimals ?? 1), pad.l - 4, y + 4);
+      }
+
+      // zero line
+      if (minVal < 0) {
+        const y0 = H - pad.b - ((0 - minVal) / range) * (H - pad.t - pad.b);
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pad.l, y0); ctx.lineTo(W - pad.r, y0); ctx.stroke();
+      }
+
+      // bars
+      labels.forEach((lbl, i) => {
+        const x0 = pad.l + i * gap + (gap - bw * datasets.length) / 2;
+        datasets.forEach((ds, di) => {
+          const v = ds.data[i] ?? 0;
+          const y0 = H - pad.b - ((Math.max(v, 0) - minVal) / range) * (H - pad.t - pad.b);
+          const yBase = H - pad.b - ((Math.max(0, minVal) - minVal) / range) * (H - pad.t - pad.b);
+          const barH = Math.abs(yBase - y0) || 1;
+          const x = x0 + di * bw;
+          ctx.fillStyle = ds.color || '#185FA5';
+          ctx.fillRect(x, Math.min(y0, yBase), bw - 1, barH);
+        });
+        // label
+        ctx.fillStyle = '#666'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(lbl, pad.l + i * gap + gap / 2, H - pad.b + 14);
+      });
+
+      // legend
+      let lx = pad.l;
+      datasets.forEach(ds => {
+        ctx.fillStyle = ds.color || '#185FA5';
+        ctx.fillRect(lx, 8, 12, 10);
+        ctx.fillStyle = '#444'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(ds.label || '', lx + 16, 17);
+        lx += ctx.measureText(ds.label || '').width + 36;
+      });
+
+      if (opts.title) {
+        ctx.fillStyle = '#444'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(opts.title, W / 2, H - 4);
+      }
+    }
+
+    function drawLineChart(canvasId, labels, datasets, opts) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.offsetWidth || 700;
+      const H = 220;
+      canvas.width = W;
+      canvas.height = H;
+      const pad = { l: 52, r: 16, t: 28, b: 40 };
+      const allVals = datasets.flatMap(d => d.data);
+      const maxVal = Math.max(...allVals);
+      const minVal = Math.min(...allVals);
+      const range = maxVal - minVal || 1;
+      const n = labels.length;
+      const xStep = (W - pad.l - pad.r) / Math.max(n - 1, 1);
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = 'var(--color-background-primary, #fff)';
+      ctx.fillRect(0, 0, W, H);
+
+      // grid
+      for (let i = 0; i <= 4; i++) {
+        const v = minVal + (range * i / 4);
+        const y = H - pad.b - ((v - minVal) / range) * (H - pad.t - pad.b);
+        ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+        ctx.fillStyle = '#999'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(v.toFixed(1), pad.l - 4, y + 4);
+      }
+
+      datasets.forEach(ds => {
+        ctx.strokeStyle = ds.color || '#185FA5';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ds.data.forEach((v, i) => {
+          const x = pad.l + i * xStep;
+          const y = H - pad.b - ((v - minVal) / range) * (H - pad.t - pad.b);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ds.data.forEach((v, i) => {
+          const x = pad.l + i * xStep;
+          const y = H - pad.b - ((v - minVal) / range) * (H - pad.t - pad.b);
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI);
+          ctx.fillStyle = ds.color || '#185FA5'; ctx.fill();
+        });
+      });
+
+      labels.forEach((lbl, i) => {
+        ctx.fillStyle = '#666'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(lbl, pad.l + i * xStep, H - pad.b + 14);
+      });
+
+      let lx = pad.l;
+      datasets.forEach(ds => {
+        ctx.strokeStyle = ds.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(lx, 13); ctx.lineTo(lx + 12, 13); ctx.stroke();
+        ctx.fillStyle = '#444'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(ds.label || '', lx + 16, 17);
+        lx += ctx.measureText(ds.label || '').width + 36;
+      });
+    }
+
+    setTimeout(function() {
+      // ── Wykres 1: Temperatury TYM ──
+      const tymD = ${tymData};
+      const billD = ${billData};
+      const compD = ${compData};
+      const labels12 = tymD.map(m => m.name);
+      drawLineChart('chart-tym', labels12, [
+        { label: 'TYM (norma)', color: '#FAC775', data: tymD.map(m => m.temp) },
+        { label: 'Rozliczeniowy', color: '#185FA5', data: billD.map(m => m.temp) },
+        { label: 'Porównawczy', color: '#27500A', data: compD.map(m => m.temp) }
+      ], { title: 'Temperatury miesięczne (°C)' });
+
+      // ── Wykres 2: HDD porównanie ──
+      const billHDD = ${billHDDData};
+      const compHDD = ${compHDDData};
+      const billLabels = billHDD.map(m => m.name);
+      const compLabels = compHDD.map(m => m.name);
+
+      drawBarChart('chart-hdd', billLabels.length ? billLabels : compLabels, [
+        { label: 'HDD rzecz. (rozlicz.)', color: '#185FA580', data: billHDD.map(m => m.hddReal) },
+        { label: 'HDD TYM (rozlicz.)', color: '#FAC775', data: billHDD.map(m => m.hddTym) }
+      ], { title: 'HDD miesięczne — okres rozliczeniowy', decimals: 0 });
+
+      // ── Wykres 3: Temperatury real ──
+      drawLineChart('chart-temp', compLabels.length ? compLabels : billLabels, [
+        { label: 'T rzecz. (porówn.)', color: '#27500A', data: compD.map(m => m.temp) },
+        { label: 'T rzecz. (rozlicz.)', color: '#185FA5', data: billD.map(m => m.temp) }
+      ], { title: 'Temperatury rzeczywiste — porównanie (°C)' });
+
+      // ── Wykres 4: Zużycie (przed/po) ──
+      drawBarChart('chart-consumption', ['Rozliczeniowe\n(po wdrożeniu)', 'Porównawcze\n(przed wdrożeniem)'], [
+        { label: 'Zmierzone', color: '#185FA5', data: [${p.billingConsumption||0}, ${p.comparisonConsumption||0}] },
+        { label: 'Skorygowane TYM', color: '#FAC775', data: [${r.billingCorrected}, ${r.comparisonCorrected}] }
+      ], { title: 'Zużycie energii: zmierzone vs skorygowane', decimals: 1 });
+
+      // ── Wykres 5: Oszczędność % i prognoza ──
+      drawBarChart('chart-savings', ['E_P skalowane\n(bez tech.)', 'E_R skor.\n(po wdrożeniu)', 'Oszczędność'], [
+        { label: 'Energia', color: '#27500A', data: [${r.comparisonCorrectedScaled}, ${r.billingCorrected}, ${r.savedEnergy}] }
+      ], { title: 'Bilans energetyczny okresu rozliczeniowego', decimals: 1 });
+
+      drawBarChart('chart-forecast', ['Bez technologii\n(bazowe)', 'Z technologią\n(prognoza)', 'Oszczędność\nroczna'], [
+        { label: 'Prognoza roczna', color: '#185FA5', data: [${r.forecastConsumptionWithout}, ${r.forecastConsumptionWith}, ${r.forecastSavedEnergy}] }
+      ], { title: 'Prognoza roczna', decimals: 1 });
+    }, 120);
+  })();
+  <\/script>
+  `;
 }
