@@ -968,6 +968,26 @@ function deleteObject(id) {
   editingObjectId = null;
   renderObjectsModule();
 }
+function copyClientAddress(btn) {
+  const form = btn.closest('form');
+  if (!form) return;
+  const clientId = Number(form.clientId && form.clientId.value);
+  if (!clientId) { alert('Najpierw wybierz klienta.'); return; }
+  const clients = getClients();
+  const client = clients.find(c => Number(c.id) === clientId);
+  if (!client) { alert('Nie znaleziono klienta.'); return; }
+  if (form.country) form.country.value = client.country || 'PL';
+  if (form.postalCode) form.postalCode.value = client.postalCode || '';
+  if (form.city) form.city.value = client.city || '';
+  if (form.street) form.street.value = client.street || '';
+  if (form.buildingNumber) form.buildingNumber.value = client.buildingNumber || '';
+  if (form.apartmentNumber) form.apartmentNumber.value = client.apartmentNumber || '';
+  if (form.googleMapsUrl && client.googleMapsUrl) form.googleMapsUrl.value = client.googleMapsUrl;
+  btn.textContent = '✅ Skopiowano!';
+  btn.style.background = '#E6F5EC';
+  setTimeout(() => { btn.textContent = '📋 Kopiuj adres klienta'; btn.style.background = 'white'; }, 2000);
+}
+
 function renderObjectsModule() {
   const container = document.getElementById("module-content");
   if (!container) return;
@@ -1235,6 +1255,7 @@ function renderObjectsModule() {
           <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
             <span style="font-size:18px;">📍</span>
             <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres obiektu</h3>
+            <button type="button" onclick="copyClientAddress(this)" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #1A6B3C;border-radius:6px;background:white;color:#1A6B3C;cursor:pointer;white-space:nowrap;">📋 Kopiuj adres klienta</button>
           </div>
           <div class="obj-body">
             <div class="obj-grid3">
