@@ -968,6 +968,64 @@ function deleteObject(id) {
   editingObjectId = null;
   renderObjectsModule();
 }
+function copyPeriodFromProtocol(type) {
+  const allObjProtocols = MeasurementsModule.findByObject(selectedMeasurementObjectId)
+    .filter(p => !editingMeasurementId || Number(p.id) !== Number(editingMeasurementId))
+    .sort((a,b) => (b.protocolDate||'').localeCompare(a.protocolDate||''));
+  const prev = allObjProtocols[0];
+  if (!prev) { alert('Brak poprzedniego protokołu do skopiowania.'); return; }
+
+  if (type === 'comparison') {
+    // Copy comparison period dates + readings + monthly data
+    const sd = document.querySelector('[name="comparisonPeriodStartDate"]');
+    const ed = document.querySelector('[name="comparisonPeriodEndDate"]');
+    const sr = document.querySelector('[name="comparisonPeriodStartReading"]');
+    const er = document.querySelector('[name="comparisonPeriodEndReading"]');
+    if (sd) sd.value = prev.comparisonPeriodStartDate || '';
+    if (ed) ed.value = prev.comparisonPeriodEndDate || '';
+    if (sr) sr.value = prev.comparisonPeriodStartReading !== undefined ? prev.comparisonPeriodStartReading : '';
+    if (er) er.value = prev.comparisonPeriodEndReading !== undefined ? prev.comparisonPeriodEndReading : '';
+    refreshPeriodTable('comparison');
+    // Restore monthly temps + days after refreshPeriodTable rebuilds rows
+    setTimeout(() => {
+      (prev.comparisonMonthly || []).forEach(m => {
+        const key = `${m.year}-${m.month}`;
+        const tr = document.querySelector(`#comparison-months-tbody tr[data-key="${key}"]`);
+        if (!tr) return;
+        const tInput = tr.querySelector('input.month-temp');
+        const dInput = tr.querySelector('input.month-days');
+        if (tInput && m.temperature !== null && m.temperature !== undefined) tInput.value = m.temperature;
+        if (dInput && m.days !== undefined) dInput.value = m.days;
+      });
+      refreshPeriodHDD('comparison');
+      refreshConsumption('comparison');
+      // Flash button
+      const btn = document.querySelector('[onclick="copyPeriodFromProtocol('comparison')"]');
+      if (btn) { btn.textContent = '✅ Skopiowano!'; btn.style.background = '#EAF3DE'; setTimeout(() => { btn.textContent = '📋 Kopiuj z poprzedniego protokołu'; btn.style.background = 'white'; }, 2000); }
+    }, 50);
+
+  } else if (type === 'tym') {
+    // Copy TYM data
+    const tymSrc = document.querySelector('[name="tymPeriodStart"]');
+    const tymEnd = document.querySelector('[name="tymPeriodEnd"]');
+    const tymDS  = document.querySelector('[name="tymDataSource"]');
+    if (tymSrc) tymSrc.value = prev.tymPeriodStart || '';
+    if (tymEnd) tymEnd.value = prev.tymPeriodEnd || '';
+    if (tymDS)  tymDS.value  = prev.tymDataSource || '';
+    (prev.tymMonthly || []).forEach(m => {
+      const tInput = document.querySelector(`[name="tymTemp_${m.month}"]`);
+      const dInput = document.querySelector(`[name="tymDays_${m.month}"]`);
+      const temp = m.tymTemperature !== undefined ? m.tymTemperature : m.temperature;
+      const days = m.tymDays !== undefined ? m.tymDays : m.days;
+      if (tInput && temp !== null && temp !== undefined) tInput.value = temp;
+      if (dInput && days !== undefined) dInput.value = days;
+    });
+    refreshTymHDD();
+    const btn = document.querySelector('[onclick="copyPeriodFromProtocol('tym')"]');
+    if (btn) { btn.textContent = '✅ Skopiowano!'; btn.style.background = '#FAEEDA'; setTimeout(() => { btn.textContent = '📋 Kopiuj TYM z poprzedniego protokołu'; btn.style.background = 'white'; }, 2000); }
+  }
+}
+
 function copyClientAddress(btn) {
   const form = btn.closest('form');
   if (!form) return;
@@ -2629,6 +2687,17 @@ function refreshPeriodHDD(prefix) {
   });
 
   if (hddEl) hddEl.textContent = total.toFixed(2);
+
+  // Sum of days
+  const daysEl = document.getElementById(`${prefix}-days-display`);
+  if (daysEl) {
+    let totalDays = 0;
+    tbody.querySelectorAll('tr[data-key]').forEach(tr => {
+      const dInput = tr.querySelector('input.month-days');
+      if (dInput) totalDays += Number(dInput.value || 0);
+    });
+    daysEl.textContent = totalDays;
+  }
 }
 
 function refreshConsumption(prefix) {
@@ -2666,6 +2735,17 @@ function refreshTymHDD() {
     if (hddCell) hddCell.textContent = hdd.toFixed(1);
   }
   if (hddEl) hddEl.textContent = total.toFixed(2);
+
+  // Sum of TYM days
+  const tymDaysEl = document.getElementById('tym-days-display');
+  if (tymDaysEl) {
+    let totalDays = 0;
+    for (let m = 1; m <= 12; m++) {
+      const dInput = document.querySelector(`[name="tymDays_${m}"]`);
+      if (dInput) totalDays += Number(dInput.value || 0);
+    }
+    tymDaysEl.textContent = totalDays;
+  }
 }
 
 // ─── Odczytanie danych tabelek z formularza ───────────────────────────────────
@@ -2716,6 +2796,12 @@ function renderMeasurementsModule() {
   const objectsForClient = ObjectsModule.findByClient(selectedClientId);
   selectedMeasurementObjectId = Number(selectedObject.id);
   const currentYear = new Date().getFullYear();
+
+  // For copy button: find most recent existing protocol for this object (not the one being edited)
+  const allObjProtocols = MeasurementsModule.findByObject(selectedMeasurementObjectId)
+    .filter(p => !editingMeasurementId || Number(p.id) !== Number(editingMeasurementId))
+    .sort((a,b) => (b.protocolDate||'').localeCompare(a.protocolDate||''));
+  const prevProtocol = allObjProtocols[0] || null;
 
   const secStyle = (bg, border) =>
     `border:1px solid ${border};border-radius:10px;margin-bottom:20px;overflow:hidden;`;
@@ -2904,11 +2990,11 @@ function renderMeasurementsModule() {
           </div>
           <div class="tym-field">
             <label>Cena energii (za jednostkę)</label>
-            <input name="energyPrice" type="number" step="0.01" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.00" style="width:100%;box-sizing:border-box;" />
+            <input name="energyPrice" type="number" step="0.001" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.000" style="width:100%;box-sizing:border-box;" />
           </div>
           <div class="tym-field">
             <label>Udział WaterAI / ESCO (%)</label>
-            <input name="waterAiShare" type="number" step="0.01" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
+            <input name="waterAiShare" type="number" step="0.001" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
           </div>
         </div>
       </div>
@@ -2962,6 +3048,9 @@ function renderMeasurementsModule() {
           <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">
             ⚡ Zużycie: <strong id="billing-consumption-display">—</strong>
           </span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">
+            📅 Łącznie: <strong id="billing-days-display">—</strong> dni
+          </span>
         </div>
       </div>
     </div>
@@ -2972,6 +3061,7 @@ function renderMeasurementsModule() {
         <span style="font-size:18px;color:#3B6D11;">📊</span>
         <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy</h3>
         <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy</span>
+        ${prevProtocol ? `<button type="button" onclick="copyPeriodFromProtocol('comparison')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #27500A;border-radius:6px;background:white;color:#27500A;cursor:pointer;white-space:nowrap;">📋 Kopiuj z poprzedniego protokołu</button>` : ''}
       </div>
       <div class="tym-body">
         <div class="tym-grid4">
@@ -3014,6 +3104,9 @@ function renderMeasurementsModule() {
           <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#EAF3DE;color:#27500A;">
             ⚡ Zużycie: <strong id="comparison-consumption-display">—</strong>
           </span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#EAF3DE;color:#27500A;">
+            📅 Łącznie: <strong id="comparison-days-display">—</strong> dni
+          </span>
         </div>
       </div>
     </div>
@@ -3024,6 +3117,7 @@ function renderMeasurementsModule() {
         <span style="font-size:18px;color:#854F0B;">❄️</span>
         <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Typowy rok meteorologiczny (TYM)</h3>
         <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FAC775;color:#633806;">długoletni</span>
+        ${prevProtocol ? `<button type="button" onclick="copyPeriodFromProtocol('tym')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;white-space:nowrap;">📋 Kopiuj TYM z poprzedniego protokołu</button>` : ''}
       </div>
       <div class="tym-body">
         <div class="tym-grid4">
@@ -3053,6 +3147,9 @@ function renderMeasurementsModule() {
         <div class="tym-summary">
           <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#FAC775;color:#633806;">
             🔥 HDD TYM: <strong id="tym-hdd-display">—</strong>
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#FAEEDA;color:#633806;">
+            📅 Łącznie: <strong id="tym-days-display">—</strong> dni
           </span>
         </div>
       </div>
