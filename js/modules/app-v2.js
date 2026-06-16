@@ -237,8 +237,34 @@ function renderInvoicingModule() {
   if (!container) return;
 
   const clients = ClientsModule.getAll();
-  const allInvoices = InvoicingModule.getAll().sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+  const allInvoices = InvoicingModule.getAll();
   const dash = InvoicingModule.getDashboard();
+
+  const q = (window._invSearch || '').toLowerCase();
+  const sort = window._invSort || 'date_desc';
+
+  let invoices = allInvoices.filter(inv => !q ||
+    (inv.invoiceNumber||'').toLowerCase().includes(q) ||
+    ((ClientsModule.find(inv.clientId)||{}).name||'').toLowerCase().includes(q) ||
+    ((inv.objectId && (ObjectsModule.find(inv.objectId)||{}).name)||'').toLowerCase().includes(q) ||
+    (inv.status||'').toLowerCase().includes(q)
+  );
+  invoices = [...invoices].sort((a,b) => {
+    if (sort === 'date_desc') return (b.issueDate||'').localeCompare(a.issueDate||'');
+    if (sort === 'date_asc')  return (a.issueDate||'').localeCompare(b.issueDate||'');
+    if (sort === 'due_asc')   return (a.dueDate||'').localeCompare(b.dueDate||'');
+    if (sort === 'due_desc')  return (b.dueDate||'').localeCompare(a.dueDate||'');
+    if (sort === 'client_asc') return ((ClientsModule.find(a.clientId)||{}).name||'').localeCompare((ClientsModule.find(b.clientId)||{}).name||'');
+    if (sort === 'amount_desc') return (b.grossAmount||0) - (a.grossAmount||0);
+    return 0;
+  });
+
+  const thS = (col, label, align) => {
+    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
+    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 12px;text-align:${align||'left'};font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+      onclick="window._invSort='${next}';renderInvoicingModule();">${label}${arrow}</th>`;
+  };
 
   const statusHtml = (status) => {
     const s = InvoicingModule.STATUSES[status] || { label: status, color: '#666', bg: '#eee' };
@@ -247,10 +273,10 @@ function renderInvoicingModule() {
 
   const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
-  const invoiceRows = allInvoices.map(inv => {
+  const invoiceRows = invoices.map(inv => {
     const client = ClientsModule.find(inv.clientId);
     const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
-    return `<tr>
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber)}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
@@ -260,9 +286,7 @@ function renderInvoicingModule() {
       <td style="padding:9px 12px;">${statusHtml(inv.status)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          ${inv.status !== 'PAID' ? `
-            <button class="small-button" onclick="markInvoicePaid(${inv.id})" style="background:#27500A;color:#fff;border-color:#27500A;">✓ Opłacona</button>
-          ` : ''}
+          ${inv.status !== 'PAID' ? `<button class="small-button" onclick="markInvoicePaid(${inv.id})" style="background:#27500A;color:#fff;border-color:#27500A;">✓ Opłacona</button>` : ''}
           <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}">🗑</button>
         </div>
       </td>
@@ -270,7 +294,6 @@ function renderInvoicingModule() {
   }).join('');
 
   container.innerHTML = `
-    <!-- DASHBOARD NALEŻNOŚCI -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
       <div style="padding:16px;border-radius:12px;background:#E6F1FB;border:1px solid #B5D4F4;text-align:center;">
         <div style="font-size:11px;color:#0C447C;font-weight:600;margin-bottom:4px;">WYSTAWIONE</div>
@@ -290,99 +313,51 @@ function renderInvoicingModule() {
       </div>
     </div>
 
-    <!-- FORMULARZ NOWEJ FAKTURY -->
     <div id="inv-form-area" style="display:none;border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h4 style="margin:0;font-size:15px;color:#0C447C;">Nowa faktura</h4>
         <button class="small-button" onclick="document.getElementById('inv-form-area').style.display='none'">✕</button>
       </div>
       <div class="calendar-form">
-        <div>
-          <label>Klient</label>
-          <select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select>
-        </div>
-        <div>
-          <label>Obiekt (opcjonalnie)</label>
-          <select id="inv-object"><option value="">— ogólnie —</option></select>
-        </div>
-        <div>
-          <label>Typ faktury</label>
-          <select id="inv-type">
-            ${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <label>Numer faktury</label>
-          <input id="inv-number" placeholder="FV/2026/001" />
-        </div>
-        <div>
-          <label>Data wystawienia</label>
-          <input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" />
-        </div>
-        <div>
-          <label>Termin płatności</label>
-          <input id="inv-due-date" type="date" />
-        </div>
-        <div>
-          <label>Kwota netto</label>
-          <input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" />
-        </div>
-        <div>
-          <label>VAT (%)</label>
-          <select id="inv-vat">
-            <option value="23">23%</option>
-            <option value="8">8%</option>
-            <option value="0">0%</option>
-          </select>
-        </div>
-        <div>
-          <label>Waluta</label>
-          <select id="inv-currency">
-            <option value="PLN">PLN</option>
-            <option value="EUR">EUR</option>
-            <option value="CZK">CZK</option>
-          </select>
-        </div>
-        <div>
-          <label>Status</label>
-          <select id="inv-status">
-            ${Object.entries(InvoicingModule.STATUSES).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}
-          </select>
-        </div>
-        <div style="grid-column:1/-1;">
-          <label>Uwagi</label>
-          <input id="inv-notes" placeholder="opcjonalne uwagi" />
-        </div>
-        <div style="grid-column:1/-1;">
-          <button class="primary-button" type="button" onclick="saveInvoice()" style="width:auto;padding:10px 24px;margin:0;">Zapisz fakturę</button>
-        </div>
+        <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
+        <div><label>Obiekt (opcjonalnie)</label><select id="inv-object"><option value="">— ogólnie —</option></select></div>
+        <div><label>Typ faktury</label><select id="inv-type">${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
+        <div><label>Numer faktury</label><input id="inv-number" placeholder="FV/2026/001" /></div>
+        <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
+        <div><label>Termin płatności</label><input id="inv-due-date" type="date" /></div>
+        <div><label>Kwota netto</label><input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" /></div>
+        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="8">8%</option><option value="0">0%</option></select></div>
+        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option></select></div>
+        <div><label>Status</label><select id="inv-status">${Object.entries(InvoicingModule.STATUSES).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
+        <div style="grid-column:1/-1;"><label>Uwagi</label><input id="inv-notes" placeholder="opcjonalne uwagi" /></div>
+        <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveInvoice()" style="width:auto;padding:10px 24px;margin:0;">Zapisz fakturę</button></div>
       </div>
     </div>
 
-    <!-- TABELA FAKTUR -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <h3 style="margin:0;font-size:15px;font-weight:500;">Faktury (${allInvoices.length})</h3>
-      <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('inv-form-area').style.display='block'">
-        + Nowa faktura
-      </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;">Faktury (${invoices.length}${q ? ' z '+allInvoices.length : ''})</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="search" placeholder="Szukaj faktury..." value="${escapeHtml(q)}"
+          oninput="window._invSearch=this.value;renderInvoicingModule();"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;" onclick="document.getElementById('inv-form-area').style.display='block'">+ Nowa faktura</button>
+      </div>
     </div>
 
-    ${allInvoices.length === 0
-      ? `<div class="reminder-card"><strong>Brak faktur</strong><div class="reminder-meta">Dodaj pierwszą fakturę klikając "Nowa faktura".</div></div>`
+    ${invoices.length === 0
+      ? `<div class="reminder-card"><strong>${q ? 'Brak wyników' : 'Brak faktur'}</strong><div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Dodaj pierwszą fakturę.'}</div></div>`
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-              <tr style="background:var(--color-background-secondary);">
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data wystawienia</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Termin płatności</th>
-                <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Brutto</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-              </tr>
-            </thead>
+            <thead><tr style="background:var(--color-background-secondary);">
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
+              ${thS('client','Klient')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
+              ${thS('date','Data wyst.')}
+              ${thS('due','Termin płat.')}
+              ${thS('amount','Brutto','right')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+              <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+            </tr></thead>
             <tbody>${invoiceRows}</tbody>
           </table>
         </div>`
@@ -756,12 +731,37 @@ function renderAnalysesModule() {
     .map(([k, v]) => `<option value="${k}">${v.icon} ${v.label}</option>`)
     .join('');
 
-  const rows = allAnalyses.map(a => {
+  const q = (window._analSearch || '').toLowerCase();
+  const sort = window._analSort || 'date_desc';
+
+  let filtered = allAnalyses.filter(a => !q ||
+    (a.name||'').toLowerCase().includes(q) ||
+    ((ClientsModule.find(a.clientId)||{}).name||'').toLowerCase().includes(q) ||
+    ((ObjectsModule.find(a.objectId)||{}).name||'').toLowerCase().includes(q) ||
+    (a.author||'').toLowerCase().includes(q) ||
+    ((AnalysesModule.TYPES[a.analysisType]||{}).label||'').toLowerCase().includes(q)
+  );
+  filtered = [...filtered].sort((a,b) => {
+    if (sort === 'date_desc') return (b.executedAt||'').localeCompare(a.executedAt||'');
+    if (sort === 'date_asc')  return (a.executedAt||'').localeCompare(b.executedAt||'');
+    if (sort === 'client_asc') return ((ClientsModule.find(a.clientId)||{}).name||'').localeCompare((ClientsModule.find(b.clientId)||{}).name||'');
+    if (sort === 'name_asc')  return (a.name||'').localeCompare(b.name||'');
+    return 0;
+  });
+
+  const thA = (col, label) => {
+    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
+    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+      onclick="window._analSort='${next}';renderAnalysesModule();">${label}${arrow}</th>`;
+  };
+
+  const rows = filtered.map(a => {
     const client = ClientsModule.find(a.clientId);
     const obj = ObjectsModule.find(a.objectId);
     const type = AnalysesModule.TYPES[a.analysisType] || { icon: '🔬', label: a.analysisType };
     const status = AnalysesModule.STATUSES[a.status] || { label: a.status, color: '#666' };
-    return `<tr>
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(a.name)}</td>
       <td style="padding:9px 12px;font-size:13px;">${type.icon} ${type.label}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
@@ -770,9 +770,7 @@ function renderAnalysesModule() {
       <td style="padding:9px 12px;">${statusBadge(status.label, status.color, status.color + '22')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(a.author)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
-        <div style="display:flex;gap:4px;">
-          <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}">🗑</button>
-        </div>
+        <button class="small-button" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -832,29 +830,32 @@ function renderAnalysesModule() {
     </div>
 
     <!-- TABELA -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <h3 style="margin:0;font-size:15px;font-weight:500;">Analizy (${allAnalyses.length})</h3>
-      <button class="primary-button" style="font-size:13px;padding:8px 16px;" onclick="document.getElementById('anal-form-area').style.display='block';updateAnalObjects(document.getElementById('anal-client').value||'${firstClientId}')">
-        + Nowa analiza
-      </button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;">Analizy (${filtered.length}${q ? ' z '+allAnalyses.length : ''})</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="search" placeholder="Szukaj analizy..." value="${escapeHtml(q)}"
+          oninput="window._analSearch=this.value;renderAnalysesModule();"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;" onclick="document.getElementById('anal-form-area').style.display='block';updateAnalObjects(document.getElementById('anal-client').value||'${firstClientId}')">
+          + Nowa analiza
+        </button>
+      </div>
     </div>
 
-    ${allAnalyses.length === 0
-      ? `<div class="reminder-card"><strong>Brak analiz</strong><div class="reminder-meta">Dodaj pierwszą analizę klikając „+ Nowa analiza". Na podstawie analiz tworzone są następnie Raporty ESCO.</div></div>`
+    ${filtered.length === 0
+      ? `<div class="reminder-card"><strong>${q ? 'Brak wyników' : 'Brak analiz'}</strong><div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Dodaj pierwszą analizę klikając „+ Nowa analiza". Na podstawie analiz tworzone są następnie Raporty ESCO.'}</div></div>`
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-              <tr style="background:var(--color-background-secondary);">
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Autor</th>
-                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-              </tr>
-            </thead>
+            <thead><tr style="background:var(--color-background-secondary);">
+              ${thA('name','Nazwa')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ</th>
+              ${thA('client','Klient')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
+              ${thA('date','Data')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Autor</th>
+              <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+            </tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`

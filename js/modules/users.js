@@ -100,6 +100,32 @@ function renderUsersModule() {
     ? allUsers
     : allUsers.filter(u => u.role === usersActiveRole);
 
+  const q = (window._usrSearch || '').toLowerCase();
+  const sort = window._usrSort || 'name_asc';
+
+  let display = filtered.filter(u => !q ||
+    (u.firstName+' '+u.lastName).toLowerCase().includes(q) ||
+    (u.email||'').toLowerCase().includes(q) ||
+    (u.phone||'').toLowerCase().includes(q) ||
+    ((ClientsModule && u.clientId ? (ClientsModule.find(u.clientId)||{}).name : '')||'').toLowerCase().includes(q)
+  );
+  display = [...display].sort((a,b) => {
+    const na = (a.firstName+' '+a.lastName).toLowerCase();
+    const nb = (b.firstName+' '+b.lastName).toLowerCase();
+    if (sort === 'name_asc')  return na.localeCompare(nb);
+    if (sort === 'name_desc') return nb.localeCompare(na);
+    if (sort === 'role_asc')  return (a.role||'').localeCompare(b.role||'');
+    if (sort === 'status_asc') return (a.status||'').localeCompare(b.status||'');
+    return 0;
+  });
+
+  const thU = (col, label) => {
+    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
+    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+      onclick="window._usrSort='${next}';renderUsersModule();">${label}${arrow}</th>`;
+  };
+
   const roleCounts = {};
   Object.keys(UsersModule.ROLES).forEach(r => {
     roleCounts[r] = allUsers.filter(u => u.role === r).length;
@@ -213,61 +239,62 @@ function renderUsersModule() {
   </div>` : '';
 
   // Users table
-  const rows = filtered.map(u => {
-    const r = UsersModule.ROLES[u.role] || { icon: '👤', label: u.role, color: '#666', bg: '#f5f5f5' };
-    const s = UsersModule.STATUS_LABELS[u.status] || { label: u.status, color: '#666', bg: '#f5f5f5' };
-    const client = u.clientId ? (ClientsModule.find(u.clientId) || {}).name || '—' : '—';
-    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:10px 12px;">
-        <div style="font-size:13px;font-weight:500;">${escapeHtml(u.firstName)} ${escapeHtml(u.lastName)}</div>
-        <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(u.email)}</div>
-      </td>
-      <td style="padding:10px 12px;">
-        <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;background:${r.bg};color:${r.color};">
-          ${r.icon} ${r.label}
-        </span>
-      </td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(u.phone || '—')}</td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client)}</td>
-      <td style="padding:10px 12px;">
-        <span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
-      </td>
-      <td style="padding:10px 12px;white-space:nowrap;">
-        <button class="small-button" onclick="editUser(${u.id})">Edytuj</button>
-        <button class="small-button" onclick="if(confirm('Usuń konto ${escapeHtml(u.firstName)} ${escapeHtml(u.lastName)}?')){UsersModule.remove(${u.id});renderUsersModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
-      </td>
-    </tr>`;
-  }).join('');
-
   const tableHtml = `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
     <h3 style="margin:0;font-size:15px;font-weight:500;">
       ${usersActiveRole === 'all' ? 'Wszyscy użytkownicy' : (UsersModule.ROLES[usersActiveRole]||{}).label || ''}
-      <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${filtered.length})</span>
+      <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${display.length}${q ? ' z '+filtered.length : ''})</span>
     </h3>
-    <button class="primary-button" style="font-size:13px;padding:8px 16px;"
-      onclick="showUserForm=true;editingUserId=null;renderUsersModule();">
-      + Nowe konto
-    </button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="search" placeholder="Szukaj użytkownika..." value="${(window._usrSearch||'').replace(/"/g,'&quot;')}"
+        oninput="window._usrSearch=this.value;renderUsersModule();"
+        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+      <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;"
+        onclick="showUserForm=true;editingUserId=null;renderUsersModule();">
+        + Nowe konto
+      </button>
+    </div>
   </div>
-  ${filtered.length === 0 ? `
+  ${display.length === 0 ? `
     <div class="reminder-card">
-      <strong>Brak użytkowników</strong>
-      <div class="reminder-meta">Kliknij „+ Nowe konto" aby dodać pierwszego użytkownika.</div>
+      <strong>${q ? 'Brak wyników wyszukiwania' : 'Brak użytkowników'}</strong>
+      <div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Kliknij „+ Nowe konto" aby dodać pierwszego użytkownika.'}</div>
     </div>` : `
   <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
     <table style="width:100%;border-collapse:collapse;">
       <thead>
         <tr style="background:var(--color-background-secondary);">
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Użytkownik</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Rola</th>
+          ${thU('name','Użytkownik')}
+          ${thU('role','Rola')}
           <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Telefon</th>
           <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+          ${thU('status','Status')}
           <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
         </tr>
       </thead>
-      <tbody>${rows}</tbody>
+      <tbody>${display.map(u => {
+        const r = UsersModule.ROLES[u.role] || { icon: '👤', label: u.role, color: '#666', bg: '#f5f5f5' };
+        const s = UsersModule.STATUS_LABELS[u.status] || { label: u.status, color: '#666', bg: '#f5f5f5' };
+        const client = u.clientId ? ((typeof ClientsModule !== 'undefined' && ClientsModule.find(u.clientId)) || {}).name || '—' : '—';
+        return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+          <td style="padding:10px 12px;">
+            <div style="font-size:13px;font-weight:500;">${escapeHtml(u.firstName)} ${escapeHtml(u.lastName)}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(u.email)}</div>
+          </td>
+          <td style="padding:10px 12px;">
+            <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span>
+          </td>
+          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(u.phone || '—')}</td>
+          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client)}</td>
+          <td style="padding:10px 12px;">
+            <span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
+          </td>
+          <td style="padding:10px 12px;white-space:nowrap;">
+            <button class="small-button" onclick="editUser(${u.id})">Edytuj</button>
+            <button class="small-button" onclick="if(confirm('Usuń konto?')){UsersModule.remove(${u.id});renderUsersModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
     </table>
   </div>`}`;
 

@@ -306,11 +306,32 @@ function renderClientsList() {
   const container = document.getElementById("clients-list");
   if (!container) return;
 
-  const clients = getClients();
+  const allClients = getClients();
+  const q = (window._cliSearch || '').toLowerCase();
+  const sort = window._cliSort || 'name_asc';
   const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny", AT:"Austria", GB:"W. Brytania" };
 
+  let clients = allClients.filter(c => !q ||
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.vatId||'').toLowerCase().includes(q) ||
+    (c.city||'').toLowerCase().includes(q)
+  );
+  clients = [...clients].sort((a,b) => {
+    if (sort === 'name_asc')  return (a.name||'').localeCompare(b.name||'');
+    if (sort === 'name_desc') return (b.name||'').localeCompare(a.name||'');
+    if (sort === 'city_asc')  return (a.city||'').localeCompare(b.city||'');
+    if (sort === 'city_desc') return (b.city||'').localeCompare(a.city||'');
+    return 0;
+  });
+
+  const thS = (col, label) => {
+    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
+    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
+    return `<th class="cli-table th" style="cursor:pointer;" onclick="window._cliSort='${next}';renderClientsList();">${label}${arrow}</th>`;
+  };
+
   const tableRows = clients.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak klientów — dodaj pierwszego poniżej.</td></tr>`
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${q ? 'Brak wyników wyszukiwania.' : 'Brak klientów — dodaj pierwszego poniżej.'}</td></tr>`
     : clients.map(client => {
         const objCount = ObjectsModule.findByClient(client.id).length;
         return `<tr>
@@ -339,18 +360,21 @@ function renderClientsList() {
 
   container.innerHTML = `
     <!-- TABELA KLIENTÓW -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-        Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length})</span>
+        Klienci <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${clients.length}${q ? ' z '+allClients.length : ''})</span>
       </h3>
+      <input type="search" placeholder="Szukaj klienta..." value="${escapeHtml(window._cliSearch||'')}"
+        oninput="window._cliSearch=this.value;renderClientsList();"
+        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:220px;" />
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
       <table class="cli-table">
         <thead>
           <tr>
-            <th>Nazwa klienta</th>
+            ${thS('name','Nazwa klienta')}
             <th>VAT ID</th>
-            <th>Kraj</th>
+            ${thS('city','Kraj/Miasto')}
             <th>Akcje</th>
           </tr>
         </thead>
@@ -922,12 +946,36 @@ function renderObjectsModule() {
   const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
   const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
-  const tableRows = allObjects.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak obiektów — dodaj pierwszy poniżej.</td></tr>`
-    : allObjects.map(obj => {
+  const qObj = (window._objSearch || '').toLowerCase();
+  const sortObj = window._objSort || 'name_asc';
+
+  let displayObjects = allObjects.filter(obj => !qObj ||
+    (obj.name||'').toLowerCase().includes(qObj) ||
+    (getClientName(obj.clientId)||'').toLowerCase().includes(qObj) ||
+    (objTypeLabel[obj.objectType]||obj.objectType||'').toLowerCase().includes(qObj) ||
+    (objStatusLabel[obj.status]||'').toLowerCase().includes(qObj)
+  );
+  displayObjects = [...displayObjects].sort((a,b) => {
+    if (sortObj === 'name_asc')   return (a.name||'').localeCompare(b.name||'');
+    if (sortObj === 'name_desc')  return (b.name||'').localeCompare(a.name||'');
+    if (sortObj === 'client_asc') return (getClientName(a.clientId)||'').localeCompare(getClientName(b.clientId)||'');
+    if (sortObj === 'status_asc') return (a.status||'').localeCompare(b.status||'');
+    return 0;
+  });
+
+  const thObj = (col, label) => {
+    const next = sortObj === col+'_asc' ? col+'_desc' : col+'_asc';
+    const arrow = sortObj === col+'_asc' ? ' ↑' : sortObj === col+'_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+      onclick="window._objSort='${next}';renderObjectsModule();">${label}${arrow}</th>`;
+  };
+
+  const tableRows = displayObjects.length === 0
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${qObj ? 'Brak wyników wyszukiwania.' : 'Brak obiektów — dodaj pierwszy poniżej.'}</td></tr>`
+    : displayObjects.map(obj => {
         const statusColor = objStatusColor[obj.status] || "#666";
         const protCount = MeasurementsModule.findByObject(obj.id).length;
-        return `<tr>
+        return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
           <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
@@ -959,19 +1007,22 @@ function renderObjectsModule() {
     </style>
 
     <!-- TABELA OBIEKTÓW — zawsze widoczna -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-        Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${allObjects.length})</span>
+        Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${displayObjects.length}${qObj ? ' z '+allObjects.length : ''})</span>
       </h3>
+      <input type="search" placeholder="Szukaj obiektu..." value="${escapeHtml(window._objSearch||'')}"
+        oninput="window._objSearch=this.value;renderObjectsModule();"
+        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:220px;" />
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--color-background-secondary);">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa obiektu</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ obiektu</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa klienta</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+            ${thObj('name','Nazwa obiektu')}
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ</th>
+            ${thObj('client','Klient')}
+            ${thObj('status','Status')}
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
         </thead>
@@ -2888,59 +2939,91 @@ function renderMeasurementsModule() {
 
 function renderProtocolsTable(protocols, objectId) {
   const obj = objectId ? ObjectsModule.find(objectId) : null;
-  const unit = (obj && obj.energyUnit) || "GJ";
+
+  // Apply search filter
+  const q = (window._protSearch || '').toLowerCase();
+  const sort = window._protSort || 'date_desc';
+
+  let filtered = protocols.filter(item => {
+    if (!q) return true;
+    const client = ClientsModule.find(item.clientId);
+    const object = ObjectsModule.find(item.objectId);
+    return (
+      (item.protocolDate || '').includes(q) ||
+      ((client && client.name) || '').toLowerCase().includes(q) ||
+      ((object && object.name) || '').toLowerCase().includes(q) ||
+      (item.billingPeriodStartDate || '').includes(q) ||
+      (item.billingPeriodEndDate || '').includes(q)
+    );
+  });
+
+  // Sort
+  filtered = [...filtered].sort((a, b) => {
+    if (sort === 'date_desc') return (b.protocolDate || '').localeCompare(a.protocolDate || '');
+    if (sort === 'date_asc')  return (a.protocolDate || '').localeCompare(b.protocolDate || '');
+    if (sort === 'client')    return ((ClientsModule.find(a.clientId)||{}).name||'').localeCompare((ClientsModule.find(b.clientId)||{}).name||'');
+    if (sort === 'object')    return ((ObjectsModule.find(a.objectId)||{}).name||'').localeCompare((ObjectsModule.find(b.objectId)||{}).name||'');
+    return 0;
+  });
+
+  const thS = (col, label) => {
+    const active = sort === col + '_asc' || sort === col + '_desc';
+    const next = sort === col + '_asc' ? col + '_desc' : col + '_asc';
+    const arrow = sort === col + '_asc' ? ' ↑' : sort === col + '_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;user-select:none;white-space:nowrap;${active ? 'color:#0C447C;' : ''}"
+      onclick="window._protSort='${next}';renderMeasurementsModule();">${label}${arrow}</th>`;
+  };
 
   const headerHtml = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;margin-top:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:8px;gap:10px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
         Protokoły TYM
-        <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${protocols.length})</span>
+        <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${filtered.length}${q ? ' z ' + protocols.length : ''})</span>
       </h3>
-      <button class="primary-button" onclick="showMeasurementForm=true;editingMeasurementId=null;renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;">
-        + Dodaj protokół TYM
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="search" placeholder="Szukaj protokołu..." value="${escapeHtml(window._protSearch || '')}"
+          oninput="window._protSearch=this.value;renderMeasurementsModule();"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <button class="primary-button" onclick="showMeasurementForm=true;editingMeasurementId=null;renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;white-space:nowrap;">
+          + Dodaj protokół TYM
+        </button>
+      </div>
     </div>`;
 
-  if (protocols.length === 0) {
-    return headerHtml + `<div class="reminder-card"><strong>Brak protokołów TYM</strong>
-      <div class="reminder-meta">Kliknij "+ Dodaj protokół TYM" aby rozpocząć rozliczenie ESCO.</div>
+  if (filtered.length === 0) {
+    return headerHtml + `<div class="reminder-card"><strong>${q ? 'Brak wyników wyszukiwania' : 'Brak protokołów TYM'}</strong>
+      <div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Kliknij "+ Dodaj protokół TYM" aby rozpocząć rozliczenie ESCO.'}</div>
     </div>`;
   }
 
-  const fmt2 = v => Number(v || 0).toFixed(2);
-  const fmt3 = v => Number(v || 0).toFixed(3);
-
-  const rows = protocols.map(item => {
-    const u = item.energyUnit || unit;
-    return `<tr>
-      <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(item.protocolDate || "—")}</td>
-      <td style="padding:10px 12px;font-size:13px;">${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:right;">${fmt3(item.billingConsumption)} ${escapeHtml(u)}</td>
-      <td style="padding:10px 12px;font-size:13px;">${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:right;">${fmt3(item.comparisonConsumption)} ${escapeHtml(u)}</td>
-      <td style="padding:10px 12px;">
-        ${item.includeLinearRegression ? '<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:2px 7px;border-radius:10px;">📈 Regresja</span>' : ''}
-      </td>
-      <td style="padding:10px 12px;white-space:nowrap;">
-        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" style="white-space:nowrap;">Podgląd</button>
-        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
-        <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
-        <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
+  const rows = filtered.map(item => {
+    const client = ClientsModule.find(item.clientId);
+    const object = ObjectsModule.find(item.objectId);
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;white-space:nowrap;">${escapeHtml(item.protocolDate || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;">${escapeHtml((client && client.name) || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;">${escapeHtml((object && object.name) || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.billingPeriodStartDate || '')} → ${escapeHtml(item.billingPeriodEndDate || '')}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))">Podgląd</button>
+          <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport</button>
+          <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});">Edytuj</button>
+          <button class="small-button" onclick="deleteMeasurement(${item.id})" style="color:#c00;border-color:#c00;">Usuń</button>
+        </div>
       </td>
     </tr>`;
-  }).join("");
+  }).join('');
 
   return headerHtml + `
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--color-background-secondary);">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data protokołu</th>
+            ${thS('date', 'Data protokołu')}
+            ${thS('client', 'Klient')}
+            ${thS('object', 'Obiekt')}
             <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres rozliczeniowy</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie rozlicz.</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres porównawczy</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie porówn.</th>
-            <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Załączniki</th>
             <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
         </thead>
