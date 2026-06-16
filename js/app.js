@@ -641,6 +641,7 @@ function createObject(form) {
 
     backOfficeOwner: form.backOfficeOwner.value.trim(),
     energyAnalystOwner: form.energyAnalystOwner.value.trim(),
+    salesRepresentative: form.salesRepresentative ? form.salesRepresentative.value.trim() : "",
 
     // DANE KLIMATYCZNE TYM
     weatherStation: form.weatherStation ? form.weatherStation.value.trim() : "",
@@ -874,6 +875,7 @@ function editObject(id) {
 
   form.backOfficeOwner.value = object.backOfficeOwner || "";
   form.energyAnalystOwner.value = object.energyAnalystOwner || "";
+  if (form.salesRepresentative) form.salesRepresentative.value = object.salesRepresentative || "";
 
   if (form.weatherStation) form.weatherStation.value = object.weatherStation || "";
   if (form.weatherSource) form.weatherSource.value = object.weatherSource || "WeatherOnline / Robot Klimatu";
@@ -1031,12 +1033,16 @@ function renderObjectsModule() {
             </div>
             <div class="obj-grid2">
               <div class="obj-field">
-                <label>Opiekun Back Office</label>
+                <label>Back Office</label>
                 <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
               </div>
               <div class="obj-field">
-                <label>Opiekun Energy Analyst</label>
+                <label>Energy Analyst</label>
                 <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
+              </div>
+              <div class="obj-field">
+                <label>Sales Representative</label>
+                <input name="salesRepresentative" placeholder="np. Jan Nowak" />
               </div>
             </div>
           </div>
