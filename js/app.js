@@ -176,6 +176,99 @@ function addContactRow() {
   container.appendChild(row);
 }
 
+
+function viewClient(id) {
+  const client = ClientsModule.find(id);
+  if (!client) return;
+
+  const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny" };
+  const modelLabel = { ESCO:"ESCO", FLAT:"Abonament", PROJECT:"Projekt" };
+
+  const contacts = (client.contacts || []).map(c => `
+    <tr>
+      <td style="padding:6px 10px;font-size:13px;">${escapeHtml(c.name||"")}</td>
+      <td style="padding:6px 10px;font-size:13px;">${escapeHtml(c.role||"")}</td>
+      <td style="padding:6px 10px;font-size:13px;">${escapeHtml(c.email||"")}</td>
+      <td style="padding:6px 10px;font-size:13px;">${escapeHtml(c.phone||"")}</td>
+    </tr>`).join("");
+
+  const container = document.getElementById("module-content");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="max-width:720px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="margin:0;font-size:18px;font-weight:600;color:var(--color-text-primary);">
+          👤 ${escapeHtml(client.name)}
+        </h2>
+        <div style="display:flex;gap:8px;">
+          <button class="small-button" onclick="editClient(${client.id})">✏️ Edytuj</button>
+          <button class="small-button" onclick="openModule('clients')">← Wróć</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane podstawowe</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">NIP / VAT ID</div>
+          <div style="font-size:14px;margin-bottom:12px;">${escapeHtml(client.vatId||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Kraj</div>
+          <div style="font-size:14px;margin-bottom:12px;">${escapeHtml(countryLabel[client.country]||client.country||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Język</div>
+          <div style="font-size:14px;">${escapeHtml(client.language||"—")}</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Adres</div>
+          <div style="font-size:14px;line-height:1.7;">
+            ${escapeHtml(client.street||"")} ${escapeHtml(client.buildingNumber||"")}${client.apartmentNumber?" / "+escapeHtml(client.apartmentNumber):""}<br/>
+            ${escapeHtml(client.postalCode||"")} ${escapeHtml(client.city||"")}<br/>
+            ${escapeHtml(countryLabel[client.country]||client.country||"")}
+          </div>
+          ${client.googleMapsUrl ? `<a href="${escapeHtml(client.googleMapsUrl)}" target="_blank" rel="noopener" style="font-size:12px;margin-top:8px;display:inline-block;">🗺️ Google Maps</a>` : ""}
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Rozliczenia</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Model rozliczenia</div>
+          <div style="font-size:14px;margin-bottom:12px;">${escapeHtml(modelLabel[client.settlementModel]||client.settlementModel||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Udział ESCO (%)</div>
+          <div style="font-size:14px;margin-bottom:12px;"><strong>${escapeHtml(String(client.escoShare||"—"))} %</strong></div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Termin płatności</div>
+          <div style="font-size:14px;">${escapeHtml(String(client.paymentDays||"—"))} dni</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Kontakt</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">E-mail do faktur</div>
+          <div style="font-size:14px;">${escapeHtml(client.invoiceEmail||"—")}</div>
+        </div>
+
+      </div>
+
+      ${contacts ? `
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Osoby kontaktowe</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+            <th style="text-align:left;padding:6px 10px;font-weight:500;color:var(--color-text-secondary);">Imię i nazwisko</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500;color:var(--color-text-secondary);">Rola</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500;color:var(--color-text-secondary);">E-mail</th>
+            <th style="text-align:left;padding:6px 10px;font-weight:500;color:var(--color-text-secondary);">Telefon</th>
+          </tr></thead>
+          <tbody>${contacts}</tbody>
+        </table>
+      </div>` : ""}
+
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="primary-button" onclick="openClientObjects(${client.id})">🏗️ Obiekty klienta</button>
+        <button class="small-button" onclick="editClient(${client.id})">✏️ Edytuj klienta</button>
+      </div>
+    </div>
+  `;
+}
+
 function showClientForm(editing) {
   const fc = document.getElementById("client-form-container");
   const cl = document.getElementById("clients-list");
@@ -228,6 +321,7 @@ function renderClientsList() {
             <button class="small-button" onclick="event.stopPropagation();openClientObjects(${client.id})" style="background:#185FA5;color:#fff;border-color:#185FA5;white-space:nowrap;">
               🏗️ Obiekty (${objCount})
             </button>
+            <button class="small-button" onclick="event.stopPropagation();viewClient(${client.id});openModule('clients')" style="white-space:nowrap;">Podgląd</button>
             <button class="small-button" onclick="event.stopPropagation();editClient(${client.id})" style="white-space:nowrap;">Edytuj</button>
             <button class="small-button" onclick="event.stopPropagation();deleteClient(${client.id})" style="white-space:nowrap;">Usuń</button>
           </td>
@@ -442,6 +536,144 @@ function createObject(form) {
   renderObjectsModule();
 }
 
+
+function viewObject(id) {
+  const obj = ObjectsModule.find(id);
+  if (!obj) return;
+
+  const client = ClientsModule.find(obj.clientId);
+  const protocols = MeasurementsModule.findByObject(id);
+
+  const objTypeLabel = {
+    HOTEL:"Hotel", SCHOOL:"Szkoła", KINDERGARTEN:"Przedszkole",
+    OFFICE:"Urząd/administracja", HOUSING_COMMUNITY:"Wspólnota mieszkaniowa",
+    COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
+    OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
+  };
+  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
+  const heatLabel = { NONE:"Brak", GAS:"Gaz", COAL:"Węgiel", OIL:"Olej", ELECTRIC:"Elektryczne", HEAT_PUMP:"Pompa ciepła", DISTRICT:"Ciepło sieciowe", OTHER:"Inne" };
+  const readingLabel = { INVOICE:"Faktura", METER:"Licznik", SUBSTATION:"Węzeł cieplny" };
+
+  const statusColor = objStatusColor[obj.status] || "#666";
+  const fmt2 = v => Number(v||0).toFixed(2);
+
+  const protRows = protocols.map(p => {
+    const r = p.escoResults || calcESCOResults(p);
+    return `<tr>
+      <td style="padding:7px 10px;font-size:13px;">${escapeHtml(p.protocolDate||"—")}</td>
+      <td style="padding:7px 10px;font-size:13px;">${escapeHtml(p.billingPeriodStartDate||"")} → ${escapeHtml(p.billingPeriodEndDate||"")}</td>
+      <td style="padding:7px 10px;font-size:13px;text-align:right;">${Number(p.billingConsumption||0).toFixed(3)} ${escapeHtml(p.energyUnit||"")}</td>
+      <td style="padding:7px 10px;font-size:13px;text-align:right;color:${r.savedEnergyPct>=0?"#27500A":"#c00"};">
+        ${fmt2(r.savedEnergyPct)} %
+      </td>
+      <td style="padding:7px 10px;white-space:nowrap;">
+        <button class="small-button" onclick="viewProtocol(${p.id})">Podgląd</button>
+        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">Edytuj</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  const container = document.getElementById("module-content");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="max-width:720px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">
+            ${escapeHtml(client ? client.name : "")}
+          </div>
+          <h2 style="margin:0;font-size:18px;font-weight:600;color:var(--color-text-primary);">
+            🏗️ ${escapeHtml(obj.name||"—")}
+            <span style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:20px;background:${statusColor}22;color:${statusColor};margin-left:8px;">
+              ${escapeHtml(objStatusLabel[obj.status]||obj.status||"")}
+            </span>
+          </h2>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="small-button" onclick="showObjectForm=true;editingObjectId=null;editObject(${obj.id})">✏️ Edytuj</button>
+          <button class="small-button" onclick="openModule('objects')">← Wróć</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Lokalizacja</div>
+          <div style="font-size:14px;line-height:1.7;">
+            ${escapeHtml(obj.street||"")} ${escapeHtml(obj.buildingNumber||"")}${obj.apartmentNumber?" / "+escapeHtml(obj.apartmentNumber):""}<br/>
+            ${escapeHtml(obj.postalCode||"")} ${escapeHtml(obj.city||"")}
+          </div>
+          ${obj.googleMapsUrl ? `<a href="${escapeHtml(obj.googleMapsUrl)}" target="_blank" rel="noopener" style="font-size:12px;margin-top:8px;display:inline-block;">🗺️ Google Maps</a>` : ""}
+          <div style="margin-top:12px;font-size:13px;color:var(--color-text-secondary);">Typ obiektu</div>
+          <div style="font-size:14px;">${escapeHtml(objTypeLabel[obj.objectType]||obj.objectType||"—")}</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Ogrzewanie</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Źródło CO</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(heatLabel[obj.heatingSourceCO]||obj.heatingSourceCO||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Źródło CWU</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(heatLabel[obj.heatingSourceCWU]||obj.heatingSourceCWU||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Odczyt zużycia</div>
+          <div style="font-size:14px;">${escapeHtml(readingLabel[obj.heatConsumptionReading]||obj.heatConsumptionReading||"—")}</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane klimatyczne</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Stacja meteo</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(obj.weatherStation||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Źródło danych</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(obj.weatherSource||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Temperatura bazowa</div>
+          <div style="font-size:14px;">${escapeHtml(String(obj.baseTemperature??21))} °C</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane energetyczne</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Jednostka energii</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(obj.energyUnit||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Waluta</div>
+          <div style="font-size:14px;margin-bottom:10px;">${escapeHtml(obj.currency||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Cena energii</div>
+          <div style="font-size:14px;">${escapeHtml(String(obj.energyPrice||"—"))} ${escapeHtml(obj.currency||"")}</div>
+        </div>
+
+      </div>
+
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;">
+            Protokoły TYM (${protocols.length})
+          </div>
+          <button class="primary-button" style="font-size:12px;padding:5px 12px;" onclick="openObjectMeasurements(${obj.id})">
+            + Dodaj protokół
+          </button>
+        </div>
+        ${protocols.length === 0
+          ? `<div style="font-size:13px;color:var(--color-text-secondary);">Brak protokołów dla tego obiektu.</div>`
+          : `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+                <th style="text-align:left;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Data protokołu</th>
+                <th style="text-align:left;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Okres rozliczeniowy</th>
+                <th style="text-align:right;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Zużycie</th>
+                <th style="text-align:right;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Oszczędność</th>
+                <th style="padding:7px 10px;"></th>
+              </tr></thead>
+              <tbody>${protRows}</tbody>
+            </table>`
+        }
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="small-button" onclick="showObjectForm=true;editingObjectId=null;editObject(${obj.id})">✏️ Edytuj obiekt</button>
+        <button class="small-button" onclick="viewClient(${obj.clientId});openModule('clients')">👤 Podgląd klienta</button>
+      </div>
+    </div>
+  `;
+}
+
 function editObject(id) {
   const object = ObjectsModule.find(id);
   if (!object) return;
@@ -553,6 +785,7 @@ function renderObjectsModule() {
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
             <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="white-space:nowrap;">📋 Protokoły (${protCount})</button>
+            <button class="small-button" onclick="event.stopPropagation();viewObject(${obj.id});openModule('objects')" style="white-space:nowrap;">Podgląd</button>
             <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
             <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">Usuń</button>
           </td>
@@ -1434,6 +1667,238 @@ function createMeasurement(form) {
   renderMeasurementsModule();
 }
 
+
+function viewProtocol(id) {
+  const p = MeasurementsModule.find(id);
+  if (!p) return;
+
+  const client = ClientsModule.find(p.clientId);
+  const obj = ObjectsModule.find(p.objectId);
+  const r = p.escoResults || calcESCOResults(p);
+  const u = p.energyUnit || "GJ";
+  const cur = p.currency || "PLN";
+  const fmt2 = v => Number(v||0).toFixed(2);
+  const fmt3 = v => Number(v||0).toFixed(3);
+  const fmt4 = v => Number(v||0).toFixed(4);
+
+  const tymRows = (p.tymMonthly||[]).map(m => `
+    <tr>
+      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.tymTemperature!==null&&m.tymTemperature!==undefined?fmt2(m.tymTemperature):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.tymDays||m.days||""))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.tymTemperature||m.temperature||0))*Number(m.tymDays||m.days||0)))}</td>
+    </tr>`).join("");
+
+  const billingRows = (p.realMonthly||[]).map(m => `
+    <tr>
+      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.temperature!==null&&m.temperature!==undefined?fmt2(m.temperature):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.days||""))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.temperature||0))*Number(m.days||0)))}</td>
+    </tr>`).join("");
+
+  const compRows = (p.comparisonMonthly||[]).map(m => `
+    <tr>
+      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${m.temperature!==null&&m.temperature!==undefined?fmt2(m.temperature):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${escapeHtml(String(m.days||""))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(m.temperature||0))*Number(m.days||0)))}</td>
+    </tr>`).join("");
+
+  const savedColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
+
+  const container = document.getElementById("module-content");
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="max-width:760px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">
+            ${escapeHtml(client?client.name:"")} / ${escapeHtml(obj?obj.name:"")}
+          </div>
+          <h2 style="margin:0;font-size:18px;font-weight:600;color:var(--color-text-primary);">
+            📋 Protokół TYM — ${escapeHtml(p.protocolDate||"brak daty")}
+          </h2>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj</button>
+          <button class="small-button" onclick="openModule('measurements')">← Wróć</button>
+        </div>
+      </div>
+
+      <!-- Dane podstawowe -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane protokołu</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Opracował</div>
+          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.preparedBy||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Jednostka</div>
+          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(u)}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Cena energii</div>
+          <div style="font-size:14px;">${fmt2(p.energyPrice||0)} ${escapeHtml(cur)} / ${escapeHtml(u)}</div>
+        </div>
+
+        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane klimatyczne</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Stacja meteo</div>
+          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.weatherStation||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Źródło danych</div>
+          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.weatherSource||"—")}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Temperatura bazowa</div>
+          <div style="font-size:14px;">${escapeHtml(String(p.baseTemperature||21))} °C</div>
+          ${p.weatherSourceUrl ? `<a href="${escapeHtml(p.weatherSourceUrl)}" target="_blank" rel="noopener" style="font-size:12px;margin-top:8px;display:inline-block;">🌡️ Link do danych klimatycznych</a>` : ""}
+        </div>
+
+      </div>
+
+      <!-- Okresy -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+
+        <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;">
+          <div style="background:#E6F1FB;padding:10px 14px;font-size:13px;font-weight:500;color:#0C447C;">
+            📅 Okres rozliczeniowy
+          </div>
+          <div style="padding:14px;">
+            <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.billingPeriodStartDate||"?")} → ${escapeHtml(p.billingPeriodEndDate||"?")}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodStartReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodEndReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
+            <div style="font-size:16px;font-weight:600;color:#0C447C;">${fmt3(p.billingConsumption||0)} ${escapeHtml(u)}</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;">
+          <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
+            📊 Okres porównawczy
+          </div>
+          <div style="padding:14px;">
+            <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.comparisonPeriodStartDate||"?")} → ${escapeHtml(p.comparisonPeriodEndDate||"?")}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodStartReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
+            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodEndReading||0)} ${escapeHtml(u)}</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
+            <div style="font-size:16px;font-weight:600;color:#27500A;">${fmt3(p.comparisonConsumption||0)} ${escapeHtml(u)}</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Tabele temperatur -->
+      ${tymRows ? `
+      <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#FEF3DC;padding:10px 14px;font-size:13px;font-weight:500;color:#633806;">
+          🌡️ Temperatury TYM (rok standardowy)
+        </div>
+        <div style="padding:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp TYM (°C)</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD TYM</th>
+            </tr></thead>
+            <tbody>${tymRows}</tbody>
+            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
+              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD TYM (rozlicz.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddTymBilling)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>` : ""}
+
+      ${billingRows ? `
+      <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#E6F1FB;padding:10px 14px;font-size:13px;font-weight:500;color:#0C447C;">
+          🌡️ Temperatury rzeczywiste — okres rozliczeniowy
+        </div>
+        <div style="padding:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp. śr. (°C)</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD</th>
+            </tr></thead>
+            <tbody>${billingRows}</tbody>
+            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
+              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD rzecz. (rozlicz.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealBilling)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>` : ""}
+
+      ${compRows ? `
+      <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
+          🌡️ Temperatury rzeczywiste — okres porównawczy
+        </div>
+        <div style="padding:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp. śr. (°C)</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
+              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD</th>
+            </tr></thead>
+            <tbody>${compRows}</tbody>
+            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
+              <td colspan="3" style="padding:6px 8px;font-weight:600;font-size:13px;">Suma HDD rzecz. (porówn.)</td>
+              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealComparison)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </div>` : ""}
+
+      <!-- Wyniki ESCO -->
+      <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
+          ⚡ Wyniki ESCO
+        </div>
+        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">HDD TYM rozlicz. / rzecz.</div>
+            <div style="font-size:14px;margin-bottom:10px;">${fmt2(r.hddTymBilling)} / ${fmt2(r.hddRealBilling)}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Współczynnik korekty (k)</div>
+            <div style="font-size:14px;margin-bottom:10px;">${fmt4(r.kBilling)}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Zużycie rozlicz. skorygowane</div>
+            <div style="font-size:14px;margin-bottom:10px;">${fmt3(r.billingCorrected)} ${escapeHtml(u)}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Zużycie porówn. skalowane do TYM</div>
+            <div style="font-size:14px;">${fmt3(r.comparisonCorrectedScaled)} ${escapeHtml(u)}</div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Oszczędność energii</div>
+            <div style="font-size:18px;font-weight:700;color:${savedColor};margin-bottom:4px;">${fmt3(r.savedEnergy)} ${escapeHtml(u)}</div>
+            <div style="font-size:22px;font-weight:700;color:${savedColor};margin-bottom:12px;">${fmt2(r.savedEnergyPct)} %</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Oszczędność finansowa</div>
+            <div style="font-size:18px;font-weight:700;color:${savedColor};margin-bottom:8px;">${fmt2(r.savedMoney)} ${escapeHtml(cur)}</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Udział WaterAI (${escapeHtml(String(p.waterAiShare||0))} %)</div>
+            <div style="font-size:16px;font-weight:600;">${fmt2(r.waterAiShare)} ${escapeHtml(cur)}</div>
+          </div>
+        </div>
+      </div>
+
+      ${p.note ? `
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Notatka</div>
+        <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.note)}</div>
+      </div>` : ""}
+
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj protokół</button>
+        ${obj ? `<button class="small-button" onclick="viewObject(${obj.id});openModule('objects')">🏗️ Podgląd obiektu</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function editMeasurement(id) {
   const protocol = MeasurementsModule.find(id);
   if (!protocol) return;
@@ -2164,6 +2629,7 @@ function renderProtocolsTable(protocols, objectId) {
         ${item.includeLinearRegression ? '<span style="font-size:11px;background:#FAEEDA;color:#633806;padding:2px 7px;border-radius:10px;">📈 Regresja</span>' : ''}
       </td>
       <td style="padding:10px 12px;white-space:nowrap;">
+        <button class="small-button" onclick="viewProtocol(${item.id})" style="white-space:nowrap;">Podgląd</button>
         <button class="small-button" onclick="showMeasurementForm=true;editMeasurement(${item.id});" style="white-space:nowrap;">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})" style="white-space:nowrap;">Usuń</button>
       </td>
@@ -2472,6 +2938,7 @@ function renderMeasurementsList() {
       ` : ""}
 
       <div style="margin-top: 12px;">
+        <button class="small-button" onclick="viewProtocol(${item.id})">Podgląd</button>
         <button class="small-button" onclick="editMeasurement(${item.id})">Edytuj</button>
         <button class="small-button" onclick="deleteMeasurement(${item.id})">Usuń</button>
       </div>
