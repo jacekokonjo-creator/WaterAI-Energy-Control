@@ -481,37 +481,63 @@ function openClientObjects(clientId) {
 
   const objects = ObjectsModule.findByClient(clientId);
 
-  const objectCards = objects.length === 0
-    ? `<div class="reminder-card"><strong>Brak obiektów</strong><div class="reminder-meta">Ten klient nie ma jeszcze żadnych obiektów. Dodaj obiekt w module Obiekty.</div></div>`
+  const objTypeLabel = {
+    HOTEL:"Hotel", SCHOOL:"Szkoła", KINDERGARTEN:"Przedszkole",
+    OFFICE:"Urząd/administracja", HOUSING_COMMUNITY:"Wspólnota mieszkaniowa",
+    COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
+    OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
+  };
+  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
+
+  const tableRows = objects.length === 0
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">
+        Ten klient nie ma jeszcze żadnych obiektów.
+       </td></tr>`
     : objects.map(obj => {
-        const protocols = MeasurementsModule.findByObject(obj.id);
-        const protCount = protocols.length;
-        return `
-        <div class="reminder-card" style="border-left:4px solid #185FA5;">
-          <strong>${escapeHtml(obj.name || "Obiekt bez nazwy")}</strong>
-          <div class="reminder-meta">
-            Typ: ${escapeHtml(obj.objectType || "")}<br />
-            Status: ${escapeHtml(obj.status || "")}<br />
-            Adres: ${escapeHtml(obj.postalCode || "")} ${escapeHtml(obj.city || "")}, ${escapeHtml(obj.street || "")} ${escapeHtml(obj.buildingNumber || "")}<br />
-            Energy Analyst: ${escapeHtml(obj.energyAnalystOwner || "—")}<br />
-            Protokołów TYM: <strong>${protCount}</strong>
-          </div>
-          <div style="margin-top:10px;">
-            <button class="small-button" onclick="openObjectProtocols(${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;">
-              📋 Protokoły TYM (${protCount})
-            </button>
-            <button class="small-button" onclick="editObject(${obj.id});openModule('objects');">Edytuj obiekt</button>
-          </div>
-        </div>
-        `;
+        const protCount = MeasurementsModule.findByObject(obj.id).length;
+        const statusColor = objStatusColor[obj.status] || "#666";
+        return `<tr>
+          <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
+          <td style="padding:10px 12px;">
+            <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${statusColor}22;color:${statusColor};">
+              ${escapeHtml(objStatusLabel[obj.status] || obj.status || "—")}
+            </span>
+          </td>
+          <td style="padding:10px 12px;white-space:nowrap;">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">👁 Podgląd</button>
+              <button class="small-button" onclick="editObject(${obj.id});openModule('objects');" style="white-space:nowrap;">✏️ Edytuj</button>
+              <button class="small-button" onclick="if(confirm('Usunąć obiekt?')){ObjectsModule.remove(${obj.id});openClientObjects(${clientId});}" style="white-space:nowrap;">🗑 Usuń</button>
+              <button class="small-button" onclick="openObjectProtocols(${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;">📋 Protokoły (${protCount})</button>
+            </div>
+          </td>
+        </tr>`;
       }).join("");
 
   container.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="small-button" onclick="renderClientsList()" style="font-size:13px;">← Wszyscy klienci</button>
-      <h3 style="margin:0;font-size:16px;color:#0C447C;">🏢 ${escapeHtml(client ? client.name : "Klient")}</h3>
+      <h3 style="margin:0;font-size:16px;color:#0C447C;">🏢 ${escapeHtml(client ? client.name : "Klient")} — Obiekty</h3>
+      <span style="font-size:12px;color:var(--color-text-secondary);">(${objects.length})</span>
     </div>
-    ${objectCards}
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:16px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--color-background-secondary);">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa obiektu</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ obiektu</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <button class="primary-button" onclick="editObject(null);openModule('objects');" style="font-size:13px;padding:10px 20px;">
+      + Dodaj obiekt dla tego klienta
+    </button>
   `;
 }
 
@@ -856,9 +882,7 @@ function renderObjectsModule() {
     container.innerHTML = `
       <div class="reminder-card">
         <strong>Najpierw dodaj klienta</strong>
-        <div class="reminder-meta">
-          Obiekt musi być przypisany do klienta. Wejdź w moduł Klienci i dodaj pierwszego klienta.
-        </div>
+        <div class="reminder-meta">Obiekt musi być przypisany do klienta.</div>
       </div>
     `;
     return;
@@ -871,33 +895,30 @@ function renderObjectsModule() {
     COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
     OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
   };
-  const objStatusLabel = {
-    IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny",
-    PAUSED:"Wstrzymany", FINISHED:"Zakończony"
-  };
-  const objStatusColor = {
-    IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666"
-  };
+  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
   const tableRows = allObjects.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak obiektów — kliknij "+ Dodaj obiekt".</td></tr>`
+    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak obiektów — dodaj pierwszy poniżej.</td></tr>`
     : allObjects.map(obj => {
         const statusColor = objStatusColor[obj.status] || "#666";
         const protCount = MeasurementsModule.findByObject(obj.id).length;
-        return `<tr style="cursor:pointer;" onclick="openObjectMeasurements(${obj.id})">
-          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
+        return `<tr>
           <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
+          <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
           <td style="padding:10px 12px;">
             <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${statusColor}22;color:${statusColor};">
               ${escapeHtml(objStatusLabel[obj.status] || obj.status || "—")}
             </span>
           </td>
           <td style="padding:10px 12px;white-space:nowrap;">
-            <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="white-space:nowrap;">📋 Protokoły (${protCount})</button>
-            <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">Podgląd</button>
-            <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">Edytuj</button>
-            <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">Usuń</button>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="small-button" onclick="event.stopPropagation();switchToView('objects',()=>viewObject(${obj.id}))" style="white-space:nowrap;">👁 Podgląd</button>
+              <button class="small-button" onclick="event.stopPropagation();showObjectForm=true;editingObjectId=null;editObject(${obj.id});" style="white-space:nowrap;">✏️ Edytuj</button>
+              <button class="small-button" onclick="event.stopPropagation();deleteObject(${obj.id})" style="white-space:nowrap;">🗑 Usuń</button>
+              <button class="small-button" onclick="event.stopPropagation();openObjectMeasurements(${obj.id})" style="background:#27500A;color:#fff;border-color:#27500A;white-space:nowrap;">📋 Protokoły (${protCount})</button>
+            </div>
           </td>
         </tr>`;
       }).join("");
@@ -913,304 +934,304 @@ function renderObjectsModule() {
       .obj-field input, .obj-field select { width:100%; box-sizing:border-box; }
     </style>
 
-    <!-- TABELA OBIEKTÓW -->
-    <div id="objects-table-view" style="${"display:" + (showObjectForm ? "none" : "block")}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-          Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${allObjects.length})</span>
-        </h3>
-        <button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:7px 16px;">
-          + Dodaj obiekt
-        </button>
-      </div>
-      <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead>
-            <tr style="background:var(--color-background-secondary);">
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa obiektu</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ obiektu</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
+    <!-- TABELA OBIEKTÓW — zawsze widoczna -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
+        Obiekty <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${allObjects.length})</span>
+      </h3>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--color-background-secondary);">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa obiektu</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ obiektu</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa klienta</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+
+    <!-- FORMULARZ DODAJ/EDYTUJ — pod tabelą -->
+    <div id="objects-form-view" style="display:${showObjectForm ? "block" : "none"};">
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="margin:0;font-size:16px;color:#0C447C;">${editingObjectId ? "Edytuj obiekt" : "Nowy obiekt"}</h3>
+          <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();">✕ Zamknij</button>
+        </div>
+        <form onsubmit="createObject(this); return false;">
+
+        <!-- DANE PODSTAWOWE -->
+        <div class="obj-section" style="border:1px solid #B5D4F4;">
+          <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">🏗️</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe obiektu</h3>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid4">
+              <div class="obj-field">
+                <label>Klient</label>
+                <select name="clientId" required>
+                  ${clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Nazwa obiektu</label>
+                <input name="name" required placeholder="np. Hotel Warszawa" />
+              </div>
+              <div class="obj-field">
+                <label>Typ obiektu</label>
+                <select name="objectType">
+                  <option value="HOTEL">Hotel</option>
+                  <option value="SCHOOL">Szkoła</option>
+                  <option value="KINDERGARTEN">Przedszkole</option>
+                  <option value="OFFICE">Urząd / administracja</option>
+                  <option value="HOUSING_COMMUNITY">Wspólnota mieszkaniowa</option>
+                  <option value="COOPERATIVE">Spółdzielnia</option>
+                  <option value="INDUSTRY">Zakład przemysłowy</option>
+                  <option value="OFFICE_BUILDING">Biurowiec</option>
+                  <option value="HOSPITAL">Szpital</option>
+                  <option value="OTHER">Inne</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Status obiektu</label>
+                <select name="status">
+                  <option value="IMPLEMENTATION">Wdrożenie</option>
+                  <option value="ACTIVE">Aktywny</option>
+                  <option value="PAUSED">Wstrzymany</option>
+                  <option value="FINISHED">Zakończony</option>
+                </select>
+              </div>
+            </div>
+            <div class="obj-grid2">
+              <div class="obj-field">
+                <label>Opiekun Back Office</label>
+                <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
+              </div>
+              <div class="obj-field">
+                <label>Opiekun Energy Analyst</label>
+                <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADRES -->
+        <div class="obj-section" style="border:1px solid #B8E0C8;">
+          <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">📍</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres obiektu</h3>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid3">
+              <div class="obj-field">
+                <label>Kraj</label>
+                <select name="country">
+                  <option value="PL">Polska</option>
+                  <option value="CZ">Czechy</option>
+                  <option value="SK">Słowacja</option>
+                  <option value="AT">Austria</option>
+                  <option value="DE">Niemcy</option>
+                  <option value="GB">Wielka Brytania</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Kod pocztowy</label>
+                <input name="postalCode" placeholder="np. 00-001" />
+              </div>
+              <div class="obj-field">
+                <label>Miasto</label>
+                <input name="city" placeholder="np. Warszawa" />
+              </div>
+              <div class="obj-field">
+                <label>Ulica</label>
+                <input name="street" placeholder="np. Prosta" />
+              </div>
+              <div class="obj-field">
+                <label>Nr budynku</label>
+                <input name="buildingNumber" placeholder="np. 10" />
+              </div>
+              <div class="obj-field">
+                <label>Nr lokalu</label>
+                <input name="apartmentNumber" placeholder="opcjonalnie" />
+              </div>
+            </div>
+            <div class="obj-field">
+              <label>Google Maps URL</label>
+              <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." style="width:100%;box-sizing:border-box;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- SYSTEM GRZEWCZY -->
+        <div class="obj-section" style="border:1px solid #F4D4A0;">
+          <div style="background:#FDF3E0;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">🔥</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#7A4A00;">System grzewczy i rozliczeniowy</h3>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid3">
+              <div class="obj-field">
+                <label>Źródło ciepła C.O.</label>
+                <select name="heatingSourceCO">
+                  <option value="NONE">Brak</option>
+                  <option value="HEAT_PUMP">Pompa ciepła</option>
+                  <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+                  <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+                  <option value="OIL_BOILER">Kocioł olejowy</option>
+                  <option value="GAS_BOILER">Kocioł gazowy</option>
+                  <option value="BIOMASS">Inna biomasa</option>
+                  <option value="PELLET_BOILER">Kocioł na pellet</option>
+                  <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+                  <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+                  <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Źródło ciepła C.W.U.</label>
+                <select name="heatingSourceCWU">
+                  <option value="NONE">Brak</option>
+                  <option value="HEAT_PUMP">Pompa ciepła</option>
+                  <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
+                  <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
+                  <option value="OIL_BOILER">Kocioł olejowy</option>
+                  <option value="GAS_BOILER">Kocioł gazowy</option>
+                  <option value="BIOMASS">Inna biomasa</option>
+                  <option value="PELLET_BOILER">Kocioł na pellet</option>
+                  <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
+                  <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
+                  <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Odczyt zużycia ciepła</label>
+                <select name="heatConsumptionReading">
+                  <option value="ONLINE">On-line</option>
+                  <option value="CLIENT">Podawany przez Klienta</option>
+                  <option value="WATERAI">Wykonywany przez WAI</option>
+                  <option value="INVOICE">Z FV</option>
+                </select>
+              </div>
+            </div>
+            <div class="obj-field" style="margin-bottom:12px;">
+              <label>Szczegóły odczytu</label>
+              <input name="heatConsumptionReadingDetails" placeholder="np. SUPLA, Modbus TCP, licznik Kamstrup..." style="width:100%;box-sizing:border-box;" />
+            </div>
+            <div class="obj-grid3">
+              <div class="obj-field">
+                <label>Cykl rozliczeniowy</label>
+                <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
+                  <option value="MONTHLY">Miesięczny</option>
+                  <option value="TWO_MONTHS">Co 2 miesiące</option>
+                  <option value="QUARTERLY">Kwartalny</option>
+                  <option value="HALF_YEAR">Półroczny</option>
+                  <option value="YEARLY">Roczny</option>
+                  <option value="MANUAL_DATES">Wg wskazanych dat</option>
+                </select>
+              </div>
+              <div class="obj-field" id="billingStartDateContainer">
+                <label>Data pierwszego rozliczenia</label>
+                <input name="billingStartDate" type="date" />
+              </div>
+              <div class="obj-field">
+                <label>Przypomnij przed terminem (dni)</label>
+                <input name="reminderDaysBefore" type="number" min="0" value="14" />
+              </div>
+            </div>
+            <div id="manualDatesContainer" style="display:none;">
+              <label style="font-size:12px;color:var(--color-text-secondary);">Daty rozliczeń</label>
+              <div id="manualDatesList"></div>
+              <button type="button" class="small-button" onclick="addManualBillingDate()">Dodaj datę</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DANE KLIMATYCZNE -->
+        <div class="obj-section" style="border:1px solid #B5C8F4;">
+          <div style="background:#E8EDFB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">🌡️</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C2C7C;">Dane klimatyczne (TYM)</h3>
+            <span style="font-size:11px;color:#0C2C7C;">zwykle stałe dla obiektu</span>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid3">
+              <div class="obj-field">
+                <label>Stacja meteorologiczna</label>
+                <input name="weatherStation" placeholder="np. Warszawa-Okęcie" />
+              </div>
+              <div class="obj-field">
+                <label>Źródło danych klimatycznych</label>
+                <input name="weatherSource" value="WeatherOnline / Robot Klimatu" />
+              </div>
+              <div class="obj-field">
+                <label>Temperatura bazowa (°C)</label>
+                <input name="baseTemperature" type="number" step="0.1" value="21" />
+              </div>
+            </div>
+            <div class="obj-grid2">
+              <div class="obj-field">
+                <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
+                <input name="weatherSourceUrl" type="url" placeholder="https://..." />
+              </div>
+              <div class="obj-field">
+                <label>Data pobrania danych klimatycznych</label>
+                <input name="weatherDataDownloadDate" type="date" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DANE ENERGETYCZNE -->
+        <div class="obj-section" style="border:1px solid #C8B5F4;">
+          <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">⚡</span>
+            <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
+            <span style="font-size:11px;color:#3D0C7C;">zwykle stałe dla obiektu</span>
+          </div>
+          <div class="obj-body">
+            <div class="obj-grid3">
+              <div class="obj-field">
+                <label>Jednostka energii</label>
+                <select name="energyUnit">
+                  <option value="GJ">GJ</option>
+                  <option value="MWh">MWh</option>
+                  <option value="kWh">kWh</option>
+                  <option value="m3">m³</option>
+                  <option value="Gcal">Gcal</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Waluta</label>
+                <select name="currency">
+                  <option value="PLN">PLN</option>
+                  <option value="EUR">EUR</option>
+                  <option value="CZK">CZK</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+              <div class="obj-field">
+                <label>Cena energii (za jednostkę)</label>
+                <input name="energyPrice" type="number" step="0.01" min="0" placeholder="np. 85.00" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="primary-button" type="submit">${editingObjectId ? "Zapisz zmiany" : "Dodaj obiekt"}</button>
+          <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();">Anuluj</button>
+        </div>
+
+        </form>
       </div>
     </div>
 
-    <!-- FORMULARZ OBIEKTU -->
-    <div id="objects-form-view" style="${"display:" + (showObjectForm ? "block" : "none")}">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();" style="font-size:13px;">← Wróć do listy</button>
-        <h3 style="margin:0;font-size:16px;color:#0C447C;">${editingObjectId ? "Edytuj obiekt" : "Nowy obiekt"}</h3>
-      </div>
-      <form onsubmit="createObject(this); return false;">
-
-      <!-- DANE PODSTAWOWE -->
-      <div class="obj-section" style="border:1px solid #B5D4F4;">
-        <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">🏗️</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe obiektu</h3>
-        </div>
-        <div class="obj-body">
-          <div class="obj-grid4">
-            <div class="obj-field">
-              <label>Klient</label>
-              <select name="clientId" required>
-                ${clients.map(client => `<option value="${client.id}">${escapeHtml(client.name)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Nazwa obiektu</label>
-              <input name="name" required placeholder="np. Hotel Warszawa" />
-            </div>
-            <div class="obj-field">
-              <label>Typ obiektu</label>
-              <select name="objectType">
-                <option value="HOTEL">Hotel</option>
-                <option value="SCHOOL">Szkoła</option>
-                <option value="KINDERGARTEN">Przedszkole</option>
-                <option value="OFFICE">Urząd / administracja</option>
-                <option value="HOUSING_COMMUNITY">Wspólnota mieszkaniowa</option>
-                <option value="COOPERATIVE">Spółdzielnia</option>
-                <option value="INDUSTRY">Zakład przemysłowy</option>
-                <option value="OFFICE_BUILDING">Biurowiec</option>
-                <option value="HOSPITAL">Szpital</option>
-                <option value="OTHER">Inne</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Status obiektu</label>
-              <select name="status">
-                <option value="IMPLEMENTATION">Wdrożenie</option>
-                <option value="ACTIVE">Aktywny</option>
-                <option value="PAUSED">Wstrzymany</option>
-                <option value="FINISHED">Zakończony</option>
-              </select>
-            </div>
-          </div>
-          <div class="obj-grid2">
-            <div class="obj-field">
-              <label>Opiekun Back Office</label>
-              <input name="backOfficeOwner" placeholder="np. Anna Kowalska" />
-            </div>
-            <div class="obj-field">
-              <label>Opiekun Energy Analyst</label>
-              <input name="energyAnalystOwner" placeholder="np. Petr Novak" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ADRES -->
-      <div class="obj-section" style="border:1px solid #B8E0C8;">
-        <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">📍</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Adres obiektu</h3>
-        </div>
-        <div class="obj-body">
-          <div class="obj-grid3">
-            <div class="obj-field">
-              <label>Kraj</label>
-              <select name="country">
-                <option value="PL">Polska</option>
-                <option value="CZ">Czechy</option>
-                <option value="SK">Słowacja</option>
-                <option value="AT">Austria</option>
-                <option value="DE">Niemcy</option>
-                <option value="GB">Wielka Brytania</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Kod pocztowy</label>
-              <input name="postalCode" placeholder="np. 00-001" />
-            </div>
-            <div class="obj-field">
-              <label>Miasto</label>
-              <input name="city" placeholder="np. Warszawa" />
-            </div>
-            <div class="obj-field">
-              <label>Ulica</label>
-              <input name="street" placeholder="np. Prosta" />
-            </div>
-            <div class="obj-field">
-              <label>Nr budynku</label>
-              <input name="buildingNumber" placeholder="np. 10" />
-            </div>
-            <div class="obj-field">
-              <label>Nr lokalu</label>
-              <input name="apartmentNumber" placeholder="opcjonalnie" />
-            </div>
-          </div>
-          <div class="obj-field">
-            <label>Google Maps URL</label>
-            <input name="googleMapsUrl" type="url" placeholder="https://maps.google.com/..." style="width:100%;box-sizing:border-box;" />
-          </div>
-        </div>
-      </div>
-
-      <!-- SYSTEM GRZEWCZY -->
-      <div class="obj-section" style="border:1px solid #F4D4A0;">
-        <div style="background:#FDF3E0;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">🔥</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#7A4A00;">System grzewczy i rozliczeniowy</h3>
-        </div>
-        <div class="obj-body">
-          <div class="obj-grid3">
-            <div class="obj-field">
-              <label>Źródło ciepła C.O.</label>
-              <select name="heatingSourceCO">
-                <option value="NONE">Brak</option>
-                <option value="HEAT_PUMP">Pompa ciepła</option>
-                <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
-                <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
-                <option value="OIL_BOILER">Kocioł olejowy</option>
-                <option value="GAS_BOILER">Kocioł gazowy</option>
-                <option value="BIOMASS">Inna biomasa</option>
-                <option value="PELLET_BOILER">Kocioł na pellet</option>
-                <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
-                <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
-                <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Źródło ciepła C.W.U.</label>
-              <select name="heatingSourceCWU">
-                <option value="NONE">Brak</option>
-                <option value="HEAT_PUMP">Pompa ciepła</option>
-                <option value="HEAT_RECOVERY">Ciepło z odzysku</option>
-                <option value="SOLID_FUEL_BOILER">Kocioł na paliwo stałe</option>
-                <option value="OIL_BOILER">Kocioł olejowy</option>
-                <option value="GAS_BOILER">Kocioł gazowy</option>
-                <option value="BIOMASS">Inna biomasa</option>
-                <option value="PELLET_BOILER">Kocioł na pellet</option>
-                <option value="DISTRICT_HEATING">Sieć ciepłownicza</option>
-                <option value="SOLAR_HEATING">Słoneczne systemy grzewcze</option>
-                <option value="ELECTRIC_HEATING">Ogrzewanie elektryczne</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Odczyt zużycia ciepła</label>
-              <select name="heatConsumptionReading">
-                <option value="ONLINE">On-line</option>
-                <option value="CLIENT">Podawany przez Klienta</option>
-                <option value="WATERAI">Wykonywany przez WAI</option>
-                <option value="INVOICE">Z FV</option>
-              </select>
-            </div>
-          </div>
-          <div class="obj-field" style="margin-bottom:12px;">
-            <label>Szczegóły odczytu</label>
-            <input name="heatConsumptionReadingDetails" placeholder="np. SUPLA, Modbus TCP, licznik Kamstrup..." style="width:100%;box-sizing:border-box;" />
-          </div>
-          <div class="obj-grid3">
-            <div class="obj-field">
-              <label>Cykl rozliczeniowy</label>
-              <select name="billingCycle" id="billingCycle" onchange="toggleBillingFields()">
-                <option value="MONTHLY">Miesięczny</option>
-                <option value="TWO_MONTHS">Co 2 miesiące</option>
-                <option value="QUARTERLY">Kwartalny</option>
-                <option value="HALF_YEAR">Półroczny</option>
-                <option value="YEARLY">Roczny</option>
-                <option value="MANUAL_DATES">Wg wskazanych dat</option>
-              </select>
-            </div>
-            <div class="obj-field" id="billingStartDateContainer">
-              <label>Data pierwszego rozliczenia</label>
-              <input name="billingStartDate" type="date" />
-            </div>
-            <div class="obj-field">
-              <label>Przypomnij przed terminem (dni)</label>
-              <input name="reminderDaysBefore" type="number" min="0" value="14" />
-            </div>
-          </div>
-          <div id="manualDatesContainer" style="display:none;">
-            <label style="font-size:12px;color:var(--color-text-secondary);">Daty rozliczeń</label>
-            <div id="manualDatesList"></div>
-            <button type="button" class="small-button" onclick="addManualBillingDate()">Dodaj datę</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- DANE KLIMATYCZNE -->
-      <div class="obj-section" style="border:1px solid #B5C8F4;">
-        <div style="background:#E8EDFB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">🌡️</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C2C7C;">Dane klimatyczne (TYM)</h3>
-          <span style="font-size:11px;color:#0C2C7C;">zwykle stałe dla obiektu</span>
-        </div>
-        <div class="obj-body">
-          <div class="obj-grid3">
-            <div class="obj-field">
-              <label>Stacja meteorologiczna</label>
-              <input name="weatherStation" placeholder="np. Warszawa-Okęcie" />
-            </div>
-            <div class="obj-field">
-              <label>Źródło danych klimatycznych</label>
-              <input name="weatherSource" value="WeatherOnline / Robot Klimatu" />
-            </div>
-            <div class="obj-field">
-              <label>Temperatura bazowa (°C)</label>
-              <input name="baseTemperature" type="number" step="0.1" value="21" />
-            </div>
-          </div>
-          <div class="obj-grid2">
-            <div class="obj-field">
-              <label>Link do źródła danych (WeatherOnline / Robot Klimatu)</label>
-              <input name="weatherSourceUrl" type="url" placeholder="https://..." />
-            </div>
-            <div class="obj-field">
-              <label>Data pobrania danych klimatycznych</label>
-              <input name="weatherDataDownloadDate" type="date" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- DANE ENERGETYCZNE -->
-      <div class="obj-section" style="border:1px solid #C8B5F4;">
-        <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">⚡</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
-          <span style="font-size:11px;color:#3D0C7C;">zwykle stałe dla obiektu</span>
-        </div>
-        <div class="obj-body">
-          <div class="obj-grid3">
-            <div class="obj-field">
-              <label>Jednostka energii</label>
-              <select name="energyUnit">
-                <option value="GJ">GJ</option>
-                <option value="MWh">MWh</option>
-                <option value="kWh">kWh</option>
-                <option value="m3">m³</option>
-                <option value="Gcal">Gcal</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Waluta</label>
-              <select name="currency">
-                <option value="PLN">PLN</option>
-                <option value="EUR">EUR</option>
-                <option value="CZK">CZK</option>
-                <option value="GBP">GBP</option>
-              </select>
-            </div>
-            <div class="obj-field">
-              <label>Cena energii (za jednostkę)</label>
-              <input name="energyPrice" type="number" step="0.01" min="0" placeholder="np. 85.00" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-top:8px;display:flex;gap:10px;">
-        <button class="primary-button" type="submit">${editingObjectId ? "Zapisz zmiany" : "Dodaj obiekt"}</button>
-        <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();">Anuluj</button>
-      </div>
-
-      </form>
-    </div>
+    <!-- PRZYCISK DODAJ — pod formularzem gdy zamknięty -->
+    ${!showObjectForm ? `<button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:10px 20px;">+ Dodaj obiekt</button>` : ""}
   `;
 }
 
