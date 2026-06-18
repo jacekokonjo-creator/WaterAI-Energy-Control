@@ -1230,7 +1230,46 @@ function renderAnalysisTYMContent(obj, allForObj) {
       </div>
     </div>
 
-    <!-- OKRES ROZLICZENIOWY -->
+    
+      <!-- DANE ENERGETYCZNE -->
+      <div class="anal-section" style="border:1px solid #C8B5F4;">
+        <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">⚡</span>
+          <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
+        </div>
+        <div class="anal-body">
+          <div class="anal-grid4">
+            <div class="anal-field"><label>Jednostka energii</label>
+              <select name="energyUnit">
+                <option value="kWh" ${(ip.energyUnit||obj.energyUnit||'kWh')==='kWh'?'selected':''}>kWh</option>
+                <option value="m³" ${(ip.energyUnit||obj.energyUnit||'')==='m³'?'selected':''}>m³ (gaz)</option>
+                <option value="GJ"  ${(ip.energyUnit||obj.energyUnit||'')==='GJ'?'selected':''}>GJ</option>
+                <option value="MWh" ${(ip.energyUnit||obj.energyUnit||'')==='MWh'?'selected':''}>MWh</option>
+              </select>
+            </div>
+            <div class="anal-field"><label>Waluta</label>
+              <select name="currency">
+                <option value="PLN" ${(ip.currency||obj.currency||'PLN')==='PLN'?'selected':''}>PLN</option>
+                <option value="EUR" ${(ip.currency||obj.currency||'')==='EUR'?'selected':''}>EUR</option>
+                <option value="CZK" ${(ip.currency||obj.currency||'')==='CZK'?'selected':''}>CZK</option>
+                <option value="USD" ${(ip.currency||obj.currency||'')==='USD'?'selected':''}>USD</option>
+              </select>
+            </div>
+            <div class="anal-field"><label>Cena energii (za jednostkę)</label>
+              <input name="energyPrice" type="number" step="0.0001" min="0"
+                value="${ip.energyPrice||obj.energyPrice||''}"
+                placeholder="np. 0.54" style="width:100%;box-sizing:border-box;"/>
+            </div>
+            <div class="anal-field"><label>Udział WaterAI / ESCO (%)</label>
+              <input name="escoShare" type="number" step="0.1" min="0" max="100"
+                value="${ip.escoShare!=null?ip.escoShare:(obj.escoShare!=null?obj.escoShare:'')}"
+                placeholder="np. 50" style="width:100%;box-sizing:border-box;"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- OKRES ROZLICZENIOWY -->
     <div class="anal-section" style="border:1px solid #B5D4F4;">
       <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;color:#185FA5;">📅</span>
