@@ -609,13 +609,13 @@ function openObjectProtocols(objectId) {
   const fmt3 = v => Number(v || 0).toFixed(3);
 
   const protocolCards = protocols.length === 0
-    ? `<div class="reminder-card"><strong>Brak protokołów TYM</strong><div class="reminder-meta">Dodaj pierwszy protokół w module Pomiary / Protokół TYM.</div></div>`
+    ? `<div class="reminder-card"><strong>Brak okresów bazowych</strong><div class="reminder-meta">Dodaj pierwszy okres bazowy w module Okresy bazowe.</div></div>`
     : protocols.map(item => {
         const u = item.energyUnit || unit;
         const fmt3 = v => Number(v || 0).toFixed(3);
         return `
         <div class="reminder-card" style="border-left:4px solid #27500A;">
-          <strong>📋 Protokół TYM: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+          <strong>📋 Okres bazowy: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
           <div class="reminder-meta">
             Opracował: ${escapeHtml(item.preparedBy || "")}<br />
             Rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
@@ -635,11 +635,11 @@ function openObjectProtocols(objectId) {
   container.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="small-button" onclick="openClientObjects(${clientId})" style="font-size:13px;">← Obiekty klienta</button>
-      <h3 style="margin:0;font-size:16px;color:#27500A;">📋 ${escapeHtml(obj ? obj.name : "Obiekt")} — Protokoły TYM</h3>
+      <h3 style="margin:0;font-size:16px;color:#27500A;">📋 ${escapeHtml(obj ? obj.name : "Obiekt")} — Okresy bazowe</h3>
     </div>
     <div style="margin-bottom:16px;">
       <button class="primary-button" onclick="selectedMeasurementObjectId=${objectId};openModule('measurements');" style="font-size:13px;">
-        + Dodaj nowy protokół TYM
+        + Dodaj nowy okres bazowy
       </button>
     </div>
     ${protocolCards}
@@ -853,10 +853,10 @@ function viewObject(id) {
       <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;">
-            Protokoły TYM (${protocols.length})
+            Okresy bazowe (${protocols.length})
           </div>
           <button class="primary-button" style="font-size:12px;padding:5px 12px;" onclick="openObjectMeasurements(${obj.id})">
-            + Dodaj protokół
+            + Dodaj okres bazowy
           </button>
         </div>
         ${protocols.length === 0
@@ -864,7 +864,7 @@ function viewObject(id) {
           : `<table style="width:100%;border-collapse:collapse;font-size:13px;">
               <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
                 <th style="text-align:left;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Data protokołu</th>
-                <th style="text-align:left;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Okres rozliczeniowy</th>
+                <th style="text-align:left;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Okres bazowy</th>
                 <th style="text-align:right;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Zużycie</th>
                 <th style="text-align:right;padding:7px 10px;font-weight:500;color:var(--color-text-secondary);">Oszczędność</th>
                 <th style="padding:7px 10px;"></th>
@@ -2075,10 +2075,10 @@ function createMeasurement(form) {
     return;
   }
 
-  const billingStart = Number(form.billingPeriodStartReading.value || 0);
-  const billingEnd = Number(form.billingPeriodEndReading.value || 0);
-  const comparisonStart = Number(form.comparisonPeriodStartReading.value || 0);
-  const comparisonEnd = Number(form.comparisonPeriodEndReading.value || 0);
+  const billingStart = Number((form.billingPeriodStartReading ? form.billingPeriodStartReading.value : 0) || 0);
+  const billingEnd = Number((form.billingPeriodEndReading ? form.billingPeriodEndReading.value : 0) || 0);
+  const comparisonStart = Number((form.comparisonPeriodStartReading ? form.comparisonPeriodStartReading.value : 0) || 0);
+  const comparisonEnd = Number((form.comparisonPeriodEndReading ? form.comparisonPeriodEndReading.value : 0) || 0);
 
   const tymMonthly = buildTymMonthlyFromForm(form);
   const realMonthly = buildPeriodMonthlyFromForm("billing");
@@ -2097,10 +2097,10 @@ function createMeasurement(form) {
     weatherDataDownloadDate: form.elements["weatherDataDownloadDate"] ? form.elements["weatherDataDownloadDate"].value : "",
     baseTemperature: Number(form.baseTemperature.value || 21),
 
-    energyUnit: form.energyUnit.value,
-    currency: form.currency.value,
-    energyPrice: Number(form.energyPrice.value || 0),
-    waterAiShare: Number(form.waterAiShare.value || 0),
+    energyUnit: (form.energyUnit ? form.energyUnit.value : null) || object.energyUnit || 'kWh',
+    currency: (form.currency ? form.currency.value : null) || object.currency || 'PLN',
+    energyPrice: Number((form.energyPrice ? form.energyPrice.value : null) || object.energyPrice || 0),
+    waterAiShare: Number((form.waterAiShare ? form.waterAiShare.value : null) || object.escoShare || 0),
 
     billingPeriodStartDate: (form.elements["billingPeriodStartDate"] ? form.elements["billingPeriodStartDate"].value : "") || "",
     billingPeriodStartReading: billingStart,
@@ -2252,7 +2252,7 @@ function viewProtocol(id) {
             ${escapeHtml(client?client.name:"")} / ${escapeHtml(obj?obj.name:"")}
           </div>
           <h2 style="margin:0;font-size:18px;font-weight:600;color:var(--color-text-primary);">
-            📋 Protokół TYM — ${escapeHtml(p.protocolDate||"brak daty")}
+            📋 Okres bazowy — ${escapeHtml(p.protocolDate||"brak daty")}
           </h2>
         </div>
         <div style="display:flex;gap:8px;">
@@ -2781,7 +2781,7 @@ function renderMeasurementsModule() {
     container.innerHTML = `
       <div class="reminder-card">
         <strong>Najpierw dodaj klienta i obiekt</strong>
-        <div class="reminder-meta">Protokół TYM musi być przypisany do konkretnego obiektu.</div>
+        <div class="reminder-meta">Okres bazowy musi być przypisany do konkretnego obiektu.</div>
       </div>
     `;
     return;
@@ -3095,7 +3095,7 @@ function renderMeasurementsModule() {
     </div>
 
 <button class="primary-button" type="submit">
-        ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
+        ${editingMeasurementId ? "Zapisz protokół" : "Dodaj okres bazowy"}
       </button>
       <button class="small-button" type="button" onclick="cancelMeasurementEdit()">
         ${editingMeasurementId ? "Anuluj edycję" : "← Wróć do listy"}
@@ -3159,22 +3159,22 @@ function renderProtocolsTable(protocols, objectId) {
   const headerHtml = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:8px;gap:10px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">
-        Protokoły TYM
+        Okresy bazowe
         <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${filtered.length}${q ? ' z ' + protocols.length : ''})</span>
       </h3>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input type="search" placeholder="Szukaj protokołu..." value="${escapeHtml(window._protSearch || '')}"
+        <input type="search" placeholder="Szukaj okresu bazowego..." value="${escapeHtml(window._protSearch || '')}"
           oninput="window._protSearch=this.value;renderMeasurementsModule();"
           style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
         <button class="primary-button" onclick="showMeasurementForm=true;editingMeasurementId=null;renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;white-space:nowrap;">
-          + Dodaj protokół TYM
+          + Dodaj okres bazowy
         </button>
       </div>
     </div>`;
 
   if (filtered.length === 0) {
-    return headerHtml + `<div class="reminder-card"><strong>${q ? 'Brak wyników wyszukiwania' : 'Brak protokołów TYM'}</strong>
-      <div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Kliknij "+ Dodaj protokół TYM" aby rozpocząć rozliczenie ESCO.'}</div>
+    return headerHtml + `<div class="reminder-card"><strong>${q ? 'Brak wyników wyszukiwania' : 'Brak okresów bazowych'}</strong>
+      <div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Kliknij "+ Dodaj okres bazowy" aby rozpocząć rozliczenie ESCO.'}</div>
     </div>`;
   }
 
@@ -3204,7 +3204,7 @@ function renderProtocolsTable(protocols, objectId) {
             ${thS('date', 'Data protokołu')}
             ${thS('client', 'Klient')}
             ${thS('object', 'Obiekt')}
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres rozliczeniowy</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres bazowy</th>
             <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
           </tr>
         </thead>
@@ -3644,8 +3644,8 @@ function renderMeasurementsList() {
   if (protocols.length === 0) {
     container.innerHTML = `
       <div class="reminder-card">
-        <strong>Brak protokołów TYM</strong>
-        <div class="reminder-meta">Dodaj pierwszy protokół TYM dla tego obiektu.</div>
+        <strong>Brak okresów bazowych</strong>
+        <div class="reminder-meta">Dodaj pierwszy okres bazowy dla tego obiektu.</div>
       </div>
     `;
     return;
@@ -3657,7 +3657,7 @@ function renderMeasurementsList() {
 
     return `
     <div class="reminder-card">
-      <strong>Protokół TYM z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+      <strong>Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
 
       <div class="reminder-meta">
         Klient: ${escapeHtml(getClientName(item.clientId))}<br />
@@ -3670,7 +3670,7 @@ function renderMeasurementsList() {
       </div>
 
       <div class="reminder-meta" style="margin-top:8px;">
-        <strong>Okres rozliczeniowy:</strong><br />
+        <strong>Okres bazowy:</strong><br />
         ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
         Zużycie: <strong>${fmt3(item.billingConsumption)} ${unit}</strong><br /><br />
         <strong>Okres porównawczy:</strong><br />
@@ -3877,7 +3877,7 @@ function generateESCOReport(protocolId) {
           ⚡ Raport ESCO
         </h2>
         <div style="font-size:13px;color:var(--color-text-secondary);">
-          Protokół TYM z dnia ${escapeHtml(p.protocolDate || "—")} &nbsp;·&nbsp;
+          Okres bazowy z dnia ${escapeHtml(p.protocolDate || "—")} &nbsp;·&nbsp;
           Opracował: ${escapeHtml(p.preparedBy || "—")} &nbsp;·&nbsp;
           Temperatura bazowa: ${base} °C
         </div>
