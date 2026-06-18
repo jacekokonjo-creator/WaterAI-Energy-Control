@@ -3070,7 +3070,7 @@ function renderMeasurementsModule() {
       </div>
       <div class="tym-body">
 
-        <div class="tym-grid4" style="margin-bottom:12px;">
+        <div class="tym-grid4" style="margin-bottom:14px;">
           <div class="tym-field">
             <label>Numer protokołu</label>
             <input name="protocolNumber" type="text" placeholder="np. PROT/2026/001"
@@ -3090,7 +3090,7 @@ function renderMeasurementsModule() {
           </div>
         </div>
 
-        <div class="tym-grid4" style="margin-bottom:0;">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;">
           <div class="tym-field">
             <label>Opracował / Energy Analyst</label>
             <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
@@ -3112,13 +3112,8 @@ function renderMeasurementsModule() {
             </div>
           </div>
           <div class="tym-field">
-            <label>Zatwierdził</label>
-            <input name="approvedBy" type="text" placeholder="opcjonalnie"
-              style="width:100%;box-sizing:border-box;" />
-          </div>
-          <div class="tym-field" style="grid-column:span 2;">
             <label>Uwagi do protokołu</label>
-            <textarea name="protocolNotes" rows="2" placeholder="Dodatkowe uwagi, zastrzeżenia..."
+            <textarea name="protocolNotes" rows="3" placeholder="Dodatkowe uwagi, zastrzeżenia, źródło danych, nietypowy okres itp."
               style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;"></textarea>
           </div>
         </div>
@@ -3127,11 +3122,11 @@ function renderMeasurementsModule() {
     </div>
 
     <!-- PRZYCISKI ZAPISU -->
-    <div style="display:flex;gap:12px;align-items:center;padding:20px 0 8px 0;border-top:2px solid var(--color-border-tertiary);margin-top:8px;">
-      <button class="primary-button" type="submit" style="padding:10px 28px;font-size:14px;">
+    <div style="display:flex;gap:12px;align-items:center;padding:16px 0 4px 0;">
+      <button class="primary-button" type="submit" style="padding:11px 32px;font-size:14px;font-weight:600;">
         ${editingMeasurementId ? "💾 Zapisz protokół" : "✅ Dodaj okres bazowy"}
       </button>
-      <button class="small-button" type="button" onclick="cancelMeasurementEdit()" style="padding:10px 20px;font-size:13px;">
+      <button class="small-button" type="button" onclick="cancelMeasurementEdit()" style="padding:11px 22px;font-size:13px;">
         ${editingMeasurementId ? "✕ Anuluj edycję" : "← Wróć do listy"}
       </button>
     </div>
