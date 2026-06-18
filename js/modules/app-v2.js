@@ -1156,7 +1156,21 @@ function renderAnalysisTYMContent(obj, allForObj) {
         <div class="anal-grid4">
           <div class="anal-field"><label>Nazwa analizy</label><input name="analName" required placeholder="np. TYM Kwiecień 2026" value="${escapeHtml(editing&&editing.name||'')}"/></div>
           <div class="anal-field"><label>Data protokołu</label><input name="analDate" type="date" required value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
-          <div class="anal-field"><label>Autor</label><input name="analAuthor" placeholder="np. Jan Nowak" value="${escapeHtml(editing&&editing.author||'')}"/></div>
+          <div class="anal-field">
+            <label>Opracował / Energy Analyst</label>
+            ${(()=>{
+              const analysts = (window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []);
+              const suggested = editing&&editing.author ? editing.author : (selObj&&selObj.energyAnalystOwner ? selObj.energyAnalystOwner : '');
+              const opts = analysts.map(u=>`<option value="${escapeHtml((u.firstName||'')+' '+(u.lastName||'')).trim()}"></option>`).join('');
+              return `<div style="display:flex;gap:6px;align-items:center;">
+                <input name="analAuthor" list="analyst-suggestions" placeholder="np. Jan Nowak"
+                  value="${escapeHtml(suggested)}"
+                  style="flex:1;"
+                  title="Domyślnie: Energy Analyst przypisany do obiektu"/>
+                <datalist id="analyst-suggestions">${opts}</datalist>
+              </div>`;
+            })()}
+          </div>
           <div class="anal-field"><label>Status</label><select name="analStatus">
             ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}" ${(editing&&editing.status||'DRAFT')===k?'selected':''}>${v.label}</option>`).join('')}
           </select></div>
@@ -1392,7 +1406,21 @@ function renderAnalysisRegressionContent(obj, allForObj) {
         <div class="anal-grid4">
           <div class="anal-field"><label>Nazwa analizy</label><input name="regName" required placeholder="np. Regresja PRI LIPE 04.2026" value="${escapeHtml(editing&&editing.name||'')}"/></div>
           <div class="anal-field"><label>Data analizy</label><input name="regDate" type="date" value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
-          <div class="anal-field"><label>Autor</label><input name="regAuthor" value="${escapeHtml(editing&&editing.author||'')}"/></div>
+          <div class="anal-field">
+            <label>Opracował / Energy Analyst</label>
+            ${(()=>{
+              const analysts = (window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []);
+              const suggested = editing&&editing.author ? editing.author : (selObj&&selObj.energyAnalystOwner ? selObj.energyAnalystOwner : '');
+              const opts = analysts.map(u=>`<option value="${escapeHtml((u.firstName||'')+' '+(u.lastName||'')).trim()}"></option>`).join('');
+              return `<div style="display:flex;gap:6px;align-items:center;">
+                <input name="regAuthor" list="analyst-suggestions" placeholder="np. Jan Nowak"
+                  value="${escapeHtml(suggested)}"
+                  style="flex:1;"
+                  title="Domyślnie: Energy Analyst przypisany do obiektu"/>
+                <datalist id="analyst-suggestions">${opts}</datalist>
+              </div>`;
+            })()}
+          </div>
           <div class="anal-field"><label>Status</label><select name="regStatus">
             ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
           </select></div>
