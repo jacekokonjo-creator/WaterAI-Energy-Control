@@ -1158,18 +1158,7 @@ function renderAnalysisTYMContent(obj, allForObj) {
           <div class="anal-field"><label>Data protokołu</label><input name="analDate" type="date" required value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
           <div class="anal-field">
             <label>Opracował / Energy Analyst</label>
-            ${(()=>{
-              const analysts = (window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []);
-              const suggested = editing&&editing.author ? editing.author : (selObj&&selObj.energyAnalystOwner ? selObj.energyAnalystOwner : '');
-              const opts = analysts.map(u=>`<option value="${escapeHtml((u.firstName||'')+' '+(u.lastName||'')).trim()}"></option>`).join('');
-              return `<div style="display:flex;gap:6px;align-items:center;">
-                <input name="analAuthor" list="analyst-suggestions" placeholder="np. Jan Nowak"
-                  value="${escapeHtml(suggested)}"
-                  style="flex:1;"
-                  title="Domyślnie: Energy Analyst przypisany do obiektu"/>
-                <datalist id="analyst-suggestions">${opts}</datalist>
-              </div>`;
-            })()}
+            ${buildAnalystField('analAuthor', editing&&editing.author||'', selObj)}
           </div>
           <div class="anal-field"><label>Status</label><select name="analStatus">
             ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}" ${(editing&&editing.status||'DRAFT')===k?'selected':''}>${v.label}</option>`).join('')}
@@ -1408,18 +1397,7 @@ function renderAnalysisRegressionContent(obj, allForObj) {
           <div class="anal-field"><label>Data analizy</label><input name="regDate" type="date" value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
           <div class="anal-field">
             <label>Opracował / Energy Analyst</label>
-            ${(()=>{
-              const analysts = (window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []);
-              const suggested = editing&&editing.author ? editing.author : (selObj&&selObj.energyAnalystOwner ? selObj.energyAnalystOwner : '');
-              const opts = analysts.map(u=>`<option value="${escapeHtml((u.firstName||'')+' '+(u.lastName||'')).trim()}"></option>`).join('');
-              return `<div style="display:flex;gap:6px;align-items:center;">
-                <input name="regAuthor" list="analyst-suggestions" placeholder="np. Jan Nowak"
-                  value="${escapeHtml(suggested)}"
-                  style="flex:1;"
-                  title="Domyślnie: Energy Analyst przypisany do obiektu"/>
-                <datalist id="analyst-suggestions">${opts}</datalist>
-              </div>`;
-            })()}
+            ${buildAnalystField('regAuthor', editing&&editing.author||'', selObj)}
           </div>
           <div class="anal-field"><label>Status</label><select name="regStatus">
             ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
@@ -2458,6 +2436,49 @@ function renderDashboardSummary() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const _origOpenModule = window.openModule;
+
+function buildAnalystField(inputName, currentValue, selObj) {
+  const analysts = window.UsersModule ? UsersModule.findByRole('energyAnalyst') : [];
+  const suggested = currentValue || (selObj && selObj.energyAnalystOwner ? selObj.energyAnalystOwner : '');
+  const uid = inputName + '_analyst_field';
+
+  // Build select options: each analyst + separator + "Inny"
+  const exactMatch = analysts.find(u => {
+    const full = ((u.firstName||'')+' '+(u.lastName||'')).trim();
+    return full === suggested;
+  });
+
+  const opts = analysts.map(u => {
+    const full = ((u.firstName||'')+' '+(u.lastName||'')).trim();
+    return `<option value="${escapeHtml(full)}" ${full===suggested?'selected':''}>${escapeHtml(full)}</option>`;
+  }).join('');
+
+  const showCustom = suggested && !exactMatch;
+  const selectVal = showCustom ? '__other__' : (suggested || '');
+
+  return `
+    <select id="${uid}_sel" onchange="(function(s){
+      const inp=document.getElementById('${uid}_inp');
+      const wrap=document.getElementById('${uid}_wrap');
+      if(s.value==='__other__'){wrap.style.display='flex';inp.focus();}
+      else{wrap.style.display='none';document.getElementById('${uid}_hidden').value=s.value;}
+    })(this)" style="width:100%;">
+      <option value="" ${!suggested?'selected':''}>— wybierz —</option>
+      ${opts}
+      <option value="__other__" ${showCustom?'selected':''}>✏️ Inny (wpisz ręcznie)</option>
+    </select>
+    <input type="hidden" id="${uid}_hidden" name="${inputName}" value="${escapeHtml(showCustom ? '' : suggested)}"/>
+    <div id="${uid}_wrap" style="display:${showCustom?'flex':'none'};gap:4px;margin-top:4px;align-items:center;">
+      <input id="${uid}_inp" type="text" placeholder="Wpisz imię i nazwisko"
+        value="${escapeHtml(showCustom ? suggested : '')}"
+        oninput="document.getElementById('${uid}_hidden').value=this.value"
+        style="flex:1;"/>
+      <button type="button" title="Wróć do listy"
+        onclick="document.getElementById('${uid}_sel').value='';document.getElementById('${uid}_hidden').value='';document.getElementById('${uid}_wrap').style.display='none';"
+        style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>
+    </div>`;
+}
+
 window.openModule = function(moduleName) {
   const newModules = ['documents', 'invoicing', 'analyses', 'dashboard', 'users', 'reports', 'escoReports'];
   if (newModules.includes(moduleName)) {
