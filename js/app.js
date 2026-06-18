@@ -2088,8 +2088,12 @@ function createMeasurement(form) {
     clientId: object.clientId,
     objectId: form.objectId.value,
 
+    protocolNumber: form.protocolNumber ? form.protocolNumber.value.trim() : "",
     protocolDate: form.elements["protocolDate"] ? form.elements["protocolDate"].value : "",
+    protocolStatus: form.protocolStatus ? form.protocolStatus.value : "DRAFT",
     preparedBy: form.preparedBy ? form.preparedBy.value.trim() : "",
+    approvedBy: form.approvedBy ? form.approvedBy.value.trim() : "",
+    protocolNotes: form.protocolNotes ? form.protocolNotes.value.trim() : "",
 
     weatherStation: form.weatherStation ? form.weatherStation.value.trim() : "",
     weatherSource: form.weatherSource ? form.weatherSource.value.trim() : "",
@@ -3065,11 +3069,28 @@ function renderMeasurementsModule() {
         <h3 style="margin:0;font-size:15px;font-weight:500;color:#333;">Szczegóły protokołu</h3>
       </div>
       <div class="tym-body">
-        <div class="tym-grid4">
+
+        <div class="tym-grid4" style="margin-bottom:12px;">
+          <div class="tym-field">
+            <label>Numer protokołu</label>
+            <input name="protocolNumber" type="text" placeholder="np. PROT/2026/001"
+              style="width:100%;box-sizing:border-box;" />
+          </div>
           <div class="tym-field">
             <label>Data protokołu</label>
             <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
           </div>
+          <div class="tym-field">
+            <label>Status</label>
+            <select name="protocolStatus" style="width:100%;box-sizing:border-box;">
+              <option value="DRAFT">Szkic</option>
+              <option value="FINAL">Finalny</option>
+              <option value="SIGNED">Podpisany</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tym-grid4" style="margin-bottom:0;">
           <div class="tym-field">
             <label>Opracował / Energy Analyst</label>
             <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
@@ -3090,15 +3111,28 @@ function renderMeasurementsModule() {
                 style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>
             </div>
           </div>
+          <div class="tym-field">
+            <label>Zatwierdził</label>
+            <input name="approvedBy" type="text" placeholder="opcjonalnie"
+              style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field" style="grid-column:span 2;">
+            <label>Uwagi do protokołu</label>
+            <textarea name="protocolNotes" rows="2" placeholder="Dodatkowe uwagi, zastrzeżenia..."
+              style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;"></textarea>
+          </div>
         </div>
+
       </div>
     </div>
 
-<button class="primary-button" type="submit">
-        ${editingMeasurementId ? "Zapisz protokół" : "Dodaj okres bazowy"}
+    <!-- PRZYCISKI ZAPISU -->
+    <div style="display:flex;gap:12px;align-items:center;padding:20px 0 8px 0;border-top:2px solid var(--color-border-tertiary);margin-top:8px;">
+      <button class="primary-button" type="submit" style="padding:10px 28px;font-size:14px;">
+        ${editingMeasurementId ? "💾 Zapisz protokół" : "✅ Dodaj okres bazowy"}
       </button>
-      <button class="small-button" type="button" onclick="cancelMeasurementEdit()">
-        ${editingMeasurementId ? "Anuluj edycję" : "← Wróć do listy"}
+      <button class="small-button" type="button" onclick="cancelMeasurementEdit()" style="padding:10px 20px;font-size:13px;">
+        ${editingMeasurementId ? "✕ Anuluj edycję" : "← Wróć do listy"}
       </button>
     </div>
 
