@@ -2929,47 +2929,23 @@ function renderMeasurementsModule() {
           </div>
           <div class="tym-field">
             <label>Opracował / Energy Analyst</label>
-            ${(()=>{
-              const _analysts = window.UsersModule ? UsersModule.findByRole('energyAnalyst') : [];
-              const _suggested = (editing && editing.preparedBy) || selectedObject.energyAnalystOwner || '';
-              const _uid = 'preparedBy_field';
-              const _match = _analysts.find(u => ((u.firstName||'')+' '+(u.lastName||'')).trim() === _suggested);
-              const _showInp = _suggested && !_match;
-              const _opts = _analysts.map(u => {
-                const _n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
-                return '<option value="'+_n+'" '+(_n===_suggested?'selected':'')+'>'+_n+'</option>';
-              }).join('');
-              return '<select name="preparedBy" id="'+_uid+'_sel" style="width:100%;box-sizing:border-box;" '
-                +'onchange="(function(s){'
-                  +'var wrap=document.getElementById(\''+_uid+'_wrap\');'
-                  +'if(s.value===\'__other__\'){'
-                    +'wrap.style.display=\'flex\';'
-                    +'s.removeAttribute(\'name\');'
-                    +'document.getElementById(\''+_uid+'_inp\').setAttribute(\'name\',\'preparedBy\');'
-                    +'document.getElementById(\''+_uid+'_inp\').focus();'
-                  +'}else{'
-                    +'wrap.style.display=\'none\';'
-                    +'s.setAttribute(\'name\',\'preparedBy\');'
-                    +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                  +'}'
-                +'})(this)">'
-                +'<option value="">— wybierz analityka —</option>'
-                +_opts
-                +'<option value="__other__" '+(_showInp?'selected':'')+'>✏️ Inny (wpisz ręcznie)</option>'
-                +'</select>'
-                +'<div id="'+_uid+'_wrap" style="display:'+(_showInp?'flex':'none')+';gap:4px;margin-top:4px;align-items:center;">'
-                  +'<input id="'+_uid+'_inp" type="text" placeholder="Wpisz imię i nazwisko" '
-                    +(_showInp?'name="preparedBy" ':' ')
-                    +'value="'+(_showInp?_suggested:'')+'" style="flex:1;box-sizing:border-box;"/>'
-                  +'<button type="button" '
-                    +'onclick="document.getElementById(\''+_uid+'_sel\').value=\'\';'
-                      +'document.getElementById(\''+_uid+'_sel\').setAttribute(\'name\',\'preparedBy\');'
-                      +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                      +'document.getElementById(\''+_uid+'_inp\').value=\'\';'
-                      +'document.getElementById(\''+_uid+'_wrap\').style.display=\'none\';" '
-                    +'style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>'
-                +'</div>';
-            })()}
+            <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
+              onchange="(function(s){var w=document.getElementById('preparedBy_wrap');if(s.value==='__other__'){w.style.display='flex';s.removeAttribute('name');document.getElementById('preparedBy_inp').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').focus();}else{w.style.display='none';s.setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');}})(this)">
+              <option value="">— wybierz analityka —</option>
+              ${(window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []).map(u => {
+                const n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
+                const sel = n === (selectedObject.energyAnalystOwner||'') ? 'selected' : '';
+                return '<option value="'+n+'" '+sel+'>'+n+'</option>';
+              }).join('')}
+              <option value="__other__">✏️ Inny (wpisz ręcznie)</option>
+            </select>
+            <div id="preparedBy_wrap" style="display:none;gap:4px;margin-top:4px;align-items:center;">
+              <input id="preparedBy_inp" type="text" placeholder="Wpisz imię i nazwisko"
+                style="flex:1;box-sizing:border-box;"/>
+              <button type="button"
+                onclick="document.getElementById('preparedBy_sel').value='';document.getElementById('preparedBy_sel').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');document.getElementById('preparedBy_inp').value='';document.getElementById('preparedBy_wrap').style.display='none';"
+                style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>
+            </div>
           </div>
         </div>
       </div>
