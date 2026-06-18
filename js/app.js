@@ -2915,43 +2915,7 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
-    <!-- ═══ DANE PODSTAWOWE PROTOKOŁU ═══ -->
-    <div class="tym-section" style="border:1px solid #C8C8C8;">
-      <div style="background:#F2F2F2;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📋</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#333;">Dane podstawowe protokołu</h3>
-      </div>
-      <div class="tym-body">
-        <div class="tym-grid4">
-          <div class="tym-field">
-            <label>Data protokołu</label>
-            <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
-          </div>
-          <div class="tym-field">
-            <label>Opracował / Energy Analyst</label>
-            <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
-              onchange="(function(s){var w=document.getElementById('preparedBy_wrap');if(s.value==='__other__'){w.style.display='flex';s.removeAttribute('name');document.getElementById('preparedBy_inp').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').focus();}else{w.style.display='none';s.setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');}})(this)">
-              <option value="">— wybierz analityka —</option>
-              ${(window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []).map(u => {
-                const n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
-                const sel = n === (selectedObject.energyAnalystOwner||'') ? 'selected' : '';
-                return '<option value="'+n+'" '+sel+'>'+n+'</option>';
-              }).join('')}
-              <option value="__other__">✏️ Inny (wpisz ręcznie)</option>
-            </select>
-            <div id="preparedBy_wrap" style="display:none;gap:4px;margin-top:4px;align-items:center;">
-              <input id="preparedBy_inp" type="text" placeholder="Wpisz imię i nazwisko"
-                style="flex:1;box-sizing:border-box;"/>
-              <button type="button"
-                onclick="document.getElementById('preparedBy_sel').value='';document.getElementById('preparedBy_sel').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');document.getElementById('preparedBy_inp').value='';document.getElementById('preparedBy_wrap').style.display='none';"
-                style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ DANE KLIMATYCZNE PROTOKOŁU ═══ -->
+<!-- ═══ DANE KLIMATYCZNE PROTOKOŁU ═══ -->
     <div class="tym-section" style="border:1px solid #B5C8F4;">
       <div style="background:#E8EDFB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">🌡️</span>
@@ -2984,98 +2948,11 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
-    <!-- ═══ DANE ENERGETYCZNE PROTOKOŁU ═══ -->
-    <div class="tym-section" style="border:1px solid #C8B5F4;">
-      <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">⚡</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
-      </div>
-      <div class="tym-body">
-        <div class="tym-grid4">
-          <div class="tym-field">
-            <label>Jednostka energii</label>
-            <select name="energyUnit" style="width:100%;">
-              ${["GJ","MWh","kWh","m3","Gcal"].map(u => `<option value="${u}" ${(selectedObject.energyUnit||"GJ")===u?"selected":""}>${u==="m3"?"m³":u}</option>`).join("")}
-            </select>
-          </div>
-          <div class="tym-field">
-            <label>Waluta</label>
-            <select name="currency" style="width:100%;">
-              ${["PLN","EUR","CZK","GBP"].map(c => `<option value="${c}" ${(selectedObject.currency||"PLN")===c?"selected":""}>${c}</option>`).join("")}
-            </select>
-          </div>
-          <div class="tym-field">
-            <label>Cena energii (za jednostkę)</label>
-            <input name="energyPrice" type="number" step="0.001" min="0" value="${escapeHtml(String(selectedObject.energyPrice||""))}" placeholder="np. 85.000" style="width:100%;box-sizing:border-box;" />
-          </div>
-          <div class="tym-field">
-            <label>Udział WaterAI / ESCO (%)</label>
-            <input name="waterAiShare" type="number" step="0.001" min="0" max="100" placeholder="np. 50" style="width:100%;box-sizing:border-box;" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ OKRES ROZLICZENIOWY — niebieski ═══ -->
-    <div class="tym-section" style="border:1px solid #B5D4F4;">
-      <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#185FA5;">📅</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Okres rozliczeniowy</h3>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#B5D4F4;color:#0C447C;">bieżący</span>
-      </div>
-      <div class="tym-body">
-        <div class="tym-grid4">
-          <div class="tym-field">
-            <label>Data od</label>
-            <input name="billingPeriodStartDate" type="date" required style="width:100%;box-sizing:border-box;"
-              oninput="refreshPeriodTable('billing')" />
-          </div>
-          <div class="tym-field">
-            <label>Data do</label>
-            <input name="billingPeriodEndDate" type="date" required style="width:100%;box-sizing:border-box;"
-              oninput="refreshPeriodTable('billing')" />
-          </div>
-          <div class="tym-field">
-            <label>Odczyt startowy</label>
-            <input name="billingPeriodStartReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
-              oninput="refreshConsumption('billing')" />
-          </div>
-          <div class="tym-field">
-            <label>Odczyt końcowy</label>
-            <input name="billingPeriodEndReading" type="number" step="0.001" required style="width:100%;box-sizing:border-box;"
-              oninput="refreshConsumption('billing')" />
-          </div>
-        </div>
-        <table class="tym-table">
-          <thead><tr>
-            <th style="width:30%;">Miesiąc</th>
-            <th style="width:22%;">Śr. temp. (°C)</th>
-            <th style="width:18%;">Dni</th>
-            <th style="width:30%;">HDD</th>
-          </tr></thead>
-          <tbody id="billing-months-tbody">
-            <tr><td colspan="4" style="text-align:center;color:var(--color-text-tertiary);padding:14px;font-size:13px;">Wybierz daty aby zobaczyć miesiące</td></tr>
-          </tbody>
-        </table>
-        <div class="tym-summary">
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#B5D4F4;color:#0C447C;">
-            🔥 HDD: <strong id="billing-hdd-display">—</strong>
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">
-            ⚡ Zużycie: <strong id="billing-consumption-display">—</strong>
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">
-            📅 Łącznie: <strong id="billing-days-display">—</strong> dni
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ OKRES PORÓWNAWCZY — zielony ═══ -->
+<!-- ═══ OKRES PORÓWNAWCZY (BAZOWY) — zielony ═══ -->
     <div class="tym-section" style="border:1px solid #C0DD97;">
       <div style="background:#EAF3DE;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;color:#3B6D11;">📊</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy</h3>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy (bazowy)</h3>
         <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy</span>
         ${prevProtocol ? '<button type="button" onclick="copyPeriodFromProtocol(\'comparison\')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #27500A;border-radius:6px;background:white;color:#27500A;cursor:pointer;white-space:nowrap;">📋 Kopiuj z poprzedniego protokołu</button>' : ''}
       </div>
@@ -3127,7 +3004,7 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
-    <!-- ═══ TYM — pomarańczowy ═══ -->
+<!-- ═══ TYM — pomarańczowy ═══ -->
     <div class="tym-section" style="border:1px solid #FAC775;">
       <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;color:#854F0B;">❄️</span>
@@ -3171,13 +3048,53 @@ function renderMeasurementsModule() {
       </div>
     </div>
 
+
+
     <div style="margin-bottom:16px;">
       <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatka</label>
       <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." style="width:100%;box-sizing:border-box;" />
     </div>
 
     <div style="display:flex;gap:12px;align-items:center;">
-      <button class="primary-button" type="submit">
+      
+
+<!-- ═══ SZCZEGÓŁY PROTOKOŁU ═══ -->
+    <div class="tym-section" style="border:1px solid #C8C8C8;">
+      <div style="background:#F2F2F2;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📋</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#333;">Szczegóły protokołu</h3>
+      </div>
+      <div class="tym-body">
+        <div class="tym-grid4">
+          <div class="tym-field">
+            <label>Data protokołu</label>
+            <input name="protocolDate" type="date" required style="width:100%;box-sizing:border-box;" />
+          </div>
+          <div class="tym-field">
+            <label>Opracował / Energy Analyst</label>
+            <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
+              onchange="(function(s){var w=document.getElementById('preparedBy_wrap');if(s.value==='__other__'){w.style.display='flex';s.removeAttribute('name');document.getElementById('preparedBy_inp').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').focus();}else{w.style.display='none';s.setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');}})(this)">
+              <option value="">— wybierz analityka —</option>
+              ${(window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []).map(u => {
+                const n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
+                const sel = n === (selectedObject.energyAnalystOwner||'') ? 'selected' : '';
+                return '<option value="'+n+'" '+sel+'>'+n+'</option>';
+              }).join('')}
+              <option value="__other__">✏️ Inny (wpisz ręcznie)</option>
+            </select>
+            <div id="preparedBy_wrap" style="display:none;gap:4px;margin-top:4px;align-items:center;">
+              <input id="preparedBy_inp" type="text" placeholder="Wpisz imię i nazwisko"
+                style="flex:1;box-sizing:border-box;"/>
+              <button type="button"
+                onclick="document.getElementById('preparedBy_sel').value='';document.getElementById('preparedBy_sel').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');document.getElementById('preparedBy_inp').value='';document.getElementById('preparedBy_wrap').style.display='none';"
+                style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<button class="primary-button" type="submit">
         ${editingMeasurementId ? "Zapisz protokół" : "Dodaj protokół TYM"}
       </button>
       <button class="small-button" type="button" onclick="cancelMeasurementEdit()">
