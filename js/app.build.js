@@ -3711,8 +3711,7 @@ function renderMeasurementsList() {
       <div class="reminder-card">
         <strong>Brak wybranego obiektu</strong>
         <div class="reminder-meta">Wybierz klienta i obiekt, aby zobaczyć protokoły.</div>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
@@ -3723,57 +3722,53 @@ function renderMeasurementsList() {
       <div class="reminder-card">
         <strong>Brak okresów bazowych</strong>
         <div class="reminder-meta">Dodaj pierwszy okres bazowy dla tego obiektu.</div>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
-  container.innerHTML = protocols.map(item => {
-    const unit = item.energyUnit || "GJ";
-    const fmt3 = v => Number(v || 0).toFixed(3);
+  const rows = protocols.map(item => {
+    const clientNum = ClientsModule.getNumber(item.clientId);
+    const objNum    = ObjectsModule.getNumber(item.objectId);
+    const clientLabel = (clientNum ? 'K'+clientNum+' — ' : '') + escapeHtml(getClientName(item.clientId));
+    const objLabel    = (clientNum && objNum ? 'K'+clientNum+'-'+objNum+' — ' : '') + escapeHtml(getObjectName(item.objectId));
+    const periodFrom  = item.comparisonPeriodStartDate || item.billingPeriodStartDate || '—';
+    const periodTo    = item.comparisonPeriodEndDate   || item.billingPeriodEndDate   || '—';
+    const period      = periodFrom !== '—' ? periodFrom + ' → ' + periodTo : '—';
 
-    return `
-    <div class="reminder-card">
-      <strong>${item.protocolNumber ? escapeHtml(item.protocolNumber)+' — ' : ''}Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
-
-      <div class="reminder-meta">
-        Klient: ${escapeHtml(getClientName(item.clientId))}<br />
-        Obiekt: ${escapeHtml(getObjectName(item.objectId))}<br />
-        Opracował: ${escapeHtml(item.preparedBy || item.energyAnalystOwner || "")}<br />
-        Stacja met.: ${escapeHtml(item.weatherStation || "")}<br />
-        Źródło danych: ${escapeHtml(item.weatherSource || "")}<br />
-        ${item.weatherSourceUrl ? `<a href="${escapeHtml(item.weatherSourceUrl)}" target="_blank" rel="noopener">Link do danych klimatycznych</a><br />` : ""}
-        Temperatura bazowa: ${escapeHtml(String(item.baseTemperature || 21))} °C
-      </div>
-
-      <div class="reminder-meta" style="margin-top:8px;">
-        <strong>Okres bazowy:</strong><br />
-        ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
-        Zużycie: <strong>${fmt3(item.billingConsumption)} ${unit}</strong><br /><br />
-        <strong>Okres porównawczy:</strong><br />
-        ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
-        Zużycie: <strong>${fmt3(item.comparisonConsumption)} ${unit}</strong>
-      </div>
-
-      ${item.includeLinearRegression ? `
-        <div class="reminder-meta" style="margin-top:6px;color:#666;">
-          ☑ Analiza regresji liniowej dołączona jako załącznik
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:10px 12px;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(item.protocolNumber||'—')}</td>
+      <td style="padding:10px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.protocolDate||'—')}</td>
+      <td style="padding:10px 12px;font-size:13px;">${clientLabel}</td>
+      <td style="padding:10px 12px;font-size:13px;">${objLabel}</td>
+      <td style="padding:10px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(period)}</td>
+      <td style="padding:10px 12px;">
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" title="Podgląd">👁</button>
+          <button class="icon-btn" onclick="editMeasurement(${item.id})" title="Edytuj">✏️</button>
+          <button class="icon-btn icon-btn-del" onclick="deleteMeasurement(${item.id})" title="Usuń">🗑</button>
         </div>
-      ` : ""}
+      </td>
+    </tr>`;
+  }).join('');
 
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
-        <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" class="icon-btn" title="Podgląd">👁</button>
-        <button class="small-button" onclick="editMeasurement(${item.id})" class="icon-btn" title="Edytuj">✏️</button>
-        <button class="small-button" onclick="deleteMeasurement(${item.id})" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
-      </div>
-    </div>
-  `}).join("");
+  container.innerHTML = `
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:var(--color-background-secondary);">
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;">Nr protokołu</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;">Data protokołu</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;">Okres bazowy</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// RAPORT ESCO — pełna logika krok po kroku z wykresami
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function generateESCOReport(protocolId) {
   const p = MeasurementsModule.find(protocolId);
