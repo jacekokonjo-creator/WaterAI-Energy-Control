@@ -1101,6 +1101,16 @@ function renderObjectsModule() {
     if (sortObj === 'sales_desc')     return (b.salesRepresentative||'').localeCompare(a.salesRepresentative||'');
     if (sortObj === 'analyst_asc')    return (a.energyAnalystOwner||'').localeCompare(b.energyAnalystOwner||'');
     if (sortObj === 'analyst_desc')   return (b.energyAnalystOwner||'').localeCompare(a.energyAnalystOwner||'');
+    if (sortObj === 'num_asc') {
+      const na = (ClientsModule.getNumber(a.clientId)||0)*1000 + (ObjectsModule.getNumber(a.id)||0);
+      const nb = (ClientsModule.getNumber(b.clientId)||0)*1000 + (ObjectsModule.getNumber(b.id)||0);
+      return na - nb;
+    }
+    if (sortObj === 'num_desc') {
+      const na = (ClientsModule.getNumber(a.clientId)||0)*1000 + (ObjectsModule.getNumber(a.id)||0);
+      const nb = (ClientsModule.getNumber(b.clientId)||0)*1000 + (ObjectsModule.getNumber(b.id)||0);
+      return nb - na;
+    }
     return 0;
   });
 
@@ -1117,8 +1127,10 @@ function renderObjectsModule() {
         const statusColor = objStatusColor[obj.status] || "#666";
         const protCount = MeasurementsModule.findByObject(obj.id).length;
         const objNum = ObjectsModule.getNumber(obj.id);
+        const objClientNum = ClientsModule.getNumber(obj.clientId);
+        const objLabel = (objClientNum != null && objNum != null) ? 'K'+objClientNum+'-'+objNum : '—';
         return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-          <td style="padding:10px 12px;font-size:12px;font-weight:600;color:var(--color-text-tertiary);text-align:center;">${objNum||'—'}</td>
+          <td style="padding:10px 12px;font-size:12px;font-weight:600;color:var(--color-text-tertiary);text-align:center;">${objLabel}</td>
           <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
