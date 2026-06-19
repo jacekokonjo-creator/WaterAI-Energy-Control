@@ -57,6 +57,19 @@ const ClientsModule = {
       if (c.id !== Number(id)) return c;
       return { ...c, ...data, updatedAt: new Date().toISOString() };
     }));
+  },
+
+  // Numer klienta = kolejna pozycja wśród OBECNYCH klientów (sortowanie wg daty utworzenia / id rosnąco).
+  // Nie jest to trwały numer zapisany w rekordzie — przelicza się dynamicznie z aktualnej listy,
+  // więc po usunięciu klienta numeracja pozostałych "zagęszcza się" bez dziur.
+  getOrderedList() {
+    return this.getAll().slice().sort((a, b) => Number(a.id) - Number(b.id));
+  },
+
+  getNumber(id) {
+    const ordered = this.getOrderedList();
+    const idx = ordered.findIndex(c => Number(c.id) === Number(id));
+    return idx === -1 ? null : idx + 1;
   }
 };
 
