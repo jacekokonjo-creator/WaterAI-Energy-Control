@@ -1410,8 +1410,8 @@ function renderAnalysisRegressionContent(obj, allForObj) {
   const editing = editingAnalysisId ? AnalysesModule.find(editingAnalysisId) : null;
   const ip = editing&&editing.inputParams ? editing.inputParams : {};
 
-  // Regression data table rows (30 rows temp range -15 to 19 or from file)
-  const regRows = Array.from({length:35},(_,i)=>i-15).map(t=>`<tr data-t="${t}">
+  // Tabela regresji: 26 wierszy, zakres temp. -15 do +10°C — zgodnie z wzorcem Excel (AVERAGE D4:D29)
+  const regRows = Array.from({length:26},(_,i)=>i-15).map(t=>`<tr data-t="${t}">
     <td style="padding:3px 6px;font-size:13px;text-align:center;">${t}</td>
     <td style="padding:2px 4px;"><input class="reg-supply-before" data-t="${t}" type="number" step="0.01" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
     <td style="padding:2px 4px;"><input class="reg-supply-after" data-t="${t}" type="number" step="0.01" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
@@ -1532,7 +1532,7 @@ function renderAnalysisRegressionContent(obj, allForObj) {
     <div class="anal-section" style="border:1px solid #FAC775;">
       <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">📊</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Tabela danych (zakres temp. -15°C do +19°C)</h3>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Tabela danych (zakres temp. -15°C do +10°C)</h3>
         <button type="button" onclick="calcRegTable()" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;">🔄 Przelicz z równań</button>
       </div>
       <div class="anal-body" style="overflow-x:auto;">
@@ -1920,7 +1920,7 @@ function calcRegTable() {
   if(document.getElementById('reg-heat-before-eq')) document.getElementById('reg-heat-before-eq').textContent=`${hba>=0?'+':''}${hba}x + ${hbb}`;
   if(document.getElementById('reg-heat-after-eq')) document.getElementById('reg-heat-after-eq').textContent=`${haa>=0?'+':''}${haa}x + ${hab}`;
 
-  let totalSupplyDiff=0, totalHeatDiff=0, count=0;
+  let totalSupplyDiff=0, totalHeatDiff=0, count=0, countH=0;
   document.querySelectorAll('#reg-data-table tr').forEach(tr=>{
     const t=Number(tr.dataset.t);
     const sb=sba*t+sbb, sa=saa*t+sab;
@@ -1935,13 +1935,15 @@ function calcRegTable() {
     if(hba!==0||hbb!==0) { if(heatBefore&&!heatBefore.value) heatBefore.value=hb.toFixed(3); if(heatAfter&&!heatAfter.value) heatAfter.value=ha.toFixed(3); }
     const sbv=Number(supplyBefore?.value||0), sav=Number(supplyAfter?.value||0);
     const hbv=Number(heatBefore?.value||0), hav=Number(heatAfter?.value||0);
-    if(sbv>0&&sav>=0){const d=(sav-sbv)/sbv*100;if(supplyDiff)supplyDiff.textContent=d.toFixed(2)+'%';totalSupplyDiff+=d;count++;}
-    if(hbv>0&&hav>=0){const d=(hav-hbv)/hbv*100;if(heatDiff)heatDiff.textContent=d.toFixed(2)+'%';totalHeatDiff+=d;}
+    // % obniżenia wg wzorca Excel: (PRZED − PO) / PRZED × 100  (wartość dodatnia = redukcja)
+    if(sbv>0&&sav>=0){const d=(sbv-sav)/sbv*100;if(supplyDiff)supplyDiff.textContent=d.toFixed(2)+'%';totalSupplyDiff+=d;count++;}
+    if(hbv>0&&hav>=0){const d=(hbv-hav)/hbv*100;if(heatDiff)heatDiff.textContent=d.toFixed(2)+'%';totalHeatDiff+=d;countH++;}
   });
-  if(count>0){
-    const avgS=totalSupplyDiff/count, avgH=totalHeatDiff/count;
-    if(document.getElementById('reg-avg-supply'))document.getElementById('reg-avg-supply').textContent=avgS.toFixed(2)+'%';
-    if(document.getElementById('reg-avg-heat'))document.getElementById('reg-avg-heat').textContent=avgH.toFixed(2)+'%';
+  const avgS = count>0  ? totalSupplyDiff/count  : null;
+  const avgH = countH>0 ? totalHeatDiff/countH   : null;
+  if(document.getElementById('reg-avg-supply')) document.getElementById('reg-avg-supply').textContent = avgS!=null ? avgS.toFixed(2)+'%' : '—';
+  if(document.getElementById('reg-avg-heat'))   document.getElementById('reg-avg-heat').textContent   = avgH!=null ? avgH.toFixed(2)+'%' : '—';
+  if(avgS!=null || avgH!=null){
     window._regResults={avgReductionSupply:avgS, avgReductionHeat:avgH};
   }
 }
