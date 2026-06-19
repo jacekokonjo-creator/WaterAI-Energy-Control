@@ -1,5 +1,9 @@
 // WaterAI Energy Control
-// Migration Module v1.1.0
+// Migration Module v1.2.0
+//
+// NAPRAWA: migracja v1→v2 wykonuje się teraz DOKŁADNIE RAZ (znacznik w localStorage),
+// a po zakończeniu stary klucz v1 jest usuwany. Dzięki temu rekord skasowany przez
+// użytkownika w v2 nie jest ponownie wstawiany przy każdym odświeżeniu strony.
 
 const MigrationModule = {
 
@@ -11,55 +15,65 @@ const MigrationModule = {
   },
 
   migrateClients() {
+    // Jeśli migracja już się odbyła — nic nie rób (kluczowa zmiana).
+    if (localStorage.getItem('waterai_clients_v1_migrated')) return;
+
     const v2 = JSON.parse(localStorage.getItem('waterai_clients_v2') || '[]');
     const v1 = JSON.parse(localStorage.getItem('waterai_clients_v1') || '[]');
-    if (!v1.length) return;
 
-    // Merge: add any v1 entries not already in v2 (by id)
-    const v2ids = new Set(v2.map(c => Number(c.id)));
-    const toAdd = v1.filter(c => !v2ids.has(Number(c.id))).map(c => ({
-      ...c,
-      regon: c.regon || '',
-      status: c.status || 'ACTIVE',
-      cooperationStartDate: c.cooperationStartDate || '',
-      notes: c.notes || ''
-    }));
-    if (toAdd.length) {
-      const merged = [...v2, ...toAdd];
-      localStorage.setItem('waterai_clients_v2', JSON.stringify(merged));
-      console.log('[WaterAI] Merged ' + toAdd.length + ' clients v1→v2');
+    if (v1.length) {
+      const v2ids = new Set(v2.map(c => Number(c.id)));
+      const toAdd = v1.filter(c => !v2ids.has(Number(c.id))).map(c => ({
+        ...c,
+        regon: c.regon || '',
+        status: c.status || 'ACTIVE',
+        cooperationStartDate: c.cooperationStartDate || '',
+        notes: c.notes || ''
+      }));
+      if (toAdd.length) {
+        localStorage.setItem('waterai_clients_v2', JSON.stringify([...v2, ...toAdd]));
+        console.log('[WaterAI] Migrated ' + toAdd.length + ' clients v1→v2');
+      }
     }
+
+    // Migracja zakończona: usuń stary klucz i ustaw znacznik, żeby już nigdy nie wróciła.
+    localStorage.removeItem('waterai_clients_v1');
+    localStorage.setItem('waterai_clients_v1_migrated', new Date().toISOString());
   },
 
   migrateObjects() {
+    if (localStorage.getItem('waterai_objects_v1_migrated')) return;
+
     const v2 = JSON.parse(localStorage.getItem('waterai_objects_v2') || '[]');
     const v1 = JSON.parse(localStorage.getItem('waterai_objects_v1') || '[]');
-    if (!v1.length) return;
 
-    // Merge: add any v1 entries not already in v2 (by id)
-    const v2ids = new Set(v2.map(o => Number(o.id)));
-    const toAdd = v1.filter(o => !v2ids.has(Number(o.id))).map(o => ({
-      ...o,
-      totalArea: o.totalArea || 0,
-      heatedArea: o.heatedArea || 0,
-      cooledArea: o.cooledArea || 0,
-      yearBuilt: o.yearBuilt || null,
-      description: o.description || '',
-      contractStartDate: o.contractStartDate || '',
-      contractEndDate: o.contractEndDate || '',
-      installationDate: o.installationDate || '',
-      commissioningDate: o.commissioningDate || '',
-      settlementModel: o.settlementModel || 'ESCO',
-      escoShare: o.escoShare || 50,
-      paymentDays: o.paymentDays || 14,
-      invoiceEmail: o.invoiceEmail || '',
-      salesRepresentative: o.salesRepresentative || ''
-    }));
-    if (toAdd.length) {
-      const merged = [...v2, ...toAdd];
-      localStorage.setItem('waterai_objects_v2', JSON.stringify(merged));
-      console.log('[WaterAI] Merged ' + toAdd.length + ' objects v1→v2');
+    if (v1.length) {
+      const v2ids = new Set(v2.map(o => Number(o.id)));
+      const toAdd = v1.filter(o => !v2ids.has(Number(o.id))).map(o => ({
+        ...o,
+        totalArea: o.totalArea || 0,
+        heatedArea: o.heatedArea || 0,
+        cooledArea: o.cooledArea || 0,
+        yearBuilt: o.yearBuilt || null,
+        description: o.description || '',
+        contractStartDate: o.contractStartDate || '',
+        contractEndDate: o.contractEndDate || '',
+        installationDate: o.installationDate || '',
+        commissioningDate: o.commissioningDate || '',
+        settlementModel: o.settlementModel || 'ESCO',
+        escoShare: o.escoShare || 50,
+        paymentDays: o.paymentDays || 14,
+        invoiceEmail: o.invoiceEmail || '',
+        salesRepresentative: o.salesRepresentative || ''
+      }));
+      if (toAdd.length) {
+        localStorage.setItem('waterai_objects_v2', JSON.stringify([...v2, ...toAdd]));
+        console.log('[WaterAI] Migrated ' + toAdd.length + ' objects v1→v2');
+      }
     }
+
+    localStorage.removeItem('waterai_objects_v1');
+    localStorage.setItem('waterai_objects_v1_migrated', new Date().toISOString());
   },
 
   migrateWorkflowToCalendar() {
