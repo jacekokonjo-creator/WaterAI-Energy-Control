@@ -330,6 +330,8 @@ function renderClientsList() {
     if (sort === 'city_desc')   return (b.city||'').localeCompare(a.city||'');
     if (sort === 'vat_asc')     return (a.vatId||'').localeCompare(b.vatId||'');
     if (sort === 'vat_desc')    return (b.vatId||'').localeCompare(a.vatId||'');
+    if (sort === 'num_asc')     return (ClientsModule.getNumber(a.id)||0) - (ClientsModule.getNumber(b.id)||0);
+    if (sort === 'num_desc')    return (ClientsModule.getNumber(b.id)||0) - (ClientsModule.getNumber(a.id)||0);
     return 0;
   });
 
@@ -387,7 +389,7 @@ function renderClientsList() {
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
-            <th style="text-align:center;padding:8px 12px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);width:42px;">#</th>
+            ${thS('num','#')}
             ${thS('name','Nazwa klienta')}
             ${thS('country','Kraj')}
             ${thS('city','Miasto')}
@@ -1165,7 +1167,7 @@ function renderObjectsModule() {
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--color-background-secondary);">
-            <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);width:40px;">#</th>
+            ${thObj('num','#')}
             ${thObj('name','Nazwa obiektu')}
             ${thObj('client','Klient')}
             ${thObj('type','Typ')}
