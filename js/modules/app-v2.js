@@ -1138,6 +1138,8 @@ function renderAnalysisTYMContent(obj, allForObj) {
 
   // Billing months template (dynamic)
   // Comparison months template (dynamic)
+  const baseProtocols = (typeof MeasurementsModule !== 'undefined' ? MeasurementsModule.findByObject(selectedAnalysisObjectId) : []);
+
   const form = `
   <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1208,68 +1210,13 @@ function renderAnalysisTYMContent(obj, allForObj) {
         </div>
         <div class="anal-grid4">
           <div class="anal-field"><label>Stacja meteo</label><input name="weatherStation" placeholder="np. Sliač, Słowacja" value="${escapeHtml(ip.weatherStation||obj.weatherStation||'')}"/></div>
-          <div class="anal-field"><label>Temperatura bazowa T_b (°C)</label><input name="baseTemp" type="number" step="0.1" value="${ip.baseTemperature||obj.baseTemperature||21}"/></div>
-          <div class="anal-field"><label>Jednostka energii</label><select name="energyUnit">
-            <option value="kWh" ${(ip.energyUnit||'kWh')==='kWh'?'selected':''}>kWh</option>
-            <option value="m³" ${(ip.energyUnit||'')==='m³'?'selected':''}>m³ (gaz)</option>
-            <option value="GJ" ${(ip.energyUnit||'')==='GJ'?'selected':''}>GJ</option>
-            <option value="MWh" ${(ip.energyUnit||'')==='MWh'?'selected':''}>MWh</option>
-          </select></div>
-          <div class="anal-field"><label>Waluta</label><select name="currency">
-            <option value="EUR" ${(ip.currency||'EUR')==='EUR'?'selected':''}>EUR</option>
-            <option value="PLN" ${(ip.currency||'')==='PLN'?'selected':''}>PLN</option>
-            <option value="CZK" ${(ip.currency||'')==='CZK'?'selected':''}>CZK</option>
-            <option value="SKK" ${(ip.currency||'')==='SKK'?'selected':''}>SKK</option>
-          </select></div>
-        </div>
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Cena energii (za jednostkę)</label><input name="energyPrice" type="number" step="0.001" min="0" value="${ip.energyPrice||obj.energyPrice||''}" placeholder="np. 0.191"/></div>
-          <div class="anal-field"><label>Udział ESCO (%)</label><input name="escoShare" type="number" min="0" max="100" value="${ip.escoShare||obj.escoShare||50}"/></div>
+          <div class="anal-field"><label>Temperatura bazowa T_b (°C)</label><input name="baseTemp" type="number" step="0.1" value="${ip.baseTemperature||obj.baseTemperature||21}" oninput="calcAnalTYM()"/></div>
           <div class="anal-field"></div><div class="anal-field"></div>
         </div>
       </div>
     </div>
 
-    
-      <!-- DANE ENERGETYCZNE -->
-      <div class="anal-section" style="border:1px solid #C8B5F4;">
-        <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">⚡</span>
-          <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
-        </div>
-        <div class="anal-body">
-          <div class="anal-grid4">
-            <div class="anal-field"><label>Jednostka energii</label>
-              <select name="energyUnit">
-                <option value="kWh" ${(ip.energyUnit||obj.energyUnit||'kWh')==='kWh'?'selected':''}>kWh</option>
-                <option value="m³" ${(ip.energyUnit||obj.energyUnit||'')==='m³'?'selected':''}>m³ (gaz)</option>
-                <option value="GJ"  ${(ip.energyUnit||obj.energyUnit||'')==='GJ'?'selected':''}>GJ</option>
-                <option value="MWh" ${(ip.energyUnit||obj.energyUnit||'')==='MWh'?'selected':''}>MWh</option>
-              </select>
-            </div>
-            <div class="anal-field"><label>Waluta</label>
-              <select name="currency">
-                <option value="PLN" ${(ip.currency||obj.currency||'PLN')==='PLN'?'selected':''}>PLN</option>
-                <option value="EUR" ${(ip.currency||obj.currency||'')==='EUR'?'selected':''}>EUR</option>
-                <option value="CZK" ${(ip.currency||obj.currency||'')==='CZK'?'selected':''}>CZK</option>
-                <option value="USD" ${(ip.currency||obj.currency||'')==='USD'?'selected':''}>USD</option>
-              </select>
-            </div>
-            <div class="anal-field"><label>Cena energii (za jednostkę)</label>
-              <input name="energyPrice" type="number" step="0.0001" min="0"
-                value="${ip.energyPrice||obj.energyPrice||''}"
-                placeholder="np. 0.54" style="width:100%;box-sizing:border-box;"/>
-            </div>
-            <div class="anal-field"><label>Udział WaterAI / ESCO (%)</label>
-              <input name="escoShare" type="number" step="0.1" min="0" max="100"
-                value="${ip.escoShare!=null?ip.escoShare:(obj.escoShare!=null?obj.escoShare:'')}"
-                placeholder="np. 50" style="width:100%;box-sizing:border-box;"/>
-            </div>
-          </div>
-        </div>
-      </div>
-
-<!-- OKRES ROZLICZENIOWY -->
+    <!-- OKRES ROZLICZENIOWY -->
     <div class="anal-section" style="border:1px solid #B5D4F4;">
       <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;color:#185FA5;">📅</span>
@@ -1280,8 +1227,8 @@ function renderAnalysisTYMContent(obj, allForObj) {
         <div class="anal-grid4">
           <div class="anal-field"><label>Data od</label><input name="billFrom" type="date" required value="${ip.billingFrom||''}" oninput="buildAnalPeriodTable('bill')"/></div>
           <div class="anal-field"><label>Data do</label><input name="billTo" type="date" required value="${ip.billingTo||''}" oninput="buildAnalPeriodTable('bill')"/></div>
-          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="billConsumption" type="number" step="0.001" required value="${ip.billingConsumption||''}" placeholder="z licznika"/></div>
-          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="billCO" type="number" step="0.001" value="${ip.billingCO||''}" placeholder="jeśli podzielone"/></div>
+          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="billConsumption" type="number" step="0.001" required value="${ip.billingConsumption||''}" placeholder="z licznika" oninput="calcAnalTYM()"/></div>
+          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="billCO" type="number" step="0.001" value="${ip.billingCO||''}" placeholder="jeśli podzielone" oninput="calcAnalTYM()"/></div>
         </div>
         <table class="anal-table">
           <thead><tr>
@@ -1299,20 +1246,72 @@ function renderAnalysisTYMContent(obj, allForObj) {
       </div>
     </div>
 
-    <!-- OKRES PORÓWNAWCZY -->
-    <div class="anal-section" style="border:1px solid #C0DD97;">
-      <div style="background:#EAF3DE;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#3B6D11;">📊</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy</h3>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy (przed WaterAI)</span>
-        ${prev?`<button type="button" onclick="copyAnalPrevPeriod('comp')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #27500A;border-radius:6px;background:white;color:#27500A;cursor:pointer;">📋 Kopiuj z poprzedniej</button>`:''}
+    <!-- DANE ENERGETYCZNE -->
+    <div class="anal-section" style="border:1px solid #C8B5F4;">
+      <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">⚡</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
       </div>
       <div class="anal-body">
         <div class="anal-grid4">
+          <div class="anal-field"><label>Jednostka energii</label>
+            <select name="energyUnit" onchange="calcAnalTYM()">
+              <option value="kWh" ${(ip.energyUnit||obj.energyUnit||'kWh')==='kWh'?'selected':''}>kWh</option>
+              <option value="m³" ${(ip.energyUnit||obj.energyUnit||'')==='m³'?'selected':''}>m³ (gaz/woda)</option>
+              <option value="GJ"  ${(ip.energyUnit||obj.energyUnit||'')==='GJ'?'selected':''}>GJ</option>
+              <option value="MWh" ${(ip.energyUnit||obj.energyUnit||'')==='MWh'?'selected':''}>MWh</option>
+            </select>
+          </div>
+          <div class="anal-field"><label>Waluta</label>
+            <select name="currency" onchange="calcAnalTYM()">
+              <option value="PLN" ${(ip.currency||obj.currency||'PLN')==='PLN'?'selected':''}>PLN</option>
+              <option value="EUR" ${(ip.currency||obj.currency||'')==='EUR'?'selected':''}>EUR</option>
+              <option value="CZK" ${(ip.currency||obj.currency||'')==='CZK'?'selected':''}>CZK</option>
+              <option value="USD" ${(ip.currency||obj.currency||'')==='USD'?'selected':''}>USD</option>
+            </select>
+          </div>
+          <div class="anal-field"><label>Cena energii (za jednostkę)</label>
+            <input name="energyPrice" type="number" step="0.0001" min="0"
+              value="${ip.energyPrice||obj.energyPrice||''}"
+              placeholder="np. 0.54" oninput="calcAnalTYM()"/>
+          </div>
+          <div class="anal-field"><label>Udział WaterAI / ESCO (%)</label>
+            <input name="escoShare" type="number" step="0.1" min="0" max="100"
+              value="${ip.escoShare!=null?ip.escoShare:(obj.escoShare!=null?obj.escoShare:50)}"
+              placeholder="np. 50"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OKRES PORÓWNAWCZY (BAZOWY) -->
+    <div class="anal-section" style="border:1px solid #C0DD97;">
+      <div style="background:#EAF3DE;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;color:#3B6D11;">📊</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy (bazowy)</h3>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">przed WaterAI</span>
+      </div>
+      <div class="anal-body">
+
+        <div class="anal-field" style="margin-bottom:14px;">
+          <label>Wybierz okres bazowy</label>
+          <select name="sourceProtocolId" id="anal-base-protocol-sel" style="width:100%;"
+            onchange="applyBaseProtocolToAnal(this.value)">
+            <option value="">— wpisz ręcznie poniżej —</option>
+            ${baseProtocols.map(p=>{
+              const sel = ip.sourceProtocolId && Number(ip.sourceProtocolId)===Number(p.id) ? 'selected' : '';
+              const label = (p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
+              return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
+            }).join('')}
+          </select>
+          <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla tego obiektu. Wybór wypełni poniższe pola automatycznie — możesz je jeszcze skorygować.</p>
+        </div>
+
+        <div class="anal-grid4">
           <div class="anal-field"><label>Data od</label><input name="compFrom" type="date" required value="${ip.compFrom||''}" oninput="buildAnalPeriodTable('comp')"/></div>
           <div class="anal-field"><label>Data do</label><input name="compTo" type="date" required value="${ip.compTo||''}" oninput="buildAnalPeriodTable('comp')"/></div>
-          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="compConsumption" type="number" step="0.001" required value="${ip.compConsumption||''}" placeholder="z licznika"/></div>
-          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="compCO" type="number" step="0.001" value="${ip.compCO||''}" placeholder="jeśli podzielone"/></div>
+          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="compConsumption" type="number" step="0.001" required value="${ip.compConsumption||''}" placeholder="z licznika" oninput="calcAnalTYM()"/></div>
+          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="compCO" type="number" step="0.001" value="${ip.compCO||''}" placeholder="jeśli podzielone" oninput="calcAnalTYM()"/></div>
         </div>
         <table class="anal-table">
           <thead><tr>
@@ -1371,10 +1370,12 @@ function renderAnalysisTYMContent(obj, allForObj) {
         <div><div style="font-size:28px;font-weight:700;" id="res-e-index">—</div><div style="font-size:11px;opacity:.8;">spadek wsk. E</div></div>
       </div>
       <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;opacity:.9;">
-        <div>Wskaźnik E rozlicz.: <strong id="res-e-bill">—</strong></div>
-        <div>Wskaźnik E porówn.: <strong id="res-e-comp">—</strong></div>
-        <div>k rozlicz.: <strong id="res-k-bill">—</strong></div>
-        <div>k porówn.: <strong id="res-k-comp">—</strong></div>
+        <div>Wskaźnik E rozlicz. (zużycie/HDD_TYM): <strong id="res-e-bill">—</strong></div>
+        <div>Wskaźnik E porówn. (zużycie/HDD_TYM): <strong id="res-e-comp">—</strong></div>
+        <div>Współczynnik korekty k rozlicz. (HDD_TYM/HDD_rzecz): <strong id="res-k-bill">—</strong></div>
+        <div>Współczynnik korekty k porówn. (HDD_TYM/HDD_rzecz): <strong id="res-k-comp">—</strong></div>
+        <div>Zużycie skor. do TYM (rozlicz.): <strong id="res-cons-bill-tym">—</strong></div>
+        <div>Zużycie skor. do TYM (porówn.): <strong id="res-cons-comp-tym">—</strong></div>
       </div>
     </div>
 
@@ -1677,41 +1678,59 @@ function refreshAnalPeriodHDD(prefix) {
 function calcAnalTYM() {
   refreshAnalPeriodHDD('bill');
   refreshAnalPeriodHDD('comp');
-  // TYM sum
+
   const baseTempEl=document.querySelector('[name="baseTemp"]');
   const baseTemp=baseTempEl?Number(baseTempEl.value||21):21;
-  let hddTym=0,daysTym=0;
+
+  // ── HDD TYM per-month (used to build proportional HDD_TYM for each period) ──
+  const tymByMonth={}; // month(1-12) -> avg temp
+  let hddTymSum=0, daysTymSum=0;
   for(let m=1;m<=12;m++){
     const t=document.querySelector(`[name="tymTemp_anal_${m}"]`);
     const d=document.querySelector(`[name="tymDays_anal_${m}"]`);
     const cell=document.getElementById(`hdd-tym-anal-${m}`);
     if(!t||t.value===''){if(cell)cell.textContent='—';continue;}
     const days=Number(d?d.value:0);
-    const hdd=Math.max(0,baseTemp-Number(t.value))*days;
-    hddTym+=hdd; daysTym+=days;
+    const temp=Number(t.value);
+    tymByMonth[m]=temp;
+    const hdd=Math.max(0,baseTemp-temp)*days;
+    hddTymSum+=hdd; daysTymSum+=days;
     if(cell)cell.textContent=hdd.toFixed(1);
   }
   const hddSumEl=document.getElementById('hdd-tym-anal-sum');
   const daysSumEl=document.getElementById('days-tym-anal-sum');
-  if(hddSumEl)hddSumEl.textContent=hddTym.toFixed(2);
-  if(daysSumEl)daysSumEl.textContent=daysTym;
+  if(hddSumEl)hddSumEl.textContent=hddTymSum.toFixed(2);
+  if(daysSumEl)daysSumEl.textContent=daysTymSum;
 
-  // Calculate results
+  // ── HDD rzeczywiste dla każdego okresu (rozliczeniowy/porównawczy) ──
+  // oraz HDD_TYM DLA TYCH SAMYCH MIESIĘCY co dany okres (wg wzoru Excela: HDD_TYM liczone
+  // na rozbiciu dni KAŻDEGO okresu na miesiące, używając normy TYM dla danego miesiąca)
   const billTbody=document.getElementById('bill-months-anal');
   const compTbody=document.getElementById('comp-months-anal');
   if(!billTbody||!compTbody) return;
-  let hddBill=0, hddComp=0;
+
+  let hddBillReal=0, hddBillTym=0, daysBill=0;
   billTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
+    const key=tr.dataset.key; const month=Number(key.split('-')[1]);
     const t=tr.querySelector('input.anal-month-temp');
     const d=tr.querySelector('input.anal-month-days');
     if(!t||t.value==='') return;
-    hddBill+=Math.max(0,baseTemp-Number(t.value))*Number(d?d.value:0);
+    const days=Number(d?d.value:0);
+    hddBillReal+=Math.max(0,baseTemp-Number(t.value))*days;
+    if(tymByMonth[month]!=null) hddBillTym+=Math.max(0,baseTemp-tymByMonth[month])*days;
+    daysBill+=days;
   });
+
+  let hddCompReal=0, hddCompTym=0, daysComp=0;
   compTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
+    const key=tr.dataset.key; const month=Number(key.split('-')[1]);
     const t=tr.querySelector('input.anal-month-temp');
     const d=tr.querySelector('input.anal-month-days');
     if(!t||t.value==='') return;
-    hddComp+=Math.max(0,baseTemp-Number(t.value))*Number(d?d.value:0);
+    const days=Number(d?d.value:0);
+    hddCompReal+=Math.max(0,baseTemp-Number(t.value))*days;
+    if(tymByMonth[month]!=null) hddCompTym+=Math.max(0,baseTemp-tymByMonth[month])*days;
+    daysComp+=days;
   });
 
   const billCOEl=document.querySelector('[name="billCO"]');
@@ -1720,33 +1739,40 @@ function calcAnalTYM() {
   const compConsEl=document.querySelector('[name="compConsumption"]');
   const priceEl=document.querySelector('[name="energyPrice"]');
   const unitEl=document.querySelector('[name="energyUnit"]');
+  const currencyEl=document.querySelector('[name="currency"]');
 
   const billCons=Number((billCOEl&&billCOEl.value)?billCOEl.value:(billConsEl?billConsEl.value:0));
   const compCons=Number((compCOEl&&compCOEl.value)?compCOEl.value:(compConsEl?compConsEl.value:0));
   const price=Number(priceEl?priceEl.value:0);
   const unit=unitEl?unitEl.value:'kWh';
+  const currency=currencyEl?currencyEl.value:'EUR';
 
-  if(!hddTym||!hddBill||!hddComp||!billCons||!compCons) { document.getElementById('anal-tym-results')&&(document.getElementById('anal-tym-results').style.display='none'); return; }
+  if(!hddBillTym||!hddCompTym||!hddBillReal||!hddCompReal||!billCons||!compCons){
+    const rd=document.getElementById('anal-tym-results'); if(rd) rd.style.display='none';
+    return;
+  }
 
-  // Wskaźnik E = CO / HDD_TYM
-  // Dla okresu rozlicz: HDD_TYM proporcjonalne do liczby miesięcy rozlicz
-  const billDaysEl=document.getElementById('bill-days-anal');
-  const compDaysEl=document.getElementById('comp-days-anal');
-  const billDays=billDaysEl?Number(billDaysEl.textContent||0):0;
-  const compDays=compDaysEl?Number(compDaysEl.textContent||0):0;
-  const totalDays2=billDays+compDays||365;
-  const hddTymBill=hddTym*(billDays/totalDays2||0.5);
-  const hddTymComp=hddTym*(compDays/totalDays2||0.5);
+  // ── Wzory zgodne z protokołem Excel ──
+  // k = HDD_TYM / HDD_rzeczywiste  (osobno dla każdego okresu)
+  const kBill = hddBillReal>0 ? hddBillTym/hddBillReal : 0;
+  const kComp = hddCompReal>0 ? hddCompTym/hddCompReal : 0;
 
-  const eBill = hddTymBill>0 ? billCons/hddTymBill : 0;
-  const eComp = hddTymComp>0 ? compCons/hddTymComp : 0;
+  // Zużycie skorygowane do TYM = zużycie_rzecz × k
+  const consBillTym = billCons*kBill;
+  const consCompTym = compCons*kComp;
 
-  const coBezTech = eComp * hddTymBill;
-  const savedEnergy = coBezTech - billCons;
-  const savedPct = coBezTech>0 ? savedEnergy/coBezTech : 0;
-  const savedMoney = savedEnergy * price;
-  const kBill = hddBill>0 ? hddTymBill/hddBill : 0;
-  const kComp = hddComp>0 ? hddTymComp/hddComp : 0;
+  // Wskaźnik energetyczny E = zużycie_rzecz / HDD_TYM  [jednostka/HDD]
+  const eBill = hddBillTym>0 ? billCons/hddBillTym : 0;
+  const eComp = hddCompTym>0 ? compCons/hddCompTym : 0;
+
+  // Zużycie porównawcze przeliczone na HDD_TYM okresu rozliczeniowego (ile zużyłbyś BEZ
+  // technologii w takim samym okresie/pogodzie co rozliczeniowy)
+  const consCompProjectedToBill = eComp*hddBillTym;
+
+  // Oszczędność = zużycie_bez_technologii − zużycie_z_technologią (po korekcie TYM)
+  const savedEnergy = consCompProjectedToBill - consBillTym;
+  const savedPct = consCompProjectedToBill>0 ? savedEnergy/consCompProjectedToBill : 0;
+  const savedMoney = savedEnergy*price;
   const eChange = eComp>0 ? (eBill-eComp)/eComp : 0;
 
   const resDiv=document.getElementById('anal-tym-results');
@@ -1754,16 +1780,51 @@ function calcAnalTYM() {
     resDiv.style.display='block';
     document.getElementById('res-pct').textContent=(savedPct*100).toFixed(1)+'%';
     document.getElementById('res-energy').textContent=savedEnergy.toFixed(2)+' '+unit;
-    document.getElementById('res-money').textContent=price>0?savedMoney.toFixed(2)+' '+(document.querySelector('[name="currency"]')?document.querySelector('[name="currency"]').value:'EUR'):'—';
+    document.getElementById('res-money').textContent=price>0?savedMoney.toFixed(2)+' '+currency:'—';
     document.getElementById('res-e-index').textContent=(eChange*100).toFixed(1)+'%';
-    document.getElementById('res-e-bill').textContent=eBill.toFixed(3)+' '+unit+'/HDD';
-    document.getElementById('res-e-comp').textContent=eComp.toFixed(3)+' '+unit+'/HDD';
+    document.getElementById('res-e-bill').textContent=eBill.toFixed(4)+' '+unit+'/HDD';
+    document.getElementById('res-e-comp').textContent=eComp.toFixed(4)+' '+unit+'/HDD';
     document.getElementById('res-k-bill').textContent=kBill.toFixed(4);
     document.getElementById('res-k-comp').textContent=kComp.toFixed(4);
+    document.getElementById('res-cons-bill-tym').textContent=consBillTym.toFixed(2)+' '+unit;
+    document.getElementById('res-cons-comp-tym').textContent=consCompTym.toFixed(2)+' '+unit;
   }
-  // Store for form save
-  window._analTYMResults = { savedEnergy, savedEnergyPct:savedPct, savedMoney, eBill, eComp, kBill, kComp, eChange, hddTymBill, hddTymComp };
+
+  window._analTYMResults = {
+    savedEnergy, savedEnergyPct:savedPct, savedMoney, eBill, eComp, kBill, kComp, eChange,
+    hddBillReal, hddCompReal, hddBillTym, hddCompTym, consBillTym, consCompTym, consCompProjectedToBill
+  };
 }
+
+function applyBaseProtocolToAnal(protocolId) {
+  if (!protocolId) return;
+  const p = MeasurementsModule.find(protocolId);
+  if (!p) return;
+
+  const setVal = (name, val) => { const el=document.querySelector(`[name="${name}"]`); if(el && val!=null && val!=='') el.value=val; };
+
+  setVal('compFrom', p.comparisonPeriodStartDate);
+  setVal('compTo', p.comparisonPeriodEndDate);
+  setVal('compConsumption', p.comparisonConsumption);
+  if (p.weatherStation) setVal('weatherStation', p.weatherStation);
+  if (p.baseTemperature) setVal('baseTemp', p.baseTemperature);
+
+  buildAnalPeriodTable('comp');
+
+  // Fill monthly temps/days from saved comparisonMonthly if present
+  setTimeout(()=>{
+    (p.comparisonMonthly||[]).forEach(m=>{
+      if (m.year==null || m.month==null) return;
+      const tr=document.querySelector(`#comp-months-anal tr[data-key="${m.year}-${m.month}"]`);
+      if(!tr) return;
+      const t=tr.querySelector('input.anal-month-temp'); const d=tr.querySelector('input.anal-month-days');
+      if(t && m.temperature!=null) t.value=m.temperature;
+      if(d && m.days!=null) d.value=m.days;
+    });
+    calcAnalTYM();
+  }, 60);
+}
+
 
 function calcRegTable() {
   const sba=Number(document.querySelector('[name="supplyBefore_a"]')?.value||0);
@@ -1827,6 +1888,7 @@ function saveTYMAnalysis(form) {
     const d=document.querySelector(`[name="tymDays_anal_${m}"]`);
     tymMonths.push({month:m,temp:t&&t.value!==''?Number(t.value):null,days:Number(d?d.value:MONTH_DAYS_ANAL[m-1])});
   }
+  const sourceProtocolSel = document.getElementById('anal-base-protocol-sel');
   const data = {
     clientId: selectedAnalysisObjectId ? Number(ObjectsModule.find(selectedAnalysisObjectId)?.clientId) : 0,
     objectId: selectedAnalysisObjectId,
@@ -1837,6 +1899,7 @@ function saveTYMAnalysis(form) {
     status: form.analStatus.value,
     comments: form.analNotes.value.trim(),
     inputParams: {
+      sourceProtocolId: sourceProtocolSel && sourceProtocolSel.value ? Number(sourceProtocolSel.value) : null,
       billingFrom: form.billFrom.value,
       billingTo: form.billTo.value,
       billingConsumption: Number(form.billConsumption.value),
@@ -1865,8 +1928,13 @@ function saveTYMAnalysis(form) {
       kBill: r.kBill,
       kComp: r.kComp,
       eChange: r.eChange,
-      hddTymBill: r.hddTymBill,
-      hddTymComp: r.hddTymComp
+      hddBillReal: r.hddBillReal,
+      hddCompReal: r.hddCompReal,
+      hddTymBill: r.hddBillTym,
+      hddTymComp: r.hddCompTym,
+      consBillTym: r.consBillTym,
+      consCompTym: r.consCompTym,
+      consCompProjectedToBill: r.consCompProjectedToBill
     }
   };
   if (editingAnalysisId) { AnalysesModule.update(editingAnalysisId, data); }
@@ -1874,6 +1942,7 @@ function saveTYMAnalysis(form) {
   showAnalysisForm=false; editingAnalysisId=null;
   renderAnalysesModule();
 }
+
 
 function saveRegAnalysis(form) {
   const r = window._regResults || {};
