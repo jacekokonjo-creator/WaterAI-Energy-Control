@@ -1,0 +1,16 @@
+# Sekrety / poświadczenia — NIGDY nie commitować
+token.txt
+*.token
+.env
+.env.*
+secrets.*
+
+# Śmieci systemowe / edytora
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Logi
+*.log
