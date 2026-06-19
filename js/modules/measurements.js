@@ -79,6 +79,28 @@ const MeasurementsModule = {
       .sort((a, b) =>
         String(b.protocolDate || "").localeCompare(String(a.protocolDate || ""))
       );
+  },
+
+  // Protokoły obiektu posortowane chronologicznie wg utworzenia (do numeracji kolejnej, nie po dacie protokołu)
+  findByObjectChrono(objectId) {
+    return this.getAll()
+      .filter(item => Number(item.objectId) === Number(objectId))
+      .sort((a, b) => Number(a.id) - Number(b.id));
+  },
+
+  // Sugerowany kolejny numer protokołu dla danego obiektu, z prefiksem K{nr klienta}-O{nr obiektu}.
+  // excludeId pozwala pominąć aktualnie edytowany protokół przy liczeniu kolejności.
+  suggestProtocolNumber(objectId, excludeId) {
+    const obj = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.find(objectId) : null;
+    if (!obj) return '';
+    const clientNum = (typeof ClientsModule !== 'undefined') ? ClientsModule.getNumber(obj.clientId) : null;
+    const objNum = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.getNumber(objectId) : null;
+    if (clientNum == null || objNum == null) return '';
+    const existing = this.findByObjectChrono(objectId)
+      .filter(p => !excludeId || Number(p.id) !== Number(excludeId));
+    const seq = existing.length + 1;
+    const seqStr = String(seq).padStart(3, '0');
+    return `K${clientNum}-O${objNum}-${seqStr}`;
   }
 };
 
