@@ -1078,7 +1078,7 @@ function renderObjectsModule() {
   const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
   const qObj = (window._objSearch || '').toLowerCase();
-  const sortObj = window._objSort || 'name_asc';
+  const sortObj = window._objSort || 'num_asc';
 
   let displayObjects = allObjects.filter(obj => !qObj ||
     (obj.name||'').toLowerCase().includes(qObj) ||
