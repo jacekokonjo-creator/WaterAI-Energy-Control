@@ -344,7 +344,9 @@ function renderClientsList() {
   const tableRows = clients.length === 0
     ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${q ? 'Brak wyników wyszukiwania.' : 'Brak klientów — dodaj pierwszego poniżej.'}</td></tr>`
     : clients.map(client => {
+        const clientNum = ClientsModule.getNumber(client.id);
         return `<tr>
+          <td style="padding:10px 12px;font-size:12px;font-weight:700;color:var(--color-text-tertiary);text-align:center;width:42px;">${clientNum||'—'}</td>
           <td style="padding:10px 12px;font-weight:500;color:var(--color-text-primary);">${escapeHtml(client.name)}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(countryLabel[client.country] || client.country || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(client.city || "—")}</td>
