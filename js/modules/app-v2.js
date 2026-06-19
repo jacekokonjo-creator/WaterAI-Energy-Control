@@ -1139,6 +1139,9 @@ function renderAnalysisTYMContent(obj, allForObj) {
   // Billing months template (dynamic)
   // Comparison months template (dynamic)
   const baseProtocols = (typeof MeasurementsModule !== 'undefined' ? MeasurementsModule.findByObject(selectedAnalysisObjectId) : []);
+  const clientsAll = ClientsModule.getAll();
+  const formObjClientId = obj ? Number(obj.clientId) : (clientsAll[0]?Number(clientsAll[0].id):0);
+  const objsForFormClient = ObjectsModule.findByClient(formObjClientId);
 
   const form = `
   <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
@@ -1148,11 +1151,11 @@ function renderAnalysisTYMContent(obj, allForObj) {
     </div>
     <form onsubmit="saveTYMAnalysis(this);return false;">
 
-    <!-- DANE PODSTAWOWE -->
+    <!-- DANE PODSTAWOWE ANALIZY -->
     <div class="anal-section" style="border:1px solid #B5D4F4;">
       <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">📋</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe</h3>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe analizy</h3>
       </div>
       <div class="anal-body">
         <div class="anal-grid4">
@@ -1212,6 +1215,40 @@ function renderAnalysisTYMContent(obj, allForObj) {
           <div class="anal-field"><label>Stacja meteo</label><input name="weatherStation" placeholder="np. Sliač, Słowacja" value="${escapeHtml(ip.weatherStation||obj.weatherStation||'')}"/></div>
           <div class="anal-field"><label>Temperatura bazowa T_b (°C)</label><input name="baseTemp" type="number" step="0.1" value="${ip.baseTemperature||obj.baseTemperature||21}" oninput="calcAnalTYM()"/></div>
           <div class="anal-field"></div><div class="anal-field"></div>
+        </div>
+
+        <div class="anal-grid4" style="margin-top:4px;padding-top:14px;border-top:1px dashed var(--color-border-tertiary);">
+          <div class="anal-field">
+            <label>Klient</label>
+            <select name="formClientId" id="anal-form-client-sel" style="width:100%;"
+              onchange="(function(sel){
+                const objs = ObjectsModule.findByClient(Number(sel.value));
+                selectedAnalysisObjectId = objs.length ? Number(objs[0].id) : null;
+                renderAnalysesModule();
+              })(this)">
+              ${clientsAll.map(c=>`<option value="${c.id}" ${Number(c.id)===formObjClientId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="anal-field">
+            <label>Obiekt</label>
+            <select name="formObjectId" id="anal-form-object-sel" style="width:100%;"
+              onchange="selectedAnalysisObjectId=Number(this.value);renderAnalysesModule();">
+              ${objsForFormClient.map(o=>`<option value="${o.id}" ${Number(o.id)===selectedAnalysisObjectId?'selected':''}>${escapeHtml(o.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="anal-field" style="grid-column:span 2;">
+            <label>Okres bazowy</label>
+            <select name="sourceProtocolId" id="anal-base-protocol-sel" style="width:100%;"
+              onchange="applyBaseProtocolToAnal(this.value)">
+              <option value="">— wpisz dane ręcznie poniżej —</option>
+              ${baseProtocols.map(p=>{
+                const sel = ip.sourceProtocolId && Number(ip.sourceProtocolId)===Number(p.id) ? 'selected' : '';
+                const label = (p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
+                return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
+              }).join('')}
+            </select>
+            <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla wybranego obiektu. Wybór wypełni dane okresu porównawczego oraz TYM poniżej.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1284,98 +1321,34 @@ function renderAnalysisTYMContent(obj, allForObj) {
       </div>
     </div>
 
-    <!-- OKRES PORÓWNAWCZY (BAZOWY) -->
-    <div class="anal-section" style="border:1px solid #C0DD97;">
-      <div style="background:#EAF3DE;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#3B6D11;">📊</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#27500A;">Okres porównawczy (bazowy)</h3>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">przed WaterAI</span>
-      </div>
-      <div class="anal-body">
-
-        <div class="anal-field" style="margin-bottom:14px;">
-          <label>Wybierz okres bazowy</label>
-          <select name="sourceProtocolId" id="anal-base-protocol-sel" style="width:100%;"
-            onchange="applyBaseProtocolToAnal(this.value)">
-            <option value="">— wpisz ręcznie poniżej —</option>
-            ${baseProtocols.map(p=>{
-              const sel = ip.sourceProtocolId && Number(ip.sourceProtocolId)===Number(p.id) ? 'selected' : '';
-              const label = (p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
-              return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
-            }).join('')}
-          </select>
-          <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla tego obiektu. Wybór wypełni poniższe pola automatycznie — możesz je jeszcze skorygować.</p>
-        </div>
-
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Data od</label><input name="compFrom" type="date" required value="${ip.compFrom||''}" oninput="buildAnalPeriodTable('comp')"/></div>
-          <div class="anal-field"><label>Data do</label><input name="compTo" type="date" required value="${ip.compTo||''}" oninput="buildAnalPeriodTable('comp')"/></div>
-          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="compConsumption" type="number" step="0.001" required value="${ip.compConsumption||''}" placeholder="z licznika" oninput="calcAnalTYM()"/></div>
-          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="compCO" type="number" step="0.001" value="${ip.compCO||''}" placeholder="jeśli podzielone" oninput="calcAnalTYM()"/></div>
-        </div>
-        <table class="anal-table">
-          <thead><tr>
-            <th style="width:28%;">Miesiąc</th>
-            <th style="width:20%;">Śr. temp. (°C)</th>
-            <th style="width:16%;">Dni</th>
-            <th style="width:36%;">HDD rzecz.</th>
-          </tr></thead>
-          <tbody id="comp-months-anal"><tr><td colspan="4" style="padding:12px;text-align:center;color:var(--color-text-tertiary);font-size:13px;">Wybierz daty</td></tr></tbody>
-        </table>
-        <div class="anal-summary">
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#C0DD97;color:#27500A;">🔥 HDD rzecz.: <strong id="comp-hdd-anal">—</strong></span>
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#EAF3DE;color:#27500A;">📅 Łącznie: <strong id="comp-days-anal">—</strong> dni</span>
-        </div>
-      </div>
+    <!-- pola ukryte: dane okresu porównawczego (bazowego) i TYM, wypełniane przez wybór "Okres bazowy" powyżej -->
+    <div style="display:none;">
+      <input name="compFrom" type="date" value="${ip.compFrom||''}"/>
+      <input name="compTo" type="date" value="${ip.compTo||''}"/>
+      <input name="compConsumption" type="number" value="${ip.compConsumption||''}"/>
+      <input name="compCO" type="number" value="${ip.compCO||''}"/>
+      <input name="tymYearFrom" value="${ip.tymYearFrom||''}"/>
+      <input name="tymYearTo" value="${ip.tymYearTo||''}"/>
+      <input name="tymSource" value="${ip.tymSource||obj.weatherSource||'WeatherOnline / Robot Klimatu'}"/>
+      <table><tbody id="comp-months-anal"></tbody></table>
+      <table><tbody>${tymMonthRows}</tbody></table>
     </div>
+    <span id="comp-hdd-anal" style="display:none;"></span>
+    <span id="comp-days-anal" style="display:none;"></span>
+    <span id="hdd-tym-anal-sum" style="display:none;"></span>
+    <span id="days-tym-anal-sum" style="display:none;"></span>
 
-    <!-- TYM -->
+    <!-- ANALIZA — pełny tok obliczeniowy -->
     <div class="anal-section" style="border:1px solid #FAC775;">
       <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#854F0B;">❄️</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Typowy Rok Meteorologiczny (TYM)</h3>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#FAC775;color:#633806;">długoletnie normy</span>
-        ${prev?`<button type="button" onclick="copyAnalPrevPeriod('tym')" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;">📋 Kopiuj TYM z poprzedniej</button>`:''}
+        <span style="font-size:18px;color:#854F0B;">🧮</span>
+        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Analiza — korekta klimatyczna TYM</h3>
       </div>
-      <div class="anal-body">
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Okres TYM od (rok)</label><input name="tymYearFrom" placeholder="np. 1991" value="${ip.tymYearFrom||''}"/></div>
-          <div class="anal-field"><label>Okres TYM do (rok)</label><input name="tymYearTo" placeholder="np. 2020" value="${ip.tymYearTo||''}"/></div>
-          <div class="anal-field" style="grid-column:span 2;"><label>Źródło danych TYM</label><input name="tymSource" value="${ip.tymSource||obj.weatherSource||'WeatherOnline / Robot Klimatu'}"/></div>
+      <div class="anal-body" id="anal-tym-walkthrough">
+        <div class="reminder-card" style="background:#FFF9EF;">
+          <strong>Wybierz okres bazowy</strong>
+          <div class="reminder-meta">Wybierz „Okres bazowy" w sekcji Dane podstawowe analizy powyżej, aby zobaczyć tu pełny tok obliczeniowy korekty klimatycznej.</div>
         </div>
-        <p style="font-size:11px;color:var(--color-text-tertiary);margin:0 0 8px;">Wpisz średnie temperatury miesięczne z WeatherOnline / Robot Klimatu.</p>
-        <table class="anal-table">
-          <thead><tr>
-            <th style="width:28%;">Miesiąc</th>
-            <th style="width:20%;">Śr. temp. TYM (°C)</th>
-            <th style="width:16%;">Dni</th>
-            <th style="width:36%;">HDD TYM</th>
-          </tr></thead>
-          <tbody>${tymMonthRows}</tbody>
-        </table>
-        <div class="anal-summary">
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#FAC775;color:#633806;">🔥 HDD TYM: <strong id="hdd-tym-anal-sum">—</strong></span>
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#FAEEDA;color:#633806;">📅 Łącznie: <strong id="days-tym-anal-sum">—</strong> dni</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- WYNIKI (live) -->
-    <div id="anal-tym-results" style="display:none;" class="anal-result-box">
-      <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.7;margin-bottom:12px;">WYNIK ANALIZY TYM</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-        <div><div style="font-size:28px;font-weight:700;" id="res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji zużycia</div></div>
-        <div><div style="font-size:28px;font-weight:700;" id="res-energy">—</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
-        <div><div style="font-size:28px;font-weight:700;" id="res-money">—</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
-        <div><div style="font-size:28px;font-weight:700;" id="res-e-index">—</div><div style="font-size:11px;opacity:.8;">spadek wsk. E</div></div>
-      </div>
-      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;opacity:.9;">
-        <div>Wskaźnik E rozlicz. (zużycie/HDD_TYM): <strong id="res-e-bill">—</strong></div>
-        <div>Wskaźnik E porówn. (zużycie/HDD_TYM): <strong id="res-e-comp">—</strong></div>
-        <div>Współczynnik korekty k rozlicz. (HDD_TYM/HDD_rzecz): <strong id="res-k-bill">—</strong></div>
-        <div>Współczynnik korekty k porówn. (HDD_TYM/HDD_rzecz): <strong id="res-k-comp">—</strong></div>
-        <div>Zużycie skor. do TYM (rozlicz.): <strong id="res-cons-bill-tym">—</strong></div>
-        <div>Zużycie skor. do TYM (porówn.): <strong id="res-cons-comp-tym">—</strong></div>
       </div>
     </div>
 
@@ -1387,11 +1360,21 @@ function renderAnalysisTYMContent(obj, allForObj) {
     <div style="display:flex;gap:10px;align-items:center;">
       <button class="primary-button" type="submit">${editing?'Zapisz zmiany':'Zapisz analizę TYM'}</button>
       <button class="small-button" type="button" onclick="showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">Anuluj</button>
-      <button class="small-button" type="button" onclick="calcAnalTYM()" style="margin-left:auto;">🔄 Przelicz</button>
     </div>
 
     </form>
-  </div>`;
+  </div>
+  <script>
+    (function(){
+      setTimeout(function(){
+        if (typeof buildAnalPeriodTable === 'function') {
+          buildAnalPeriodTable('bill');
+          buildAnalPeriodTable('comp');
+        }
+        ${ip.compFrom||ip.billingFrom ? "if (typeof calcAnalTYM === 'function') calcAnalTYM();" : ""}
+      }, 50);
+    })();
+  </script>`;
 
   return listSection + form;
 }
@@ -1682,55 +1665,59 @@ function calcAnalTYM() {
   const baseTempEl=document.querySelector('[name="baseTemp"]');
   const baseTemp=baseTempEl?Number(baseTempEl.value||21):21;
 
-  // ── HDD TYM per-month (used to build proportional HDD_TYM for each period) ──
-  const tymByMonth={}; // month(1-12) -> avg temp
+  // ── HDD TYM per-month (normy długoletnie) ──
+  const tymByMonth={};
   let hddTymSum=0, daysTymSum=0;
   for(let m=1;m<=12;m++){
     const t=document.querySelector(`[name="tymTemp_anal_${m}"]`);
     const d=document.querySelector(`[name="tymDays_anal_${m}"]`);
-    const cell=document.getElementById(`hdd-tym-anal-${m}`);
-    if(!t||t.value===''){if(cell)cell.textContent='—';continue;}
+    if(!t||t.value==='')continue;
     const days=Number(d?d.value:0);
     const temp=Number(t.value);
     tymByMonth[m]=temp;
-    const hdd=Math.max(0,baseTemp-temp)*days;
-    hddTymSum+=hdd; daysTymSum+=days;
-    if(cell)cell.textContent=hdd.toFixed(1);
+    hddTymSum+=Math.max(0,baseTemp-temp)*days; daysTymSum+=days;
   }
   const hddSumEl=document.getElementById('hdd-tym-anal-sum');
   const daysSumEl=document.getElementById('days-tym-anal-sum');
   if(hddSumEl)hddSumEl.textContent=hddTymSum.toFixed(2);
   if(daysSumEl)daysSumEl.textContent=daysTymSum;
 
-  // ── HDD rzeczywiste dla każdego okresu (rozliczeniowy/porównawczy) ──
-  // oraz HDD_TYM DLA TYCH SAMYCH MIESIĘCY co dany okres (wg wzoru Excela: HDD_TYM liczone
-  // na rozbiciu dni KAŻDEGO okresu na miesiące, używając normy TYM dla danego miesiąca)
+  // ── HDD rzeczywiste i HDD_TYM rozbite wg dni KAŻDEGO okresu (rozliczeniowy / porównawczy) ──
   const billTbody=document.getElementById('bill-months-anal');
   const compTbody=document.getElementById('comp-months-anal');
+  const walkDiv=document.getElementById('anal-tym-walkthrough');
   if(!billTbody||!compTbody) return;
 
   let hddBillReal=0, hddBillTym=0, daysBill=0;
+  const billMonthRows=[];
   billTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
     const key=tr.dataset.key; const month=Number(key.split('-')[1]);
     const t=tr.querySelector('input.anal-month-temp');
     const d=tr.querySelector('input.anal-month-days');
     if(!t||t.value==='') return;
     const days=Number(d?d.value:0);
-    hddBillReal+=Math.max(0,baseTemp-Number(t.value))*days;
-    if(tymByMonth[month]!=null) hddBillTym+=Math.max(0,baseTemp-tymByMonth[month])*days;
-    daysBill+=days;
+    const tempReal=Number(t.value);
+    const hddReal=Math.max(0,baseTemp-tempReal)*days;
+    const tymT=tymByMonth[month];
+    const hddTym=tymT!=null?Math.max(0,baseTemp-tymT)*days:0;
+    hddBillReal+=hddReal; hddBillTym+=hddTym; daysBill+=days;
+    billMonthRows.push({month,days,tempReal,tymT,hddReal,hddTym});
   });
 
   let hddCompReal=0, hddCompTym=0, daysComp=0;
+  const compMonthRows=[];
   compTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
     const key=tr.dataset.key; const month=Number(key.split('-')[1]);
     const t=tr.querySelector('input.anal-month-temp');
     const d=tr.querySelector('input.anal-month-days');
     if(!t||t.value==='') return;
     const days=Number(d?d.value:0);
-    hddCompReal+=Math.max(0,baseTemp-Number(t.value))*days;
-    if(tymByMonth[month]!=null) hddCompTym+=Math.max(0,baseTemp-tymByMonth[month])*days;
-    daysComp+=days;
+    const tempReal=Number(t.value);
+    const hddReal=Math.max(0,baseTemp-tempReal)*days;
+    const tymT=tymByMonth[month];
+    const hddTym=tymT!=null?Math.max(0,baseTemp-tymT)*days:0;
+    hddCompReal+=hddReal; hddCompTym+=hddTym; daysComp+=days;
+    compMonthRows.push({month,days,tempReal,tymT,hddReal,hddTym});
   });
 
   const billCOEl=document.querySelector('[name="billCO"]');
@@ -1747,57 +1734,159 @@ function calcAnalTYM() {
   const unit=unitEl?unitEl.value:'kWh';
   const currency=currencyEl?currencyEl.value:'EUR';
 
+  const MN=['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+  const f1=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const f2=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const f4=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:4,maximumFractionDigits:4});
+  const pct=v=>(Number(v||0)*100).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+
   if(!hddBillTym||!hddCompTym||!hddBillReal||!hddCompReal||!billCons||!compCons){
-    const rd=document.getElementById('anal-tym-results'); if(rd) rd.style.display='none';
+    if(walkDiv) walkDiv.innerHTML = `
+      <div class="reminder-card" style="background:#FFF9EF;">
+        <strong>Brakuje danych do obliczeń</strong>
+        <div class="reminder-meta">Uzupełnij: okres bazowy (porównawczy), temperatury TYM oraz zużycie w okresie rozliczeniowym i porównawczym.</div>
+      </div>`;
+    window._analTYMResults = null;
     return;
   }
 
   // ── Wzory zgodne z protokołem Excel ──
-  // k = HDD_TYM / HDD_rzeczywiste  (osobno dla każdego okresu)
   const kBill = hddBillReal>0 ? hddBillTym/hddBillReal : 0;
   const kComp = hddCompReal>0 ? hddCompTym/hddCompReal : 0;
-
-  // Zużycie skorygowane do TYM = zużycie_rzecz × k
   const consBillTym = billCons*kBill;
   const consCompTym = compCons*kComp;
-
-  // Wskaźnik energetyczny E = zużycie_rzecz / HDD_TYM  [jednostka/HDD]
   const eBill = hddBillTym>0 ? billCons/hddBillTym : 0;
   const eComp = hddCompTym>0 ? compCons/hddCompTym : 0;
-
-  // Zużycie porównawcze przeliczone na HDD_TYM okresu rozliczeniowego (ile zużyłbyś BEZ
-  // technologii w takim samym okresie/pogodzie co rozliczeniowy)
   const consCompProjectedToBill = eComp*hddBillTym;
-
-  // Oszczędność = zużycie_bez_technologii − zużycie_z_technologią (po korekcie TYM)
   const savedEnergy = consCompProjectedToBill - consBillTym;
   const savedPct = consCompProjectedToBill>0 ? savedEnergy/consCompProjectedToBill : 0;
   const savedMoney = savedEnergy*price;
   const eChange = eComp>0 ? (eBill-eComp)/eComp : 0;
 
-  const resDiv=document.getElementById('anal-tym-results');
-  if(resDiv){
-    resDiv.style.display='block';
-    document.getElementById('res-pct').textContent=(savedPct*100).toFixed(1)+'%';
-    document.getElementById('res-energy').textContent=savedEnergy.toFixed(2)+' '+unit;
-    document.getElementById('res-money').textContent=price>0?savedMoney.toFixed(2)+' '+currency:'—';
-    document.getElementById('res-e-index').textContent=(eChange*100).toFixed(1)+'%';
-    document.getElementById('res-e-bill').textContent=eBill.toFixed(4)+' '+unit+'/HDD';
-    document.getElementById('res-e-comp').textContent=eComp.toFixed(4)+' '+unit+'/HDD';
-    document.getElementById('res-k-bill').textContent=kBill.toFixed(4);
-    document.getElementById('res-k-comp').textContent=kComp.toFixed(4);
-    document.getElementById('res-cons-bill-tym').textContent=consBillTym.toFixed(2)+' '+unit;
-    document.getElementById('res-cons-comp-tym').textContent=consCompTym.toFixed(2)+' '+unit;
-  }
-
   window._analTYMResults = {
     savedEnergy, savedEnergyPct:savedPct, savedMoney, eBill, eComp, kBill, kComp, eChange,
     hddBillReal, hddCompReal, hddBillTym, hddCompTym, consBillTym, consCompTym, consCompProjectedToBill
   };
+
+  if (!walkDiv) return;
+
+  const rowsHtml = (rows) => rows.map(r=>`<tr>
+    <td style="padding:5px 8px;font-size:12px;">${MN[r.month-1]}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;">${r.days}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.tempReal)}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;">${r.tymT!=null?f1(r.tymT):'—'}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.hddReal)}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.hddTym)}</td>
+  </tr>`).join('');
+
+  const stepCard = (num, title, formula, calc, result, note) => `
+    <div style="border-left:3px solid #FAC775;padding:10px 0 10px 14px;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:4px;">Krok ${num}. ${title}</div>
+      <div style="font-family:monospace;font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">${formula}</div>
+      <div style="font-family:monospace;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">${calc}</div>
+      <div style="font-size:15px;font-weight:700;color:#0C447C;">${result}</div>
+      ${note?`<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px;">${note}</div>`:''}
+    </div>`;
+
+  walkDiv.innerHTML = `
+
+    <div style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:8px;">ROZBICIE NA MIESIĄCE — OKRES ROZLICZENIOWY</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+          <th style="padding:5px 8px;text-align:left;">Miesiąc</th><th style="padding:5px 8px;text-align:right;">Dni</th>
+          <th style="padding:5px 8px;text-align:right;">Temp. rzecz.</th><th style="padding:5px 8px;text-align:right;">Temp. TYM</th>
+          <th style="padding:5px 8px;text-align:right;">HDD rzecz.</th><th style="padding:5px 8px;text-align:right;">HDD TYM</th>
+        </tr></thead>
+        <tbody>${rowsHtml(billMonthRows)}</tbody>
+        <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
+          <td style="padding:5px 8px;">SUMA</td><td style="padding:5px 8px;text-align:right;">${daysBill}</td>
+          <td></td><td></td>
+          <td style="padding:5px 8px;text-align:right;">${f1(hddBillReal)}</td><td style="padding:5px 8px;text-align:right;">${f1(hddBillTym)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:8px;">ROZBICIE NA MIESIĄCE — OKRES PORÓWNAWCZY (BAZOWY)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
+          <th style="padding:5px 8px;text-align:left;">Miesiąc</th><th style="padding:5px 8px;text-align:right;">Dni</th>
+          <th style="padding:5px 8px;text-align:right;">Temp. rzecz.</th><th style="padding:5px 8px;text-align:right;">Temp. TYM</th>
+          <th style="padding:5px 8px;text-align:right;">HDD rzecz.</th><th style="padding:5px 8px;text-align:right;">HDD TYM</th>
+        </tr></thead>
+        <tbody>${rowsHtml(compMonthRows)}</tbody>
+        <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
+          <td style="padding:5px 8px;">SUMA</td><td style="padding:5px 8px;text-align:right;">${daysComp}</td>
+          <td></td><td></td>
+          <td style="padding:5px 8px;text-align:right;">${f1(hddCompReal)}</td><td style="padding:5px 8px;text-align:right;">${f1(hddCompTym)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:6px;">TOK OBLICZENIOWY</div>
+
+    ${stepCard(1, 'Współczynnik korekty klimatycznej k = HDD_TYM / HDD_rzeczywiste',
+      'k = HDD_TYM ÷ HDD_rzecz',
+      `k_rozlicz = ${f1(hddBillTym)} ÷ ${f1(hddBillReal)} &nbsp;&nbsp;|&nbsp;&nbsp; k_porówn = ${f1(hddCompTym)} ÷ ${f1(hddCompReal)}`,
+      `k_rozlicz = ${f4(kBill)} &nbsp;&nbsp;&nbsp; k_porówn = ${f4(kComp)}`,
+      'k > 1 → okres był cieplejszy od normy TYM (zużyto mniej niż w typowym roku)')}
+
+    ${stepCard(2, 'Zużycie skorygowane do warunków TYM',
+      'Zużycie_TYM = Zużycie_rzecz × k',
+      `Zużycie_rozlicz_TYM = ${f2(billCons)} × ${f4(kBill)} &nbsp;&nbsp;|&nbsp;&nbsp; Zużycie_porówn_TYM = ${f2(compCons)} × ${f4(kComp)}`,
+      `${f2(consBillTym)} ${unit} &nbsp;&nbsp;&nbsp; ${f2(consCompTym)} ${unit}`,
+      'Zużycie przeliczone tak, jakby panowała typowa pogoda (TYM) w obu okresach')}
+
+    ${stepCard(3, 'Wskaźnik energetyczny E = Zużycie ÷ HDD_TYM',
+      'E = Zużycie_rzecz ÷ HDD_TYM',
+      `E_rozlicz = ${f2(billCons)} ÷ ${f1(hddBillTym)} &nbsp;&nbsp;|&nbsp;&nbsp; E_porówn = ${f2(compCons)} ÷ ${f1(hddCompTym)}`,
+      `E_rozlicz = ${f4(eBill)} ${unit}/HDD &nbsp;&nbsp;&nbsp; E_porówn = ${f4(eComp)} ${unit}/HDD`,
+      'Efektywność energetyczna obiektu — niezależna od długości okresu i pogody. Im niżej, tym lepiej.')}
+
+    ${stepCard(4, 'Zużycie porównawcze rzutowane na okres rozliczeniowy',
+      'Zużycie_bez_technologii = E_porówn × HDD_TYM_rozlicz',
+      `${f4(eComp)} × ${f1(hddBillTym)}`,
+      `${f2(consCompProjectedToBill)} ${unit}`,
+      'Ile zużyłby obiekt w takim samym czasie i takiej samej (typowej) pogodzie, gdyby nie wdrożono technologii — wg wskaźnika z okresu porównawczego')}
+
+    ${stepCard(5, 'Oszczędność energii',
+      'Oszczędność = Zużycie_bez_technologii − Zużycie_rozlicz_TYM',
+      `${f2(consCompProjectedToBill)} − ${f2(consBillTym)}`,
+      `${f2(savedEnergy)} ${unit}`)}
+
+    ${stepCard(6, 'Oszczędność jako % zużycia bazowego',
+      '% = Oszczędność ÷ Zużycie_bez_technologii',
+      `${f2(savedEnergy)} ÷ ${f2(consCompProjectedToBill)}`,
+      pct(savedPct))}
+
+    ${stepCard(7, 'Wartość oszczędności',
+      'Wartość = Oszczędność × Cena jednostkowa',
+      `${f2(savedEnergy)} ${unit} × ${price} ${currency}/${unit}`,
+      `${f2(savedMoney)} ${currency}`)}
+
+    <div style="margin-top:18px;padding:18px;border-radius:12px;background:linear-gradient(135deg,#633806,#3D2204);color:white;">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.8;margin-bottom:12px;">WYNIK KOŃCOWY</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
+        <div><div style="font-size:26px;font-weight:700;">${pct(savedPct)}</div><div style="font-size:11px;opacity:.8;">redukcja zużycia</div></div>
+        <div><div style="font-size:26px;font-weight:700;">${f2(savedEnergy)} ${unit}</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
+        <div><div style="font-size:26px;font-weight:700;">${price>0?f2(savedMoney)+' '+currency:'—'}</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
+        <div><div style="font-size:26px;font-weight:700;">${pct(eChange)}</div><div style="font-size:11px;opacity:.8;">zmiana wsk. E</div></div>
+      </div>
+    </div>
+  `;
 }
 
 function applyBaseProtocolToAnal(protocolId) {
-  if (!protocolId) return;
+  if (!protocolId) {
+    const walkDiv=document.getElementById('anal-tym-walkthrough');
+    if(walkDiv) walkDiv.innerHTML = `
+      <div class="reminder-card" style="background:#FFF9EF;">
+        <strong>Wybierz okres bazowy</strong>
+        <div class="reminder-meta">Wybierz „Okres bazowy" w sekcji Dane podstawowe analizy powyżej, aby zobaczyć tu pełny tok obliczeniowy korekty klimatycznej.</div>
+      </div>`;
+    return;
+  }
   const p = MeasurementsModule.find(protocolId);
   if (!p) return;
 
@@ -1808,10 +1897,21 @@ function applyBaseProtocolToAnal(protocolId) {
   setVal('compConsumption', p.comparisonConsumption);
   if (p.weatherStation) setVal('weatherStation', p.weatherStation);
   if (p.baseTemperature) setVal('baseTemp', p.baseTemperature);
+  if (p.tymPeriodStart) setVal('tymYearFrom', p.tymPeriodStart);
+  if (p.tymPeriodEnd) setVal('tymYearTo', p.tymPeriodEnd);
+  if (p.tymDataSource) setVal('tymSource', p.tymDataSource);
+
+  // Fill TYM monthly norms from saved protocol
+  (p.tymMonthly||[]).forEach(m=>{
+    if (m.month==null) return;
+    const t=document.querySelector(`[name="tymTemp_anal_${m.month}"]`);
+    const d=document.querySelector(`[name="tymDays_anal_${m.month}"]`);
+    if(t && m.temperature!=null) t.value=m.temperature;
+    if(d && m.days!=null) d.value=m.days;
+  });
 
   buildAnalPeriodTable('comp');
 
-  // Fill monthly temps/days from saved comparisonMonthly if present
   setTimeout(()=>{
     (p.comparisonMonthly||[]).forEach(m=>{
       if (m.year==null || m.month==null) return;
