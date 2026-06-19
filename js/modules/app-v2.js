@@ -1139,9 +1139,6 @@ function renderAnalysisTYMContent(obj, allForObj) {
   // Billing months template (dynamic)
   // Comparison months template (dynamic)
   const baseProtocols = (typeof MeasurementsModule !== 'undefined' ? MeasurementsModule.findByObject(selectedAnalysisObjectId) : []);
-  const clientsAll = ClientsModule.getAll();
-  const formObjClientId = obj ? Number(obj.clientId) : (clientsAll[0]?Number(clientsAll[0].id):0);
-  const objsForFormClient = ObjectsModule.findByClient(formObjClientId);
 
   const form = `
   <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
@@ -1218,36 +1215,18 @@ function renderAnalysisTYMContent(obj, allForObj) {
         </div>
 
         <div class="anal-grid4" style="margin-top:4px;padding-top:14px;border-top:1px dashed var(--color-border-tertiary);">
-          <div class="anal-field">
-            <label>Klient</label>
-            <select name="formClientId" id="anal-form-client-sel" style="width:100%;"
-              onchange="(function(sel){
-                const objs = ObjectsModule.findByClient(Number(sel.value));
-                selectedAnalysisObjectId = objs.length ? Number(objs[0].id) : null;
-                renderAnalysesModule();
-              })(this)">
-              ${clientsAll.map(c=>`<option value="${c.id}" ${Number(c.id)===formObjClientId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
-            </select>
-          </div>
-          <div class="anal-field">
-            <label>Obiekt</label>
-            <select name="formObjectId" id="anal-form-object-sel" style="width:100%;"
-              onchange="selectedAnalysisObjectId=Number(this.value);renderAnalysesModule();">
-              ${objsForFormClient.map(o=>`<option value="${o.id}" ${Number(o.id)===selectedAnalysisObjectId?'selected':''}>${escapeHtml(o.name)}</option>`).join('')}
-            </select>
-          </div>
-          <div class="anal-field" style="grid-column:span 2;">
+          <div class="anal-field" style="grid-column:span 4;">
             <label>Okres bazowy</label>
             <select name="sourceProtocolId" id="anal-base-protocol-sel" style="width:100%;"
               onchange="applyBaseProtocolToAnal(this.value)">
               <option value="">— wpisz dane ręcznie poniżej —</option>
               ${baseProtocols.map(p=>{
                 const sel = ip.sourceProtocolId && Number(ip.sourceProtocolId)===Number(p.id) ? 'selected' : '';
-                const label = (p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
+                const label = (p.protocolNumber?p.protocolNumber+' — ':'')+(p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
                 return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
               }).join('')}
             </select>
-            <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla wybranego obiektu. Wybór wypełni dane okresu porównawczego oraz TYM poniżej.</p>
+            <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla wybranego obiektu (wybranego powyżej, nad zakładkami). Wybór wypełni dane okresu porównawczego oraz TYM poniżej.</p>
           </div>
         </div>
       </div>
