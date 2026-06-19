@@ -91,7 +91,9 @@ const ObjectsModule = {
   },
 
   findByClient(clientId) {
-    return this.getAll().filter(o => Number(o.clientId) === Number(clientId));
+    return this.getAll()
+      .filter(o => Number(o.clientId) === Number(clientId))
+      .sort((a, b) => Number(a.id) - Number(b.id));
   },
 
   update(id, data) {
@@ -103,6 +105,16 @@ const ObjectsModule = {
         updatedAt: new Date().toISOString()
       };
     }));
+  },
+
+  // Numer obiektu = kolejna pozycja WŚRÓD OBIEKTÓW TEGO SAMEGO KLIENTA (rosnąco wg id/daty utworzenia).
+  // Przeliczany dynamicznie z aktualnej listy obiektów danego klienta — bez trwałych dziur po usunięciu.
+  getNumber(id) {
+    const obj = this.find(id);
+    if (!obj) return null;
+    const siblings = this.findByClient(obj.clientId);
+    const idx = siblings.findIndex(o => Number(o.id) === Number(id));
+    return idx === -1 ? null : idx + 1;
   }
 };
 
