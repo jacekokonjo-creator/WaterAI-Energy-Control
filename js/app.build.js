@@ -545,7 +545,7 @@ function openClientObjects(clientId) {
   const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
   const tableRows = objects.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">
+    ? `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">
         Ten klient nie ma jeszcze żadnych obiektów.
        </td></tr>`
     : objects.map(obj => {
@@ -1107,11 +1107,13 @@ function renderObjectsModule() {
   };
 
   const tableRows = displayObjects.length === 0
-    ? `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${qObj ? 'Brak wyników wyszukiwania.' : 'Brak obiektów — dodaj pierwszy poniżej.'}</td></tr>`
+    ? `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${qObj ? 'Brak wyników wyszukiwania.' : 'Brak obiektów — dodaj pierwszy poniżej.'}</td></tr>`
     : displayObjects.map(obj => {
         const statusColor = objStatusColor[obj.status] || "#666";
         const protCount = MeasurementsModule.findByObject(obj.id).length;
+        const objNum = ObjectsModule.getNumber(obj.id);
         return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+          <td style="padding:10px 12px;font-size:12px;font-weight:600;color:var(--color-text-tertiary);text-align:center;">${objNum||'—'}</td>
           <td style="padding:10px 12px;font-size:13px;font-weight:500;">${escapeHtml(obj.name || "—")}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(getClientName(obj.clientId))}</td>
           <td style="padding:10px 12px;font-size:13px;">${escapeHtml(objTypeLabel[obj.objectType] || obj.objectType || "—")}</td>
@@ -1160,6 +1162,7 @@ function renderObjectsModule() {
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--color-background-secondary);">
+            <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);width:40px;">#</th>
             ${thObj('name','Nazwa obiektu')}
             ${thObj('client','Klient')}
             ${thObj('type','Typ')}
@@ -2072,6 +2075,22 @@ function createMeasurement(form) {
 
   if (!object) {
     alert("Wybierz obiekt dla protokołu.");
+    return;
+  }
+
+  const protocolNumberVal = form.protocolNumber ? form.protocolNumber.value.trim() : "";
+  if (!protocolNumberVal) {
+    alert("Numer protokołu jest wymagany. Bez niego nie można zapisać okresu bazowego.");
+    if (form.protocolNumber) form.protocolNumber.focus();
+    return;
+  }
+  const duplicateProtocol = MeasurementsModule.getAll().find(p =>
+    String(p.protocolNumber || "").trim() === protocolNumberVal &&
+    (!editingMeasurementId || Number(p.id) !== Number(editingMeasurementId))
+  );
+  if (duplicateProtocol) {
+    alert("Numer protokołu \"" + protocolNumberVal + "\" już istnieje. Wybierz inny numer.");
+    if (form.protocolNumber) form.protocolNumber.focus();
     return;
   }
 
@@ -3072,9 +3091,17 @@ function renderMeasurementsModule() {
 
         <div class="tym-grid4" style="margin-bottom:14px;">
           <div class="tym-field">
-            <label>Numer protokołu</label>
-            <input name="protocolNumber" type="text" placeholder="np. PROT/2026/001"
+            <label>Numer protokołu <span style="color:#c00;">*</span></label>
+            <input name="protocolNumber" type="text" required placeholder="np. K2-O1-001"
+              value="${(()=>{
+                if (editingMeasurementId) {
+                  const ex = MeasurementsModule.find(editingMeasurementId);
+                  return ex && ex.protocolNumber ? escapeHtml(ex.protocolNumber) : '';
+                }
+                return escapeHtml(MeasurementsModule.suggestProtocolNumber(selectedObject.id) || '');
+              })()}"
               style="width:100%;box-sizing:border-box;" />
+            <p style="font-size:10px;color:var(--color-text-tertiary);margin:4px 0 0;">Sugerowany format: K{nr klienta}-O{nr obiektu}-{kolejny nr}. Można edytować ręcznie.</p>
           </div>
           <div class="tym-field">
             <label>Data protokołu</label>
@@ -3686,7 +3713,7 @@ function renderMeasurementsList() {
 
     return `
     <div class="reminder-card">
-      <strong>Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+      <strong>${item.protocolNumber ? escapeHtml(item.protocolNumber)+' — ' : ''}Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
 
       <div class="reminder-meta">
         Klient: ${escapeHtml(getClientName(item.clientId))}<br />
