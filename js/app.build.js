@@ -1905,6 +1905,13 @@ function openObjectMeasurements(objectId) {
   openModule("measurements");
 }
 
+function refreshProtocolNumberSuggestion(objectId) {
+  const inp = document.getElementById('protocol-number-input');
+  if (!inp || inp.dataset.userEdited === '1') return;
+  const suggested = MeasurementsModule.suggestProtocolNumber(objectId, null);
+  if (suggested) inp.value = suggested;
+}
+
 function updateMeasurementObjectOptions(clientId) {
   const select = document.getElementById("measurement-object-select");
   if (!select) return;
@@ -1919,6 +1926,7 @@ function updateMeasurementObjectOptions(clientId) {
   }
 
   selectedMeasurementObjectId = Number(objects[0].id);
+  refreshProtocolNumberSuggestion(selectedMeasurementObjectId);
 
   select.innerHTML = objects.map(object => `
     <option value="${object.id}">
@@ -2947,7 +2955,7 @@ function renderMeasurementsModule() {
           </div>
           <div class="tym-field">
             <label>Obiekt</label>
-            <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsList();" style="width:100%;">
+            <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);refreshProtocolNumberSuggestion(selectedMeasurementObjectId);renderMeasurementsList();" style="width:100%;">
               ${objectsForClient.map(o => { const cn = ClientsModule.getNumber(o.clientId); const on = ObjectsModule.getNumber(o.id); return `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${(cn&&on) ? "K"+cn+"-"+on+" — " : ""}${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`; }).join("")}
             </select>
           </div>
@@ -3109,14 +3117,10 @@ function renderMeasurementsModule() {
         <div class="tym-grid4" style="margin-bottom:14px;">
           <div class="tym-field">
             <label>Numer protokołu <span style="color:#c00;">*</span></label>
-            <input name="protocolNumber" type="text" required placeholder="np. K1-1-001"
-              value="${(()=>{
-                if (editingMeasurementId) {
-                  const ex = MeasurementsModule.find(editingMeasurementId);
-                  return ex && ex.protocolNumber ? escapeHtml(ex.protocolNumber) : '';
-                }
-                return escapeHtml(MeasurementsModule.suggestProtocolNumber(selectedObject.id) || '');
-              })()}"
+            <input name="protocolNumber" id="protocol-number-input" type="text" required placeholder="np. K1-1-001" oninput="this.dataset.userEdited='1'"
+              value="${editingMeasurementId
+                ? escapeHtml((MeasurementsModule.find(editingMeasurementId)||{}).protocolNumber||'')
+                : escapeHtml(MeasurementsModule.suggestProtocolNumber(selectedObject.id, null)||'')}"
               style="width:100%;box-sizing:border-box;" />
             <p style="font-size:10px;color:var(--color-text-tertiary);margin:4px 0 0;">Sugerowany format: K{nr klienta}-O{nr obiektu}-{kolejny nr}. Można edytować ręcznie.</p>
           </div>
