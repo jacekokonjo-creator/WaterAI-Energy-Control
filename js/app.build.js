@@ -3133,7 +3133,7 @@ function renderMeasurementsModule() {
 
   </form>
 
-  <div id="measurements-list" style="margin-top:24px;"></div>
+  <div id="measurements-list" style="margin-top:24px;${showMeasurementForm ? ' display:none;' : ''}"></div>
   `)}
 
   ${activeMeasurementsTab === 'regression' ? renderRegressionTab(protocolsForTabs) : ''}
