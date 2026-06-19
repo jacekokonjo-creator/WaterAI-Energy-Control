@@ -2942,13 +2942,13 @@ function renderMeasurementsModule() {
           <div class="tym-field">
             <label>Klient</label>
             <select name="clientId" required onchange="updateMeasurementObjectOptions(this.value)" style="width:100%;">
-              ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === selectedClientId ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+              ${clients.map(c => { const cn = ClientsModule.getNumber(c.id); return `<option value="${c.id}" ${Number(c.id) === selectedClientId ? "selected" : ""}>${cn ? "K"+cn+" — " : ""}${escapeHtml(c.name)}</option>`; }).join("")}
             </select>
           </div>
           <div class="tym-field">
             <label>Obiekt</label>
             <select name="objectId" id="measurement-object-select" required onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsList();" style="width:100%;">
-              ${objectsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`).join("")}
+              ${objectsForClient.map(o => { const cn = ClientsModule.getNumber(o.clientId); const on = ObjectsModule.getNumber(o.id); return `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? "selected" : ""}>${(cn&&on) ? "K"+cn+"-"+on+" — " : ""}${escapeHtml(o.name || "Obiekt bez nazwy")}</option>`; }).join("")}
             </select>
           </div>
         </div>
@@ -3109,7 +3109,7 @@ function renderMeasurementsModule() {
         <div class="tym-grid4" style="margin-bottom:14px;">
           <div class="tym-field">
             <label>Numer protokołu <span style="color:#c00;">*</span></label>
-            <input name="protocolNumber" type="text" required placeholder="np. K2-O1-001"
+            <input name="protocolNumber" type="text" required placeholder="np. K1-1-001"
               value="${(()=>{
                 if (editingMeasurementId) {
                   const ex = MeasurementsModule.find(editingMeasurementId);
