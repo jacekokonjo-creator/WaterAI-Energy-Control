@@ -342,7 +342,7 @@ function renderClientsList() {
     `<th style="text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);">${label}</th>`;
 
   const tableRows = clients.length === 0
-    ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${q ? 'Brak wyników wyszukiwania.' : 'Brak klientów — dodaj pierwszego poniżej.'}</td></tr>`
+    ? `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">${q ? 'Brak wyników wyszukiwania.' : 'Brak klientów — dodaj pierwszego poniżej.'}</td></tr>`
     : clients.map(client => {
         const clientNum = ClientsModule.getNumber(client.id);
         return `<tr>
@@ -387,6 +387,7 @@ function renderClientsList() {
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
+            <th style="text-align:center;padding:8px 12px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);width:42px;">#</th>
             ${thS('name','Nazwa klienta')}
             ${thS('country','Kraj')}
             ${thS('city','Miasto')}
