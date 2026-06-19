@@ -100,7 +100,7 @@ const MeasurementsModule = {
       .filter(p => !excludeId || Number(p.id) !== Number(excludeId));
     const seq = existing.length + 1;
     const seqStr = String(seq).padStart(3, '0');
-    return `K${clientNum}-O${objNum}-${seqStr}`;
+    return `K${clientNum}-${objNum}-${seqStr}`;
   }
 };
 
