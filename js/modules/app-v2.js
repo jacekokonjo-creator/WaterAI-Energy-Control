@@ -1180,6 +1180,7 @@ function _analWizard() {
   const t = AnalysesModule.TYPES[ANAL.type];
   const clients = ClientsModule.getAll();
   const objsForClient = ANAL.clientId ? ObjectsModule.findByClient(ANAL.clientId) : [];
+  const baseProtocols = (ANAL.objectId && window.MeasurementsModule) ? (MeasurementsModule.findByObject(ANAL.objectId) || []) : [];
 
   const selector = `
     <div class="anw-sec">
@@ -1198,9 +1199,9 @@ function _analWizard() {
             </select></div>
           <div class="anw-f"><label>Okres bazowy (PRZED instalacją)</label>
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
-              <option value="">${ANAL.objectId ? '— ręcznie poniżej —' : 'najpierw obiekt'}</option>
-              <option value="season_prev" ${ANAL.basePeriod === 'season_prev' ? 'selected' : ''}>Poprzedni sezon ogrzewczy (IX–V)</option>
-              <option value="custom" ${ANAL.basePeriod === 'custom' ? 'selected' : ''}>Okres niestandardowy</option>
+              <option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
+              ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
+              <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>
             </select></div>
         </div>
         ${ANAL.objectId ? _analCtx() : ''}
@@ -1357,12 +1358,58 @@ function analOnObject(v) {
 }
 function analOnBasePeriod(v) {
   ANAL.basePeriod = v || null;
-  if (v === 'season_prev') {
-    const yr = new Date().getFullYear() - 1;
-    ANAL.before.from = yr + '-09-01'; ANAL.before.to = (yr + 1) + '-05-31';
-    ANAL.before.months = _analMonthsBetween(ANAL.before.from, ANAL.before.to);
+  if (v && v !== 'manual') {
+    const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
+    if (p) _analApplyBaseProtocol(p);
   }
   renderAnalysesModule();
+}
+
+// Wczytuje wybrany okres bazowy (protokół) do kreatora:
+// TYM → standardowy sezon, okres porównawczy → PRZED instalacją
+function _analApplyBaseProtocol(p) {
+  // Standard = Typowy Rok Meteorologiczny (TYM)
+  const tym = p.tymMonthly || [];
+  if (tym.length) {
+    const std = JSON.parse(JSON.stringify(ANAL_STD_DEFAULT));
+    tym.forEach(m => {
+      const mo = Number(m.month);
+      if (mo >= 1 && mo <= 12) {
+        const t = (m.tymTemperature ?? m.temperature);
+        const d = (m.tymDays ?? m.days);
+        std[mo] = [
+          (t !== null && t !== undefined && t !== '') ? Number(t) : std[mo][0],
+          (d !== null && d !== undefined && d !== '') ? Number(d) : std[mo][1]
+        ];
+      }
+    });
+    ANAL.std = std;
+  }
+  // PRZED instalacją = okres porównawczy (bazowy)
+  ANAL.before.from = p.comparisonPeriodStartDate || '';
+  ANAL.before.to = p.comparisonPeriodEndDate || '';
+  const comp = p.comparisonMonthly || [];
+  if (comp.length) {
+    ANAL.before.months = comp.map(m => {
+      const mo = Number(m.month) || 1;
+      const yr = Number(m.year) || (m.monthName && /\d{4}/.test(m.monthName) ? Number(m.monthName.match(/\d{4}/)[0]) : '');
+      return {
+        year: yr,
+        month: mo,
+        name: m.monthName || (ANAL_MONTHS[mo - 1] + (yr ? ' ' + yr : '')),
+        days: (m.days !== null && m.days !== undefined) ? Number(m.days) : '',
+        tme: (m.temperature !== null && m.temperature !== undefined) ? Number(m.temperature) : ''
+      };
+    });
+  } else {
+    ANAL.before.months = _analMonthsBetween(ANAL.before.from, ANAL.before.to);
+  }
+  ANAL.before.consumption = (p.comparisonConsumption !== null && p.comparisonConsumption !== undefined) ? p.comparisonConsumption : '';
+  // jednostka / waluta / cena / udział z protokołu (jeśli ustawione)
+  if (p.energyUnit) ANAL.energy.unit = p.energyUnit;
+  if (p.currency) ANAL.energy.currency = p.currency;
+  if (p.energyPrice) ANAL.energy.price = p.energyPrice;
+  if (p.waterAiShare !== null && p.waterAiShare !== undefined && p.waterAiShare !== '') ANAL.energy.escoShare = p.waterAiShare;
 }
 function analOnDates(key, which, val) {
   ANAL[key][which] = val;

@@ -1905,7 +1905,7 @@ function openObjectMeasurements(objectId) {
 
 function refreshProtocolNumberSuggestion(objectId) {
   const inp = document.getElementById('protocol-number-input');
-  if (!inp || inp.dataset.userEdited === '1') return;
+  if (!inp || inp.dataset.userEdited === '1' || editingMeasurementId) return;
   const suggested = MeasurementsModule.suggestProtocolNumber(objectId, null);
   if (suggested) inp.value = suggested;
 }
