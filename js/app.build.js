@@ -2238,56 +2238,44 @@ function viewProtocol(id) {
 
   const client = ClientsModule.find(p.clientId);
   const obj = ObjectsModule.find(p.objectId);
-  const r = p.escoResults || calcESCOResults(p);
   const u = p.energyUnit || "GJ";
   const cur = p.currency || "PLN";
-  const fmt2 = v => Number(v||0).toFixed(2);
-  const fmt3 = v => Number(v||0).toFixed(3);
-  const fmt4 = v => Number(v||0).toFixed(4);
+  const baseTemp = Number(p.baseTemperature || 21);
+  const fmt2 = v => Number(v || 0).toFixed(2);
+  const fmt3 = v => Number(v || 0).toFixed(3);
 
+  const statusLabels = { DRAFT: "Roboczy", FINAL: "Finalny", SIGNED: "Podpisany", ARCHIVED: "Zarchiwizowany" };
+  const statusLabel = statusLabels[p.protocolStatus] || p.protocolStatus || "—";
+
+  // TYM — typowy rok meteorologiczny (12 miesięcy)
   const tymMonthly = p.tymMonthly || [];
-  const tymTotalDays = tymMonthly.reduce((s,m) => s + Number(m.tymDays ?? m.days ?? 0), 0);
+  const tymTotalDays = tymMonthly.reduce((s, m) => s + Number(m.tymDays ?? m.days ?? 0), 0);
   const tymRows = tymMonthly.map(m => {
     const days = m.tymDays ?? m.days ?? "";
     const temp = m.tymTemperature ?? m.temperature;
-    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
+    const hdd = fmt2(Math.max(0, (baseTemp - Number(temp || 0)) * Number(days || 0)));
     return `<tr>
-      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName || ("M" + m.month))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
     </tr>`;
   }).join("");
 
-  const billingMonthly = p.realMonthly || [];
-  const billingTotalDays = billingMonthly.reduce((s,m) => s + Number(m.days ?? 0), 0);
-  const billingRows = billingMonthly.map(m => {
-    const days = m.days ?? "";
-    const temp = m.temperature;
-    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
-    return `<tr>
-      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
-    </tr>`;
-  }).join("");
-
+  // Okres porównawczy (bazowy)
   const compMonthly = p.comparisonMonthly || [];
-  const compTotalDays = compMonthly.reduce((s,m) => s + Number(m.days ?? 0), 0);
+  const compTotalDays = compMonthly.reduce((s, m) => s + Number(m.days ?? 0), 0);
   const compRows = compMonthly.map(m => {
     const days = m.days ?? "";
     const temp = m.temperature;
-    const hdd = fmt2(Math.max(0,(Number(p.baseTemperature||21)-Number(temp||0))*Number(days||0)));
+    const hdd = fmt2(Math.max(0, (baseTemp - Number(temp || 0)) * Number(days || 0)));
     return `<tr>
-      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName||("M"+m.month))}</td>
-      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp!==null&&temp!==undefined?fmt2(temp):"—"}</td>
+      <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName || ("M" + m.month))}</td>
+      <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${days !== "" ? days : "—"}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${hdd}</td>
     </tr>`;
   }).join("");
-
-  const savedColor = r.savedEnergyPct >= 0 ? "#27500A" : "#c00";
 
   const container = document.getElementById("module-content");
   if (!container) return;
@@ -2297,10 +2285,10 @@ function viewProtocol(id) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
         <div>
           <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">
-            ${escapeHtml(client?client.name:"")} / ${escapeHtml(obj?obj.name:"")}
+            ${escapeHtml(client ? client.name : "")} / ${escapeHtml(obj ? obj.name : "")}
           </div>
           <h2 style="margin:0;font-size:18px;font-weight:600;color:var(--color-text-primary);">
-            📋 Okres bazowy — ${escapeHtml(p.protocolDate||"brak daty")}
+            📋 Okres bazowy — ${escapeHtml(p.protocolDate || "brak daty")}
           </h2>
         </div>
         <div style="display:flex;gap:8px;">
@@ -2309,182 +2297,101 @@ function viewProtocol(id) {
         </div>
       </div>
 
-      <!-- Dane podstawowe -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-
-        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
-          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane protokołu</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Opracował</div>
-          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.preparedBy||"—")}</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Jednostka</div>
-          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(u)}</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Cena energii</div>
-          <div style="font-size:14px;">${fmt2(p.energyPrice||0)} ${escapeHtml(cur)} / ${escapeHtml(u)}</div>
+      <!-- Dane klimatyczne -->
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🌡️ Dane klimatyczne</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;">
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Stacja meteo</div><div style="font-size:14px;">${escapeHtml(p.weatherStation || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Źródło danych</div><div style="font-size:14px;">${escapeHtml(p.weatherSource || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Data pobrania danych</div><div style="font-size:14px;">${escapeHtml(p.weatherDataDownloadDate || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Temperatura bazowa</div><div style="font-size:14px;">${escapeHtml(String(baseTemp))} °C</div></div>
         </div>
-
-        <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;">
-          <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Dane klimatyczne</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Stacja meteo</div>
-          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.weatherStation||"—")}</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Źródło danych</div>
-          <div style="font-size:14px;margin-bottom:8px;">${escapeHtml(p.weatherSource||"—")}</div>
-          <div style="font-size:13px;color:var(--color-text-secondary);">Temperatura bazowa</div>
-          <div style="font-size:14px;">${escapeHtml(String(p.baseTemperature||21))} °C</div>
-          ${p.weatherSourceUrl ? `<a href="${escapeHtml(p.weatherSourceUrl)}" target="_blank" rel="noopener" style="font-size:12px;margin-top:8px;display:inline-block;">🌡️ Link do danych klimatycznych</a>` : ""}
-        </div>
-
+        ${p.weatherSourceUrl ? `<a href="${escapeHtml(p.weatherSourceUrl)}" target="_blank" rel="noopener" style="font-size:12px;margin-top:10px;display:inline-block;">🔗 Link do źródła danych klimatycznych</a>` : ""}
       </div>
 
-      <!-- Okresy -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-
-        <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;">
-          <div style="background:#E6F1FB;padding:10px 14px;font-size:13px;font-weight:500;color:#0C447C;">
-            📅 Okres rozliczeniowy
-          </div>
-          <div style="padding:14px;">
-            <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
-            <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.billingPeriodStartDate||"?")} → ${escapeHtml(p.billingPeriodEndDate||"?")}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Liczba dni okresu</div>
-            <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#0C447C;">${billingTotalDays} dni</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodStartReading??0)} ${escapeHtml(u)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.billingPeriodEndReading||0)} ${escapeHtml(u)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
-            <div style="font-size:16px;font-weight:600;color:#0C447C;">${fmt3(p.billingConsumption||0)} ${escapeHtml(u)}</div>
-          </div>
-        </div>
-
-        <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;">
-          <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
-            📊 Okres porównawczy
-          </div>
-          <div style="padding:14px;">
-            <div style="font-size:13px;color:var(--color-text-secondary);">Okres</div>
-            <div style="font-size:14px;font-weight:500;margin-bottom:8px;">${escapeHtml(p.comparisonPeriodStartDate||"?")} → ${escapeHtml(p.comparisonPeriodEndDate||"?")}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Liczba dni okresu</div>
-            <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#27500A;">${compTotalDays} dni</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodStartReading??0)} ${escapeHtml(u)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div>
-            <div style="font-size:14px;margin-bottom:8px;">${fmt3(p.comparisonPeriodEndReading||0)} ${escapeHtml(u)}</div>
-            <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie</div>
-            <div style="font-size:16px;font-weight:600;color:#27500A;">${fmt3(p.comparisonConsumption||0)} ${escapeHtml(u)}</div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Tabele temperatur -->
-      ${tymRows ? `
-      <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:16px;">
-        <div style="background:#FEF3DC;padding:10px 14px;font-size:13px;font-weight:500;color:#633806;">
-          🌡️ Temperatury TYM (rok standardowy)
-        </div>
-        <div style="padding:14px;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
-              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp TYM (°C)</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD TYM</th>
-            </tr></thead>
-            <tbody>${tymRows}</tbody>
-            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
-              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${tymTotalDays}</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddTymBilling)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>` : ""}
-
-      ${billingRows ? `
-      <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-bottom:16px;">
-        <div style="background:#E6F1FB;padding:10px 14px;font-size:13px;font-weight:500;color:#0C447C;">
-          🌡️ Temperatury rzeczywiste — okres rozliczeniowy
-        </div>
-        <div style="padding:14px;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
-              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp. śr. (°C)</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD</th>
-            </tr></thead>
-            <tbody>${billingRows}</tbody>
-            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
-              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${billingTotalDays}</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealBilling)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>` : ""}
-
-      ${compRows ? `
+      <!-- Okres porównawczy (bazowy) -->
       <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;margin-bottom:16px;">
-        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
-          🌡️ Temperatury rzeczywiste — okres porównawczy
+        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;display:flex;align-items:center;gap:8px;">
+          📊 Okres porównawczy (bazowy)
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#C0DD97;color:#27500A;">bazowy</span>
         </div>
         <div style="padding:14px;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
-              <th style="text-align:left;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Miesiąc</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Temp. śr. (°C)</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">Dni</th>
-              <th style="text-align:right;padding:5px 8px;font-weight:500;color:var(--color-text-secondary);">HDD</th>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-bottom:12px;">
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Okres</div><div style="font-size:14px;font-weight:500;">${escapeHtml(p.comparisonPeriodStartDate || "?")} → ${escapeHtml(p.comparisonPeriodEndDate || "?")}</div></div>
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Liczba dni okresu</div><div style="font-size:14px;font-weight:600;color:#27500A;">${compTotalDays} dni</div></div>
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Odczyt startowy</div><div style="font-size:14px;">${fmt3(p.comparisonPeriodStartReading ?? 0)} ${escapeHtml(u)}</div></div>
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Odczyt końcowy</div><div style="font-size:14px;">${fmt3(p.comparisonPeriodEndReading || 0)} ${escapeHtml(u)}</div></div>
+          </div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Zużycie bazowe</div>
+          <div style="font-size:16px;font-weight:600;color:#27500A;margin-bottom:${compRows ? "12px" : "0"};">${fmt3(p.comparisonConsumption || 0)} ${escapeHtml(u)}</div>
+          ${compRows ? `
+          <table style="width:100%;border-collapse:collapse;border-top:1px solid var(--color-border-tertiary);">
+            <thead><tr style="background:var(--color-background-secondary);">
+              <th style="padding:6px 8px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Miesiąc</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Śr. temp. (°C)</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Dni</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">HDD</th>
             </tr></thead>
             <tbody>${compRows}</tbody>
-            <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);">
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;">Suma</td>
-              <td style="padding:6px 8px;font-size:13px;text-align:right;">—</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${compTotalDays}</td>
-              <td style="padding:6px 8px;font-weight:600;font-size:13px;text-align:right;">${fmt2(r.hddRealComparison)}</td>
+          </table>` : ""}
+        </div>
+      </div>
+
+      <!-- Typowy rok meteorologiczny (TYM) -->
+      ${tymRows ? `
+      <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:16px;">
+        <div style="background:#FAEEDA;padding:10px 14px;font-size:13px;font-weight:500;color:#633806;">🌍 Typowy rok meteorologiczny (TYM)</div>
+        <div style="padding:14px;">
+          ${(p.tymPeriodStart || p.tymPeriodEnd || p.tymDataSource) ? `
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 24px;margin-bottom:12px;">
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Okres TYM od (rok)</div><div style="font-size:14px;">${escapeHtml(p.tymPeriodStart || "—")}</div></div>
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Okres TYM do (rok)</div><div style="font-size:14px;">${escapeHtml(p.tymPeriodEnd || "—")}</div></div>
+            <div><div style="font-size:13px;color:var(--color-text-secondary);">Źródło danych TYM</div><div style="font-size:14px;">${escapeHtml(p.tymDataSource || "—")}</div></div>
+          </div>` : ""}
+          <table style="width:100%;border-collapse:collapse;border-top:1px solid var(--color-border-tertiary);">
+            <thead><tr style="background:var(--color-background-secondary);">
+              <th style="padding:6px 8px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Miesiąc</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Temp. TYM (°C)</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Dni</th>
+              <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">HDD TYM</th>
+            </tr></thead>
+            <tbody>${tymRows}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
+              <td style="padding:6px 8px;font-size:13px;">Suma</td><td></td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">${tymTotalDays}</td><td></td>
             </tr></tfoot>
           </table>
         </div>
       </div>` : ""}
 
-      <!-- Wyniki ESCO -->
-      <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;margin-bottom:16px;">
-        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:500;color:#27500A;">
-          ⚡ Wyniki ESCO
-        </div>
-        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">HDD TYM rozlicz. / rzecz.</div>
-            <div style="font-size:14px;margin-bottom:10px;">${fmt2(r.hddTymBilling)} / ${fmt2(r.hddRealBilling)}</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Współczynnik korekty (k)</div>
-            <div style="font-size:14px;margin-bottom:10px;">${fmt4(r.kBilling)}</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Zużycie rozlicz. skorygowane</div>
-            <div style="font-size:14px;margin-bottom:10px;">${fmt3(r.billingCorrected)} ${escapeHtml(u)}</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Zużycie porówn. skalowane do TYM</div>
-            <div style="font-size:14px;">${fmt3(r.comparisonCorrectedScaled)} ${escapeHtml(u)}</div>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Oszczędność energii</div>
-            <div style="font-size:18px;font-weight:700;color:${savedColor};margin-bottom:4px;">${fmt3(r.savedEnergy)} ${escapeHtml(u)}</div>
-            <div style="font-size:22px;font-weight:700;color:${savedColor};margin-bottom:12px;">${fmt2(r.savedEnergyPct)} %</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Oszczędność finansowa</div>
-            <div style="font-size:18px;font-weight:700;color:${savedColor};margin-bottom:8px;">${fmt2(r.savedMoney)} ${escapeHtml(cur)}</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">Udział WaterAI (${escapeHtml(String(p.waterAiShare||0))} %)</div>
-            <div style="font-size:16px;font-weight:600;">${fmt2(r.waterAiShare)} ${escapeHtml(cur)}</div>
-          </div>
-        </div>
-      </div>
-
       ${p.note ? `
+      <!-- Notatka -->
       <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Notatka</div>
+        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📝 Notatka</div>
         <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.note)}</div>
       </div>` : ""}
 
+      <!-- Szczegóły protokołu -->
+      <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">📋 Szczegóły protokołu</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 24px;">
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Numer protokołu</div><div style="font-size:14px;font-weight:500;">${escapeHtml(p.protocolNumber || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Data protokołu</div><div style="font-size:14px;">${escapeHtml(p.protocolDate || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Status</div><div style="font-size:14px;">${escapeHtml(statusLabel)}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Opracował / Energy Analyst</div><div style="font-size:14px;">${escapeHtml(p.preparedBy || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Zatwierdził</div><div style="font-size:14px;">${escapeHtml(p.approvedBy || "—")}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Jednostka energii</div><div style="font-size:14px;">${escapeHtml(u)}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Cena energii</div><div style="font-size:14px;">${fmt2(p.energyPrice || 0)} ${escapeHtml(cur)} / ${escapeHtml(u)}</div></div>
+          <div><div style="font-size:13px;color:var(--color-text-secondary);">Udział WaterAI / ESCO</div><div style="font-size:14px;">${escapeHtml(String(p.waterAiShare || 0))} %</div></div>
+        </div>
+        ${p.protocolNotes ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border-tertiary);">
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Uwagi do protokołu</div>
+          <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.protocolNotes)}</div>
+        </div>` : ""}
+      </div>
+
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        <button class="primary-button" style="background:#27500A;border-color:#27500A;" onclick="generateESCOReport(${p.id})">⚡ Generuj Raport ESCO</button>
         <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj protokół</button>
         ${obj ? `<button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))">🏗️ Podgląd obiektu</button>` : ""}
       </div>
