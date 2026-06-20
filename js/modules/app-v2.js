@@ -953,1271 +953,569 @@ function saveCalendarEvent() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MODUŁ ANALIZ
+// MODUŁ ANALIZY — nowy przepływ kreatora (v2)
+// Typ analizy → „+ Nowa analiza" → klient/obiekt/okres bazowy → dane → „Wykonaj analizę"
+// Metoda stopniodni (Tᵢ = 20 °C, SD20 = z₀·(20−tₘₑ), φ = ΣSD_stand/ΣSD_rzecz,
+// Qs = Qc.o.·φ, OSZ% = (Qs_przed − Qs_po)/Qs_przed) — zgodnie z metodyką forHEAT.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODUŁ ANALIZY — z zakładkami identycznymi do Pomiarów
-// ═══════════════════════════════════════════════════════════════════════════════
+const _escA = (typeof escapeHtml === 'function') ? escapeHtml : (v => String(v == null ? '' : v));
+const _fmtDateA = (typeof fmtDate === 'function') ? fmtDate : (d => d || '—');
+function _fmtA(n, d = 2) {
+  return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
 
-let activeAnalysisTab = 'tym';
-let showAnalysisForm = false;
-let editingAnalysisId = null;
-let selectedAnalysisObjectId = null;
+const ANAL_TI = 20; // projektowa temperatura wewnętrzna [°C]
+const ANAL_MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+// Standardowy sezon ogrzewczy — domyślnie Lublin (wg metodyki). [tme, z0] per miesiąc 1–12.
+const ANAL_STD_DEFAULT = { 1:[-2.6,31], 2:[-1.9,28], 3:[3.2,31], 4:[9.2,30], 5:[14.4,5], 6:[0,0], 7:[0,0], 8:[0,0], 9:[12.8,5], 10:[8.5,31], 11:[1.3,30], 12:[-2.1,31] };
+const _sd20 = (tme, z0) => Math.max(0, ANAL_TI - Number(tme)) * Number(z0 || 0);
 
-const MONTHS_ANAL = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
-const MONTH_DAYS_ANAL = [31,28,31,30,31,30,31,31,30,31,30,31];
+// stan kreatora analiz
+let ANAL = null;
+let selectedAnalysisObjectId = null; // zachowane dla zgodności
 
+function _analResetState() {
+  ANAL = {
+    step: 1,
+    type: null,
+    clientId: null,
+    objectId: null,
+    basePeriod: null,
+    std: JSON.parse(JSON.stringify(ANAL_STD_DEFAULT)),
+    before: { from: '', to: '', consumption: '', months: [] },
+    after:  { from: '', to: '', consumption: '', months: [] },
+    energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50 },
+    results: null,
+    editingId: null
+  };
+}
+
+function _analMonthsBetween(from, to) {
+  if (!from || !to) return [];
+  const a = new Date(from), b = new Date(to);
+  if (isNaN(a) || isNaN(b) || a > b) return [];
+  const out = []; let y = a.getFullYear(), m = a.getMonth();
+  while (y < b.getFullYear() || (y === b.getFullYear() && m <= b.getMonth())) {
+    const dim = new Date(y, m + 1, 0).getDate();
+    let d = dim;
+    if (y === a.getFullYear() && m === a.getMonth()) d = dim - a.getDate() + 1;
+    if (y === b.getFullYear() && m === b.getMonth()) d = Math.min(d, b.getDate());
+    out.push({ year: y, month: m + 1, name: ANAL_MONTHS[m] + ' ' + y, days: d, tme: '' });
+    m++; if (m > 11) { m = 0; y++; }
+  }
+  return out;
+}
+
+const ANAL_STYLE = `<style>
+  .anw-steps{display:flex;gap:6px;align-items:center;margin:0 0 22px;flex-wrap:wrap;}
+  .anw-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-tertiary);}
+  .anw-step .dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--color-background-secondary);color:var(--color-text-tertiary);}
+  .anw-step.active .dot{background:#0C447C;color:#fff;}
+  .anw-step.done .dot{background:#27500A;color:#fff;}
+  .anw-step.active{color:#0C447C;font-weight:600;}
+  .anw-step .arr{color:var(--color-border-tertiary);}
+  .anw-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .anw-type{position:relative;border:1.5px solid var(--color-border-tertiary);border-radius:14px;padding:18px 16px;cursor:pointer;background:var(--color-background-primary);transition:.15s;display:flex;flex-direction:column;gap:8px;}
+  .anw-type:hover{border-color:#B5D4F4;box-shadow:0 4px 14px rgba(12,68,124,.08);transform:translateY(-1px);}
+  .anw-type.sel{border-color:#0C447C;background:#E6F1FB;box-shadow:0 4px 16px rgba(12,68,124,.14);}
+  .anw-type .ico{font-size:26px;}
+  .anw-type .t{font-size:14px;font-weight:600;color:var(--color-text-primary);}
+  .anw-type .d{font-size:12px;color:var(--color-text-secondary);}
+  .anw-type .badge{position:absolute;top:12px;right:12px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+  .anw-type .badge.ready{background:#EAF3DE;color:#27500A;}
+  .anw-type .badge.soon{background:#FFF1E0;color:#9A5B00;}
+  .anw-type .chk{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#0C447C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .anw-act{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+  .anw-sec{border:1px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;margin-bottom:18px;}
+  .anw-head{padding:12px 16px;display:flex;align-items:center;gap:10px;}
+  .anw-head .ico{font-size:18px;} .anw-head h3{margin:0;font-size:14px;font-weight:600;}
+  .anw-head .pill{font-size:11px;padding:2px 9px;border-radius:20px;margin-left:auto;}
+  .anw-body{padding:16px;background:var(--color-background-primary);}
+  .anw-blue{background:#E6F1FB;} .anw-blue h3{color:#0C447C;}
+  .anw-gold{background:#FAEEDA;} .anw-gold h3{color:#633806;}
+  .anw-before{background:#EEF4FB;} .anw-before h3{color:#0C447C;}
+  .anw-after{background:#EAF3DE;} .anw-after h3{color:#27500A;}
+  .anw-g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .anw-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  .anw-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .anw-f label{display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;font-weight:500;}
+  .anw-f input,.anw-f select{width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;background:var(--color-background-primary);box-sizing:border-box;}
+  table.anw-t{width:100%;border-collapse:collapse;font-size:13px;}
+  table.anw-t th{text-align:left;padding:7px 8px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);white-space:nowrap;}
+  table.anw-t td{padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary);}
+  table.anw-t td.calc{font-variant-numeric:tabular-nums;color:var(--color-text-secondary);text-align:right;}
+  table.anw-t input{width:100%;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;text-align:right;box-sizing:border-box;}
+  table.anw-t tfoot td{font-weight:700;padding:8px;border-top:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
+  .anw-muted{color:var(--color-text-tertiary);font-size:12px;}
+  .anw-note{font-size:11px;color:var(--color-text-tertiary);margin-top:8px;}
+  .anw-note a{color:#0C447C;}
+  .anw-ctx{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:var(--color-background-secondary);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--color-text-secondary);margin-top:14px;}
+  .anw-ctx b{color:var(--color-text-primary);}
+  .anw-run{background:linear-gradient(135deg,#15803d,#22a35a);color:#fff;font-size:15px;font-weight:600;padding:14px 30px;border-radius:12px;box-shadow:0 6px 18px rgba(34,163,90,.25);border:none;cursor:pointer;}
+  .anw-run:hover{filter:brightness(1.05);}
+  .anw-hero{background:linear-gradient(135deg,#0C447C,#1a6bb5);color:#fff;border-radius:14px;padding:22px 24px;display:flex;gap:28px;flex-wrap:wrap;align-items:center;}
+  .anw-hero .big{font-size:34px;font-weight:800;line-height:1;}
+  .anw-hero .lbl{font-size:12px;opacity:.85;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+  .anw-rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px;}
+  .anw-tile{border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px 16px;background:var(--color-background-primary);}
+  .anw-tile .v{font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;}
+  .anw-tile .k{font-size:11px;color:var(--color-text-secondary);margin-top:2px;}
+  @media(max-width:680px){.anw-g4{grid-template-columns:1fr 1fr;}.anw-g3{grid-template-columns:1fr;}}
+</style>`;
+
+// ── ENTRY POINT (wywoływane przez nawigację: moduleName==='analyses') ──────────
 function renderAnalysesModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
+  if (!ANAL) _analResetState();
 
   const clients = ClientsModule.getAll();
   const objects = ObjectsModule.getAll();
-
   if (!clients.length || !objects.length) {
-    container.innerHTML = `<div class="reminder-card"><strong>Najpierw dodaj klienta i obiekt</strong><div class="reminder-meta">Analiza musi być przypisana do obiektu.</div></div>`;
+    container.innerHTML = `${ANAL_STYLE}<div class="reminder-card"><strong>Najpierw dodaj klienta i obiekt</strong><div class="reminder-meta">Analiza musi być przypisana do obiektu.</div></div>`;
     return;
   }
 
-  let selObj = selectedAnalysisObjectId ? ObjectsModule.find(selectedAnalysisObjectId) : objects[0];
-  if (!selObj) selObj = objects[0];
-  selectedAnalysisObjectId = Number(selObj.id);
-  const selClientId = Number(selObj.clientId);
-  const objsForClient = ObjectsModule.findByClient(selClientId);
+  container.innerHTML = ANAL_STYLE + _analStepsBar() + (ANAL.step === 1 ? _analTypeSelect() : _analWizard());
 
-  const objSelector = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px;">
-      <div style="font-size:12px;color:var(--color-text-secondary);">Klient:</div>
-      <select onchange="selectedAnalysisObjectId=null;const objs=ObjectsModule.findByClient(Number(this.value));if(objs.length)selectedAnalysisObjectId=objs[0].id;renderAnalysesModule();"
-        style="font-size:13px;padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:8px;">
-        ${clients.map(c=>`<option value="${c.id}" ${Number(c.id)===selClientId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
-      </select>
-      <div style="font-size:12px;color:var(--color-text-secondary);">Obiekt:</div>
-      <select onchange="selectedAnalysisObjectId=Number(this.value);renderAnalysesModule();"
-        style="font-size:13px;padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:8px;">
-        ${objsForClient.map(o=>`<option value="${o.id}" ${Number(o.id)===selectedAnalysisObjectId?'selected':''}>${escapeHtml(o.name)}</option>`).join('')}
-      </select>
-    </div>`;
+  if (ANAL.step === 2 && ANAL.type === 'TYM' && ANAL.objectId) _analRecalcLive();
+}
 
-  const TABS = [
-    { key:'tym',        icon:'🌡️', label:'Korekta TYM' },
-    { key:'regression', icon:'📈', label:'Regresja liniowa' },
-    { key:'occupancy',  icon:'🏨', label:'Korekta obłożenia' },
-    { key:'area',       icon:'📐', label:'Korekta powierzchni' },
-    { key:'volume',     icon:'⚙️', label:'Korekta intensywności' },
-    { key:'schedule',   icon:'📅', label:'Harmonogram' },
-    { key:'custom',     icon:'🔬', label:'Własna' },
+function _analStepsBar() {
+  const items = [
+    { n: 1, l: 'Typ analizy' },
+    { n: 2, l: 'Klient · obiekt · okres' },
+    { n: 3, l: 'Dane i obliczenia' },
+    { n: 4, l: 'Wykonaj' }
   ];
-
-  const tabs = `<div class="meas-tabs">
-    ${TABS.map(t=>`<button type="button" class="meas-tab ${activeAnalysisTab===t.key?'active':''} ${t.key==='regression'?'meas-tab-reg':''}"
-      onclick="activeAnalysisTab='${t.key}';showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">
-      ${t.icon} ${t.label}
-    </button>`).join('')}
-  </div>`;
-
-  const analysesForObj = (AnalysesModule.getAll()||[])
-    .filter(a=>Number(a.objectId)===selectedAnalysisObjectId)
-    .sort((a,b)=>(b.executedAt||'').localeCompare(a.executedAt||''));
-
-  container.innerHTML = `
-  <style>
-    .meas-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--color-border-tertiary);}
-    .meas-tab{padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--color-text-secondary);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;}
-    .meas-tab.active{color:#0C447C;border-bottom-color:#0C447C;}
-    .meas-tab:hover:not(.active){color:var(--color-text-primary);background:var(--color-background-secondary);}
-    .meas-tab-reg{color:#633806!important;}.meas-tab-reg.active{color:#633806!important;border-bottom-color:#FAC775!important;}
-    .anal-section{margin-bottom:20px;border-radius:10px;overflow:hidden;}
-    .anal-body{padding:16px;background:var(--color-background-primary);}
-    .anal-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
-    .anal-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;}
-    .anal-grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;}
-    .anal-field label{font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;}
-    .anal-field input,.anal-field select{width:100%;box-sizing:border-box;}
-    .anal-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
-    .anal-table th{text-align:left;padding:6px 8px;font-size:11px;font-weight:500;color:var(--color-text-secondary);border-bottom:.5px solid var(--color-border-tertiary);}
-    .anal-summary{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;align-items:center;}
-    .anal-result-box{background:linear-gradient(135deg,#0C447C 0%,#1a6bb5 100%);color:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;}
-  </style>
-  ${objSelector}
-  ${tabs}
-  ${activeAnalysisTab==='tym' ? renderAnalysisTYMContent(selObj, analysesForObj) : ''}
-  ${activeAnalysisTab==='regression' ? renderAnalysisRegressionContent(selObj, analysesForObj) : ''}
-  ${activeAnalysisTab==='occupancy' ? renderAnalysisPlaceholder('🏨','Korekta obłożenia','#E6F1FB','#B5D4F4','#0C447C') : ''}
-  ${activeAnalysisTab==='area' ? renderAnalysisPlaceholder('📐','Korekta powierzchni','#E8F5E9','#A5D6A7','#2E7D32') : ''}
-  ${activeAnalysisTab==='volume' ? renderAnalysisPlaceholder('⚙️','Korekta intensywności','#FFF3E0','#FFCC80','#E65100') : ''}
-  ${activeAnalysisTab==='schedule' ? renderAnalysisPlaceholder('📅','Harmonogram','#F3E5F5','#CE93D8','#6A1B9A') : ''}
-  ${activeAnalysisTab==='custom' ? renderAnalysisPlaceholder('🔬','Własna analiza','#FCE4EC','#F48FB1','#880E4F') : ''}
-  `;
+  let cur = ANAL.step === 1 ? 1 : (ANAL.results ? 4 : (ANAL.clientId && ANAL.objectId ? 3 : 2));
+  return `<div class="anw-steps">` + items.map((it, i) => {
+    const cls = it.n < cur ? 'done' : (it.n === cur ? 'active' : '');
+    return `<div class="anw-step ${cls}"><span class="dot">${it.n < cur ? '✓' : it.n}</span>${it.l}</div>` +
+      (i < items.length - 1 ? '<span class="arr">→</span>' : '');
+  }).join('') + `</div>`;
 }
 
-function renderAnalysisPlaceholder(icon,title,bg,border,color) {
-  return `<div style="border:1px solid ${border};border-radius:10px;overflow:hidden;">
-    <div style="background:${bg};padding:14px 18px;display:flex;align-items:center;gap:12px;">
-      <span style="font-size:22px;">${icon}</span>
-      <h3 style="margin:0;font-size:15px;font-weight:600;color:${color};">${title}</h3>
-    </div>
-    <div style="padding:32px 20px;background:var(--color-background-primary);text-align:center;">
-      <div style="font-size:40px;margin-bottom:12px;">🚧</div>
-      <p style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin:0 0 8px;">Moduł w przygotowaniu</p>
-    </div>
-  </div>`;
-}
-
-// ── ZAKŁADKA TYM ─────────────────────────────────────────────────────────────
-
-function renderAnalysisTYMContent(obj, allForObj) {
-  const tymAnalyses = allForObj.filter(a=>a.analysisType==='TYM');
-
-  const listSection = `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:13px;color:var(--color-text-secondary);">${tymAnalyses.length} analiz TYM</span>
-    <button class="primary-button" onclick="showAnalysisForm=true;editingAnalysisId=null;activeAnalysisTab='tym';renderAnalysesModule();" style="font-size:13px;padding:8px 18px;">+ Nowa analiza TYM</button>
-  </div>
-  ${tymAnalyses.length===0 ? `<div class="reminder-card"><strong>Brak analiz TYM</strong><div class="reminder-meta">Kliknij „+ Nowa analiza TYM" aby wykonać pierwszą analizę korygującą do Typowego Roku Meteorologicznego.</div></div>` : `
-  <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:var(--color-background-secondary);">
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data protokołu</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Okres rozliczeniowy</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Oszczędność</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">% redukcji</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Wartość</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-        <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-      </tr></thead>
-      <tbody>
-        ${tymAnalyses.map(a=>{
-          const r=a.results||{};
-          const pct=r.savedEnergyPct?((r.savedEnergyPct*100)<1?r.savedEnergyPct*100:r.savedEnergyPct).toFixed(1)+'%':'—';
-          const st=AnalysesModule.STATUSES[a.status]||{label:a.status,color:'#666'};
-          return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-            <td style="padding:9px 12px;font-size:13px;font-weight:500;">${fmtDate(a.executedAt)}</td>
-            <td style="padding:9px 12px;font-size:13px;">${fmtDate(a.inputParams&&a.inputParams.billingFrom)} → ${fmtDate(a.inputParams&&a.inputParams.billingTo)}</td>
-            <td style="padding:9px 12px;font-size:13px;">${r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2)+' '+(a.inputParams&&a.inputParams.energyUnit||'kWh'):'—'}</td>
-            <td style="padding:9px 12px;font-size:13px;color:${r.savedEnergyPct>0?'#27500A':'#c00'};">${pct}</td>
-            <td style="padding:9px 12px;font-size:13px;">${r.savedMoney!=null?Number(r.savedMoney).toFixed(2)+' '+(a.inputParams&&a.inputParams.currency||'EUR'):'—'}</td>
-            <td style="padding:9px 12px;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.color}22;color:${st.color};">${st.label}</span></td>
-            <td style="padding:9px 12px;white-space:nowrap;">
-              <div style="display:flex;gap:4px;align-items:center;">
-                <button class="icon-btn" onclick="viewTYMAnalysis(${a.id})" title="Podgląd">👁</button>
-                <button class="icon-btn" onclick="editTYMAnalysis(${a.id})" title="Edytuj">✏️</button>
-                <button class="icon-btn icon-btn-del" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" title="Usuń">🗑</button>
-              </div>
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-  </div>`}`;
-
-  if (!showAnalysisForm || activeAnalysisTab!=='tym') return listSection;
-
-  const editing = editingAnalysisId ? AnalysesModule.find(editingAnalysisId) : null;
-  const ip = editing&&editing.inputParams ? editing.inputParams : {};
-  const prev = tymAnalyses.filter(a=>!editingAnalysisId||Number(a.id)!==Number(editingAnalysisId))
-    .sort((a,b)=>(b.executedAt||'').localeCompare(a.executedAt||''))[0];
-
-  // TYM months table
-  const tymMonthRows = MONTHS_ANAL.map((mn,i)=>{
-    const m=i+1;
-    const defDays=MONTH_DAYS_ANAL[i];
-    const prevTym=(prev&&prev.inputParams&&prev.inputParams.tymMonths||[]).find(x=>x.month===m)||{};
-    const defTemp=ip.tymMonths?(ip.tymMonths[i]||{}).temp:'';
-    const defD=ip.tymMonths?(ip.tymMonths[i]||{}).days||defDays:prevTym.days||defDays;
-    return `<tr data-m="${m}">
-      <td style="padding:5px 8px;color:var(--color-text-secondary);font-size:13px;">${mn}</td>
-      <td style="padding:3px 6px;"><input class="tym-temp-anal" name="tymTemp_anal_${m}" type="number" step="0.01" placeholder="°C"
-        value="${defTemp||''}" style="width:80px;font-size:13px;padding:3px 6px;" oninput="calcAnalTYM()" /></td>
-      <td style="padding:3px 6px;"><input class="tym-days-anal" name="tymDays_anal_${m}" type="number" min="0" max="31"
-        value="${defD}" style="width:55px;font-size:13px;padding:3px 6px;" oninput="calcAnalTYM()" /></td>
-      <td style="padding:5px 8px;font-size:13px;color:var(--color-text-tertiary);" id="hdd-tym-anal-${m}">—</td>
-    </tr>`;
+// ── KROK 1: wybór typu + „+ Nowa analiza" + lista istniejących ──────────────────
+function _analTypeSelect() {
+  const cards = Object.entries(AnalysesModule.TYPES).map(([k, t]) => {
+    const ready = (k === 'TYM' || k === 'REGRESSION'); // gotowe metody
+    return `<div class="anw-type ${ANAL.type === k ? 'sel' : ''}" onclick="analSelectType('${k}')">
+      ${ANAL.type === k ? '<span class="chk">✓</span>' : ''}
+      <span class="badge ${ready ? 'ready' : 'soon'}">${ready ? 'GOTOWE' : 'WKRÓTCE'}</span>
+      <span class="ico">${t.icon}</span>
+      <span class="t">${_escA(t.label)}</span>
+      <span class="d">${_analTypeDesc(k)}</span>
+    </div>`;
   }).join('');
 
-  // Billing months template (dynamic)
-  // Comparison months template (dynamic)
-  const baseProtocols = (typeof MeasurementsModule !== 'undefined' ? MeasurementsModule.findByObject(selectedAnalysisObjectId) : []);
-
-  const form = `
-  <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;font-size:16px;color:#0C447C;">${editing?'Edytuj analizę TYM':'Nowa analiza TYM — Korekta klimatyczna'}</h3>
-      <button class="small-button" onclick="showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">✕ Zamknij</button>
-    </div>
-    <form onsubmit="saveTYMAnalysis(this);return false;">
-
-    <!-- DANE PODSTAWOWE ANALIZY -->
-    <div class="anal-section" style="border:1px solid #B5D4F4;">
-      <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📋</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane podstawowe analizy</h3>
-      </div>
-      <div class="anal-body">
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Nazwa analizy</label><input name="analName" required placeholder="np. TYM Kwiecień 2026" value="${escapeHtml(editing&&editing.name||'')}"/></div>
-          <div class="anal-field"><label>Data protokołu</label><input name="analDate" type="date" required value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
-          <div class="anal-field">
-            <label>Opracował / Energy Analyst</label>
-            ${(()=>{
-              const _analysts = window.UsersModule ? UsersModule.findByRole('energyAnalyst') : [];
-              const _suggested = (editing&&editing.author) || (obj&&obj.energyAnalystOwner) || '';
-              const _uid = 'analAuthor_field';
-              const _match = _analysts.find(u=>((u.firstName||'')+' '+(u.lastName||'')).trim()===_suggested);
-              const _opts = _analysts.map(u=>{
-                const _n=((u.firstName||'')+' '+(u.lastName||'')).trim();
-                return '<option value="'+_n+'" '+(_n===_suggested?'selected':'')+'>'+_n+'</option>';
-              }).join('');
-              const _showInp = _suggested && !_match;
-              return '<div>'
-                +'<select name="analAuthor" id="'+_uid+'_sel" style="width:100%;" '
-                  +'onchange="(function(s){'
-                    +'if(s.value===\'__other__\'){'
-                      +'document.getElementById(\''+_uid+'_wrap\').style.display=\'flex\';'
-                      +'s.removeAttribute(\'name\');'
-                      +'document.getElementById(\''+_uid+'_inp\').setAttribute(\'name\',\'analAuthor\');'
-                      +'document.getElementById(\''+_uid+'_inp\').focus();'
-                    +'}else{'
-                      +'document.getElementById(\''+_uid+'_wrap\').style.display=\'none\';'
-                      +'s.setAttribute(\'name\',\'analAuthor\');'
-                      +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                    +'}'
-                  +'})(this)">'
-                +'<option value="">— wybierz analityka —</option>'
-                +_opts
-                +'<option value="__other__" '+(_showInp?'selected':'')+'>✏️ Inny (wpisz ręcznie)</option>'
-                +'</select>'
-                +'<div id="'+_uid+'_wrap" style="display:'+(_showInp?'flex':'none')+';gap:4px;margin-top:4px;align-items:center;">'
-                  +'<input id="'+_uid+'_inp" type="text" placeholder="Wpisz imię i nazwisko" '
-                    +(_showInp?'name="analAuthor" ':' ')
-                    +'value="'+(_showInp?_suggested:'')+'" '
-                    +'style="flex:1;"/>'
-                  +'<button type="button" onclick="'
-                    +'document.getElementById(\''+_uid+'_sel\').value=\'\';'
-                    +'document.getElementById(\''+_uid+'_sel\').setAttribute(\'name\',\'analAuthor\');'
-                    +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                    +'document.getElementById(\''+_uid+'_inp\').value=\'\';'
-                    +'document.getElementById(\''+_uid+'_wrap\').style.display=\'none\';" '
-                    +'style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>'
-                +'</div>'
-              +'</div>';
-            })()}
-          </div>
-          <div class="anal-field"><label>Status</label><select name="analStatus">
-            ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}" ${(editing&&editing.status||'DRAFT')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select></div>
-        </div>
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Stacja meteo</label><input name="weatherStation" placeholder="np. Sliač, Słowacja" value="${escapeHtml(ip.weatherStation||obj.weatherStation||'')}"/></div>
-          <div class="anal-field"><label>Temperatura bazowa T_b (°C)</label><input name="baseTemp" type="number" step="0.1" value="${ip.baseTemperature||obj.baseTemperature||21}" oninput="calcAnalTYM()"/></div>
-          <div class="anal-field"></div><div class="anal-field"></div>
-        </div>
-
-        <div class="anal-grid4" style="margin-top:4px;padding-top:14px;border-top:1px dashed var(--color-border-tertiary);">
-          <div class="anal-field" style="grid-column:span 4;">
-            <label>Okres bazowy</label>
-            <select name="sourceProtocolId" id="anal-base-protocol-sel" style="width:100%;"
-              onchange="applyBaseProtocolToAnal(this.value)">
-              <option value="">— wpisz dane ręcznie poniżej —</option>
-              ${baseProtocols.map(p=>{
-                const sel = ip.sourceProtocolId && Number(ip.sourceProtocolId)===Number(p.id) ? 'selected' : '';
-                const label = (p.protocolNumber?p.protocolNumber+' — ':'')+(p.comparisonPeriodStartDate||'?')+' → '+(p.comparisonPeriodEndDate||'?')+'  •  '+(p.comparisonConsumption||0)+' '+(p.energyUnit||'')+'  •  protokół z '+(p.protocolDate||'brak daty');
-                return `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
-              }).join('')}
-            </select>
-            <p style="font-size:11px;color:var(--color-text-tertiary);margin:6px 0 0;">Lista pochodzi z zakładki <strong>Okres bazowy</strong> dla wybranego obiektu (wybranego powyżej, nad zakładkami). Wybór wypełni dane okresu porównawczego oraz TYM poniżej.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- OKRES ROZLICZENIOWY -->
-    <div class="anal-section" style="border:1px solid #B5D4F4;">
-      <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#185FA5;">📅</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Okres rozliczeniowy</h3>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#B5D4F4;color:#0C447C;">bieżący</span>
-      </div>
-      <div class="anal-body">
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Data od</label><input name="billFrom" type="date" required value="${ip.billingFrom||''}" oninput="buildAnalPeriodTable('bill')"/></div>
-          <div class="anal-field"><label>Data do</label><input name="billTo" type="date" required value="${ip.billingTo||''}" oninput="buildAnalPeriodTable('bill')"/></div>
-          <div class="anal-field"><label>Zużycie (odczyt)</label><input name="billConsumption" type="number" step="0.001" required value="${ip.billingConsumption||''}" placeholder="z licznika" oninput="calcAnalTYM()"/></div>
-          <div class="anal-field"><label>Zużycie CO (po odjęciu CWU)</label><input name="billCO" type="number" step="0.001" value="${ip.billingCO||''}" placeholder="jeśli podzielone" oninput="calcAnalTYM()"/></div>
-        </div>
-        <table class="anal-table">
-          <thead><tr>
-            <th style="width:28%;">Miesiąc</th>
-            <th style="width:20%;">Śr. temp. (°C)</th>
-            <th style="width:16%;">Dni</th>
-            <th style="width:36%;">HDD rzecz.</th>
-          </tr></thead>
-          <tbody id="bill-months-anal"><tr><td colspan="4" style="padding:12px;text-align:center;color:var(--color-text-tertiary);font-size:13px;">Wybierz daty</td></tr></tbody>
-        </table>
-        <div class="anal-summary">
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#B5D4F4;color:#0C447C;">🔥 HDD rzecz.: <strong id="bill-hdd-anal">—</strong></span>
-          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px;background:#E6F1FB;color:#0C447C;">📅 Łącznie: <strong id="bill-days-anal">—</strong> dni</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- DANE ENERGETYCZNE -->
-    <div class="anal-section" style="border:1px solid #C8B5F4;">
-      <div style="background:#EDE8FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">⚡</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#3D0C7C;">Dane energetyczne</h3>
-      </div>
-      <div class="anal-body">
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Jednostka energii</label>
-            <select name="energyUnit" onchange="calcAnalTYM()">
-              <option value="kWh" ${(ip.energyUnit||obj.energyUnit||'kWh')==='kWh'?'selected':''}>kWh</option>
-              <option value="m³" ${(ip.energyUnit||obj.energyUnit||'')==='m³'?'selected':''}>m³ (gaz/woda)</option>
-              <option value="GJ"  ${(ip.energyUnit||obj.energyUnit||'')==='GJ'?'selected':''}>GJ</option>
-              <option value="MWh" ${(ip.energyUnit||obj.energyUnit||'')==='MWh'?'selected':''}>MWh</option>
-            </select>
-          </div>
-          <div class="anal-field"><label>Waluta</label>
-            <select name="currency" onchange="calcAnalTYM()">
-              <option value="PLN" ${(ip.currency||obj.currency||'PLN')==='PLN'?'selected':''}>PLN</option>
-              <option value="EUR" ${(ip.currency||obj.currency||'')==='EUR'?'selected':''}>EUR</option>
-              <option value="CZK" ${(ip.currency||obj.currency||'')==='CZK'?'selected':''}>CZK</option>
-              <option value="USD" ${(ip.currency||obj.currency||'')==='USD'?'selected':''}>USD</option>
-            </select>
-          </div>
-          <div class="anal-field"><label>Cena energii (za jednostkę)</label>
-            <input name="energyPrice" type="number" step="0.0001" min="0"
-              value="${ip.energyPrice||obj.energyPrice||''}"
-              placeholder="np. 0.54" oninput="calcAnalTYM()"/>
-          </div>
-          <div class="anal-field"><label>Udział WaterAI / ESCO (%)</label>
-            <input name="escoShare" type="number" step="0.1" min="0" max="100"
-              value="${ip.escoShare!=null?ip.escoShare:(obj.escoShare!=null?obj.escoShare:50)}"
-              placeholder="np. 50"/>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- pola ukryte: dane okresu porównawczego (bazowego) i TYM, wypełniane przez wybór "Okres bazowy" powyżej -->
-    <div style="display:none;">
-      <input name="compFrom" type="date" value="${ip.compFrom||''}"/>
-      <input name="compTo" type="date" value="${ip.compTo||''}"/>
-      <input name="compConsumption" type="number" value="${ip.compConsumption||''}"/>
-      <input name="compCO" type="number" value="${ip.compCO||''}"/>
-      <input name="tymYearFrom" value="${ip.tymYearFrom||''}"/>
-      <input name="tymYearTo" value="${ip.tymYearTo||''}"/>
-      <input name="tymSource" value="${ip.tymSource||obj.weatherSource||'WeatherOnline / Robot Klimatu'}"/>
-      <table><tbody id="comp-months-anal"></tbody></table>
-      <table><tbody>${tymMonthRows}</tbody></table>
-    </div>
-    <span id="comp-hdd-anal" style="display:none;"></span>
-    <span id="comp-days-anal" style="display:none;"></span>
-    <span id="hdd-tym-anal-sum" style="display:none;"></span>
-    <span id="days-tym-anal-sum" style="display:none;"></span>
-
-    <!-- ANALIZA — pełny tok obliczeniowy -->
-    <div class="anal-section" style="border:1px solid #FAC775;">
-      <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;color:#854F0B;">🧮</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Analiza — korekta klimatyczna TYM</h3>
-      </div>
-      <div class="anal-body" id="anal-tym-walkthrough">
-        <div class="reminder-card" style="background:#FFF9EF;">
-          <strong>Wybierz okres bazowy</strong>
-          <div class="reminder-meta">Wybierz „Okres bazowy" w sekcji Dane podstawowe analizy powyżej, aby zobaczyć tu pełny tok obliczeniowy korekty klimatycznej.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="anal-field" style="margin-bottom:16px;">
-      <label>Uwagi</label>
-      <input name="analNotes" placeholder="opcjonalne uwagi do analizy" value="${escapeHtml(editing&&editing.comments||'')}"/>
-    </div>
-
-    <div style="display:flex;gap:10px;align-items:center;">
-      <button class="primary-button" type="submit">${editing?'Zapisz zmiany':'Zapisz analizę TYM'}</button>
-      <button class="small-button" type="button" onclick="showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">Anuluj</button>
-    </div>
-
-    </form>
-  </div>
-  <script>
-    (function(){
-      setTimeout(function(){
-        if (typeof buildAnalPeriodTable === 'function') {
-          buildAnalPeriodTable('bill');
-          buildAnalPeriodTable('comp');
-        }
-        ${ip.compFrom||ip.billingFrom ? "if (typeof calcAnalTYM === 'function') calcAnalTYM();" : ""}
-      }, 50);
-    })();
-  </script>`;
-
-  return listSection + form;
-}
-
-// ── ZAKŁADKA REGRESJA LINIOWA ─────────────────────────────────────────────────
-
-function renderAnalysisRegressionContent(obj, allForObj) {
-  const regAnalyses = allForObj.filter(a=>a.analysisType==='REGRESSION');
-
-  const listSection = `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:13px;color:var(--color-text-secondary);">${regAnalyses.length} analiz regresji</span>
-    <button class="primary-button" onclick="showAnalysisForm=true;editingAnalysisId=null;activeAnalysisTab='regression';renderAnalysesModule();" style="font-size:13px;padding:8px 18px;">+ Nowa analiza regresji</button>
-  </div>
-  ${regAnalyses.length===0 ? `<div class="reminder-card"><strong>Brak analiz regresji liniowej</strong><div class="reminder-meta">Kliknij „+ Nowa analiza regresji" aby dodać analizę techniczną PRZED/PO wdrożeniu WaterAI.</div></div>` : `
-  <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:var(--color-background-secondary);">
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Data</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nazwa</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Temp. zasil. PRZED</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Temp. zasil. PO</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie PRZED</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Zużycie PO</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Redukcja śr.</th>
-        <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-      </tr></thead>
-      <tbody>
-        ${regAnalyses.map(a=>{
-          const r=a.results||{};
-          const ip2=a.inputParams||{};
-          return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-            <td style="padding:9px 12px;font-size:13px;">${fmtDate(a.executedAt)}</td>
-            <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(a.name)}</td>
-            <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${ip2.supplyBefore||'—'}</td>
-            <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${ip2.supplyAfter||'—'}</td>
-            <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${ip2.heatBefore||'—'}</td>
-            <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);">${ip2.heatAfter||'—'}</td>
-            <td style="padding:9px 12px;font-size:13px;color:#27500A;">${r.avgReductionHeat!=null?Number(r.avgReductionHeat).toFixed(1)+'%':'—'}</td>
-            <td style="padding:9px 12px;white-space:nowrap;">
-              <div style="display:flex;gap:4px;align-items:center;">
-                <button class="icon-btn" onclick="viewRegAnalysis(${a.id})" title="Podgląd">👁</button>
-                <button class="icon-btn icon-btn-del" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" title="Usuń">🗑</button>
-              </div>
-            </td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-  </div>`}`;
-
-  if (!showAnalysisForm || activeAnalysisTab!=='regression') return listSection;
-
-  const editing = editingAnalysisId ? AnalysesModule.find(editingAnalysisId) : null;
-  const ip = editing&&editing.inputParams ? editing.inputParams : {};
-
-  // Tabela regresji: 26 wierszy, zakres temp. -15 do +10°C — zgodnie z wzorcem Excel (AVERAGE D4:D29)
-  const regRows = Array.from({length:26},(_,i)=>i-15).map(t=>`<tr data-t="${t}">
-    <td style="padding:3px 6px;font-size:13px;text-align:center;">${t}</td>
-    <td style="padding:2px 4px;"><input class="reg-supply-before" data-t="${t}" type="number" step="0.01" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
-    <td style="padding:2px 4px;"><input class="reg-supply-after" data-t="${t}" type="number" step="0.01" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
-    <td style="padding:3px 6px;font-size:12px;text-align:center;color:var(--color-text-tertiary);" class="reg-supply-diff">—</td>
-    <td style="padding:2px 4px;"><input class="reg-heat-before" data-t="${t}" type="number" step="0.001" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
-    <td style="padding:2px 4px;"><input class="reg-heat-after" data-t="${t}" type="number" step="0.001" style="width:75px;font-size:12px;padding:2px 5px;"/></td>
-    <td style="padding:3px 6px;font-size:12px;text-align:center;color:var(--color-text-tertiary);" class="reg-heat-diff">—</td>
-  </tr>`).join('');
-
-  const regForm = `
-  <div style="border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;font-size:16px;color:#633806;">Nowa analiza — Regresja liniowa</h3>
-      <button class="small-button" onclick="showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">✕ Zamknij</button>
-    </div>
-    <form onsubmit="saveRegAnalysis(this);return false;">
-
-    <!-- DANE PODSTAWOWE -->
-    <div class="anal-section" style="border:1px solid #FAC775;">
-      <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📈</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Dane podstawowe</h3>
-      </div>
-      <div class="anal-body">
-        <div class="anal-grid4">
-          <div class="anal-field"><label>Nazwa analizy</label><input name="regName" required placeholder="np. Regresja PRI LIPE 04.2026" value="${escapeHtml(editing&&editing.name||'')}"/></div>
-          <div class="anal-field"><label>Data analizy</label><input name="regDate" type="date" value="${editing&&editing.executedAt||new Date().toISOString().slice(0,10)}"/></div>
-          <div class="anal-field">
-            <label>Opracował / Energy Analyst</label>
-            ${(()=>{
-              const _analysts = window.UsersModule ? UsersModule.findByRole('energyAnalyst') : [];
-              const _suggested = (editing&&editing.author) || (obj&&obj.energyAnalystOwner) || '';
-              const _uid = 'regAuthor_field';
-              const _match = _analysts.find(u=>((u.firstName||'')+' '+(u.lastName||'')).trim()===_suggested);
-              const _opts = _analysts.map(u=>{
-                const _n=((u.firstName||'')+' '+(u.lastName||'')).trim();
-                return '<option value="'+_n+'" '+(_n===_suggested?'selected':'')+'>'+_n+'</option>';
-              }).join('');
-              const _showInp = _suggested && !_match;
-              return '<div>'
-                +'<select name="regAuthor" id="'+_uid+'_sel" style="width:100%;" '
-                  +'onchange="(function(s){'
-                    +'if(s.value===\'__other__\'){'
-                      +'document.getElementById(\''+_uid+'_wrap\').style.display=\'flex\';'
-                      +'s.removeAttribute(\'name\');'
-                      +'document.getElementById(\''+_uid+'_inp\').setAttribute(\'name\',\'regAuthor\');'
-                      +'document.getElementById(\''+_uid+'_inp\').focus();'
-                    +'}else{'
-                      +'document.getElementById(\''+_uid+'_wrap\').style.display=\'none\';'
-                      +'s.setAttribute(\'name\',\'regAuthor\');'
-                      +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                    +'}'
-                  +'})(this)">'
-                +'<option value="">— wybierz analityka —</option>'
-                +_opts
-                +'<option value="__other__" '+(_showInp?'selected':'')+'>✏️ Inny (wpisz ręcznie)</option>'
-                +'</select>'
-                +'<div id="'+_uid+'_wrap" style="display:'+(_showInp?'flex':'none')+';gap:4px;margin-top:4px;align-items:center;">'
-                  +'<input id="'+_uid+'_inp" type="text" placeholder="Wpisz imię i nazwisko" '
-                    +(_showInp?'name="regAuthor" ':' ')
-                    +'value="'+(_showInp?_suggested:'')+'" '
-                    +'style="flex:1;"/>'
-                  +'<button type="button" onclick="'
-                    +'document.getElementById(\''+_uid+'_sel\').value=\'\';'
-                    +'document.getElementById(\''+_uid+'_sel\').setAttribute(\'name\',\'regAuthor\');'
-                    +'document.getElementById(\''+_uid+'_inp\').removeAttribute(\'name\');'
-                    +'document.getElementById(\''+_uid+'_inp\').value=\'\';'
-                    +'document.getElementById(\''+_uid+'_wrap\').style.display=\'none\';" '
-                    +'style="padding:4px 8px;font-size:11px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;">✕</button>'
-                +'</div>'
-              +'</div>';
-            })()}
-          </div>
-          <div class="anal-field"><label>Status</label><select name="regStatus">
-            ${Object.entries(AnalysesModule.STATUSES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
-          </select></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RÓWNANIA REGRESJI -->
-    <div class="anal-section" style="border:1px solid #FAC775;">
-      <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📐</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Równania regresji y = ax + b</h3>
-      </div>
-      <div class="anal-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-          <div>
-            <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:10px;padding:6px 10px;background:#FAEEDA;border-radius:6px;">Temperatura zasilania (°C)</div>
-            <div class="anal-grid2">
-              <div class="anal-field"><label>PRZED: a (nachylenie)</label><input name="supplyBefore_a" type="number" step="0.0001" placeholder="np. -0.3094" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PRZED: b (wyraz wolny)</label><input name="supplyBefore_b" type="number" step="0.001" placeholder="np. 53.523" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PO: a (nachylenie)</label><input name="supplyAfter_a" type="number" step="0.0001" placeholder="np. -0.3455" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PO: b (wyraz wolny)</label><input name="supplyAfter_b" type="number" step="0.001" placeholder="np. 47.474" oninput="calcRegTable()"/></div>
-            </div>
-            <div style="font-size:12px;color:#633806;margin-top:6px;">
-              PRZED: y = <span id="reg-supply-before-eq">—</span> &nbsp;|&nbsp; PO: y = <span id="reg-supply-after-eq">—</span>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:10px;padding:6px 10px;background:#FAEEDA;border-radius:6px;">Zużycie ciepła (kWh/GJ)</div>
-            <div class="anal-grid2">
-              <div class="anal-field"><label>PRZED: a</label><input name="heatBefore_a" type="number" step="0.0001" placeholder="np. -0.1308" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PRZED: b</label><input name="heatBefore_b" type="number" step="0.001" placeholder="np. 6.335" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PO: a</label><input name="heatAfter_a" type="number" step="0.0001" placeholder="np. 0.1482" oninput="calcRegTable()"/></div>
-              <div class="anal-field"><label>PO: b</label><input name="heatAfter_b" type="number" step="0.001" placeholder="np. 4.8405" oninput="calcRegTable()"/></div>
-            </div>
-            <div style="font-size:12px;color:#633806;margin-top:6px;">
-              PRZED: y = <span id="reg-heat-before-eq">—</span> &nbsp;|&nbsp; PO: y = <span id="reg-heat-after-eq">—</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TABELA DANYCH REGRESJI -->
-    <div class="anal-section" style="border:1px solid #FAC775;">
-      <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📊</span>
-        <h3 style="margin:0;font-size:15px;font-weight:500;color:#633806;">Tabela danych (zakres temp. -15°C do +10°C)</h3>
-        <button type="button" onclick="calcRegTable()" style="margin-left:auto;font-size:12px;padding:4px 12px;border:1px solid #633806;border-radius:6px;background:white;color:#633806;cursor:pointer;">🔄 Przelicz z równań</button>
-      </div>
-      <div class="anal-body" style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+  const all = (AnalysesModule.getAll() || []).sort((a, b) => (b.executedAt || '').localeCompare(a.executedAt || ''));
+  const list = all.length ? `
+    <div style="margin-top:28px;">
+      <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:10px;">Zapisane analizy (${all.length})</div>
+      <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="background:var(--color-background-secondary);">
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:center;">T zewn. (°C)</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);background:#E6F1FB;">T zasil. PRZED</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);background:#EAF3DE;">T zasil. PO</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Redukcja (%)</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);background:#E6F1FB;">Zużycie PRZED</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);background:#EAF3DE;">Zużycie PO</th>
-            <th style="padding:5px 8px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Redukcja (%)</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Typ</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Nazwa</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Obiekt</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Data</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Oszczędność</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:600;">Akcje</th>
           </tr></thead>
-          <tbody id="reg-data-table">${regRows}</tbody>
+          <tbody>${all.map(a => {
+            const o = ObjectsModule.find(a.objectId); const r = a.results || {};
+            const ty = AnalysesModule.TYPES[a.analysisType] || { icon: '•', label: a.analysisType };
+            const pct = r.savedEnergyPct != null ? ((r.savedEnergyPct < 1 ? r.savedEnergyPct * 100 : r.savedEnergyPct)).toFixed(1) + '%' : '—';
+            return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+              <td style="padding:9px 12px;">${ty.icon} ${_escA(ty.label)}</td>
+              <td style="padding:9px 12px;font-weight:500;">${_escA(a.name)}</td>
+              <td style="padding:9px 12px;">${_escA((o && o.name) || '—')}</td>
+              <td style="padding:9px 12px;">${_fmtDateA(a.executedAt)}</td>
+              <td style="padding:9px 12px;color:#27500A;">${r.savedEnergy != null ? Number(r.savedEnergy).toFixed(2) + ' ' + ((a.inputParams && a.inputParams.energyUnit) || '') : '—'} ${pct !== '—' ? '· ' + pct : ''}</td>
+              <td style="padding:9px 12px;white-space:nowrap;">
+                <button class="icon-btn" onclick="analView(${a.id})" title="Podgląd">👁</button>
+                <button class="icon-btn" onclick="analGenerateReport(${a.id})" title="Raport ESCO">⚡</button>
+                <button class="icon-btn icon-btn-del" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" title="Usuń">🗑</button>
+              </td>
+            </tr>`;
+          }).join('')}</tbody>
         </table>
       </div>
-      <div class="anal-body" style="padding-top:0;">
-        <div id="reg-avg-results" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;">
-          <span style="font-size:13px;padding:6px 14px;border-radius:20px;background:#FAC775;color:#633806;">🌡️ Śr. redukcja temp. zasil.: <strong id="reg-avg-supply">—</strong></span>
-          <span style="font-size:13px;padding:6px 14px;border-radius:20px;background:#FAEEDA;color:#633806;">⚡ Śr. redukcja zużycia: <strong id="reg-avg-heat">—</strong></span>
+    </div>` : '';
+
+  return `
+    <h2 style="font-size:16px;color:#0C447C;margin:0 0 4px;">1 · Wybierz typ analizy</h2>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 20px;">Najpierw określ metodę. Po wyborze typu kliknij „+ Nowa analiza", aby przejść do wyboru klienta, obiektu i okresu bazowego.</p>
+    <div class="anw-type-grid">${cards}</div>
+    <div class="anw-act">
+      <button class="primary-button" id="anw-new" ${ANAL.type ? '' : 'disabled'} onclick="analStartNew()" style="${ANAL.type ? '' : 'opacity:.5;cursor:not-allowed;'}">+ Nowa analiza</button>
+    </div>
+    ${list}`;
+}
+
+function _analTypeDesc(k) {
+  return ({
+    TYM: 'Sprowadzenie zużycia do standardowego sezonu metodą stopniodni.',
+    REGRESSION: 'Porównanie techniczne PRZED/PO wg równań y = ax + b.',
+    OCCUPANCY: 'Normalizacja zużycia względem obłożenia obiektu.',
+    AREA: 'Wskaźniki zużycia na m² powierzchni ogrzewanej.',
+    VOLUME: 'Normalizacja względem wolumenu / intensywności pracy.',
+    SCHEDULE: 'Uwzględnienie harmonogramu pracy obiektu.',
+    CUSTOM: 'Dowolny model definiowany przez analityka.'
+  })[k] || '';
+}
+
+function analSelectType(k) { ANAL.type = k; renderAnalysesModule(); }
+function analStartNew() {
+  if (!ANAL.type) return;
+  ANAL.step = 2; ANAL.results = null; ANAL.editingId = null;
+  renderAnalysesModule();
+}
+function analBackToTypes() { ANAL.step = 1; renderAnalysesModule(); }
+
+// ── KROK 2: kreator ─────────────────────────────────────────────────────────────
+function _analWizard() {
+  const t = AnalysesModule.TYPES[ANAL.type];
+  const clients = ClientsModule.getAll();
+  const objsForClient = ANAL.clientId ? ObjectsModule.findByClient(ANAL.clientId) : [];
+
+  const selector = `
+    <div class="anw-sec">
+      <div class="anw-head anw-blue"><span class="ico">🏢</span><h3>Klient · obiekt · okres bazowy</h3></div>
+      <div class="anw-body">
+        <div class="anw-g3">
+          <div class="anw-f"><label>Klient</label>
+            <select onchange="analOnClient(this.value)">
+              <option value="">— wybierz klienta —</option>
+              ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(ANAL.clientId) ? 'selected' : ''}>${_escA(c.name)}</option>`).join('')}
+            </select></div>
+          <div class="anw-f"><label>Obiekt</label>
+            <select onchange="analOnObject(this.value)" ${ANAL.clientId ? '' : 'disabled'}>
+              <option value="">${ANAL.clientId ? '— wybierz obiekt —' : 'najpierw klient'}</option>
+              ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>${_escA(o.name)}</option>`).join('')}
+            </select></div>
+          <div class="anw-f"><label>Okres bazowy (PRZED instalacją)</label>
+            <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
+              <option value="">${ANAL.objectId ? '— ręcznie poniżej —' : 'najpierw obiekt'}</option>
+              <option value="season_prev" ${ANAL.basePeriod === 'season_prev' ? 'selected' : ''}>Poprzedni sezon ogrzewczy (IX–V)</option>
+              <option value="custom" ${ANAL.basePeriod === 'custom' ? 'selected' : ''}>Okres niestandardowy</option>
+            </select></div>
         </div>
+        ${ANAL.objectId ? _analCtx() : ''}
       </div>
-    </div>
-
-    <!-- NOTATKI -->
-    <div class="anal-field" style="margin-bottom:16px;">
-      <label>Uwagi / interpretacja</label>
-      <input name="regNotes" placeholder="np. Metoda pomocnicza — potwierdza wyniki TYM od strony technicznej" value="${escapeHtml(editing&&editing.comments||'')}"/>
-    </div>
-
-    <div style="display:flex;gap:10px;">
-      <button class="primary-button" type="submit">Zapisz analizę regresji</button>
-      <button class="small-button" type="button" onclick="showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();">Anuluj</button>
-    </div>
-    </form>
-  </div>`;
-
-  return listSection + regForm;
-}
-
-// ── OBLICZENIA TYM ─────────────────────────────────────────────────────────────
-
-function buildAnalPeriodTable(prefix) {
-  const fromEl = document.querySelector(`[name="${prefix==='bill'?'billFrom':'compFrom'}"]`);
-  const toEl   = document.querySelector(`[name="${prefix==='bill'?'billTo':'compTo'}"]`);
-  const tbody  = document.getElementById(`${prefix}-months-anal`);
-  if (!tbody) return;
-  const startDate = fromEl ? fromEl.value : '';
-  const endDate   = toEl   ? toEl.value   : '';
-  const months    = typeof buildMonthsFromDates === 'function' ? buildMonthsFromDates(startDate, endDate) : [];
-  if (!months.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--color-text-tertiary);font-size:13px;">Wybierz daty</td></tr>';
-    return;
-  }
-  const baseTempEl = document.querySelector('[name="baseTemp"]');
-  const baseTemp = baseTempEl ? Number(baseTempEl.value||21) : 21;
-  const existing = {};
-  tbody.querySelectorAll('tr[data-key]').forEach(tr=>{
-    const k=tr.dataset.key;
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    if(t) existing[k]={temp:t.value, days:d?d.value:''};
-  });
-  tbody.innerHTML = months.map(m=>{
-    const key=`${m.year}-${m.month}`;
-    const prev2=existing[key]||{};
-    const tv=prev2.temp!==undefined?prev2.temp:'';
-    const dv=prev2.days!==undefined?prev2.days:m.days;
-    const hdd=tv!==''?Math.max(0,baseTemp-Number(tv))*Number(dv):null;
-    return `<tr data-key="${key}">
-      <td style="padding:5px 8px;font-size:13px;color:var(--color-text-secondary);">${m.monthName}</td>
-      <td style="padding:3px 6px;"><input class="anal-month-temp" type="number" step="0.01" placeholder="°C" value="${tv}"
-        style="width:80px;font-size:13px;padding:3px 6px;" oninput="calcAnalTYM()"/></td>
-      <td style="padding:3px 6px;"><input class="anal-month-days" type="number" min="0" max="31" value="${dv}"
-        style="width:55px;font-size:13px;padding:3px 6px;" oninput="calcAnalTYM()"/></td>
-      <td style="padding:5px 8px;font-size:13px;color:var(--color-text-tertiary);" class="anal-hdd-cell">
-        ${hdd!==null?hdd.toFixed(1):'—'}</td>
-    </tr>`;
-  }).join('');
-  refreshAnalPeriodHDD(prefix);
-}
-
-function refreshAnalPeriodHDD(prefix) {
-  const tbody = document.getElementById(`${prefix}-months-anal`);
-  const hddEl = document.getElementById(`${prefix}-hdd-anal`);
-  const daysEl= document.getElementById(`${prefix}-days-anal`);
-  if (!tbody) return;
-  const baseTempEl = document.querySelector('[name="baseTemp"]');
-  const baseTemp = baseTempEl ? Number(baseTempEl.value||21) : 21;
-  let totalHDD=0, totalDays=0;
-  tbody.querySelectorAll('tr[data-key]').forEach(tr=>{
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    const cell=tr.querySelector('.anal-hdd-cell');
-    if (!t||t.value==='') { if(cell)cell.textContent='—'; return; }
-    const days=Number(d?d.value:0);
-    const hdd=Math.max(0,baseTemp-Number(t.value))*days;
-    totalHDD+=hdd; totalDays+=days;
-    if(cell)cell.textContent=hdd.toFixed(1);
-  });
-  if(hddEl)hddEl.textContent=totalHDD.toFixed(2);
-  if(daysEl)daysEl.textContent=totalDays;
-}
-
-function calcAnalTYM() {
-  refreshAnalPeriodHDD('bill');
-  refreshAnalPeriodHDD('comp');
-
-  const baseTempEl=document.querySelector('[name="baseTemp"]');
-  const baseTemp=baseTempEl?Number(baseTempEl.value||21):21;
-
-  // ── HDD TYM per-month (normy długoletnie) ──
-  const tymByMonth={};
-  let hddTymSum=0, daysTymSum=0;
-  for(let m=1;m<=12;m++){
-    const t=document.querySelector(`[name="tymTemp_anal_${m}"]`);
-    const d=document.querySelector(`[name="tymDays_anal_${m}"]`);
-    if(!t||t.value==='')continue;
-    const days=Number(d?d.value:0);
-    const temp=Number(t.value);
-    tymByMonth[m]=temp;
-    hddTymSum+=Math.max(0,baseTemp-temp)*days; daysTymSum+=days;
-  }
-  const hddSumEl=document.getElementById('hdd-tym-anal-sum');
-  const daysSumEl=document.getElementById('days-tym-anal-sum');
-  if(hddSumEl)hddSumEl.textContent=hddTymSum.toFixed(2);
-  if(daysSumEl)daysSumEl.textContent=daysTymSum;
-
-  // ── HDD rzeczywiste i HDD_TYM rozbite wg dni KAŻDEGO okresu (rozliczeniowy / porównawczy) ──
-  const billTbody=document.getElementById('bill-months-anal');
-  const compTbody=document.getElementById('comp-months-anal');
-  const walkDiv=document.getElementById('anal-tym-walkthrough');
-  if(!billTbody||!compTbody) return;
-
-  let hddBillReal=0, hddBillTym=0, daysBill=0;
-  const billMonthRows=[];
-  billTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
-    const key=tr.dataset.key; const month=Number(key.split('-')[1]);
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    if(!t||t.value==='') return;
-    const days=Number(d?d.value:0);
-    const tempReal=Number(t.value);
-    const hddReal=Math.max(0,baseTemp-tempReal)*days;
-    const tymT=tymByMonth[month];
-    const hddTym=tymT!=null?Math.max(0,baseTemp-tymT)*days:0;
-    hddBillReal+=hddReal; hddBillTym+=hddTym; daysBill+=days;
-    billMonthRows.push({month,days,tempReal,tymT,hddReal,hddTym});
-  });
-
-  let hddCompReal=0, hddCompTym=0, daysComp=0;
-  const compMonthRows=[];
-  compTbody.querySelectorAll('tr[data-key]').forEach(tr=>{
-    const key=tr.dataset.key; const month=Number(key.split('-')[1]);
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    if(!t||t.value==='') return;
-    const days=Number(d?d.value:0);
-    const tempReal=Number(t.value);
-    const hddReal=Math.max(0,baseTemp-tempReal)*days;
-    const tymT=tymByMonth[month];
-    const hddTym=tymT!=null?Math.max(0,baseTemp-tymT)*days:0;
-    hddCompReal+=hddReal; hddCompTym+=hddTym; daysComp+=days;
-    compMonthRows.push({month,days,tempReal,tymT,hddReal,hddTym});
-  });
-
-  const billCOEl=document.querySelector('[name="billCO"]');
-  const compCOEl=document.querySelector('[name="compCO"]');
-  const billConsEl=document.querySelector('[name="billConsumption"]');
-  const compConsEl=document.querySelector('[name="compConsumption"]');
-  const priceEl=document.querySelector('[name="energyPrice"]');
-  const unitEl=document.querySelector('[name="energyUnit"]');
-  const currencyEl=document.querySelector('[name="currency"]');
-
-  const billCons=Number((billCOEl&&billCOEl.value)?billCOEl.value:(billConsEl?billConsEl.value:0));
-  const compCons=Number((compCOEl&&compCOEl.value)?compCOEl.value:(compConsEl?compConsEl.value:0));
-  const price=Number(priceEl?priceEl.value:0);
-  const unit=unitEl?unitEl.value:'kWh';
-  const currency=currencyEl?currencyEl.value:'EUR';
-
-  const MN=['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
-  const f1=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1});
-  const f2=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const f4=v=>Number(v||0).toLocaleString('pl-PL',{minimumFractionDigits:4,maximumFractionDigits:4});
-  const pct=v=>(Number(v||0)*100).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
-
-  if(!hddBillTym||!hddCompTym||!hddBillReal||!hddCompReal||!billCons||!compCons){
-    if(walkDiv) walkDiv.innerHTML = `
-      <div class="reminder-card" style="background:#FFF9EF;">
-        <strong>Brakuje danych do obliczeń</strong>
-        <div class="reminder-meta">Uzupełnij: okres bazowy (porównawczy), temperatury TYM oraz zużycie w okresie rozliczeniowym i porównawczym.</div>
-      </div>`;
-    window._analTYMResults = null;
-    return;
-  }
-
-  // ── Wzory zgodne z protokołem Excel ──
-  const kBill = hddBillReal>0 ? hddBillTym/hddBillReal : 0;
-  const kComp = hddCompReal>0 ? hddCompTym/hddCompReal : 0;
-  const consBillTym = billCons*kBill;
-  const consCompTym = compCons*kComp;
-  const eBill = hddBillTym>0 ? billCons/hddBillTym : 0;
-  const eComp = hddCompTym>0 ? compCons/hddCompTym : 0;
-  const consCompProjectedToBill = eComp*hddBillTym;
-  const savedEnergy = consCompProjectedToBill - consBillTym;
-  const savedPct = consCompProjectedToBill>0 ? savedEnergy/consCompProjectedToBill : 0;
-  const savedMoney = savedEnergy*price;
-  const eChange = eComp>0 ? (eBill-eComp)/eComp : 0;
-
-  window._analTYMResults = {
-    savedEnergy, savedEnergyPct:savedPct, savedMoney, eBill, eComp, kBill, kComp, eChange,
-    hddBillReal, hddCompReal, hddBillTym, hddCompTym, consBillTym, consCompTym, consCompProjectedToBill
-  };
-
-  if (!walkDiv) return;
-
-  const rowsHtml = (rows) => rows.map(r=>`<tr>
-    <td style="padding:5px 8px;font-size:12px;">${MN[r.month-1]}</td>
-    <td style="padding:5px 8px;font-size:12px;text-align:right;">${r.days}</td>
-    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.tempReal)}</td>
-    <td style="padding:5px 8px;font-size:12px;text-align:right;">${r.tymT!=null?f1(r.tymT):'—'}</td>
-    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.hddReal)}</td>
-    <td style="padding:5px 8px;font-size:12px;text-align:right;">${f1(r.hddTym)}</td>
-  </tr>`).join('');
-
-  const stepCard = (num, title, formula, calc, result, note) => `
-    <div style="border-left:3px solid #FAC775;padding:10px 0 10px 14px;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:4px;">Krok ${num}. ${title}</div>
-      <div style="font-family:monospace;font-size:12px;color:var(--color-text-secondary);margin-bottom:2px;">${formula}</div>
-      <div style="font-family:monospace;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">${calc}</div>
-      <div style="font-size:15px;font-weight:700;color:#0C447C;">${result}</div>
-      ${note?`<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px;">${note}</div>`:''}
     </div>`;
 
-  walkDiv.innerHTML = `
+  let body = '';
+  if (!ANAL.objectId) {
+    body = `<div class="reminder-card"><strong>Wybierz klienta i obiekt</strong><div class="reminder-meta">Po wyborze obiektu pojawi się arkusz danych i obliczeń dla metody: ${_escA(t.label)}.</div></div>`;
+  } else if (ANAL.type === 'TYM') {
+    body = _analTYMSheet();
+  } else if (ANAL.type === 'REGRESSION') {
+    body = _analRegInfo();
+  } else {
+    body = `<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">${t.icon}</span><h3>${_escA(t.label)}</h3></div>
+      <div class="anw-body" style="text-align:center;padding:40px 20px;color:var(--color-text-secondary);">
+        <div style="font-size:42px;margin-bottom:10px;">🚧</div><strong>Metoda w przygotowaniu</strong>
+        <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
+  }
 
-    <div style="margin-bottom:18px;">
-      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:8px;">ROZBICIE NA MIESIĄCE — OKRES ROZLICZENIOWY</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
-          <th style="padding:5px 8px;text-align:left;">Miesiąc</th><th style="padding:5px 8px;text-align:right;">Dni</th>
-          <th style="padding:5px 8px;text-align:right;">Temp. rzecz.</th><th style="padding:5px 8px;text-align:right;">Temp. TYM</th>
-          <th style="padding:5px 8px;text-align:right;">HDD rzecz.</th><th style="padding:5px 8px;text-align:right;">HDD TYM</th>
-        </tr></thead>
-        <tbody>${rowsHtml(billMonthRows)}</tbody>
-        <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
-          <td style="padding:5px 8px;">SUMA</td><td style="padding:5px 8px;text-align:right;">${daysBill}</td>
-          <td></td><td></td>
-          <td style="padding:5px 8px;text-align:right;">${f1(hddBillReal)}</td><td style="padding:5px 8px;text-align:right;">${f1(hddBillTym)}</td>
-        </tr></tfoot>
-      </table>
+  const footer = (ANAL.objectId && ANAL.type === 'TYM') ? `
+    <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>
+    <div class="anw-act" style="justify-content:space-between;align-items:center;">
+      <span class="anw-muted">Tᵢ = 20 °C · SD20 = z₀·(20−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
+      <button class="anw-run" onclick="analRun()">⚡ Wykonaj analizę</button>
+    </div>` : '';
+
+  return `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <button class="small-button" onclick="analBackToTypes()">← Typ analizy</button>
+      <h2 style="font-size:16px;color:#0C447C;margin:0;">${t.icon} ${_escA(t.label)}</h2>
     </div>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 18px;">2 · Uzupełnij klienta, obiekt i okres bazowy, wprowadź dane, a następnie kliknij „Wykonaj analizę" na dole.</p>
+    ${selector}${body}${footer}`;
+}
 
-    <div style="margin-bottom:20px;">
-      <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:8px;">ROZBICIE NA MIESIĄCE — OKRES PORÓWNAWCZY (BAZOWY)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        <thead><tr style="border-bottom:1px solid var(--color-border-tertiary);">
-          <th style="padding:5px 8px;text-align:left;">Miesiąc</th><th style="padding:5px 8px;text-align:right;">Dni</th>
-          <th style="padding:5px 8px;text-align:right;">Temp. rzecz.</th><th style="padding:5px 8px;text-align:right;">Temp. TYM</th>
-          <th style="padding:5px 8px;text-align:right;">HDD rzecz.</th><th style="padding:5px 8px;text-align:right;">HDD TYM</th>
-        </tr></thead>
-        <tbody>${rowsHtml(compMonthRows)}</tbody>
-        <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
-          <td style="padding:5px 8px;">SUMA</td><td style="padding:5px 8px;text-align:right;">${daysComp}</td>
-          <td></td><td></td>
-          <td style="padding:5px 8px;text-align:right;">${f1(hddCompReal)}</td><td style="padding:5px 8px;text-align:right;">${f1(hddCompTym)}</td>
-        </tr></tfoot>
+function _analCtx() {
+  const c = ClientsModule.find(ANAL.clientId), o = ObjectsModule.find(ANAL.objectId);
+  if (!o) return '';
+  return `<div class="anw-ctx">
+    <span>Klient: <b>${_escA(c ? c.name : '')}</b></span>
+    <span>Obiekt: <b>${_escA(o.name)}</b></span>
+    <span>Stacja meteo: <b>${_escA(o.weatherStation || '—')}</b></span>
+    <span>Tᵢ bazowa: <b>${ANAL_TI} °C</b></span>
+  </div>`;
+}
+
+// ── Arkusz TYM (stopniodni) ─────────────────────────────────────────────────────
+function _analTYMSheet() {
+  const stdRows = ANAL_MONTHS.map((mn, i) => {
+    const m = i + 1; const v = ANAL.std[m]; const sd = _sd20(v[0], v[1]);
+    return `<tr>
+      <td>${mn}</td>
+      <td><input type="number" step="0.1" value="${v[0]}" oninput="ANAL.std[${m}][0]=this.value;_analRecalcLive()"></td>
+      <td><input type="number" min="0" max="31" value="${v[1]}" oninput="ANAL.std[${m}][1]=this.value;_analRecalcLive()"></td>
+      <td class="calc" id="anw-std-sd-${m}">${_fmtA(sd, 1)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+  <div class="anw-sec">
+    <div class="anw-head anw-gold"><span class="ico">📐</span><h3>Standardowy sezon ogrzewczy (Tᵢ = 20 °C)</h3>
+      <span class="pill" style="background:#FAC775;color:#633806;">∑SD20_stand = <b id="anw-std-sum">—</b></span></div>
+    <div class="anw-body">
+      <table class="anw-t">
+        <thead><tr><th style="width:30%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD20_stand [(K·d)]</th></tr></thead>
+        <tbody>${stdRows}</tbody>
       </table>
+      <div class="anw-note">Wartości domyślne: standardowy sezon dla Lublina. Dane standardowe wg
+        <a href="https://www.gov.pl/web/archiwum-inwestycje-rozwoj/dane-do-obliczen-energetycznych-budynkow" target="_blank" rel="noopener">gov.pl — dane do obliczeń energetycznych budynków</a>. Edytuj dla innej lokalizacji.</div>
     </div>
-
-    <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:6px;">TOK OBLICZENIOWY</div>
-
-    ${stepCard(1, 'Współczynnik korekty klimatycznej k = HDD_TYM / HDD_rzeczywiste',
-      'k = HDD_TYM ÷ HDD_rzecz',
-      `k_rozlicz = ${f1(hddBillTym)} ÷ ${f1(hddBillReal)} &nbsp;&nbsp;|&nbsp;&nbsp; k_porówn = ${f1(hddCompTym)} ÷ ${f1(hddCompReal)}`,
-      `k_rozlicz = ${f4(kBill)} &nbsp;&nbsp;&nbsp; k_porówn = ${f4(kComp)}`,
-      'k > 1 → okres był cieplejszy od normy TYM (zużyto mniej niż w typowym roku)')}
-
-    ${stepCard(2, 'Zużycie skorygowane do warunków TYM',
-      'Zużycie_TYM = Zużycie_rzecz × k',
-      `Zużycie_rozlicz_TYM = ${f2(billCons)} × ${f4(kBill)} &nbsp;&nbsp;|&nbsp;&nbsp; Zużycie_porówn_TYM = ${f2(compCons)} × ${f4(kComp)}`,
-      `${f2(consBillTym)} ${unit} &nbsp;&nbsp;&nbsp; ${f2(consCompTym)} ${unit}`,
-      'Zużycie przeliczone tak, jakby panowała typowa pogoda (TYM) w obu okresach')}
-
-    ${stepCard(3, 'Wskaźnik energetyczny E = Zużycie ÷ HDD_TYM',
-      'E = Zużycie_rzecz ÷ HDD_TYM',
-      `E_rozlicz = ${f2(billCons)} ÷ ${f1(hddBillTym)} &nbsp;&nbsp;|&nbsp;&nbsp; E_porówn = ${f2(compCons)} ÷ ${f1(hddCompTym)}`,
-      `E_rozlicz = ${f4(eBill)} ${unit}/HDD &nbsp;&nbsp;&nbsp; E_porówn = ${f4(eComp)} ${unit}/HDD`,
-      'Efektywność energetyczna obiektu — niezależna od długości okresu i pogody. Im niżej, tym lepiej.')}
-
-    ${stepCard(4, 'Zużycie porównawcze rzutowane na okres rozliczeniowy',
-      'Zużycie_bez_technologii = E_porówn × HDD_TYM_rozlicz',
-      `${f4(eComp)} × ${f1(hddBillTym)}`,
-      `${f2(consCompProjectedToBill)} ${unit}`,
-      'Ile zużyłby obiekt w takim samym czasie i takiej samej (typowej) pogodzie, gdyby nie wdrożono technologii — wg wskaźnika z okresu porównawczego')}
-
-    ${stepCard(5, 'Oszczędność energii',
-      'Oszczędność = Zużycie_bez_technologii − Zużycie_rozlicz_TYM',
-      `${f2(consCompProjectedToBill)} − ${f2(consBillTym)}`,
-      `${f2(savedEnergy)} ${unit}`)}
-
-    ${stepCard(6, 'Oszczędność jako % zużycia bazowego',
-      '% = Oszczędność ÷ Zużycie_bez_technologii',
-      `${f2(savedEnergy)} ÷ ${f2(consCompProjectedToBill)}`,
-      pct(savedPct))}
-
-    ${stepCard(7, 'Wartość oszczędności',
-      'Wartość = Oszczędność × Cena jednostkowa',
-      `${f2(savedEnergy)} ${unit} × ${price} ${currency}/${unit}`,
-      `${f2(savedMoney)} ${currency}`)}
-
-    <div style="margin-top:18px;padding:18px;border-radius:12px;background:linear-gradient(135deg,#633806,#3D2204);color:white;">
-      <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.8;margin-bottom:12px;">WYNIK KOŃCOWY</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-        <div><div style="font-size:26px;font-weight:700;">${pct(savedPct)}</div><div style="font-size:11px;opacity:.8;">redukcja zużycia</div></div>
-        <div><div style="font-size:26px;font-weight:700;">${f2(savedEnergy)} ${unit}</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
-        <div><div style="font-size:26px;font-weight:700;">${price>0?f2(savedMoney)+' '+currency:'—'}</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
-        <div><div style="font-size:26px;font-weight:700;">${pct(eChange)}</div><div style="font-size:11px;opacity:.8;">zmiana wsk. E</div></div>
+  </div>
+  ${_analPeriodSheet('before', 'Okres bazowy — PRZED instalacją', 'anw-before', '📉', 'Qc.o. przed')}
+  ${_analPeriodSheet('after', 'Okres analizowany — PO instalacji', 'anw-after', '📈', 'Qc.o. po')}
+  <div class="anw-sec">
+    <div class="anw-head anw-blue"><span class="ico">⚡</span><h3>Parametry energetyczne i rozliczenie</h3></div>
+    <div class="anw-body">
+      <div class="anw-g4">
+        <div class="anw-f"><label>Jednostka energii</label>
+          <select onchange="ANAL.energy.unit=this.value;_analRecalcLive()">
+            ${['GJ','MWh','kWh','m³'].map(u => `<option ${ANAL.energy.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+          </select></div>
+        <div class="anw-f"><label>Waluta</label>
+          <select onchange="ANAL.energy.currency=this.value;_analRecalcLive()">
+            ${['PLN','EUR','CZK','USD'].map(u => `<option ${ANAL.energy.currency === u ? 'selected' : ''}>${u}</option>`).join('')}
+          </select></div>
+        <div class="anw-f"><label>Cena energii (za jednostkę)</label>
+          <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 85" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>
+        <div class="anw-f"><label>Udział WaterAI / ESCO [%]</label>
+          <input type="number" step="0.1" min="0" max="100" value="${ANAL.energy.escoShare}" oninput="ANAL.energy.escoShare=this.value;_analRecalcLive()"></div>
       </div>
     </div>
-  `;
+  </div>`;
 }
 
-function applyBaseProtocolToAnal(protocolId) {
-  if (!protocolId) {
-    const walkDiv=document.getElementById('anal-tym-walkthrough');
-    if(walkDiv) walkDiv.innerHTML = `
-      <div class="reminder-card" style="background:#FFF9EF;">
-        <strong>Wybierz okres bazowy</strong>
-        <div class="reminder-meta">Wybierz „Okres bazowy" w sekcji Dane podstawowe analizy powyżej, aby zobaczyć tu pełny tok obliczeniowy korekty klimatycznej.</div>
-      </div>`;
+function _analPeriodSheet(key, title, headCls, ico, qLabel) {
+  const P = ANAL[key];
+  const rows = P.months.length ? P.months.map((mo, idx) => {
+    const sdR = _sd20(mo.tme, mo.days);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1]);
+    return `<tr>
+      <td>${mo.name}</td>
+      <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.${key}.months[${idx}].tme=this.value;_analRecalcLive()"></td>
+      <td><input type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.${key}.months[${idx}].days=this.value;_analRecalcLive()"></td>
+      <td class="calc" id="anw-${key}-sdr-${idx}">${_fmtA(sdR, 1)}</td>
+      <td class="calc" id="anw-${key}-sds-${idx}">${_fmtA(sdS, 1)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="5" class="anw-muted" style="padding:12px;text-align:center;">Ustaw zakres dat, aby wygenerować miesiące</td></tr>`;
+
+  return `
+  <div class="anw-sec">
+    <div class="anw-head ${headCls}"><span class="ico">${ico}</span><h3>${title}</h3>
+      <span class="pill" style="background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">φ = <b id="anw-${key}-phi">—</b></span></div>
+    <div class="anw-body">
+      <div class="anw-g3">
+        <div class="anw-f"><label>Data od</label><input type="date" value="${P.from}" onchange="analOnDates('${key}','from',this.value)"></div>
+        <div class="anw-f"><label>Data do</label><input type="date" value="${P.to}" onchange="analOnDates('${key}','to',this.value)"></div>
+        <div class="anw-f"><label>${qLabel} — zużycie Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
+          <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.${key}.consumption=this.value;_analRecalcLive()"></div>
+      </div>
+      <table class="anw-t" style="margin-top:6px;">
+        <thead><tr><th style="width:26%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD20_rzecz</th><th style="text-align:right">SD20_stand</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Suma</td><td></td><td class="calc" id="anw-${key}-days">—</td>
+          <td class="calc" id="anw-${key}-sumr">—</td><td class="calc" id="anw-${key}-sums">—</td></tr></tfoot>
+      </table>
+      <div class="anw-note">φ = ∑SD20_stand / ∑SD20_rzecz · Qs = Qc.o.·φ → <b id="anw-${key}-qs">—</b> ${ANAL.energy.unit} (skorygowane)</div>
+    </div>
+  </div>`;
+}
+
+function _analRegInfo() {
+  return `<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">📈</span><h3>Regresja liniowa</h3></div>
+    <div class="anw-body" style="text-align:center;padding:36px 20px;color:var(--color-text-secondary);">
+      <div style="font-size:42px;margin-bottom:10px;">📈</div>
+      <strong>Arkusz regresji liniowej</strong>
+      <div class="anw-muted" style="margin-top:6px;max-width:520px;margin-left:auto;margin-right:auto;">Metoda techniczna PRZED/PO (równania y = ax + b dla temperatury zasilania i zużycia). Arkusz zostanie podpięty do tego kreatora — przepływ typ → klient/obiekt → dane → wykonaj jest już wspólny.</div>
+    </div></div>`;
+}
+
+// ── handlery wyboru / dat ───────────────────────────────────────────────────────
+function analOnClient(v) { ANAL.clientId = v ? Number(v) : null; ANAL.objectId = null; ANAL.results = null; renderAnalysesModule(); }
+function analOnObject(v) {
+  ANAL.objectId = v ? Number(v) : null; ANAL.results = null;
+  selectedAnalysisObjectId = ANAL.objectId;
+  const o = ANAL.objectId ? ObjectsModule.find(ANAL.objectId) : null;
+  if (o) {
+    ANAL.energy.unit = o.energyUnit || ANAL.energy.unit;
+    ANAL.energy.currency = o.currency || ANAL.energy.currency;
+    ANAL.energy.price = o.energyPrice || ANAL.energy.price;
+    ANAL.energy.escoShare = o.escoShare != null ? o.escoShare : ANAL.energy.escoShare;
+  }
+  renderAnalysesModule();
+}
+function analOnBasePeriod(v) {
+  ANAL.basePeriod = v || null;
+  if (v === 'season_prev') {
+    const yr = new Date().getFullYear() - 1;
+    ANAL.before.from = yr + '-09-01'; ANAL.before.to = (yr + 1) + '-05-31';
+    ANAL.before.months = _analMonthsBetween(ANAL.before.from, ANAL.before.to);
+  }
+  renderAnalysesModule();
+}
+function analOnDates(key, which, val) {
+  ANAL[key][which] = val;
+  ANAL[key].months = _analMonthsBetween(ANAL[key].from, ANAL[key].to);
+  renderAnalysesModule();
+}
+
+// ── silnik stopniodni ───────────────────────────────────────────────────────────
+function _analComputePeriod(key) {
+  const P = ANAL[key]; let sumR = 0, sumS = 0, days = 0;
+  P.months.forEach((mo, idx) => {
+    const sdR = _sd20(mo.tme, mo.days);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1]);
+    sumR += sdR; sumS += sdS; days += Number(mo.days || 0);
+    const er = document.getElementById(`anw-${key}-sdr-${idx}`); if (er) er.textContent = mo.tme !== '' ? _fmtA(sdR, 1) : '—';
+    const es = document.getElementById(`anw-${key}-sds-${idx}`); if (es) es.textContent = _fmtA(sdS, 1);
+  });
+  const phi = sumR > 0 ? sumS / sumR : null;
+  const q = Number(P.consumption || 0);
+  const qs = phi != null ? q * phi : null;
+  return { sumR, sumS, days, phi, q, qs };
+}
+
+function _analRecalcLive() {
+  if (!ANAL || ANAL.type !== 'TYM' || !ANAL.objectId) return;
+  let stdSum = 0;
+  for (let m = 1; m <= 12; m++) {
+    const v = ANAL.std[m]; const sd = _sd20(v[0], v[1]); stdSum += sd;
+    const c = document.getElementById('anw-std-sd-' + m); if (c) c.textContent = _fmtA(sd, 1);
+  }
+  const ss = document.getElementById('anw-std-sum'); if (ss) ss.textContent = _fmtA(stdSum, 1);
+
+  ['before', 'after'].forEach(key => {
+    const r = _analComputePeriod(key);
+    const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    set(`anw-${key}-phi`, r.phi != null ? _fmtA(r.phi, 4) : '—');
+    set(`anw-${key}-days`, r.days || '—');
+    set(`anw-${key}-sumr`, _fmtA(r.sumR, 1));
+    set(`anw-${key}-sums`, _fmtA(r.sumS, 1));
+    set(`anw-${key}-qs`, r.qs != null ? _fmtA(r.qs, 2) : '—');
+  });
+  document.querySelectorAll('.anw-u').forEach(e => e.textContent = ANAL.energy.unit);
+}
+
+function analRun() {
+  const before = _analComputePeriod('before');
+  const after = _analComputePeriod('after');
+  if (before.qs == null || after.qs == null) {
+    alert('Uzupełnij temperatury i dni dla obu okresów (PRZED i PO) oraz zużycie Qc.o., aby wyznaczyć współczynniki korekcyjne.');
     return;
   }
-  const p = MeasurementsModule.find(protocolId);
-  if (!p) return;
+  const savedEnergy = before.qs - after.qs;
+  const savedPct = before.qs > 0 ? savedEnergy / before.qs * 100 : 0;
+  const price = Number(ANAL.energy.price || 0);
+  const savedMoney = savedEnergy * price;
+  const escoShare = Number(ANAL.energy.escoShare || 0);
+  const escoAmount = savedMoney * escoShare / 100;
+  const clientAmount = savedMoney - escoAmount;
 
-  const setVal = (name, val) => { const el=document.querySelector(`[name="${name}"]`); if(el && val!=null && val!=='') el.value=val; };
-
-  setVal('compFrom', p.comparisonPeriodStartDate);
-  setVal('compTo', p.comparisonPeriodEndDate);
-  setVal('compConsumption', p.comparisonConsumption);
-  if (p.weatherStation) setVal('weatherStation', p.weatherStation);
-  if (p.baseTemperature) setVal('baseTemp', p.baseTemperature);
-  if (p.tymPeriodStart) setVal('tymYearFrom', p.tymPeriodStart);
-  if (p.tymPeriodEnd) setVal('tymYearTo', p.tymPeriodEnd);
-  if (p.tymDataSource) setVal('tymSource', p.tymDataSource);
-
-  // Fill TYM monthly norms from saved protocol
-  (p.tymMonthly||[]).forEach(m=>{
-    if (m.month==null) return;
-    const t=document.querySelector(`[name="tymTemp_anal_${m.month}"]`);
-    const d=document.querySelector(`[name="tymDays_anal_${m.month}"]`);
-    if(t && m.temperature!=null) t.value=m.temperature;
-    if(d && m.days!=null) d.value=m.days;
-  });
-
-  buildAnalPeriodTable('comp');
-
-  setTimeout(()=>{
-    (p.comparisonMonthly||[]).forEach(m=>{
-      if (m.year==null || m.month==null) return;
-      const tr=document.querySelector(`#comp-months-anal tr[data-key="${m.year}-${m.month}"]`);
-      if(!tr) return;
-      const t=tr.querySelector('input.anal-month-temp'); const d=tr.querySelector('input.anal-month-days');
-      if(t && m.temperature!=null) t.value=m.temperature;
-      if(d && m.days!=null) d.value=m.days;
-    });
-    calcAnalTYM();
-  }, 60);
+  ANAL.results = { before, after, savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount,
+    unit: ANAL.energy.unit, currency: ANAL.energy.currency, at: new Date().toISOString() };
+  const slot = document.getElementById('anw-results');
+  if (slot) { slot.innerHTML = _analResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  const bar = document.querySelector('.anw-steps'); if (bar) bar.outerHTML = _analStepsBar();
 }
 
-
-function calcRegTable() {
-  const sba=Number(document.querySelector('[name="supplyBefore_a"]')?.value||0);
-  const sbb=Number(document.querySelector('[name="supplyBefore_b"]')?.value||0);
-  const saa=Number(document.querySelector('[name="supplyAfter_a"]')?.value||0);
-  const sab=Number(document.querySelector('[name="supplyAfter_b"]')?.value||0);
-  const hba=Number(document.querySelector('[name="heatBefore_a"]')?.value||0);
-  const hbb=Number(document.querySelector('[name="heatBefore_b"]')?.value||0);
-  const haa=Number(document.querySelector('[name="heatAfter_a"]')?.value||0);
-  const hab=Number(document.querySelector('[name="heatAfter_b"]')?.value||0);
-
-  if(document.getElementById('reg-supply-before-eq')) document.getElementById('reg-supply-before-eq').textContent=`${sba>=0?'+':''}${sba}x + ${sbb}`;
-  if(document.getElementById('reg-supply-after-eq')) document.getElementById('reg-supply-after-eq').textContent=`${saa>=0?'+':''}${saa}x + ${sab}`;
-  if(document.getElementById('reg-heat-before-eq')) document.getElementById('reg-heat-before-eq').textContent=`${hba>=0?'+':''}${hba}x + ${hbb}`;
-  if(document.getElementById('reg-heat-after-eq')) document.getElementById('reg-heat-after-eq').textContent=`${haa>=0?'+':''}${haa}x + ${hab}`;
-
-  let totalSupplyDiff=0, totalHeatDiff=0, count=0, countH=0;
-  document.querySelectorAll('#reg-data-table tr').forEach(tr=>{
-    const t=Number(tr.dataset.t);
-    const sb=sba*t+sbb, sa=saa*t+sab;
-    const hb=hba*t+hbb, ha=haa*t+hab;
-    const supplyBefore=tr.querySelector('.reg-supply-before');
-    const supplyAfter=tr.querySelector('.reg-supply-after');
-    const heatBefore=tr.querySelector('.reg-heat-before');
-    const heatAfter=tr.querySelector('.reg-heat-after');
-    const supplyDiff=tr.querySelector('.reg-supply-diff');
-    const heatDiff=tr.querySelector('.reg-heat-diff');
-    if(sba!==0||sbb!==0) { if(supplyBefore&&!supplyBefore.value) supplyBefore.value=sb.toFixed(3); if(supplyAfter&&!supplyAfter.value) supplyAfter.value=sa.toFixed(3); }
-    if(hba!==0||hbb!==0) { if(heatBefore&&!heatBefore.value) heatBefore.value=hb.toFixed(3); if(heatAfter&&!heatAfter.value) heatAfter.value=ha.toFixed(3); }
-    const sbv=Number(supplyBefore?.value||0), sav=Number(supplyAfter?.value||0);
-    const hbv=Number(heatBefore?.value||0), hav=Number(heatAfter?.value||0);
-    // % obniżenia wg wzorca Excel: (PRZED − PO) / PRZED × 100  (wartość dodatnia = redukcja)
-    if(sbv>0&&sav>=0){const d=(sbv-sav)/sbv*100;if(supplyDiff)supplyDiff.textContent=d.toFixed(2)+'%';totalSupplyDiff+=d;count++;}
-    if(hbv>0&&hav>=0){const d=(hbv-hav)/hbv*100;if(heatDiff)heatDiff.textContent=d.toFixed(2)+'%';totalHeatDiff+=d;countH++;}
-  });
-  const avgS = count>0  ? totalSupplyDiff/count  : null;
-  const avgH = countH>0 ? totalHeatDiff/countH   : null;
-  if(document.getElementById('reg-avg-supply')) document.getElementById('reg-avg-supply').textContent = avgS!=null ? avgS.toFixed(2)+'%' : '—';
-  if(document.getElementById('reg-avg-heat'))   document.getElementById('reg-avg-heat').textContent   = avgH!=null ? avgH.toFixed(2)+'%' : '—';
-  if(avgS!=null || avgH!=null){
-    window._regResults={avgReductionSupply:avgS, avgReductionHeat:avgH};
-  }
+function _analResults() {
+  const r = ANAL.results; if (!r) return '';
+  const u = r.unit, cur = r.currency, pos = r.savedPct >= 0;
+  return `
+  <div class="anw-sec" style="border-color:#27500A;">
+    <div class="anw-head anw-after"><span class="ico">✅</span><h3>Wynik analizy — korekta stopniodni</h3>
+      <button class="small-button" style="margin-left:auto;" onclick="analSave()">💾 Zapisz analizę</button></div>
+    <div class="anw-body">
+      <div class="anw-hero">
+        <div><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(r.savedPct), 1)}%</div></div>
+        <div><div class="lbl">Energia zaoszczędzona</div><div class="big">${_fmtA(r.savedEnergy, 2)} <span style="font-size:16px;">${u}</span></div></div>
+        <div><div class="lbl">Wartość oszczędności</div><div class="big">${_fmtA(r.savedMoney, 2)} <span style="font-size:16px;">${cur}</span></div></div>
+      </div>
+      <div class="anw-rgrid">
+        <div class="anw-tile"><div class="v">${_fmtA(r.before.qs, 2)} ${u}</div><div class="k">Qs PRZED (skorygowane) · φ=${_fmtA(r.before.phi, 4)}</div></div>
+        <div class="anw-tile"><div class="v">${_fmtA(r.after.qs, 2)} ${u}</div><div class="k">Qs PO (skorygowane) · φ=${_fmtA(r.after.phi, 4)}</div></div>
+        <div class="anw-tile"><div class="v">${_fmtA(r.escoAmount, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(r.escoShare, 0)}%)</div></div>
+        <div class="anw-tile"><div class="v">${_fmtA(r.clientAmount, 2)} ${cur}</div><div class="k">Udział klienta</div></div>
+      </div>
+      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD20_stand / ∑SD20_rzecz &nbsp;|&nbsp; SD20 = z₀·(20 − tₘₑ)</div>
+    </div>
+  </div>`;
 }
 
-function saveTYMAnalysis(form) {
-  const r = window._analTYMResults || {};
-  const billMonths=[], compMonths=[];
-  document.querySelectorAll('#bill-months-anal tr[data-key]').forEach(tr=>{
-    const[y,m]=tr.dataset.key.split('-').map(Number);
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    billMonths.push({year:y,month:m,temperature:t&&t.value!==''?Number(t.value):null,days:Number(d?d.value:0)});
-  });
-  document.querySelectorAll('#comp-months-anal tr[data-key]').forEach(tr=>{
-    const[y,m]=tr.dataset.key.split('-').map(Number);
-    const t=tr.querySelector('input.anal-month-temp');
-    const d=tr.querySelector('input.anal-month-days');
-    compMonths.push({year:y,month:m,temperature:t&&t.value!==''?Number(t.value):null,days:Number(d?d.value:0)});
-  });
-  const tymMonths=[];
-  for(let m=1;m<=12;m++){
-    const t=document.querySelector(`[name="tymTemp_anal_${m}"]`);
-    const d=document.querySelector(`[name="tymDays_anal_${m}"]`);
-    tymMonths.push({month:m,temp:t&&t.value!==''?Number(t.value):null,days:Number(d?d.value:MONTH_DAYS_ANAL[m-1])});
-  }
-  const sourceProtocolSel = document.getElementById('anal-base-protocol-sel');
-  const data = {
-    clientId: selectedAnalysisObjectId ? Number(ObjectsModule.find(selectedAnalysisObjectId)?.clientId) : 0,
-    objectId: selectedAnalysisObjectId,
-    name: form.analName.value.trim(),
-    analysisType: 'TYM',
-    executedAt: form.analDate.value,
-    author: form.analAuthor.value.trim(),
-    status: form.analStatus.value,
-    comments: form.analNotes.value.trim(),
+function analSave() {
+  if (!ANAL.results) return;
+  const o = ObjectsModule.find(ANAL.objectId);
+  const r = ANAL.results;
+  AnalysesModule.add({
+    clientId: ANAL.clientId,
+    objectId: ANAL.objectId,
+    name: `${AnalysesModule.TYPES[ANAL.type].label} — ${o ? o.name : ''}`,
+    analysisType: ANAL.type,
+    executedAt: new Date().toISOString().slice(0, 10),
+    status: 'COMPLETE',
     inputParams: {
-      sourceProtocolId: sourceProtocolSel && sourceProtocolSel.value ? Number(sourceProtocolSel.value) : null,
-      billingFrom: form.billFrom.value,
-      billingTo: form.billTo.value,
-      billingConsumption: Number(form.billConsumption.value),
-      billingCO: Number(form.billCO.value||0),
-      compFrom: form.compFrom.value,
-      compTo: form.compTo.value,
-      compConsumption: Number(form.compConsumption.value),
-      compCO: Number(form.compCO.value||0),
-      baseTemperature: Number(form.baseTemp.value),
-      weatherStation: form.weatherStation.value,
-      energyUnit: form.energyUnit.value,
-      currency: form.currency.value,
-      energyPrice: Number(form.energyPrice.value||0),
-      escoShare: Number(form.escoShare.value||50),
-      tymYearFrom: form.tymYearFrom.value,
-      tymYearTo: form.tymYearTo.value,
-      tymSource: form.tymSource.value,
-      tymMonths, billMonths, compMonths
+      std: ANAL.std, before: ANAL.before, after: ANAL.after,
+      energyUnit: ANAL.energy.unit, currency: ANAL.energy.currency,
+      energyPrice: ANAL.energy.price, escoShare: ANAL.energy.escoShare,
+      basePeriod: ANAL.basePeriod
     },
     results: {
       savedEnergy: r.savedEnergy,
-      savedEnergyPct: r.savedEnergyPct,
+      savedEnergyPct: r.savedPct,      // w procentach (np. 12.5)
       savedMoney: r.savedMoney,
-      eBill: r.eBill,
-      eComp: r.eComp,
-      kBill: r.kBill,
-      kComp: r.kComp,
-      eChange: r.eChange,
-      hddBillReal: r.hddBillReal,
-      hddCompReal: r.hddCompReal,
-      hddTymBill: r.hddBillTym,
-      hddTymComp: r.hddCompTym,
-      consBillTym: r.consBillTym,
-      consCompTym: r.consCompTym,
-      consCompProjectedToBill: r.consCompProjectedToBill
+      escoAmount: r.escoAmount,
+      phiBefore: r.before.phi, phiAfter: r.after.phi,
+      qsBefore: r.before.qs, qsAfter: r.after.qs
     }
-  };
-  if (editingAnalysisId) { AnalysesModule.update(editingAnalysisId, data); }
-  else { AnalysesModule.add(data); }
-  showAnalysisForm=false; editingAnalysisId=null;
-  renderAnalysesModule();
-}
-
-
-function saveRegAnalysis(form) {
-  const r = window._regResults || {};
-  const rows=[];
-  document.querySelectorAll('#reg-data-table tr').forEach(tr=>{
-    const t=Number(tr.dataset.t);
-    const sb=tr.querySelector('.reg-supply-before')?.value;
-    const sa=tr.querySelector('.reg-supply-after')?.value;
-    const hb=tr.querySelector('.reg-heat-before')?.value;
-    const ha=tr.querySelector('.reg-heat-after')?.value;
-    if(sb||hb) rows.push({t, supplyBefore:Number(sb||0), supplyAfter:Number(sa||0), heatBefore:Number(hb||0), heatAfter:Number(ha||0)});
   });
-  const data = {
-    clientId: selectedAnalysisObjectId ? Number(ObjectsModule.find(selectedAnalysisObjectId)?.clientId) : 0,
-    objectId: selectedAnalysisObjectId,
-    name: form.regName.value.trim(),
-    analysisType: 'REGRESSION',
-    executedAt: form.regDate.value,
-    author: form.regAuthor.value.trim(),
-    status: form.regStatus.value,
-    comments: form.regNotes.value.trim(),
-    inputParams: {
-      supplyBefore: `y=${form.supplyBefore_a.value}x+${form.supplyBefore_b.value}`,
-      supplyAfter:  `y=${form.supplyAfter_a.value}x+${form.supplyAfter_b.value}`,
-      heatBefore:   `y=${form.heatBefore_a.value}x+${form.heatBefore_b.value}`,
-      heatAfter:    `y=${form.heatAfter_a.value}x+${form.heatAfter_b.value}`,
-      supplyBefore_a: Number(form.supplyBefore_a.value), supplyBefore_b: Number(form.supplyBefore_b.value),
-      supplyAfter_a:  Number(form.supplyAfter_a.value),  supplyAfter_b:  Number(form.supplyAfter_b.value),
-      heatBefore_a:   Number(form.heatBefore_a.value),   heatBefore_b:   Number(form.heatBefore_b.value),
-      heatAfter_a:    Number(form.heatAfter_a.value),     heatAfter_b:    Number(form.heatAfter_b.value),
-      rows
-    },
-    results: { avgReductionSupply: r.avgReductionSupply, avgReductionHeat: r.avgReductionHeat }
-  };
-  AnalysesModule.add(data);
-  showAnalysisForm=false; editingAnalysisId=null;
+  alert('Analiza zapisana.');
+  _analResetState();
   renderAnalysesModule();
 }
 
-function copyAnalPrevPeriod(type) {
-  const allForObj=(AnalysesModule.getAll()||[])
-    .filter(a=>Number(a.objectId)===selectedAnalysisObjectId&&a.analysisType==='TYM'&&(!editingAnalysisId||Number(a.id)!==Number(editingAnalysisId)))
-    .sort((a,b)=>(b.executedAt||'').localeCompare(a.executedAt||''));
-  const prev=allForObj[0];
-  if(!prev){alert('Brak poprzedniej analizy TYM do skopiowania.');return;}
-  const ip=prev.inputParams||{};
-  if(type==='comp'){
-    if(document.querySelector('[name="compFrom"]')) document.querySelector('[name="compFrom"]').value=ip.compFrom||'';
-    if(document.querySelector('[name="compTo"]'))   document.querySelector('[name="compTo"]').value=ip.compTo||'';
-    if(document.querySelector('[name="compConsumption"]')) document.querySelector('[name="compConsumption"]').value=ip.compConsumption||'';
-    if(document.querySelector('[name="compCO"]')) document.querySelector('[name="compCO"]').value=ip.compCO||'';
-    buildAnalPeriodTable('comp');
-    setTimeout(()=>{
-      (ip.compMonths||[]).forEach(m=>{
-        const tr=document.querySelector(`#comp-months-anal tr[data-key="${m.year}-${m.month}"]`);
-        if(!tr)return;
-        const t=tr.querySelector('input.anal-month-temp'); const d=tr.querySelector('input.anal-month-days');
-        if(t&&m.temperature!=null)t.value=m.temperature;
-        if(d&&m.days!=null)d.value=m.days;
-      });
-      calcAnalTYM();
-    },60);
-  } else if(type==='tym'){
-    if(document.querySelector('[name="tymYearFrom"]')) document.querySelector('[name="tymYearFrom"]').value=ip.tymYearFrom||'';
-    if(document.querySelector('[name="tymYearTo"]'))   document.querySelector('[name="tymYearTo"]').value=ip.tymYearTo||'';
-    if(document.querySelector('[name="tymSource"]'))   document.querySelector('[name="tymSource"]').value=ip.tymSource||'';
-    (ip.tymMonths||[]).forEach(m=>{
-      const t=document.querySelector(`[name="tymTemp_anal_${m.month}"]`);
-      const d=document.querySelector(`[name="tymDays_anal_${m.month}"]`);
-      if(t&&m.temp!=null)t.value=m.temp;
-      if(d&&m.days!=null)d.value=m.days;
-    });
-    calcAnalTYM();
-  }
-}
-
-function editTYMAnalysis(id) {
-  editingAnalysisId=id;
-  showAnalysisForm=true;
-  activeAnalysisTab='tym';
-  renderAnalysesModule();
-  setTimeout(()=>{
-    const a=AnalysesModule.find(id); if(!a||!a.inputParams)return;
-    const ip=a.inputParams;
-    if(document.querySelector('[name="billFrom"]')) document.querySelector('[name="billFrom"]').value=ip.billingFrom||'';
-    if(document.querySelector('[name="billTo"]'))   document.querySelector('[name="billTo"]').value=ip.billingTo||'';
-    if(document.querySelector('[name="billConsumption"]')) document.querySelector('[name="billConsumption"]').value=ip.billingConsumption||'';
-    if(document.querySelector('[name="billCO"]')) document.querySelector('[name="billCO"]').value=ip.billingCO||'';
-    if(document.querySelector('[name="compFrom"]')) document.querySelector('[name="compFrom"]').value=ip.compFrom||'';
-    if(document.querySelector('[name="compTo"]'))   document.querySelector('[name="compTo"]').value=ip.compTo||'';
-    if(document.querySelector('[name="compConsumption"]')) document.querySelector('[name="compConsumption"]').value=ip.compConsumption||'';
-    if(document.querySelector('[name="compCO"]')) document.querySelector('[name="compCO"]').value=ip.compCO||'';
-    buildAnalPeriodTable('bill');
-    buildAnalPeriodTable('comp');
-    setTimeout(()=>{
-      (ip.billMonths||[]).forEach(m=>{
-        const tr=document.querySelector(`#bill-months-anal tr[data-key="${m.year}-${m.month}"]`);
-        if(!tr)return;
-        const t=tr.querySelector('input.anal-month-temp');const d=tr.querySelector('input.anal-month-days');
-        if(t&&m.temperature!=null)t.value=m.temperature;if(d&&m.days!=null)d.value=m.days;
-      });
-      (ip.compMonths||[]).forEach(m=>{
-        const tr=document.querySelector(`#comp-months-anal tr[data-key="${m.year}-${m.month}"]`);
-        if(!tr)return;
-        const t=tr.querySelector('input.anal-month-temp');const d=tr.querySelector('input.anal-month-days');
-        if(t&&m.temperature!=null)t.value=m.temperature;if(d&&m.days!=null)d.value=m.days;
-      });
-      (ip.tymMonths||[]).forEach(m=>{
-        const t=document.querySelector(`[name="tymTemp_anal_${m.month}"]`);
-        const d=document.querySelector(`[name="tymDays_anal_${m.month}"]`);
-        if(t&&m.temp!=null)t.value=m.temp;if(d&&m.days!=null)d.value=m.days;
-      });
-      calcAnalTYM();
-    },80);
-  },100);
-}
-
-function viewTYMAnalysis(id) {
-  const a=AnalysesModule.find(id); if(!a)return;
-  const container=document.getElementById('module-content'); if(!container)return;
-  const r=a.results||{}, ip=a.inputParams||{};
-  const client=ClientsModule.find(a.clientId), obj=ObjectsModule.find(a.objectId);
-  const pct=r.savedEnergyPct?((r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct)).toFixed(1)+'%':'—';
-  container.innerHTML=`
-    <button class="small-button" onclick="activeAnalysisTab='tym';showAnalysisForm=false;editingAnalysisId=null;renderAnalysesModule();" style="margin-bottom:16px;">← Lista analiz TYM</button>
-    <div class="anal-result-box" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);">
-      <div style="font-size:12px;opacity:.7;margin-bottom:8px;">📋 PROTOKÓŁ TYM — ${escapeHtml(a.name)}</div>
-      <div style="font-size:12px;opacity:.7;margin-bottom:16px;">${escapeHtml((client&&client.name)||'')} / ${escapeHtml((obj&&obj.name)||'')} · ${fmtDate(a.executedAt)}</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-        <div><div style="font-size:32px;font-weight:700;">${pct}</div><div style="font-size:11px;opacity:.8;">redukcja zużycia (TYM)</div></div>
-        <div><div style="font-size:28px;font-weight:700;">${r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2):'-'}</div><div style="font-size:11px;opacity:.8;">oszczędność (${ip.energyUnit||'kWh'})</div></div>
-        <div><div style="font-size:28px;font-weight:700;">${r.savedMoney!=null?Number(r.savedMoney).toFixed(2):'-'}</div><div style="font-size:11px;opacity:.8;">wartość (${ip.currency||'EUR'})</div></div>
-        <div><div style="font-size:28px;font-weight:700;">${r.eChange!=null?((r.eChange<0?'':'+')+(r.eChange*100).toFixed(1))+'%':'-'}</div><div style="font-size:11px;opacity:.8;">zmiana wsk. E</div></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-      <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;">
-        <div style="background:#E6F1FB;padding:10px 14px;font-size:13px;font-weight:600;color:#0C447C;">📅 Okres rozliczeniowy</div>
-        <div style="padding:12px 14px;font-size:13px;">
-          <div>${fmtDate(ip.billingFrom)} → ${fmtDate(ip.billingTo)}</div>
-          <div style="margin-top:4px;">Zużycie: <strong>${ip.billingCO||ip.billingConsumption} ${ip.energyUnit||'kWh'}</strong></div>
-          <div>HDD TYM: <strong>${r.hddTymBill!=null?Number(r.hddTymBill).toFixed(1):'-'} °C·dni</strong></div>
-          <div>k = <strong>${r.kBill!=null?Number(r.kBill).toFixed(4):'-'}</strong></div>
-          <div>E = <strong>${r.eBill!=null?Number(r.eBill).toFixed(3):'-'} ${ip.energyUnit||'kWh'}/HDD</strong></div>
+// ── podgląd / raport ────────────────────────────────────────────────────────────
+function analView(id) {
+  const a = AnalysesModule.find(id); if (!a) return;
+  const o = ObjectsModule.find(a.objectId), c = ClientsModule.find(a.clientId);
+  const r = a.results || {}, ip = a.inputParams || {};
+  const container = document.getElementById('module-content'); if (!container) return;
+  const pct = r.savedEnergyPct != null ? ((r.savedEnergyPct < 1 ? r.savedEnergyPct * 100 : r.savedEnergyPct)).toFixed(1) + '%' : '—';
+  container.innerHTML = ANAL_STYLE + `
+    <button class="small-button" onclick="renderAnalysesModule()" style="margin-bottom:16px;">← Lista analiz</button>
+    <div class="anw-sec"><div class="anw-head anw-blue"><span class="ico">${(AnalysesModule.TYPES[a.analysisType] || {}).icon || '📊'}</span><h3>${_escA(a.name)}</h3></div>
+      <div class="anw-body">
+        <div class="anw-ctx" style="margin-top:0;">
+          <span>Klient: <b>${_escA((c && c.name) || '—')}</b></span>
+          <span>Obiekt: <b>${_escA((o && o.name) || '—')}</b></span>
+          <span>Data: <b>${_fmtDateA(a.executedAt)}</b></span>
+          <span>Metoda: <b>${_escA((AnalysesModule.TYPES[a.analysisType] || {}).label || a.analysisType)}</b></span>
         </div>
-      </div>
-      <div style="border:1px solid #C0DD97;border-radius:10px;overflow:hidden;">
-        <div style="background:#EAF3DE;padding:10px 14px;font-size:13px;font-weight:600;color:#27500A;">📊 Okres porównawczy</div>
-        <div style="padding:12px 14px;font-size:13px;">
-          <div>${fmtDate(ip.compFrom)} → ${fmtDate(ip.compTo)}</div>
-          <div style="margin-top:4px;">Zużycie CO: <strong>${ip.compCO||ip.compConsumption} ${ip.energyUnit||'kWh'}</strong></div>
-          <div>HDD TYM: <strong>${r.hddTymComp!=null?Number(r.hddTymComp).toFixed(1):'-'} °C·dni</strong></div>
-          <div>k = <strong>${r.kComp!=null?Number(r.kComp).toFixed(4):'-'}</strong></div>
-          <div>E = <strong>${r.eComp!=null?Number(r.eComp).toFixed(3):'-'} ${ip.energyUnit||'kWh'}/HDD</strong></div>
+        <div class="anw-rgrid" style="margin-top:16px;">
+          <div class="anw-tile"><div class="v">${pct}</div><div class="k">Oszczędność (OSZ)</div></div>
+          <div class="anw-tile"><div class="v">${r.savedEnergy != null ? Number(r.savedEnergy).toFixed(2) + ' ' + (ip.energyUnit || '') : '—'}</div><div class="k">Energia zaoszczędzona</div></div>
+          <div class="anw-tile"><div class="v">${r.savedMoney != null ? Number(r.savedMoney).toFixed(2) + ' ' + (ip.currency || '') : '—'}</div><div class="k">Wartość oszczędności</div></div>
+          <div class="anw-tile"><div class="v">${r.phiBefore != null ? Number(r.phiBefore).toFixed(4) : '—'} / ${r.phiAfter != null ? Number(r.phiAfter).toFixed(4) : '—'}</div><div class="k">φ PRZED / PO</div></div>
         </div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="small-button" onclick="editTYMAnalysis(${a.id})">✏️ Edytuj</button>
-      <button class="small-button" onclick="generateESCOReport(${a.id})" style="background:#E6F1FB;color:#0C447C;border-color:#B5D4F4;">📄 Generuj Raport ESCO</button>
-      <button class="small-button icon-btn-del" onclick="if(confirm('Usuń?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}">🗑 Usuń</button>
-    </div>`;
+        <div class="anw-act" style="justify-content:flex-start;">
+          <button class="primary-button" onclick="analGenerateReport(${a.id})">⚡ Generuj raport ESCO</button>
+        </div>
+      </div></div>`;
 }
 
-function viewRegAnalysis(id) {
-  const a=AnalysesModule.find(id); if(!a)return;
-  const container=document.getElementById('module-content'); if(!container)return;
-  const r=a.results||{}, ip=a.inputParams||{};
-  const client=ClientsModule.find(a.clientId), obj=ObjectsModule.find(a.objectId);
-  container.innerHTML=`
-    <button class="small-button" onclick="activeAnalysisTab='regression';showAnalysisForm=false;renderAnalysesModule();" style="margin-bottom:16px;">← Lista analiz regresji</button>
-    <div style="background:linear-gradient(135deg,#633806,#9E5A0C);color:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
-      <div style="font-size:12px;opacity:.7;margin-bottom:8px;">📈 REGRESJA LINIOWA — ${escapeHtml(a.name)}</div>
-      <div style="font-size:12px;opacity:.7;margin-bottom:16px;">${escapeHtml((client&&client.name)||'')} / ${escapeHtml((obj&&obj.name)||'')} · ${fmtDate(a.executedAt)}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;text-align:center;">
-        <div><div style="font-size:28px;font-weight:700;">${r.avgReductionSupply!=null?Number(r.avgReductionSupply).toFixed(1)+'%':'—'}</div><div style="font-size:11px;opacity:.8;">śr. redukcja temp. zasilania</div></div>
-        <div><div style="font-size:28px;font-weight:700;">${r.avgReductionHeat!=null?Number(r.avgReductionHeat).toFixed(1)+'%':'—'}</div><div style="font-size:11px;opacity:.8;">śr. redukcja zużycia ciepła</div></div>
-      </div>
-    </div>
-    <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:16px;">
-      <div style="background:#FAEEDA;padding:10px 14px;font-size:13px;font-weight:600;color:#633806;">Równania regresji</div>
-      <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
-        <div><div style="font-size:11px;color:var(--color-text-secondary);">Temp. zasilania PRZED</div><strong>${ip.supplyBefore||'—'}</strong></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary);">Temp. zasilania PO</div><strong>${ip.supplyAfter||'—'}</strong></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary);">Zużycie ciepła PRZED</div><strong>${ip.heatBefore||'—'}</strong></div>
-        <div><div style="font-size:11px;color:var(--color-text-secondary);">Zużycie ciepła PO</div><strong>${ip.heatAfter||'—'}</strong></div>
-      </div>
-    </div>
-    <div style="font-size:12px;color:var(--color-text-secondary);padding:10px;background:var(--color-background-secondary);border-radius:8px;margin-bottom:16px;">
-      ℹ️ Metoda pomocnicza — nie zastępuje metody TYM w rozliczeniach. Służy jako techniczny dowód działania systemu WaterAI.
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="small-button icon-btn-del" onclick="if(confirm('Usuń?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}">🗑 Usuń</button>
-    </div>`;
+function analGenerateReport(id) {
+  if (typeof generateESCOReport === 'function') generateESCOReport(id);
+  else alert('Moduł raportów ESCO niedostępny.');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
