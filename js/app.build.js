@@ -623,10 +623,8 @@ function openObjectProtocols(objectId) {
           <strong>📋 Okres bazowy: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
           <div class="reminder-meta">
             Opracował: ${escapeHtml(item.preparedBy || "")}<br />
-            Rozliczeniowy: ${escapeHtml(item.billingPeriodStartDate || "")} → ${escapeHtml(item.billingPeriodEndDate || "")}<br />
-            Zużycie rozliczeniowe: <strong>${fmt3(item.billingConsumption)} ${u}</strong><br />
-            Porównawczy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
-            Zużycie porównawcze: <strong>${fmt3(item.comparisonConsumption)} ${u}</strong>
+            Okres bazowy: ${escapeHtml(item.comparisonPeriodStartDate || "")} → ${escapeHtml(item.comparisonPeriodEndDate || "")}<br />
+            Zużycie bazowe: <strong>${fmt3(item.comparisonConsumption)} ${u}</strong>
           </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
@@ -775,7 +773,7 @@ function viewObject(id) {
     const r = p.escoResults || calcESCOResults(p);
     return `<tr>
       <td style="padding:7px 10px;font-size:13px;">${escapeHtml(p.protocolDate||"—")}</td>
-      <td style="padding:7px 10px;font-size:13px;">${escapeHtml(p.billingPeriodStartDate||"")} → ${escapeHtml(p.billingPeriodEndDate||"")}</td>
+      <td style="padding:7px 10px;font-size:13px;">${escapeHtml(p.comparisonPeriodStartDate||"")} → ${escapeHtml(p.comparisonPeriodEndDate||"")}</td>
       <td style="padding:7px 10px;font-size:13px;text-align:right;">${Number(p.billingConsumption||0).toFixed(3)} ${escapeHtml(p.energyUnit||"")}</td>
       <td style="padding:7px 10px;font-size:13px;text-align:right;color:${r.savedEnergyPct>=0?"#27500A":"#c00"};">
         ${fmt2(r.savedEnergyPct)} %
@@ -3165,7 +3163,7 @@ function renderProtocolsTable(protocols, objectId) {
       <td style="padding:9px 12px;font-size:13px;font-weight:500;white-space:nowrap;">${escapeHtml(item.protocolDate || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((client && client.name) || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((object && object.name) || '—')}</td>
-      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.billingPeriodStartDate || '')} → ${escapeHtml(item.billingPeriodEndDate || '')}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.comparisonPeriodStartDate || '')} → ${escapeHtml(item.comparisonPeriodEndDate || '')}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${item.id}))" class="icon-btn" title="Podgląd">👁</button>
