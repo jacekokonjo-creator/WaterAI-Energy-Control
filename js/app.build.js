@@ -2244,7 +2244,7 @@ function viewProtocol(id) {
   const fmt2 = v => Number(v || 0).toFixed(2);
   const fmt3 = v => Number(v || 0).toFixed(3);
 
-  const statusLabels = { DRAFT: "Roboczy", FINAL: "Finalny", SIGNED: "Podpisany", ARCHIVED: "Zarchiwizowany" };
+  const statusLabels = { DRAFT: "Szkic", FINAL: "Finalny", SIGNED: "Podpisany", ARCHIVED: "Zarchiwizowany" };
   const statusLabel = statusLabels[p.protocolStatus] || p.protocolStatus || "—";
 
   // TYM — typowy rok meteorologiczny (12 miesięcy)
@@ -2379,10 +2379,6 @@ function viewProtocol(id) {
           <div><div style="font-size:13px;color:var(--color-text-secondary);">Data protokołu</div><div style="font-size:14px;">${escapeHtml(p.protocolDate || "—")}</div></div>
           <div><div style="font-size:13px;color:var(--color-text-secondary);">Status</div><div style="font-size:14px;">${escapeHtml(statusLabel)}</div></div>
           <div><div style="font-size:13px;color:var(--color-text-secondary);">Opracował / Energy Analyst</div><div style="font-size:14px;">${escapeHtml(p.preparedBy || "—")}</div></div>
-          <div><div style="font-size:13px;color:var(--color-text-secondary);">Zatwierdził</div><div style="font-size:14px;">${escapeHtml(p.approvedBy || "—")}</div></div>
-          <div><div style="font-size:13px;color:var(--color-text-secondary);">Jednostka energii</div><div style="font-size:14px;">${escapeHtml(u)}</div></div>
-          <div><div style="font-size:13px;color:var(--color-text-secondary);">Cena energii</div><div style="font-size:14px;">${fmt2(p.energyPrice || 0)} ${escapeHtml(cur)} / ${escapeHtml(u)}</div></div>
-          <div><div style="font-size:13px;color:var(--color-text-secondary);">Udział WaterAI / ESCO</div><div style="font-size:14px;">${escapeHtml(String(p.waterAiShare || 0))} %</div></div>
         </div>
         ${p.protocolNotes ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border-tertiary);">
