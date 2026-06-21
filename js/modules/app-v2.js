@@ -975,6 +975,12 @@ const _sd20 = (tme, z0, ti) => {
 };
 // Tᵢ bazowa całego kreatora (sezon standardowy + okres PRZED) — kopiowana z okresu bazowego
 function _analBaseTi() {
+  // Tᵢ bazowa zawsze pobierana 1:1 z AKTUALNEGO okresu bazowego (protokołu),
+  // aby zmiana temperatury bazowej w module Okresy bazowe była od razu widoczna w Analizach.
+  if (ANAL && ANAL.basePeriod && ANAL.basePeriod !== 'manual' && window.MeasurementsModule) {
+    const p = MeasurementsModule.find(Number(ANAL.basePeriod));
+    if (p && p.baseTemperature != null && p.baseTemperature !== '') return Number(p.baseTemperature);
+  }
   return (ANAL && ANAL.baseTi != null && ANAL.baseTi !== '') ? Number(ANAL.baseTi) : ANAL_TI;
 }
 // Tᵢ obowiązująca dla danego okresu: PO = ustawiana ręcznie, w pozostałych = bazowa
@@ -1357,7 +1363,7 @@ function _analPeriodSheet(key, title, headCls, ico, qLabel) {
         <div class="anw-f"><label>Data do</label><input type="date" value="${P.to}" onchange="analOnDates('${key}','to',this.value)"></div>
         ${key === 'after'
           ? `<div class="anw-f"><label>Tᵢ bazowa — okres analizowany [°C]</label><input type="number" step="0.1" value="${ANAL.after.baseTi != null ? ANAL.after.baseTi : ''}" placeholder="np. 20" oninput="ANAL.after.baseTi=this.value;_analRecalcLive()"></div>`
-          : `<div class="anw-f"><label>Tᵢ bazowa (z okresu bazowego) [°C]</label><input type="number" value="${_analBaseTi()}" disabled style="background:var(--color-background-secondary);color:var(--color-text-secondary);"></div>`}
+          : ''}
         <div class="anw-f"><label>${qLabel} — zużycie Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
           <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.${key}.consumption=this.value;_analRecalcLive()"></div>
       </div>
