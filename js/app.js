@@ -2204,6 +2204,7 @@ function viewProtocol(id) {
   // TYM — typowy rok meteorologiczny (12 miesięcy)
   const tymMonthly = p.tymMonthly || [];
   const tymTotalDays = tymMonthly.reduce((s, m) => s + Number(m.tymDays ?? m.days ?? 0), 0);
+  const tymTotalHDD = tymMonthly.reduce((s, m) => { const t = m.tymTemperature ?? m.temperature; const d = m.tymDays ?? m.days ?? 0; return s + Math.max(0, (baseTemp - Number(t || 0)) * Number(d || 0)); }, 0);
   const tymRows = tymMonthly.map(m => {
     const days = m.tymDays ?? m.days ?? "";
     const temp = m.tymTemperature ?? m.temperature;
@@ -2219,6 +2220,7 @@ function viewProtocol(id) {
   // Okres porównawczy (bazowy)
   const compMonthly = p.comparisonMonthly || [];
   const compTotalDays = compMonthly.reduce((s, m) => s + Number(m.days ?? 0), 0);
+  const compTotalHDD = compMonthly.reduce((s, m) => s + Math.max(0, (baseTemp - Number(m.temperature || 0)) * Number(m.days || 0)), 0);
   const compRows = compMonthly.map(m => {
     const days = m.days ?? "";
     const temp = m.temperature;
@@ -2287,6 +2289,11 @@ function viewProtocol(id) {
               <th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--color-text-secondary);">HDD</th>
             </tr></thead>
             <tbody>${compRows}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
+              <td style="padding:6px 8px;font-size:13px;">Suma</td><td></td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">${compTotalDays}</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">${fmt2(compTotalHDD)}</td>
+            </tr></tfoot>
           </table>` : ""}
         </div>
       </div>
@@ -2312,7 +2319,8 @@ function viewProtocol(id) {
             <tbody>${tymRows}</tbody>
             <tfoot><tr style="border-top:2px solid var(--color-border-tertiary);font-weight:600;">
               <td style="padding:6px 8px;font-size:13px;">Suma</td><td></td>
-              <td style="padding:6px 8px;font-size:13px;text-align:right;">${tymTotalDays}</td><td></td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">${tymTotalDays}</td>
+              <td style="padding:6px 8px;font-size:13px;text-align:right;">${fmt2(tymTotalHDD)}</td>
             </tr></tfoot>
           </table>
         </div>

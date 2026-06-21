@@ -969,7 +969,22 @@ const ANAL_TI = 20; // projektowa temperatura wewnętrzna [°C]
 const ANAL_MONTHS = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 // Standardowy sezon ogrzewczy — domyślnie Lublin (wg metodyki). [tme, z0] per miesiąc 1–12.
 const ANAL_STD_DEFAULT = { 1:[-2.6,31], 2:[-1.9,28], 3:[3.2,31], 4:[9.2,30], 5:[14.4,5], 6:[0,0], 7:[0,0], 8:[0,0], 9:[12.8,5], 10:[8.5,31], 11:[1.3,30], 12:[-2.1,31] };
-const _sd20 = (tme, z0) => Math.max(0, ANAL_TI - Number(tme)) * Number(z0 || 0);
+const _sd20 = (tme, z0, ti) => {
+  const T = (ti != null && ti !== '') ? Number(ti) : ((ANAL && ANAL.baseTi != null && ANAL.baseTi !== '') ? Number(ANAL.baseTi) : ANAL_TI);
+  return Math.max(0, T - Number(tme)) * Number(z0 || 0);
+};
+// Tᵢ bazowa całego kreatora (sezon standardowy + okres PRZED) — kopiowana z okresu bazowego
+function _analBaseTi() {
+  return (ANAL && ANAL.baseTi != null && ANAL.baseTi !== '') ? Number(ANAL.baseTi) : ANAL_TI;
+}
+// Tᵢ obowiązująca dla danego okresu: PO = ustawiana ręcznie, w pozostałych = bazowa
+function _analTi(key) {
+  if (key === 'after') {
+    const v = (ANAL && ANAL.after) ? ANAL.after.baseTi : null;
+    return (v != null && v !== '') ? Number(v) : _analBaseTi();
+  }
+  return _analBaseTi();
+}
 
 // stan kreatora analiz
 let ANAL = null;
@@ -983,8 +998,9 @@ function _analResetState() {
     objectId: null,
     basePeriod: null,
     std: JSON.parse(JSON.stringify(ANAL_STD_DEFAULT)),
+    baseTi: 20,
     before: { from: '', to: '', consumption: '', months: [] },
-    after:  { from: '', to: '', consumption: '', months: [] },
+    after:  { from: '', to: '', consumption: '', months: [], baseTi: 20 },
     energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50 },
     results: null,
     editingId: null
@@ -1225,11 +1241,11 @@ function _analWizard() {
   }
 
   const footer = (ANAL.objectId && ANAL.basePeriod && ANAL.type === 'TYM') ? `
-    <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>
     <div class="anw-act" style="justify-content:space-between;align-items:center;">
-      <span class="anw-muted">Tᵢ = 20 °C · SD20 = z₀·(20−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
+      <span class="anw-muted">Tᵢ = ${_analBaseTi()} °C · SD20 = z₀·(Tᵢ−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
       <button class="anw-run" onclick="analRun()">⚡ Wykonaj analizę</button>
-    </div>` : '';
+    </div>
+    <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>` : '';
 
   return `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
@@ -1248,14 +1264,14 @@ function _analCtx() {
     <span>Klient: <b>K${cn} · ${_escA(c ? c.name : '')}</b></span>
     <span>Obiekt: <b>K${cn}-${on} · ${_escA(o.name)}</b></span>
     <span>Stacja meteo: <b>${_escA(o.weatherStation || '—')}</b></span>
-    <span>Tᵢ bazowa: <b>${ANAL_TI} °C</b></span>
+    <span>Tᵢ bazowa: <b>${_analBaseTi()} °C</b></span>
   </div>`;
 }
 
 // ── Arkusz TYM (stopniodni) ─────────────────────────────────────────────────────
 function _analTYMSheet() {
   const stdRows = ANAL_MONTHS.map((mn, i) => {
-    const m = i + 1; const v = ANAL.std[m]; const sd = _sd20(v[0], v[1]);
+    const m = i + 1; const v = ANAL.std[m]; const sd = _sd20(v[0], v[1], _analBaseTi());
     return `<tr>
       <td>${mn}</td>
       <td><input type="number" step="0.1" value="${v[0]}" oninput="ANAL.std[${m}][0]=this.value;_analRecalcLive()"></td>
@@ -1266,7 +1282,7 @@ function _analTYMSheet() {
 
   return `
   <div class="anw-sec">
-    <div class="anw-head anw-gold"><span class="ico">📐</span><h3>Standardowy sezon ogrzewczy (Tᵢ = 20 °C)</h3>
+    <div class="anw-head anw-gold"><span class="ico">📐</span><h3>Standardowy sezon ogrzewczy (Tᵢ = ${_analBaseTi()} °C)</h3>
       <span class="pill" style="background:#FAC775;color:#633806;">∑SD20_stand = <b id="anw-std-sum">—</b></span></div>
     <div class="anw-body">
       <table class="anw-t">
@@ -1303,8 +1319,9 @@ function _analTYMSheet() {
 function _analPeriodSheet(key, title, headCls, ico, qLabel) {
   const P = ANAL[key];
   const rows = P.months.length ? P.months.map((mo, idx) => {
-    const sdR = _sd20(mo.tme, mo.days);
-    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1]);
+    const _ti = _analTi(key);
+    const sdR = _sd20(mo.tme, mo.days, _ti);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1], _ti);
     return `<tr>
       <td>${mo.name}</td>
       <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.${key}.months[${idx}].tme=this.value;_analRecalcLive()"></td>
@@ -1322,6 +1339,9 @@ function _analPeriodSheet(key, title, headCls, ico, qLabel) {
       <div class="anw-g3">
         <div class="anw-f"><label>Data od</label><input type="date" value="${P.from}" onchange="analOnDates('${key}','from',this.value)"></div>
         <div class="anw-f"><label>Data do</label><input type="date" value="${P.to}" onchange="analOnDates('${key}','to',this.value)"></div>
+        ${key === 'after'
+          ? `<div class="anw-f"><label>Tᵢ bazowa — okres analizowany [°C]</label><input type="number" step="0.1" value="${ANAL.after.baseTi != null ? ANAL.after.baseTi : ''}" placeholder="np. 20" oninput="ANAL.after.baseTi=this.value;_analRecalcLive()"></div>`
+          : `<div class="anw-f"><label>Tᵢ bazowa (z okresu bazowego) [°C]</label><input type="number" value="${_analBaseTi()}" disabled style="background:var(--color-background-secondary);color:var(--color-text-secondary);"></div>`}
         <div class="anw-f"><label>${qLabel} — zużycie Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
           <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.${key}.consumption=this.value;_analRecalcLive()"></div>
       </div>
@@ -1377,6 +1397,10 @@ function analOnBasePeriod(v) {
 // Wczytuje wybrany okres bazowy (protokół) do kreatora:
 // TYM → standardowy sezon, okres porównawczy → PRZED instalacją
 function _analApplyBaseProtocol(p) {
+  // Tᵢ bazowa — kopiowana 1:1 z okresu bazowego (protokołu); ten sam wzór HDD = (Tᵢ − t)·dni
+  const _bt = (p.baseTemperature != null && p.baseTemperature !== '') ? Number(p.baseTemperature) : 20;
+  ANAL.baseTi = _bt;
+  if (ANAL.after) ANAL.after.baseTi = _bt; // domyślnie tyle samo; użytkownik może zmienić dla okresu analizowanego
   // Standard = Typowy Rok Meteorologiczny (TYM)
   const tym = p.tymMonthly || [];
   if (tym.length) {
@@ -1430,8 +1454,9 @@ function analOnDates(key, which, val) {
 function _analComputePeriod(key) {
   const P = ANAL[key]; let sumR = 0, sumS = 0, days = 0;
   P.months.forEach((mo, idx) => {
-    const sdR = _sd20(mo.tme, mo.days);
-    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1]);
+    const _ti = _analTi(key);
+    const sdR = _sd20(mo.tme, mo.days, _ti);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1], _ti);
     sumR += sdR; sumS += sdS; days += Number(mo.days || 0);
     const er = document.getElementById(`anw-${key}-sdr-${idx}`); if (er) er.textContent = mo.tme !== '' ? _fmtA(sdR, 1) : '—';
     const es = document.getElementById(`anw-${key}-sds-${idx}`); if (es) es.textContent = _fmtA(sdS, 1);
@@ -1446,7 +1471,7 @@ function _analRecalcLive() {
   if (!ANAL || ANAL.type !== 'TYM' || !ANAL.objectId) return;
   let stdSum = 0;
   for (let m = 1; m <= 12; m++) {
-    const v = ANAL.std[m]; const sd = _sd20(v[0], v[1]); stdSum += sd;
+    const v = ANAL.std[m]; const sd = _sd20(v[0], v[1], _analBaseTi()); stdSum += sd;
     const c = document.getElementById('anw-std-sd-' + m); if (c) c.textContent = _fmtA(sd, 1);
   }
   const ss = document.getElementById('anw-std-sum'); if (ss) ss.textContent = _fmtA(stdSum, 1);
@@ -1490,8 +1515,7 @@ function _analResults() {
   const u = r.unit, cur = r.currency, pos = r.savedPct >= 0;
   return `
   <div class="anw-sec" style="border-color:#27500A;">
-    <div class="anw-head anw-after"><span class="ico">✅</span><h3>Wynik analizy — korekta stopniodni</h3>
-      <button class="small-button" style="margin-left:auto;" onclick="analSave()">💾 Zapisz analizę</button></div>
+    <div class="anw-head anw-after"><span class="ico">✅</span><h3>Wynik analizy — korekta stopniodni</h3></div>
     <div class="anw-body">
       <div class="anw-hero">
         <div><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(r.savedPct), 1)}%</div></div>
@@ -1504,7 +1528,10 @@ function _analResults() {
         <div class="anw-tile"><div class="v">${_fmtA(r.escoAmount, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(r.escoShare, 0)}%)</div></div>
         <div class="anw-tile"><div class="v">${_fmtA(r.clientAmount, 2)} ${cur}</div><div class="k">Udział klienta</div></div>
       </div>
-      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD20_stand / ∑SD20_rzecz &nbsp;|&nbsp; SD20 = z₀·(20 − tₘₑ)</div>
+      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD20_stand / ∑SD20_rzecz &nbsp;|&nbsp; SD20 = z₀·(Tᵢ − tₘₑ)</div>
+      <div class="anw-act" style="justify-content:flex-end;margin-top:18px;">
+        <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analSave()">💾 Zapisz analizę</button>
+      </div>
     </div>
   </div>`;
 }
