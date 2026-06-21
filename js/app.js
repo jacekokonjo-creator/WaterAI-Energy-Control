@@ -3592,10 +3592,14 @@ function renderMeasurementsList() {
   container.innerHTML = protocols.map(item => {
     const unit = item.energyUnit || "GJ";
     const fmt3 = v => Number(v || 0).toFixed(3);
+    const _cn = (typeof ClientsModule !== 'undefined') ? ClientsModule.getNumber(item.clientId) : null;
+    const _on = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.getNumber(item.objectId) : null;
+    const protoNum = item.protocolNumber
+      || ((_cn && _on) ? ('K' + _cn + '-' + _on + '-' + String(Math.max(0, MeasurementsModule.findByObjectChrono(item.objectId).findIndex(p => Number(p.id) === Number(item.id))) + 1).padStart(3, '0')) : '');
 
     return `
     <div class="reminder-card">
-      <strong>Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
+      <strong>${protoNum ? escapeHtml(protoNum) + ' · ' : ''}Okres bazowy z dnia: ${escapeHtml(item.protocolDate || "brak daty")}</strong>
 
       <div class="reminder-meta">
         Klient: ${escapeHtml(getClientName(item.clientId))}<br />

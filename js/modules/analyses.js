@@ -79,6 +79,22 @@ const AnalysesModule = {
       if (Number(a.id) !== Number(id)) return a;
       return { ...a, ...data, updatedAt: new Date().toISOString() };
     }));
+  },
+
+  // Numer analizy = K{nr klienta}-{nr obiektu}/{kolejna pozycja wśród analiz tego obiektu}.
+  // Przeliczany dynamicznie (rosnąco wg id), spójny ze schematem numeracji protokołów.
+  getNumber(id) {
+    const a = this.find(id);
+    if (!a) return null;
+    const siblings = this.getAll()
+      .filter(x => Number(x.objectId) === Number(a.objectId))
+      .sort((x, y) => Number(x.id) - Number(y.id));
+    const idx = siblings.findIndex(x => Number(x.id) === Number(id));
+    if (idx === -1) return null;
+    const cn = (typeof ClientsModule !== 'undefined' && a.clientId) ? ClientsModule.getNumber(a.clientId) : null;
+    const on = (typeof ObjectsModule !== 'undefined' && a.objectId) ? ObjectsModule.getNumber(a.objectId) : null;
+    const seq = String(idx + 1).padStart(3, '0');
+    return (cn && on) ? ('A/K' + cn + '-' + on + '/' + seq) : ('A/' + seq);
   }
 };
 

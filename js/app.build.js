@@ -3638,6 +3638,8 @@ function renderMeasurementsList() {
   const rows = protocols.map(item => {
     const clientNum = ClientsModule.getNumber(item.clientId);
     const objNum    = ObjectsModule.getNumber(item.objectId);
+    const protoNum  = item.protocolNumber
+      || ((clientNum && objNum) ? ('K' + clientNum + '-' + objNum + '-' + String(Math.max(0, MeasurementsModule.findByObjectChrono(item.objectId).findIndex(p => Number(p.id) === Number(item.id))) + 1).padStart(3, '0')) : '—');
     const clientLabel = (clientNum ? 'K'+clientNum+' — ' : '') + escapeHtml(getClientName(item.clientId));
     const objLabel    = (clientNum && objNum ? 'K'+clientNum+'-'+objNum+' — ' : '') + escapeHtml(getObjectName(item.objectId));
     const periodFrom  = item.comparisonPeriodStartDate || item.billingPeriodStartDate || '—';
@@ -3645,7 +3647,7 @@ function renderMeasurementsList() {
     const period      = periodFrom !== '—' ? periodFrom + ' → ' + periodTo : '—';
 
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:10px 12px;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(item.protocolNumber||'—')}</td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(protoNum)}</td>
       <td style="padding:10px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(item.protocolDate||'—')}</td>
       <td style="padding:10px 12px;font-size:13px;">${clientLabel}</td>
       <td style="padding:10px 12px;font-size:13px;">${objLabel}</td>

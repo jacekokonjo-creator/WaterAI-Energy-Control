@@ -1126,30 +1126,41 @@ function _analTypeSelect() {
     </div>`;
   }).join('');
 
-  const all = (AnalysesModule.getAll() || []).sort((a, b) => (b.executedAt || '').localeCompare(a.executedAt || ''));
-  const list = all.length ? `
+  const selType = ANAL.type;
+  const all = (AnalysesModule.getAll() || [])
+    .filter(a => !selType || a.analysisType === selType)
+    .sort((a, b) => (b.executedAt || '').localeCompare(a.executedAt || ''));
+  const typeLabel = (selType && AnalysesModule.TYPES[selType]) ? AnalysesModule.TYPES[selType].label : '';
+  let list = '';
+  if (selType) {
+    list = all.length ? `
     <div style="margin-top:28px;">
-      <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:10px;">Zapisane analizy (${all.length})</div>
+      <div style="font-size:13px;font-weight:600;color:var(--color-text-secondary);margin-bottom:10px;">Zapisane analizy — ${_escA(typeLabel)} (${all.length})</div>
       <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="background:var(--color-background-secondary);">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Typ</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Nazwa</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Obiekt</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Data</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Oszczędność</th>
-            <th style="padding:8px 12px;font-size:11px;font-weight:600;">Akcje</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);white-space:nowrap;">Data analizy</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);white-space:nowrap;">Nr analizy</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Klient</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Obiekt</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);white-space:nowrap;">Okres analizy</th>
+            <th style="padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);">Akcje</th>
           </tr></thead>
           <tbody>${all.map(a => {
-            const o = ObjectsModule.find(a.objectId); const r = a.results || {};
-            const ty = AnalysesModule.TYPES[a.analysisType] || { icon: '•', label: a.analysisType };
-            const pct = r.savedEnergyPct != null ? ((r.savedEnergyPct < 1 ? r.savedEnergyPct * 100 : r.savedEnergyPct)).toFixed(1) + '%' : '—';
+            const o = ObjectsModule.find(a.objectId);
+            const c = ClientsModule.find(a.clientId);
+            const cn = c ? ClientsModule.getNumber(c.id) : null;
+            const on = o ? ObjectsModule.getNumber(o.id) : null;
+            const num = (AnalysesModule.getNumber ? AnalysesModule.getNumber(a.id) : null) || ('#' + a.id);
+            const ip = a.inputParams || {};
+            const per = (ip.after && (ip.after.from || ip.after.to)) ? ip.after : (ip.before || {});
+            const period = (per.from || per.to) ? (_fmtDateA(per.from) + ' → ' + _fmtDateA(per.to)) : '—';
             return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-              <td style="padding:9px 12px;">${ty.icon} ${_escA(ty.label)}</td>
-              <td style="padding:9px 12px;font-weight:500;">${_escA(a.name)}</td>
-              <td style="padding:9px 12px;">${_escA((o && o.name) || '—')}</td>
-              <td style="padding:9px 12px;">${_fmtDateA(a.executedAt)}</td>
-              <td style="padding:9px 12px;color:#27500A;">${r.savedEnergy != null ? Number(r.savedEnergy).toFixed(2) + ' ' + ((a.inputParams && a.inputParams.energyUnit) || '') : '—'} ${pct !== '—' ? '· ' + pct : ''}</td>
+              <td style="padding:9px 12px;white-space:nowrap;">${_fmtDateA(a.executedAt)}</td>
+              <td style="padding:9px 12px;font-weight:600;white-space:nowrap;">${_escA(num)}</td>
+              <td style="padding:9px 12px;">${c ? ('K' + cn + ' · ' + _escA(c.name)) : '—'}</td>
+              <td style="padding:9px 12px;">${(c && o) ? ('K' + cn + '-' + on + ' · ' + _escA(o.name)) : _escA((o && o.name) || '—')}</td>
+              <td style="padding:9px 12px;white-space:nowrap;">${_escA(period)}</td>
               <td style="padding:9px 12px;white-space:nowrap;">
                 <button class="icon-btn" onclick="analView(${a.id})" title="Podgląd">👁</button>
                 <button class="icon-btn" onclick="analGenerateReport(${a.id})" title="Raport ESCO">⚡</button>
@@ -1159,7 +1170,12 @@ function _analTypeSelect() {
           }).join('')}</tbody>
         </table>
       </div>
-    </div>` : '';
+    </div>` : `
+    <div style="margin-top:28px;padding:18px;border:1px dashed var(--color-border-tertiary);border-radius:10px;color:var(--color-text-secondary);font-size:13px;text-align:center;">
+      Brak zapisanych analiz typu „${_escA(typeLabel)}". Kliknij „+ Nowa analiza", aby utworzyć pierwszą.
+    </div>`;
+  }
+
 
   return `
     <h2 style="font-size:16px;color:#0C447C;margin:0 0 4px;">1 · Wybierz typ analizy</h2>
