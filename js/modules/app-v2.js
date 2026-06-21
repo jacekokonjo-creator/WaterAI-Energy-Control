@@ -1190,12 +1190,12 @@ function _analWizard() {
           <div class="anw-f"><label>Klient</label>
             <select onchange="analOnClient(this.value)">
               <option value="">— wybierz klienta —</option>
-              ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(ANAL.clientId) ? 'selected' : ''}>${_escA(c.name)}</option>`).join('')}
+              ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(ANAL.clientId) ? 'selected' : ''}>K${ClientsModule.getNumber(c.id)} · ${_escA(c.name)}</option>`).join('')}
             </select></div>
           <div class="anw-f"><label>Obiekt</label>
             <select onchange="analOnObject(this.value)" ${ANAL.clientId ? '' : 'disabled'}>
               <option value="">${ANAL.clientId ? '— wybierz obiekt —' : 'najpierw klient'}</option>
-              ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>${_escA(o.name)}</option>`).join('')}
+              ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>K${ClientsModule.getNumber(o.clientId)}-${ObjectsModule.getNumber(o.id)} · ${_escA(o.name)}</option>`).join('')}
             </select></div>
           <div class="anw-f"><label>Okres bazowy (PRZED instalacją)</label>
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
@@ -1212,7 +1212,9 @@ function _analWizard() {
   if (!ANAL.objectId) {
     body = `<div class="reminder-card"><strong>Wybierz klienta i obiekt</strong><div class="reminder-meta">Po wyborze obiektu pojawi się arkusz danych i obliczeń dla metody: ${_escA(t.label)}.</div></div>`;
   } else if (ANAL.type === 'TYM') {
-    body = _analTYMSheet();
+    body = ANAL.basePeriod
+      ? _analTYMSheet()
+      : `<div class="reminder-card"><strong>Wybierz okres bazowy</strong><div class="reminder-meta">Standardowy sezon ogrzewczy oraz dane okresu PRZED instalacją zostaną wczytane z wybranego protokołu bazowego. Możesz też wybrać „✏️ Ręczne wprowadzenie".</div></div>`;
   } else if (ANAL.type === 'REGRESSION') {
     body = _analRegInfo();
   } else {
@@ -1222,7 +1224,7 @@ function _analWizard() {
         <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
   }
 
-  const footer = (ANAL.objectId && ANAL.type === 'TYM') ? `
+  const footer = (ANAL.objectId && ANAL.basePeriod && ANAL.type === 'TYM') ? `
     <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>
     <div class="anw-act" style="justify-content:space-between;align-items:center;">
       <span class="anw-muted">Tᵢ = 20 °C · SD20 = z₀·(20−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
@@ -1241,9 +1243,10 @@ function _analWizard() {
 function _analCtx() {
   const c = ClientsModule.find(ANAL.clientId), o = ObjectsModule.find(ANAL.objectId);
   if (!o) return '';
+  const cn = ClientsModule.getNumber(o.clientId), on = ObjectsModule.getNumber(o.id);
   return `<div class="anw-ctx">
-    <span>Klient: <b>${_escA(c ? c.name : '')}</b></span>
-    <span>Obiekt: <b>${_escA(o.name)}</b></span>
+    <span>Klient: <b>K${cn} · ${_escA(c ? c.name : '')}</b></span>
+    <span>Obiekt: <b>K${cn}-${on} · ${_escA(o.name)}</b></span>
     <span>Stacja meteo: <b>${_escA(o.weatherStation || '—')}</b></span>
     <span>Tᵢ bazowa: <b>${ANAL_TI} °C</b></span>
   </div>`;
@@ -1346,6 +1349,8 @@ function _analRegInfo() {
 function analOnClient(v) { ANAL.clientId = v ? Number(v) : null; ANAL.objectId = null; ANAL.results = null; renderAnalysesModule(); }
 function analOnObject(v) {
   ANAL.objectId = v ? Number(v) : null; ANAL.results = null;
+  ANAL.basePeriod = null;                                    // reset wyboru okresu bazowego
+  ANAL.std = JSON.parse(JSON.stringify(ANAL_STD_DEFAULT));   // wyczyść poprzedni sezon
   selectedAnalysisObjectId = ANAL.objectId;
   const o = ANAL.objectId ? ObjectsModule.find(ANAL.objectId) : null;
   if (o) {
@@ -1354,6 +1359,10 @@ function analOnObject(v) {
     ANAL.energy.price = o.energyPrice || ANAL.energy.price;
     ANAL.energy.escoShare = o.escoShare != null ? o.escoShare : ANAL.energy.escoShare;
   }
+  // jeśli obiekt ma dokładnie jeden okres bazowy — wczytaj go od razu z protokołu
+  const bp = (ANAL.objectId && window.MeasurementsModule)
+    ? (MeasurementsModule.findByObject(ANAL.objectId) || []) : [];
+  if (bp.length === 1) { ANAL.basePeriod = bp[0].id; _analApplyBaseProtocol(bp[0]); }
   renderAnalysesModule();
 }
 function analOnBasePeriod(v) {
