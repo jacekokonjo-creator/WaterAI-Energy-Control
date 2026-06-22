@@ -1375,7 +1375,7 @@ function _analBaseVsStandardSheet() {
   const rows = months.length ? months.map((mo, idx) => {
     const stdM = ANAL.std[mo.month] || [0, 0];
     const sdR = _sd20(mo.tme, mo.days, _ti);
-    const sdS = _sd20(stdM[0], stdM[1], _ti);
+    const sdS = _sd20(stdM[0], mo.days, _ti);
     return `<tr>
       <td>${mo.name}</td>
       <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>
@@ -1427,7 +1427,7 @@ function _analPeriodSheet(key, title, headCls, ico, qLabel) {
   const _ti = _analTi(key);
   const rows = P.months.length ? P.months.map((mo, idx) => {
     const sdR = _sd20(mo.tme, mo.days, _ti);
-    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1], _ti);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], mo.days, _ti);
     return `<tr>
       <td>${mo.name}</td>
       <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.${key}.months[${idx}].tme=this.value;_analRecalcLive()"></td>
@@ -1562,7 +1562,7 @@ function _analComputePeriod(key) {
   P.months.forEach((mo, idx) => {
     const _ti = _analTi(key);
     const sdR = _sd20(mo.tme, mo.days, _ti);
-    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1], _ti);
+    const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], mo.days, _ti);
     sumR += sdR; sumS += sdS; days += Number(mo.days || 0);
     const er = document.getElementById(`anw-${key}-sdr-${idx}`); if (er) er.textContent = mo.tme !== '' ? _fmtA(sdR, 1) : '—';
     const es = document.getElementById(`anw-${key}-sds-${idx}`); if (es) es.textContent = _fmtA(sdS, 1);
