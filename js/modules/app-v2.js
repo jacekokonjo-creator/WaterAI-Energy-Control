@@ -955,7 +955,7 @@ function saveCalendarEvent() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MODUŁ ANALIZY — nowy przepływ kreatora (v2)
 // Typ analizy → „+ Nowa analiza" → klient/obiekt/okres bazowy → dane → „Wykonaj analizę"
-// Metoda stopniodni (Tᵢ = 20 °C, SD20 = z₀·(20−tₘₑ), φ = ΣSD_stand/ΣSD_rzecz,
+// Metoda stopniodni (Tᵢ = bazowa z okresu bazowego, SD = z₀·(Tᵢ−tₘₑ), φ = ΣSD_stand/ΣSD_rzecz,
 // Qs = Qc.o.·φ, OSZ% = (Qs_przed − Qs_po)/Qs_przed) — zgodnie z metodyką forHEAT.
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1264,7 +1264,7 @@ function _analWizard() {
 
   const footer = (ANAL.objectId && ANAL.basePeriod && ANAL.type === 'TYM') ? `
     <div class="anw-act" style="justify-content:space-between;align-items:center;">
-      <span class="anw-muted">Tᵢ = ${_analBaseTi()} °C · SD20 = z₀·(Tᵢ−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
+      <span class="anw-muted">Tᵢ = ${_analBaseTi()} °C · SD${_analBaseTi()} = z₀·(Tᵢ−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ</span>
       <button class="anw-run" onclick="analRun()">⚡ Wykonaj analizę</button>
     </div>
     <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>` : '';
@@ -1305,10 +1305,10 @@ function _analTYMSheet() {
   return `
   <div class="anw-sec">
     <div class="anw-head anw-gold"><span class="ico">📐</span><h3>Standardowy sezon ogrzewczy (Tᵢ = ${_analBaseTi()} °C)</h3>
-      <span class="pill" style="background:#FAC775;color:#633806;">∑SD20_stand = <b id="anw-std-sum">—</b></span></div>
+      <span class="pill" style="background:#FAC775;color:#633806;">∑SD${_analBaseTi()}_stand = <b id="anw-std-sum">—</b></span></div>
     <div class="anw-body">
       <table class="anw-t">
-        <thead><tr><th style="width:30%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD20_stand [(K·d)]</th></tr></thead>
+        <thead><tr><th style="width:30%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD${_analBaseTi()}_stand [(K·d)]</th></tr></thead>
         <tbody>${stdRows}</tbody>
       </table>
       <div class="anw-note">Wartości domyślne: standardowy sezon dla Lublina. Dane standardowe wg
@@ -1340,8 +1340,8 @@ function _analTYMSheet() {
 
 function _analPeriodSheet(key, title, headCls, ico, qLabel) {
   const P = ANAL[key];
+  const _ti = _analTi(key);
   const rows = P.months.length ? P.months.map((mo, idx) => {
-    const _ti = _analTi(key);
     const sdR = _sd20(mo.tme, mo.days, _ti);
     const stdM = ANAL.std[mo.month]; const sdS = _sd20(stdM[0], stdM[1], _ti);
     return `<tr>
@@ -1368,12 +1368,12 @@ function _analPeriodSheet(key, title, headCls, ico, qLabel) {
           <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.${key}.consumption=this.value;_analRecalcLive()"></div>
       </div>
       <table class="anw-t" style="margin-top:6px;">
-        <thead><tr><th style="width:26%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD20_rzecz</th><th style="text-align:right">SD20_stand</th></tr></thead>
+        <thead><tr><th style="width:26%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD${_ti}_rzecz</th><th style="text-align:right">SD${_ti}_stand</th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td>Suma</td><td></td><td class="calc" id="anw-${key}-days">—</td>
           <td class="calc" id="anw-${key}-sumr">—</td><td class="calc" id="anw-${key}-sums">—</td></tr></tfoot>
       </table>
-      <div class="anw-note">φ = ∑SD20_stand / ∑SD20_rzecz · Qs = Qc.o.·φ → <b id="anw-${key}-qs">—</b> ${ANAL.energy.unit} (skorygowane)</div>
+      <div class="anw-note">φ = ∑SD${_ti}_stand / ∑SD${_ti}_rzecz · Qs = Qc.o.·φ → <b id="anw-${key}-qs">—</b> ${ANAL.energy.unit} (skorygowane)</div>
     </div>
   </div>`;
 }
@@ -1550,7 +1550,7 @@ function _analResults() {
         <div class="anw-tile"><div class="v">${_fmtA(r.escoAmount, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(r.escoShare, 0)}%)</div></div>
         <div class="anw-tile"><div class="v">${_fmtA(r.clientAmount, 2)} ${cur}</div><div class="k">Udział klienta</div></div>
       </div>
-      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD20_stand / ∑SD20_rzecz &nbsp;|&nbsp; SD20 = z₀·(Tᵢ − tₘₑ)</div>
+      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD${_analBaseTi()}_stand / ∑SD${_analBaseTi()}_rzecz &nbsp;|&nbsp; SD${_analBaseTi()} = z₀·(Tᵢ − tₘₑ)</div>
       <div class="anw-act" style="justify-content:flex-end;margin-top:18px;">
         <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analSave()">💾 Zapisz analizę</button>
       </div>
