@@ -1083,6 +1083,10 @@ const ANAL_STYLE = `<style>
   .anw-tile{border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px 16px;background:var(--color-background-primary);}
   .anw-tile .v{font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;}
   .anw-tile .k{font-size:11px;color:var(--color-text-secondary);margin-top:2px;}
+  table.anw-bvs th.anw-grp{text-align:center;font-size:11px;font-weight:700;border-bottom:1px solid var(--color-border-tertiary);}
+  table.anw-bvs .anw-grp-r{color:#0C447C;background:#EEF4FB;}
+  table.anw-bvs .anw-grp-s{color:#633806;background:#FAEEDA;}
+  table.anw-bvs th.anw-sep,table.anw-bvs td.anw-sep{border-left:2px solid var(--color-border-tertiary);}
   @media(max-width:680px){.anw-g4{grid-template-columns:1fr 1fr;}.anw-g3{grid-template-columns:1fr;}}
 </style>`;
 
@@ -1169,7 +1173,7 @@ function _analTypeSelect() {
               <td style="padding:9px 12px;white-space:nowrap;">${_escA(period)}</td>
               <td style="padding:9px 12px;white-space:nowrap;">
                 <button class="icon-btn" onclick="analView(${a.id})" title="Podgląd">👁</button>
-                <button class="icon-btn" onclick="analGenerateReport(${a.id})" title="Raport ESCO">⚡</button>
+                <button class="icon-btn" onclick="analEdit(${a.id})" title="Edytuj">✏️</button>
                 <button class="icon-btn icon-btn-del" onclick="if(confirm('Usuń analizę?')){AnalysesModule.remove(${a.id});renderAnalysesModule();}" title="Usuń">🗑</button>
               </td>
             </tr>`;
@@ -1212,6 +1216,35 @@ function analStartNew() {
   renderAnalysesModule();
 }
 function analBackToTypes() { ANAL.step = 1; renderAnalysesModule(); }
+
+// Wczytuje zapisaną analizę do kreatora (tryb edycji)
+function analEdit(id) {
+  const a = AnalysesModule.find(id);
+  if (!a) { alert('Nie znaleziono analizy.'); return; }
+  const ip = a.inputParams || {};
+  _analResetState();
+  ANAL.type = a.analysisType || 'TYM';
+  ANAL.step = 2;
+  ANAL.editingId = a.id;
+  ANAL.clientId = a.clientId != null ? Number(a.clientId) : null;
+  ANAL.objectId = a.objectId != null ? Number(a.objectId) : null;
+  selectedAnalysisObjectId = ANAL.objectId;
+  ANAL.basePeriod = (ip.basePeriod != null) ? ip.basePeriod : null;
+  if (ip.std) ANAL.std = JSON.parse(JSON.stringify(ip.std));
+  if (ip.before) ANAL.before = Object.assign({ from: '', to: '', consumption: '', months: [] }, JSON.parse(JSON.stringify(ip.before)));
+  if (ip.after) ANAL.after = Object.assign({ from: '', to: '', consumption: '', months: [], baseTi: 20 }, JSON.parse(JSON.stringify(ip.after)));
+  if (!Array.isArray(ANAL.before.months)) ANAL.before.months = [];
+  if (!Array.isArray(ANAL.after.months)) ANAL.after.months = [];
+  ANAL.energy = {
+    unit: ip.energyUnit || 'GJ',
+    currency: ip.currency || 'PLN',
+    price: (ip.energyPrice != null) ? ip.energyPrice : '',
+    escoShare: (ip.escoShare != null) ? ip.escoShare : 50
+  };
+  ANAL.results = null;
+  renderAnalysesModule();
+  setTimeout(function () { try { _analRecalcLive(); } catch (e) {} }, 0);
+}
 
 // ── KROK 2: kreator ─────────────────────────────────────────────────────────────
 function _analWizard() {
@@ -1292,30 +1325,8 @@ function _analCtx() {
 
 // ── Arkusz TYM (stopniodni) ─────────────────────────────────────────────────────
 function _analTYMSheet() {
-  const stdRows = ANAL_MONTHS.map((mn, i) => {
-    const m = i + 1; const v = ANAL.std[m]; const sd = _sd20(v[0], v[1], _analBaseTi());
-    return `<tr>
-      <td>${mn}</td>
-      <td><input type="number" step="0.1" value="${v[0]}" oninput="ANAL.std[${m}][0]=this.value;_analRecalcLive()"></td>
-      <td><input type="number" min="0" max="31" value="${v[1]}" oninput="ANAL.std[${m}][1]=this.value;_analRecalcLive()"></td>
-      <td class="calc" id="anw-std-sd-${m}">${_fmtA(sd, 1)}</td>
-    </tr>`;
-  }).join('');
-
   return `
-  <div class="anw-sec">
-    <div class="anw-head anw-gold"><span class="ico">📐</span><h3>Standardowy sezon ogrzewczy (Tᵢ = ${_analBaseTi()} °C)</h3>
-      <span class="pill" style="background:#FAC775;color:#633806;">∑SD${_analBaseTi()}_stand = <b id="anw-std-sum">—</b></span></div>
-    <div class="anw-body">
-      <table class="anw-t">
-        <thead><tr><th style="width:30%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD${_analBaseTi()}_stand [(K·d)]</th></tr></thead>
-        <tbody>${stdRows}</tbody>
-      </table>
-      <div class="anw-note">Wartości domyślne: standardowy sezon dla Lublina. Dane standardowe wg
-        <a href="https://www.gov.pl/web/archiwum-inwestycje-rozwoj/dane-do-obliczen-energetycznych-budynkow" target="_blank" rel="noopener">gov.pl — dane do obliczeń energetycznych budynków</a>. Edytuj dla innej lokalizacji.</div>
-    </div>
-  </div>
-  ${_analPeriodSheet('before', 'Okres bazowy — PRZED instalacją', 'anw-before', '📉', 'Qc.o. przed')}
+  ${_analBaseVsStandardSheet()}
   ${_analPeriodSheet('after', 'Okres analizowany — PO instalacji', 'anw-after', '📈', 'Qc.o. po')}
   <div class="anw-sec">
     <div class="anw-head anw-blue"><span class="ico">⚡</span><h3>Parametry energetyczne i rozliczenie</h3></div>
@@ -1334,6 +1345,63 @@ function _analTYMSheet() {
         <div class="anw-f"><label>Udział WaterAI / ESCO [%]</label>
           <input type="number" step="0.1" min="0" max="100" value="${ANAL.energy.escoShare}" oninput="ANAL.energy.escoShare=this.value;_analRecalcLive()"></div>
       </div>
+    </div>
+  </div>`;
+}
+
+// Scalony blok: Okres bazowy (PRZED, rzecz) zestawiony ze Standardowym sezonem (stand).
+// Jedna tabela: daty + zużycie okresu bazowego, a per miesiąc — temp/dni/SD dla obu okresów.
+function _analBaseVsStandardSheet() {
+  const P = ANAL.before;
+  const _ti = _analTi('before');
+  const months = Array.isArray(P.months) ? P.months : [];
+  const rows = months.length ? months.map((mo, idx) => {
+    const stdM = ANAL.std[mo.month] || [0, 0];
+    const sdR = _sd20(mo.tme, mo.days, _ti);
+    const sdS = _sd20(stdM[0], stdM[1], _ti);
+    return `<tr>
+      <td>${mo.name}</td>
+      <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>
+      <td><input type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.before.months[${idx}].days=this.value;_analRecalcLive()"></td>
+      <td class="calc" id="anw-before-sdr-${idx}">${_fmtA(sdR, 1)}</td>
+      <td class="anw-sep"><input type="number" step="0.1" value="${stdM[0]}" placeholder="°C" oninput="ANAL.std[${mo.month}][0]=this.value;_analRecalcLive()"></td>
+      <td><input type="number" min="0" max="31" value="${stdM[1]}" oninput="ANAL.std[${mo.month}][1]=this.value;_analRecalcLive()"></td>
+      <td class="calc" id="anw-before-sds-${idx}">${_fmtA(sdS, 1)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7" class="anw-muted" style="padding:12px;text-align:center;">Ustaw zakres dat okresu bazowego, aby wygenerować miesiące</td></tr>`;
+
+  return `
+  <div class="anw-sec">
+    <div class="anw-head anw-before"><span class="ico">📉</span><h3>Okres bazowy — PRZED instalacją (rzecz) &nbsp;·&nbsp; Standardowy sezon ogrzewczy (stand)</h3>
+      <span class="pill" style="background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">φ = <b id="anw-before-phi">—</b></span></div>
+    <div class="anw-body">
+      <div class="anw-g3">
+        <div class="anw-f"><label>Okres bazowy — data od</label><input type="date" value="${P.from}" onchange="analOnDates('before','from',this.value)"></div>
+        <div class="anw-f"><label>Okres bazowy — data do</label><input type="date" value="${P.to}" onchange="analOnDates('before','to',this.value)"></div>
+        <div class="anw-f"><label>Zużycie okresu bazowego Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
+          <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.before.consumption=this.value;_analRecalcLive()"></div>
+      </div>
+      <table class="anw-t anw-bvs" style="margin-top:6px;">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:16%">Miesiąc</th>
+            <th colspan="3" class="anw-grp anw-grp-r">Okres bazowy — PRZED (rzecz) · Tᵢ=${_ti} °C</th>
+            <th colspan="3" class="anw-grp anw-grp-s anw-sep">Standardowy sezon (stand) · Tᵢ=${_ti} °C</th>
+          </tr>
+          <tr>
+            <th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD_rzecz</th>
+            <th class="anw-sep">śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD_stand</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td>Suma</td>
+          <td></td><td class="calc" id="anw-before-days">—</td><td class="calc" id="anw-before-sumr">—</td>
+          <td class="anw-sep"></td><td></td><td class="calc" id="anw-before-sums">—</td>
+        </tr></tfoot>
+      </table>
+      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie skorygowane do standardowego sezonu).
+        Standardowy sezon: domyślnie Lublin (<a href="https://www.gov.pl/web/archiwum-inwestycje-rozwoj/dane-do-obliczen-energetycznych-budynkow" target="_blank" rel="noopener">gov.pl</a>) — kolumny „stand" są edytowalne dla innej lokalizacji.</div>
     </div>
   </div>`;
 }
@@ -1562,7 +1630,7 @@ function analSave() {
   if (!ANAL.results) return;
   const o = ObjectsModule.find(ANAL.objectId);
   const r = ANAL.results;
-  AnalysesModule.add({
+  const payload = {
     clientId: ANAL.clientId,
     objectId: ANAL.objectId,
     name: `${AnalysesModule.TYPES[ANAL.type].label} — ${o ? o.name : ''}`,
@@ -1583,8 +1651,14 @@ function analSave() {
       phiBefore: r.before.phi, phiAfter: r.after.phi,
       qsBefore: r.before.qs, qsAfter: r.after.qs
     }
-  });
-  alert('Analiza zapisana.');
+  };
+  if (ANAL.editingId) {
+    AnalysesModule.update(ANAL.editingId, payload);
+    alert('Analiza zaktualizowana.');
+  } else {
+    AnalysesModule.add(payload);
+    alert('Analiza zapisana.');
+  }
   _analResetState();
   renderAnalysesModule();
 }
