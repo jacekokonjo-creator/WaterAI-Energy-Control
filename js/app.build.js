@@ -2480,7 +2480,7 @@ function editMeasurement(id) {
       const tInput = tr.querySelector("input.month-temp");
       const dInput = tr.querySelector("input.month-days");
       if (tInput) tInput.value = item.temperature ?? item.realTemperature ?? "";
-      if (dInput && (item.days || item.realDays)) dInput.value = item.days ?? item.realDays ?? "";
+      if (dInput) { const _dv = (item.days !== undefined && item.days !== null && item.days !== "") ? item.days : ((item.realDays !== undefined && item.realDays !== null && item.realDays !== "") ? item.realDays : null); if (_dv !== null) dInput.value = _dv; }
     });
   }
 
