@@ -1063,6 +1063,8 @@ const ANAL_STYLE = `<style>
   .anw-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
   .anw-f label{display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;font-weight:500;}
   .anw-f input,.anw-f select{width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;background:var(--color-background-primary);box-sizing:border-box;}
+  .anw-ro{padding:8px 10px;border:1px dashed var(--color-border-tertiary);border-radius:8px;font-size:13px;background:var(--color-background-secondary);color:var(--color-text-primary);min-height:18px;}
+  table.anw-t td.lock{color:var(--color-text-primary);font-variant-numeric:tabular-nums;text-align:right;background:rgba(99,56,6,.03);}
   table.anw-t{width:100%;border-collapse:collapse;font-size:13px;}
   table.anw-t th{text-align:left;padding:7px 8px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);white-space:nowrap;}
   table.anw-t td{padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary);}
@@ -1401,31 +1403,48 @@ function _analBaseVsStandardSheet() {
   const P = ANAL.before;
   const _ti = _analTi('before');
   const months = Array.isArray(P.months) ? P.months : [];
+  const locked = !!(ANAL.basePeriod && ANAL.basePeriod !== 'manual');
   const rows = months.length ? months.map((mo, idx) => {
     const stdM = ANAL.std[mo.month] || [0, 0];
     const sdR = _sd20(mo.tme, mo.days, _ti);
     const sdS = _sd20(stdM[0], mo.days, _ti);
+    const tmeR = locked ? `<td class="lock">${mo.tme === '' || mo.tme == null ? '—' : _fmtA(Number(mo.tme), 1)}</td>`
+      : `<td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>`;
+    const daysR = locked ? `<td class="lock">${mo.days}</td>`
+      : `<td><input type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.before.months[${idx}].days=this.value;_analRecalcLive()"></td>`;
+    const tmeS = locked ? `<td class="anw-sep lock">${_fmtA(Number(stdM[0]), 1)}</td>`
+      : `<td class="anw-sep"><input type="number" step="0.1" value="${stdM[0]}" placeholder="°C" oninput="ANAL.std[${mo.month}][0]=this.value;_analRecalcLive()"></td>`;
+    const daysS = locked ? `<td class="lock">${stdM[1]}</td>`
+      : `<td><input type="number" min="0" max="31" value="${stdM[1]}" oninput="ANAL.std[${mo.month}][1]=this.value;_analRecalcLive()"></td>`;
     return `<tr>
       <td>${mo.name}</td>
-      <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>
-      <td><input type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.before.months[${idx}].days=this.value;_analRecalcLive()"></td>
+      ${tmeR}${daysR}
       <td class="calc" id="anw-before-sdr-${idx}">${_fmtA(sdR, 1)}</td>
-      <td class="anw-sep"><input type="number" step="0.1" value="${stdM[0]}" placeholder="°C" oninput="ANAL.std[${mo.month}][0]=this.value;_analRecalcLive()"></td>
-      <td><input type="number" min="0" max="31" value="${stdM[1]}" oninput="ANAL.std[${mo.month}][1]=this.value;_analRecalcLive()"></td>
+      ${tmeS}${daysS}
       <td class="calc" id="anw-before-sds-${idx}">${_fmtA(sdS, 1)}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7" class="anw-muted" style="padding:12px;text-align:center;">Ustaw zakres dat okresu bazowego, aby wygenerować miesiące</td></tr>`;
+
+  const dFrom = locked ? `<div class="anw-f"><label>Okres bazowy — data od</label><div class="anw-ro">${_fmtDateA(P.from) || '—'}</div></div>`
+    : `<div class="anw-f"><label>Okres bazowy — data od</label><input type="date" value="${P.from}" onchange="analOnDates('before','from',this.value)"></div>`;
+  const dTo = locked ? `<div class="anw-f"><label>Okres bazowy — data do</label><div class="anw-ro">${_fmtDateA(P.to) || '—'}</div></div>`
+    : `<div class="anw-f"><label>Okres bazowy — data do</label><input type="date" value="${P.to}" onchange="analOnDates('before','to',this.value)"></div>`;
+  const dCons = locked ? `<div class="anw-f"><label>Zużycie okresu bazowego Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label><div class="anw-ro">${P.consumption === '' || P.consumption == null ? '—' : _fmtA(Number(P.consumption), 2)}</div></div>`
+    : `<div class="anw-f"><label>Zużycie okresu bazowego Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
+        <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.before.consumption=this.value;_analRecalcLive()"></div>`;
+
+  const lockNote = locked
+    ? `<div class="anw-note" style="background:#FAEEDA;border-left:3px solid #633806;padding:9px 12px;border-radius:6px;color:#633806;margin-bottom:10px;">🔒 Dane okresu bazowego (PRZED) i standardowego sezonu (TYM) pochodzą z wybranego protokołu bazowego i są tu tylko do podglądu. Aby je zmienić, edytuj protokół w module <b>Okresy bazowe</b>.</div>`
+    : `<div class="anw-note" style="margin-bottom:10px;">✏️ Tryb ręczny — wprowadź dane okresu bazowego i standardowego sezonu poniżej.</div>`;
 
   return `
   <div class="anw-sec">
     <div class="anw-head anw-before"><span class="ico">📉</span><h3>Okres bazowy — PRZED instalacją (rzecz) &nbsp;·&nbsp; Standardowy sezon ogrzewczy (stand)</h3>
       <span class="pill" style="background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">φ = <b id="anw-before-phi">—</b></span></div>
     <div class="anw-body">
+      ${lockNote}
       <div class="anw-g3">
-        <div class="anw-f"><label>Okres bazowy — data od</label><input type="date" value="${P.from}" onchange="analOnDates('before','from',this.value)"></div>
-        <div class="anw-f"><label>Okres bazowy — data do</label><input type="date" value="${P.to}" onchange="analOnDates('before','to',this.value)"></div>
-        <div class="anw-f"><label>Zużycie okresu bazowego Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
-          <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.before.consumption=this.value;_analRecalcLive()"></div>
+        ${dFrom}${dTo}${dCons}
       </div>
       <table class="anw-t anw-bvs" style="margin-top:6px;">
         <thead>
@@ -1446,7 +1465,7 @@ function _analBaseVsStandardSheet() {
           <td class="anw-sep"></td><td></td><td class="calc" id="anw-before-sums">—</td>
         </tr></tfoot>
       </table>
-      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie skorygowane do standardowego sezonu).</div>
+      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie bazy skorygowane do standardowego sezonu).</div>
     </div>
   </div>`;
 }
@@ -1633,8 +1652,15 @@ function analRun() {
     alert('Uzupełnij temperatury i dni dla obu okresów (PRZED i PO) oraz zużycie Qc.o., aby wyznaczyć współczynniki korekcyjne.');
     return;
   }
-  const savedEnergy = before.qs - after.qs;
-  const savedPct = before.qs > 0 ? savedEnergy / before.qs * 100 : 0;
+  // METODA: oba okresy mogą mieć RÓŻNĄ długość. Bazę (PRZED) rzutujemy przez wskaźnik
+  // energetyczny E = Q/HDD_TYM na HDD_TYM okresu analizowanego (PO) — wspólny mianownik.
+  //   currentCorrected = Q_po · φ_po                      (zużycie PO skorygowane do TYM)
+  //   baselineProjected = (Q_przed / HDD_TYM_przed) · HDD_TYM_po   (ile zużyto by bez technologii w tych samych warunkach)
+  const currentCorrected = after.qs;
+  const eBefore = before.sumS > 0 ? before.q / before.sumS : null;   // wskaźnik energetyczny bazy [j./HDD_TYM]
+  const baselineProjected = eBefore != null ? eBefore * after.sumS : null;
+  const savedEnergy = baselineProjected != null ? baselineProjected - currentCorrected : 0;
+  const savedPct = (baselineProjected && baselineProjected > 0) ? savedEnergy / baselineProjected * 100 : 0;
   const price = Number(ANAL.energy.price || 0);
   // FIXED: cena za jednostkę × zaoszczędzona energia. VARIABLE: koszt zmienny całościowy wpisany wprost.
   const savedMoney = (ANAL.energy.priceMode === 'VARIABLE') ? price : savedEnergy * price;
@@ -1642,7 +1668,8 @@ function analRun() {
   const escoAmount = savedMoney * escoShare / 100;
   const clientAmount = savedMoney - escoAmount;
 
-  ANAL.results = { before, after, savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount,
+  ANAL.results = { before, after, eBefore, baselineProjected, currentCorrected,
+    savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount,
     unit: ANAL.energy.unit, currency: ANAL.energy.currency, at: new Date().toISOString() };
   const slot = document.getElementById('anw-results');
   if (slot) { slot.innerHTML = _analResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -1754,17 +1781,23 @@ function _analReportData(source) {
   const before = _analCalcPeriodRows(beforeP.months, std, tiBefore, beforeP.consumption);
   const after = _analCalcPeriodRows(afterP.months, std, tiAfter, afterP.consumption);
   const escoShare = Number(energy.escoShare || 0);
-  const savedEnergy = (base.savedEnergy != null) ? base.savedEnergy : ((before.qs != null && after.qs != null) ? before.qs - after.qs : null);
-  const savedPct = (base.savedPct != null) ? base.savedPct : ((before.qs > 0 && savedEnergy != null) ? savedEnergy / before.qs * 100 : null);
+  // Oszczędność liczona metodą rzutowania bazy (jak Excel) — odporna na różną długość okresów.
+  const currentCorrected = after.qs;                                   // Q_po · φ_po
+  const eBefore = before.sumS > 0 ? before.q / before.sumS : null;     // wskaźnik energetyczny bazy
+  const baselineProjected = (eBefore != null && after.sumS != null) ? eBefore * after.sumS : null;
+  const canCompute = (baselineProjected != null && currentCorrected != null);
+  const savedEnergy = canCompute ? (baselineProjected - currentCorrected) : (base.savedEnergy != null ? base.savedEnergy : null);
+  const savedPct = canCompute ? ((baselineProjected > 0) ? savedEnergy / baselineProjected * 100 : 0) : (base.savedPct != null ? base.savedPct : null);
   const price = Number(energy.price || 0);
-  const savedMoney = (base.savedMoney != null) ? base.savedMoney : ((energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : null));
-  const escoAmount = (base.escoAmount != null) ? base.escoAmount : (savedMoney != null ? savedMoney * escoShare / 100 : null);
+  const savedMoney = (energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : (base.savedMoney != null ? base.savedMoney : null));
+  const escoAmount = (savedMoney != null) ? savedMoney * escoShare / 100 : null;
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
   return {
     client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
     name, executedAt, number, saved, std, energy, tiBefore, tiAfter, cid,
     before: Object.assign({}, before, { from: beforeP.from, to: beforeP.to, consumption: beforeP.consumption }),
     after: Object.assign({}, after, { from: afterP.from, to: afterP.to, consumption: afterP.consumption }),
+    eBefore, baselineProjected, currentCorrected,
     savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount
   };
 }
@@ -1836,9 +1869,9 @@ function _analDrawCharts(data) {
     { label: 'PO', bars: [{ v: data.after.sumR, c: '#185FA5', n: 'SD rzeczywiste' }, { v: data.after.sumS, c: '#FAC775', n: 'SD standard (TYM)' }] }
   ], { title: 'Stopniodni: rzeczywiste vs standard (TYM)', unit: '°C·dni' });
   _anwBar(document.getElementById(data.cid + '-qs'), [
-    { label: 'PRZED', bars: [{ v: data.before.qs, c: '#0C447C', n: 'Qs przed' }] },
-    { label: 'PO', bars: [{ v: data.after.qs, c: '#27500A', n: 'Qs po' }] }
-  ], { title: 'Zużycie skorygowane do warunków standardowych (Qs)', unit: data.energy.unit });
+    { label: 'Odniesienie (bez techn.)', bars: [{ v: data.baselineProjected, c: '#185FA5', n: 'Q odniesienia' }] },
+    { label: 'PO (z technologią)', bars: [{ v: data.currentCorrected, c: '#27500A', n: 'Qs po' }] }
+  ], { title: 'Zużycie skorygowane do TYM: odniesienie vs po instalacji', unit: data.energy.unit });
 }
 
 function _analReportBody(data) {
@@ -1868,17 +1901,17 @@ function _analReportBody(data) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">1</span> Stopniodni grzewcze (SD) — rzeczywiste i standardowe (TYM)</h4>
-    <div class="anw-desc">Dla każdego miesiąca stopniodni to iloczyn liczby dni okresu w danym miesiącu (z₀) oraz różnicy między projektową temperaturą wewnętrzną Tᵢ a średnią temperaturą zewnętrzną. Strona standardowa stosuje temperatury Typowego Roku Meteorologicznego (TYM) przy tej samej liczbie dni okresu — to klucz porównywalności.</div>
+    <div class="anw-desc">Dla każdego miesiąca stopniodni grzewcze to iloczyn liczby dni okresu w danym miesiącu (z₀) i różnicy między projektową temperaturą wewnętrzną Tᵢ a średnią temperaturą zewnętrzną. Liczymy je osobno dla temperatur rzeczywistych (SD<sub>rzecz</sub>) i dla temperatur Typowego Roku Meteorologicznego (SD<sub>std</sub>) — każdorazowo na dniach danego okresu.</div>
     <div class="anw-formula">SD<sub>Tᵢ</sub> = z₀ · (Tᵢ − t)&nbsp;&nbsp;[°C·dni];&nbsp;&nbsp; Tᵢ(PRZED) = ${tiB} °C,&nbsp; Tᵢ(PO) = ${tiA} °C</div>
     <div class="anw-g2" style="margin-top:10px;">
-      <div><div class="anw-muted" style="margin-bottom:4px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTable(data.before, tiB)}</div>
-      <div><div class="anw-muted" style="margin-bottom:4px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTable(data.after, tiA)}</div>
+      <div><div class="anw-muted" style="margin-bottom:4px;color:#0C447C;font-weight:600;">Okres bazowy — PRZED instalacją</div>${_anwPeriodTable(data.before, tiB)}</div>
+      <div><div class="anw-muted" style="margin-bottom:4px;color:#27500A;font-weight:600;">Okres analizowany — PO instalacji</div>${_anwPeriodTable(data.after, tiA)}</div>
     </div>
   </div>
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">2</span> Współczynnik korekcyjny φ</h4>
-    <div class="anw-desc">φ normalizuje zużycie do warunków typowego roku. Jest ilorazem sumy stopniodni standardowych i rzeczywistych, liczonych na tych samych dniach okresu (φ&gt;1 → okres cieplejszy od normy).</div>
+    <div class="anw-desc">φ sprowadza zużycie danego okresu do warunków typowego roku. Jest ilorazem sumy stopniodni standardowych i rzeczywistych tego samego okresu (φ&gt;1 → okres cieplejszy od normy, zużyto mniej niż w roku typowym). Liczymy go osobno dla okresu PRZED i PO.</div>
     <div class="anw-formula">φ = ∑SD<sub>std</sub> / ∑SD<sub>rzecz</sub></div>
     <div class="anw-g2">
       <div class="anw-formula" style="border-color:#0C447C;">φ<sub>PRZED</sub> = ${_fmtA(data.before.sumS, 1)} / ${_fmtA(data.before.sumR, 1)} = <b>${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'}</b></div>
@@ -1887,20 +1920,25 @@ function _analReportBody(data) {
   </div>
 
   <div class="anw-step-card">
-    <h4><span class="anw-step-num">3</span> Zużycie skorygowane Qs</h4>
-    <div class="anw-desc">Zmierzone zużycie ciepła Qc.o. mnożymy przez φ, otrzymując zużycie, jakie wystąpiłoby w warunkach typowego roku meteorologicznego — dzięki temu oba okresy są w pełni porównywalne, niezależnie od pogody.</div>
-    <div class="anw-formula">Qs = Qc.o. · φ</div>
+    <h4><span class="anw-step-num">3</span> Zużycie skorygowane do TYM i wskaźnik energetyczny bazy</h4>
+    <div class="anw-desc">Zużycie okresu analizowanego (z technologią) sprowadzamy do warunków typowych: Qs<sub>PO</sub> = Q<sub>PO</sub>·φ<sub>PO</sub>. Dla bazy liczymy wskaźnik energetyczny E — zużycie na jednostkę stopniodnia TYM. E nie zależy od długości okresu, dlatego pozwala porównać okresy o różnym czasie trwania.</div>
     <div class="anw-g2">
-      <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} · ${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'} = <b>${data.before.qs != null ? _fmtA(data.before.qs, 2) : '—'} ${u}</b></div>
-      <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
+      <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.currentCorrected != null ? _fmtA(data.currentCorrected, 2) : '—'} ${u}</b></div>
+      <div class="anw-formula" style="border-color:#0C447C;">E<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} / ${_fmtA(data.before.sumS, 1)} = <b>${data.eBefore != null ? _fmtA(data.eBefore, 4) : '—'}</b> ${u}/SD</div>
     </div>
   </div>
 
   <div class="anw-step-card">
-    <h4><span class="anw-step-num">4</span> Oszczędność energii i rozliczenie</h4>
+    <h4><span class="anw-step-num">4</span> Zużycie odniesienia (bez technologii), rzutowane na okres analizowany</h4>
+    <div class="anw-desc">Okres bazowy i analizowany mogą mieć <b>różną długość</b> — dlatego bazy nie odejmujemy wprost. Jej wskaźnik energetyczny E<sub>PRZED</sub> rzutujemy na stopniodni TYM okresu analizowanego, otrzymując zużycie, jakie wystąpiłoby BEZ technologii w identycznych (typowych) warunkach tego samego okresu.</div>
+    <div class="anw-formula">Q<sub>odn</sub> = E<sub>PRZED</sub> · ∑SD<sub>std,PO</sub> = ${data.eBefore != null ? _fmtA(data.eBefore, 4) : '—'} · ${_fmtA(data.after.sumS, 1)} = <b>${data.baselineProjected != null ? _fmtA(data.baselineProjected, 2) : '—'} ${u}</b></div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">5</span> Oszczędność energii i rozliczenie</h4>
     <div class="anw-desc">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</div>
-    <div class="anw-formula">OSZ = (Qs<sub>PRZED</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED</sub> · 100%</div>
-    <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.before.qs || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
+    <div class="anw-formula">OSZ = (Q<sub>odn</sub> − Qs<sub>PO</sub>) / Q<sub>odn</sub> · 100%</div>
+    <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.baselineProjected || 0, 2)} − ${_fmtA(data.currentCorrected || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
     <div class="anw-rgrid" style="margin-top:10px;">
       <div class="anw-tile"><div class="v">${_fmtA(data.savedMoney || 0, 2)} ${cur}</div><div class="k">Wartość oszczędności</div></div>
       <div class="anw-tile"><div class="v">${_fmtA(data.escoAmount || 0, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(data.escoShare || 0, 0)}%)</div></div>
@@ -1909,11 +1947,28 @@ function _analReportBody(data) {
   </div>
 
   <div class="anw-step-card">
-    <h4><span class="anw-step-num">5</span> Wizualizacja</h4>
+    <h4><span class="anw-step-num">6</span> Wizualizacja</h4>
     <div class="anw-chart-wrap">
       <canvas id="${data.cid}-sd"></canvas>
       <canvas id="${data.cid}-qs"></canvas>
     </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4>📖 Legenda oznaczeń</h4>
+    <table class="anw-t"><tbody>
+      <tr><td style="width:90px;"><b>z₀</b></td><td class="anw-desc">Liczba dni danego okresu przypadających na dany miesiąc</td></tr>
+      <tr><td><b>Tᵢ</b></td><td class="anw-desc">Projektowa (bazowa) temperatura wewnętrzna budynku [°C] — z okresu bazowego</td></tr>
+      <tr><td><b>t<sub>me</sub></b></td><td class="anw-desc">Średnia temperatura zewnętrzna miesiąca [°C] — rzeczywista lub z TYM</td></tr>
+      <tr><td><b>SD<sub>Tᵢ</sub></b></td><td class="anw-desc">Stopniodni grzewcze: z₀·(Tᵢ − t<sub>me</sub>) [°C·dni]. Tylko wartości dodatnie.</td></tr>
+      <tr><td><b>TYM</b></td><td class="anw-desc">Typowy Rok Meteorologiczny — wieloletnie normy temperatur dla lokalizacji</td></tr>
+      <tr><td><b>φ</b></td><td class="anw-desc">Współczynnik korekcyjny ∑SD<sub>std</sub>/∑SD<sub>rzecz</sub> — sprowadza zużycie do warunków typowych</td></tr>
+      <tr><td><b>Qc.o.</b></td><td class="anw-desc">Zmierzone zużycie ciepła w okresie [${u}] (z faktur / ciepłomierza)</td></tr>
+      <tr><td><b>Qs</b></td><td class="anw-desc">Zużycie skorygowane do warunków TYM: Qc.o.·φ [${u}]</td></tr>
+      <tr><td><b>E</b></td><td class="anw-desc">Wskaźnik energetyczny: zużycie na jednostkę stopniodnia TYM [${u}/SD] — niezależny od długości okresu i pogody</td></tr>
+      <tr><td><b>Q<sub>odn</sub></b></td><td class="anw-desc">Zużycie odniesienia: ile zużyłby budynek BEZ technologii w warunkach okresu analizowanego (E<sub>PRZED</sub>·∑SD<sub>std,PO</sub>)</td></tr>
+      <tr><td><b>OSZ</b></td><td class="anw-desc">Oszczędność energii: (Q<sub>odn</sub> − Qs<sub>PO</sub>) / Q<sub>odn</sub> · 100%</td></tr>
+    </tbody></table>
   </div>
 
   <div class="anw-sign">
