@@ -2896,3 +2896,233 @@ function _analDrawChartsVOL(data) {
     { label: 'PO', bars: [{ v: data.after.qs, c: '#27500A', n: 'Qs po' }] }
   ], { title: 'Zużycie sprowadzone do referencyjnej intensywności (Qs)', unit: data.energy.unit });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OKRESY BAZOWE → zakładka „Korekta intensywności" — realny formularz okresu bazowego
+// (wcześniej placeholder). Wzorzec jak TYM: driver intensywności Wsk = I·z₀,
+// φ = ΣWsk_ref / ΣWsk_rzecz, Qs = Qc.o.·φ.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const IntensityBaseModule = {
+  storageKey: 'waterai_intensity_base_v1',
+  getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+  saveAll(x) { localStorage.setItem(this.storageKey, JSON.stringify(x)); },
+  add(it) { const a = this.getAll(); a.push({ ...it, id: Date.now(), createdAt: new Date().toISOString() }); this.saveAll(a); },
+  update(id, it) { this.saveAll(this.getAll().map(x => Number(x.id) === Number(id) ? { ...x, ...it, id: x.id, updatedAt: new Date().toISOString() } : x)); },
+  remove(id) { this.saveAll(this.getAll().filter(x => Number(x.id) !== Number(id))); },
+  find(id) { return this.getAll().find(x => Number(x.id) === Number(id)); },
+  findByObject(objId) { return this.getAll().filter(x => Number(x.objectId) === Number(objId)).sort((a, b) => Number(b.id) - Number(a.id)); }
+};
+window.IntensityBaseModule = IntensityBaseModule;
+
+let _intBaseDraft = null;
+let _intBaseShowForm = false;
+
+function _intBasePhi(it) {
+  let sumR = 0, sumRef = 0;
+  (it.months || []).forEach(m => {
+    const dd = Number(m.days || 0);
+    sumR += Math.max(0, Number(m.intRzecz || 0)) * dd;
+    sumRef += Math.max(0, Number(m.intRef || 0)) * dd;
+  });
+  return sumR > 0 ? sumRef / sumR : null;
+}
+
+// Przelicza na żywo wskaźniki w otwartym formularzu (bez przerysowania, zachowuje focus).
+function _intBaseRecalc() {
+  const d = _intBaseDraft; if (!d) return;
+  let sumR = 0, sumRef = 0, days = 0;
+  (d.months || []).forEach((m, idx) => {
+    const dd = Number(m.days || 0);
+    const wr = Math.max(0, Number(m.intRzecz || 0)) * dd;
+    const wref = Math.max(0, Number(m.intRef || 0)) * dd;
+    sumR += wr; sumRef += wref; days += dd;
+    const er = document.getElementById('intb-wr-' + idx); if (er) er.textContent = _fmtA(wr, 1);
+    const es = document.getElementById('intb-wref-' + idx); if (es) es.textContent = _fmtA(wref, 1);
+  });
+  const phi = sumR > 0 ? sumRef / sumR : null;
+  const q = Number(d.consumption || 0);
+  const qs = phi != null ? q * phi : null;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('intb-days', days || '—');
+  set('intb-sumr', _fmtA(sumR, 1));
+  set('intb-sumref', _fmtA(sumRef, 1));
+  set('intb-phi', phi != null ? _fmtA(phi, 4) : '—');
+  set('intb-qs', qs != null ? _fmtA(qs, 2) : '—');
+}
+
+function intBaseNew() {
+  const objId = (typeof selectedMeasurementObjectId !== 'undefined') ? selectedMeasurementObjectId : null;
+  const obj = objId ? ObjectsModule.find(objId) : null;
+  _intBaseDraft = { id: null, objectId: objId, clientId: obj ? Number(obj.clientId) : null,
+    periodFrom: '', periodTo: '', consumption: '', energyUnit: (obj && obj.energyUnit) || 'GJ', months: [] };
+  _intBaseShowForm = true;
+  renderMeasurementsModule();
+}
+
+function intBaseEdit(id) {
+  const it = IntensityBaseModule.find(id); if (!it) return;
+  _intBaseDraft = JSON.parse(JSON.stringify(it));
+  if (!Array.isArray(_intBaseDraft.months)) _intBaseDraft.months = [];
+  _intBaseShowForm = true;
+  renderMeasurementsModule();
+}
+
+function intBaseCancel() { _intBaseShowForm = false; _intBaseDraft = null; renderMeasurementsModule(); }
+
+function intBaseSetDate(which, val) {
+  if (!_intBaseDraft) return;
+  _intBaseDraft[which] = val;
+  const ms = (typeof _analMonthsBetween === 'function') ? _analMonthsBetween(_intBaseDraft.periodFrom, _intBaseDraft.periodTo) : [];
+  const old = _intBaseDraft.months || [];
+  _intBaseDraft.months = ms.map((m, i) => {
+    const prev = old[i];
+    return { month: m.month, name: m.name, days: m.days, intRzecz: prev ? prev.intRzecz : '', intRef: prev ? prev.intRef : '' };
+  });
+  renderMeasurementsModule();
+}
+
+function intBaseSave() {
+  const d = _intBaseDraft; if (!d) return;
+  if (!d.periodFrom || !d.periodTo) { alert('Ustaw daty okresu bazowego (od / do).'); return; }
+  if (d.id) IntensityBaseModule.update(d.id, d); else IntensityBaseModule.add(d);
+  _intBaseShowForm = false; _intBaseDraft = null;
+  renderMeasurementsModule();
+  alert('Okres bazowy intensywności zapisany.');
+}
+
+function intBaseDelete(id) { IntensityBaseModule.remove(id); renderMeasurementsModule(); }
+
+function _intBaseInput(val, oninput, extra) {
+  return `<input type="number" step="0.01" value="${val == null ? '' : val}" oninput="${oninput}" style="width:100%;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;${extra || ''}">`;
+}
+
+function _intBaseFormHtml() {
+  const d = _intBaseDraft;
+  const months = d.months || [];
+  const rows = months.length ? months.map((m, idx) => {
+    const dd = Number(m.days || 0);
+    const wr = Math.max(0, Number(m.intRzecz || 0)) * dd;
+    const wref = Math.max(0, Number(m.intRef || 0)) * dd;
+    return `<tr>
+      <td style="padding:4px 8px;font-size:13px;white-space:nowrap;">${escapeHtml(m.name)}</td>
+      <td style="padding:4px;">${_intBaseInput(m.intRzecz, '_intBaseDraft.months[' + idx + '].intRzecz=this.value;_intBaseRecalc()')}</td>
+      <td style="padding:4px;"><input type="number" min="0" max="31" value="${m.days}" oninput="_intBaseDraft.months[${idx}].days=this.value;_intBaseRecalc()" style="width:64px;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;"></td>
+      <td style="padding:4px 8px;text-align:right;font-size:13px;color:var(--color-text-secondary);" id="intb-wr-${idx}">${_fmtA(wr, 1)}</td>
+      <td style="padding:4px;border-left:2px solid #FFE0B2;">${_intBaseInput(m.intRef, '_intBaseDraft.months[' + idx + '].intRef=this.value;_intBaseRecalc()')}</td>
+      <td style="padding:4px 8px;text-align:right;font-size:13px;color:var(--color-text-secondary);" id="intb-wref-${idx}">${_fmtA(wref, 1)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Ustaw daty okresu (od / do), aby wygenerować miesiące.</td></tr>`;
+
+  const lbl = 'display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;';
+  const inp = 'width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;';
+  return `<div style="padding:16px;background:var(--color-background-primary);">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Okres bazowy — data od</label>
+        <input type="date" value="${d.periodFrom || ''}" onchange="intBaseSetDate('periodFrom',this.value)" style="${inp}"></div>
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Okres bazowy — data do</label>
+        <input type="date" value="${d.periodTo || ''}" onchange="intBaseSetDate('periodTo',this.value)" style="${inp}"></div>
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Zużycie Qc.o. [${escapeHtml(d.energyUnit || 'GJ')}]</label>
+        <input type="number" step="0.001" value="${d.consumption || ''}" placeholder="z faktur / ciepłomierza" oninput="_intBaseDraft.consumption=this.value;_intBaseRecalc()" style="${inp}"></div>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;">Intensywność I = driver pracy obiektu (np. liczba gości, m³, produkcja, osoby). Jeśli I jest już sumą miesięczną, wpisz dni z₀ = 1 → wtedy Wsk = I. Poziom referencyjny = docelowa/umowna intensywność, do której sprowadzamy zużycie.</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:var(--color-background-secondary);">
+          <th rowspan="2" style="padding:6px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">Miesiąc</th>
+          <th colspan="3" style="padding:6px 8px;text-align:center;font-size:11px;color:#0C447C;">Okres bazowy — rzeczywisty</th>
+          <th colspan="2" style="padding:6px 8px;text-align:center;font-size:11px;color:#E65100;border-left:2px solid #FFE0B2;">Poziom referencyjny</th>
+        </tr>
+        <tr style="background:var(--color-background-secondary);">
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">intensywność I</th>
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">dni z₀</th>
+          <th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--color-text-secondary);">Wsk_rzecz</th>
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);border-left:2px solid #FFE0B2;">intensywność I_ref</th>
+          <th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--color-text-secondary);">Wsk_ref</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr style="border-top:1px solid var(--color-border-tertiary);font-weight:600;font-size:13px;">
+          <td style="padding:6px 8px;">Suma</td>
+          <td></td>
+          <td style="padding:6px 8px;" id="intb-days">—</td>
+          <td style="padding:6px 8px;text-align:right;" id="intb-sumr">—</td>
+          <td style="padding:6px 8px;border-left:2px solid #FFE0B2;"></td>
+          <td style="padding:6px 8px;text-align:right;" id="intb-sumref">—</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:#FFF3E0;border:1px solid #FFCC80;font-size:13px;color:#7A3E00;">
+      φ = ΣWsk_ref / ΣWsk_rzecz = <b id="intb-phi">—</b> &nbsp;·&nbsp; Qs = Qc.o.·φ = <b id="intb-qs">—</b> ${escapeHtml(d.energyUnit || 'GJ')} (zużycie sprowadzone do referencyjnej intensywności)
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="small-button" onclick="intBaseCancel()">Anuluj</button>
+      <button class="primary-button" onclick="intBaseSave()">💾 Zapisz okres bazowy</button>
+    </div>
+  </div>`;
+}
+
+function renderIntensityBaseTab(icon, title, description, bgLight, bgBorder, textColor) {
+  const objId = (typeof selectedMeasurementObjectId !== 'undefined') ? selectedMeasurementObjectId : null;
+  const obj = objId ? ObjectsModule.find(objId) : null;
+  const header = `<div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">${icon}</span>
+      <div><h3 style="margin:0;font-size:15px;font-weight:600;color:${textColor};">${title}</h3>
+      <p style="margin:4px 0 0;font-size:12px;color:${textColor};opacity:0.75;">${description}</p></div></div>`;
+
+  let body;
+  if (_intBaseShowForm && _intBaseDraft) {
+    body = _intBaseFormHtml();
+  } else {
+    const list = obj ? IntensityBaseModule.findByObject(objId) : [];
+    const rows = list.length ? list.map(it => {
+      const phi = _intBasePhi(it);
+      return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+        <td style="padding:8px 10px;font-size:13px;">${_fmtDateA(it.periodFrom)} – ${_fmtDateA(it.periodTo)}</td>
+        <td style="padding:8px 10px;font-size:13px;">${_fmtA(Number(it.consumption || 0), 3)} ${escapeHtml(it.energyUnit || 'GJ')}</td>
+        <td style="padding:8px 10px;font-size:13px;">${phi != null ? _fmtA(phi, 4) : '—'}</td>
+        <td style="padding:8px 10px;text-align:right;white-space:nowrap;">
+          <button class="small-button" onclick="intBaseEdit(${it.id})" title="Edytuj">✏️</button>
+          <button class="small-button" onclick="if(confirm('Usunąć ten okres bazowy?')){intBaseDelete(${it.id})}" title="Usuń">🗑</button>
+        </td></tr>`;
+    }).join('') : `<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak zapisanych okresów bazowych intensywności dla tego obiektu. Kliknij „+ Nowy okres bazowy".</td></tr>`;
+    body = `<div style="padding:16px;background:var(--color-background-primary);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:12px;color:var(--color-text-secondary);">Obiekt: <b>${obj ? escapeHtml(obj.name) : '—'}</b></div>
+        <button class="primary-button" onclick="intBaseNew()">+ Nowy okres bazowy</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--color-background-secondary);">
+          <th style="text-align:left;padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">Okres</th>
+          <th style="text-align:left;padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">Zużycie Qc.o.</th>
+          <th style="text-align:left;padding:6px 10px;font-size:11px;color:var(--color-text-secondary);">φ</th>
+          <th></th>
+        </tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+  return `<div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">${header}${body}</div>`;
+}
+
+// Override: zakładka „volume" (Korekta intensywności) dostaje realny formularz;
+// pozostałe zakładki zachowują dotychczasowy placeholder.
+function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
+  if (type === 'volume') return renderIntensityBaseTab(icon, title, description, bgLight, bgBorder, textColor);
+  return `
+  <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">${icon}</span>
+      <div>
+        <h3 style="margin:0;font-size:15px;font-weight:600;color:${textColor};">${title}</h3>
+        <p style="margin:4px 0 0;font-size:12px;color:${textColor};opacity:0.75;">${description}</p>
+      </div>
+    </div>
+    <div style="padding:32px 20px;background:var(--color-background-primary);text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🚧</div>
+      <p style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin:0 0 8px;">Moduł w przygotowaniu</p>
+      <p style="font-size:12px;color:var(--color-text-secondary);max-width:400px;margin:0 auto;">
+        Zbieranie danych dla analizy <strong>${title}</strong> zostanie uruchomione w kolejnej wersji WaterAI.
+      </p>
+    </div>
+  </div>`;
+}
