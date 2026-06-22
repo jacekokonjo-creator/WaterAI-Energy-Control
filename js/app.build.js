@@ -627,7 +627,6 @@ function openObjectProtocols(objectId) {
             Zużycie bazowe: <strong>${fmt3(item.comparisonConsumption)} ${u}</strong>
           </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
             <button class="small-button" onclick="editMeasurement(${item.id});" class="icon-btn" title="Edytuj protokół">✏️</button>
             <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
           </div>
