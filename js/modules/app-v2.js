@@ -1727,6 +1727,123 @@ function generateESCOReport(analysisId) {
   setTimeout(()=>{ window._prefillESCOAnalysisId=analysisId; renderESCOReports(); }, 100);
 }
 
+// ── Pomocnicze: selektory, numeracja i lista analiz dla formularza raportu ──────
+function escoClientOptions(selectedId){
+  const clients=ClientsModule.getAll().slice().sort((a,b)=>Number(a.id)-Number(b.id));
+  return `<option value="">— wybierz klienta —</option>`+
+    clients.map(c=>`<option value="${c.id}" ${Number(selectedId)===Number(c.id)?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+}
+
+function escoObjectOptions(clientId, selectedId){
+  if(!clientId) return `<option value="">— najpierw wybierz klienta —</option>`;
+  const objs=ObjectsModule.findByClient(clientId);
+  if(!objs.length) return `<option value="">— brak obiektów dla klienta —</option>`;
+  return `<option value="">— wybierz obiekt —</option>`+
+    objs.map(o=>`<option value="${o.id}" ${Number(selectedId)===Number(o.id)?'selected':''}>${escapeHtml(o.name)}</option>`).join('');
+}
+
+// Numer raportu: ESCO/rok/nr klienta/nr obiektu/nr kolejny (w obrębie obiektu)
+function escoSuggestNumber(clientId, objectId){
+  const year=new Date().getFullYear();
+  const cn=(clientId&&typeof ClientsModule.getNumber==='function')?ClientsModule.getNumber(clientId):null;
+  const on=(objectId&&typeof ObjectsModule.getNumber==='function')?ObjectsModule.getNumber(objectId):null;
+  const existing=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]')
+    .filter(r=>objectId&&Number(r.objectId)===Number(objectId));
+  const seq=String(existing.length+1).padStart(3,'0');
+  if(cn&&on) return `ESCO/${year}/${cn}/${on}/${seq}`;
+  return `ESCO/${year}/${String(new Date().getMonth()+1).padStart(2,'0')}/${seq}`;
+}
+
+function escoAnalystOptions(selectedName){
+  const analysts=(typeof UsersModule!=='undefined')?UsersModule.findByRole('energyAnalyst'):[];
+  const opts=analysts.map(u=>{
+    const n=(u.firstName+' '+u.lastName).trim();
+    return `<option value="${escapeHtml(n)}" ${selectedName===n?'selected':''}>${escapeHtml(n)}</option>`;
+  }).join('');
+  return `<option value="">— wybierz —</option>`+opts+
+    (analysts.length?'':`<option value="" disabled>brak użytkowników z rolą Energy Analyst</option>`);
+}
+
+function escoClientUserOptions(clientId, selectedName){
+  let users=(typeof UsersModule!=='undefined')?UsersModule.findByRole('client'):[];
+  if(clientId) users=users.filter(u=>!u.clientId||Number(u.clientId)===Number(clientId));
+  const opts=users.map(u=>{
+    const n=(u.firstName+' '+u.lastName).trim();
+    return `<option value="${escapeHtml(n)}" ${selectedName===n?'selected':''}>${escapeHtml(n)}</option>`;
+  }).join('');
+  return `<option value="">— (uzupełnimy na końcu) —</option>`+opts;
+}
+
+// Tabela analiz przypisanych WYŁĄCZNIE do wybranego obiektu — wszystkie typy
+function escoAnalysesTableHTML(objectId, preselectIds){
+  if(!objectId) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Najpierw wybierz <b>klienta</b> i <b>obiekt</b> — pojawią się tu analizy przypisane do tego obiektu.</div>`;
+  const anals=AnalysesModule.findByObject(objectId);
+  if(!anals.length) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Brak analiz dla tego obiektu. Dodaj analizę w module <b>Analizy</b>.</div>`;
+  const pre=(preselectIds||[]).map(Number);
+  const rows=anals.map(a=>{
+    const t=AnalysesModule.TYPES[a.analysisType]||{label:a.analysisType,icon:'📊'};
+    const st=AnalysesModule.STATUSES[a.status]||{label:a.status,color:'#666'};
+    const r=a.results||{}, ip=a.inputParams||{};
+    const p=_escoAnalPct(a);
+    const pct=p!=null?p.toFixed(1)+'%':'—';
+    const energy=r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2)+' '+(ip.energyUnit||''):'—';
+    const period=(ip.billingFrom||ip.billingTo)?`${fmtDate(ip.billingFrom)} → ${fmtDate(ip.billingTo)}`:fmtDate(a.executedAt);
+    const checked=pre.includes(Number(a.id));
+    return `<tr style="border-bottom:.5px solid var(--color-border-tertiary);">
+      <td style="padding:6px 10px;text-align:center;"><input type="checkbox" name="esco_anal" value="${a.id}" ${checked?'checked':''} onchange="updateESCOSummary()"/></td>
+      <td style="padding:6px 10px;white-space:nowrap;">${t.icon} ${escapeHtml(t.label)}</td>
+      <td style="padding:6px 10px;">${escapeHtml(a.name)}</td>
+      <td style="padding:6px 10px;white-space:nowrap;">${period}</td>
+      <td style="padding:6px 10px;color:#27500A;">${pct}</td>
+      <td style="padding:6px 10px;">${energy}</td>
+      <td style="padding:6px 10px;"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:${st.color}22;color:${st.color};">${escapeHtml(st.label)}</span></td>
+    </tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="background:var(--color-background-secondary);">
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Wybierz</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Typ analizy</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Nazwa</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Okres / data</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">% redukcji</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Oszczędność</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// Reakcja na zmianę klienta — przeładuj obiekty, wyczyść analizy, odśwież numer
+function escoOnClientChange(){
+  const cid=(document.getElementById('esco-client')||{}).value;
+  const objSel=document.getElementById('esco-object');
+  if(objSel) objSel.innerHTML=escoObjectOptions(cid,null);
+  const list=document.getElementById('esco-anal-list');
+  if(list) list.innerHTML=escoAnalysesTableHTML(null,[]);
+  const num=document.getElementById('esco-number');
+  if(num) num.value=escoSuggestNumber(cid,null);
+  const appr=document.getElementById('esco-approved');
+  if(appr) appr.innerHTML=escoClientUserOptions(cid,'');
+  const box=document.getElementById('esco-summary-box');
+  if(box) box.style.display='none';
+  window._escoLiveResults=null;
+}
+
+// Reakcja na zmianę obiektu — pokaż analizy tego obiektu, odśwież numer
+function escoOnObjectChange(){
+  const cid=(document.getElementById('esco-client')||{}).value;
+  const oid=(document.getElementById('esco-object')||{}).value;
+  const list=document.getElementById('esco-anal-list');
+  if(list) list.innerHTML=escoAnalysesTableHTML(oid,[]);
+  const num=document.getElementById('esco-number');
+  if(num) num.value=escoSuggestNumber(cid,oid);
+  const box=document.getElementById('esco-summary-box');
+  if(box) box.style.display='none';
+  window._escoLiveResults=null;
+}
+
 function renderESCOReports() {
   const container=document.getElementById('module-content'); if(!container)return;
 
@@ -1734,12 +1851,11 @@ function renderESCOReports() {
     .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   window._escoReports=allReports;
 
-  const allAnalyses=AnalysesModule.getAll()||[];
-  const tymAnalyses=allAnalyses.filter(a=>a.analysisType==='TYM');
-  const regAnalyses=allAnalyses.filter(a=>a.analysisType==='REGRESSION');
-
   const prefill=window._prefillESCOAnalysisId;
   const prefillAnal=prefill?AnalysesModule.find(prefill):null;
+  const initClientId=prefillAnal?Number(prefillAnal.clientId):'';
+  const initObjectId=prefillAnal?Number(prefillAnal.objectId):'';
+  const preselectIds=prefillAnal?[Number(prefillAnal.id)]:[];
 
   const reportRows=allReports.map(rep=>{
     const client=ClientsModule.find(rep.clientId);
@@ -1777,7 +1893,7 @@ function renderESCOReports() {
     <button class="primary-button" onclick="document.getElementById('esco-form-wrap').style.display='block';window.scrollTo({top:0,behavior:'smooth'});" style="font-size:13px;padding:8px 18px;">+ Nowy raport ESCO</button>
   </div>
 
-  ${allReports.length===0?`<div class="reminder-card"><strong>Brak raportów ESCO</strong><div class="reminder-meta">Utwórz raport łącząc analizy TYM i regresji. Raport jest podstawą do wystawienia faktury za oszczędności.</div></div>`:`
+  ${allReports.length===0?`<div class="reminder-card"><strong>Brak raportów ESCO</strong><div class="reminder-meta">Wybierz klienta i obiekt, zaznacz powiązane analizy (TYM, regresja, obłożenie itd.) i wykonaj raport ESCO. Raport jest podstawą do wystawienia faktury za oszczędności.</div></div>`:`
   <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:var(--color-background-secondary);">
@@ -1808,85 +1924,36 @@ function renderESCOReports() {
           <span style="font-size:18px;">📋</span><h3 style="margin:0;font-size:15px;font-weight:500;color:#0C447C;">Dane formalne raportu</h3>
         </div>
         <div class="esco-body">
+          <div class="esco-grid2">
+            <div class="esco-field"><label>Klient *</label>
+              <select id="esco-client" name="escoClient" required onchange="escoOnClientChange()">${escoClientOptions(initClientId)}</select></div>
+            <div class="esco-field"><label>Obiekt *</label>
+              <select id="esco-object" name="escoObject" required onchange="escoOnObjectChange()">${escoObjectOptions(initClientId,initObjectId)}</select></div>
+          </div>
           <div class="esco-grid3">
-            <div class="esco-field"><label>Numer raportu</label><input name="reportNumber" required placeholder="np. ESCO/2026/Q1/001" value="ESCO/${new Date().getFullYear()}/${String(new Date().getMonth()+1).padStart(2,'0')}/001"/></div>
+            <div class="esco-field"><label>Numer raportu</label><input id="esco-number" name="reportNumber" required placeholder="ESCO/rok/nr klienta/nr obiektu/nr" value="${escoSuggestNumber(initClientId,initObjectId)}"/></div>
             <div class="esco-field"><label>Data raportu</label><input name="reportDate" type="date" required value="${new Date().toISOString().slice(0,10)}"/></div>
             <div class="esco-field"><label>Status</label><select name="reportStatus">
               <option value="DRAFT">Szkic</option>
               <option value="FINAL">Finalny</option>
               <option value="SIGNED">Podpisany</option>
             </select></div>
-            <div class="esco-field"><label>Sporządził</label><input name="preparedBy" placeholder="np. Jan Nowak"/></div>
-            <div class="esco-field"><label>Zatwierdził</label><input name="approvedBy" placeholder="opcjonalnie"/></div>
+            <div class="esco-field"><label>Sporządził (Energy Analyst)</label>
+              <select id="esco-prepared" name="preparedBy">${escoAnalystOptions('')}</select></div>
+            <div class="esco-field"><label>Zatwierdził (Klient)</label>
+              <select id="esco-approved" name="approvedBy">${escoClientUserOptions(initClientId,'')}</select></div>
           </div>
         </div>
       </div>
 
-      <!-- WYBÓR ANALIZ -->
+      <!-- POWIĄZANE ANALIZY (tylko dla wybranego obiektu, wszystkie typy) -->
       <div class="esco-section" style="border:1px solid #B8E0C8;">
         <div style="background:#E6F5EC;padding:12px 16px;display:flex;align-items:center;gap:10px;">
           <span style="font-size:18px;">🔬</span><h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Powiązane analizy</h3>
         </div>
         <div class="esco-body">
-          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Wybierz analizy TYM (główna metoda) i opcjonalnie regresji (weryfikacja):</div>
-
-          <div style="font-size:12px;font-weight:600;color:#0C447C;margin-bottom:6px;">📅 Analiza TYM (główna — do rozliczenia)</div>
-          ${tymAnalyses.length===0?`<div style="font-size:13px;color:var(--color-text-secondary);padding:10px;background:var(--color-background-secondary);border-radius:8px;margin-bottom:12px;">Brak analiz TYM — dodaj najpierw analizę w module Analizy.</div>`:`
-          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;margin-bottom:16px;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead><tr style="background:var(--color-background-secondary);">
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Wybierz</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Nazwa</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Obiekt</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Okres</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">% redukcji</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Oszczędność</th>
-              </tr></thead>
-              <tbody>
-                ${tymAnalyses.map(a=>{
-                  const obj2=ObjectsModule.find(a.objectId);
-                  const r=a.results||{}, ip=a.inputParams||{};
-                  const pct=r.savedEnergyPct!=null?((r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct)).toFixed(1)+'%':'—';
-                  const checked=(prefillAnal&&Number(prefillAnal.id)===Number(a.id))||false;
-                  return `<tr style="border-bottom:.5px solid var(--color-border-tertiary);">
-                    <td style="padding:6px 10px;text-align:center;"><input type="checkbox" name="tym_anal" value="${a.id}" ${checked?'checked':''} onchange="updateESCOSummary()"/></td>
-                    <td style="padding:6px 10px;">${escapeHtml(a.name)}</td>
-                    <td style="padding:6px 10px;">${escapeHtml((obj2&&obj2.name)||'—')}</td>
-                    <td style="padding:6px 10px;white-space:nowrap;">${fmtDate(ip.billingFrom)} → ${fmtDate(ip.billingTo)}</td>
-                    <td style="padding:6px 10px;color:#27500A;">${pct}</td>
-                    <td style="padding:6px 10px;">${r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2)+' '+(ip.energyUnit||'kWh'):'—'}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>`}
-
-          <div style="font-size:12px;font-weight:600;color:#633806;margin-bottom:6px;">📈 Analiza regresji (pomocnicza — weryfikacja techniczna)</div>
-          ${regAnalyses.length===0?`<div style="font-size:13px;color:var(--color-text-secondary);padding:10px;background:var(--color-background-secondary);border-radius:8px;">Brak analiz regresji.</div>`:`
-          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead><tr style="background:var(--color-background-secondary);">
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Wybierz</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Nazwa</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Obiekt</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Data</th>
-                <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Redukcja zużycia</th>
-              </tr></thead>
-              <tbody>
-                ${regAnalyses.map(a=>{
-                  const obj2=ObjectsModule.find(a.objectId);
-                  const r=a.results||{};
-                  return `<tr style="border-bottom:.5px solid var(--color-border-tertiary);">
-                    <td style="padding:6px 10px;text-align:center;"><input type="checkbox" name="reg_anal" value="${a.id}" onchange="updateESCOSummary()"/></td>
-                    <td style="padding:6px 10px;">${escapeHtml(a.name)}</td>
-                    <td style="padding:6px 10px;">${escapeHtml((obj2&&obj2.name)||'—')}</td>
-                    <td style="padding:6px 10px;">${fmtDate(a.executedAt)}</td>
-                    <td style="padding:6px 10px;color:#633806;">${r.avgReductionHeat!=null?Number(r.avgReductionHeat).toFixed(1)+'%':'—'}</td>
-                  </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>`}
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Wyświetlane są wszystkie analizy przypisane do wybranego obiektu (korekta TYM, regresja liniowa, korekta obłożenia, powierzchni i pozostałe). Zaznacz te, które mają wejść do raportu.</div>
+          <div id="esco-anal-list">${escoAnalysesTableHTML(initObjectId,preselectIds)}</div>
         </div>
       </div>
 
@@ -1894,10 +1961,10 @@ function renderESCOReports() {
       <div id="esco-summary-box" style="display:none;" class="anal-result-box" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);">
         <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.7;margin-bottom:12px;">PODSUMOWANIE RAPORTU ESCO</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji (TYM)</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji (śr.)</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-energy">—</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-money">—</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-reg">—</div><div style="font-size:11px;opacity:.8;">redukcja (regresja)</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-reg">—</div><div style="font-size:11px;opacity:.8;">wybrane analizy</div></div>
         </div>
         <div style="margin-top:12px;font-size:12px;opacity:.8;" id="esco-res-detail"></div>
       </div>
@@ -1909,7 +1976,7 @@ function renderESCOReports() {
       </div>
 
       <div style="display:flex;gap:10px;">
-        <button class="primary-button" type="submit">💾 Zapisz raport ESCO</button>
+        <button class="primary-button" type="submit">⚡ Wykonaj Raport ESCO</button>
         <button class="small-button" type="button" onclick="document.getElementById('esco-form-wrap').style.display='none';window._prefillESCOAnalysisId=null;">Anuluj</button>
       </div>
       </form>
@@ -1920,53 +1987,72 @@ function renderESCOReports() {
   if(prefill) setTimeout(()=>updateESCOSummary(), 100);
 }
 
-function updateESCOSummary() {
-  const tymChecks=[...document.querySelectorAll('[name="tym_anal"]:checked')].map(c=>Number(c.value));
-  const regChecks=[...document.querySelectorAll('[name="reg_anal"]:checked')].map(c=>Number(c.value));
+// Procent redukcji z dowolnego typu analizy (TYM, regresja, obłożenie, ...)
+function _escoAnalPct(a){
+  const r=a.results||{};
+  if(r.savedEnergyPct!=null) return r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct;
+  if(r.avgReductionHeat!=null) return Number(r.avgReductionHeat);
+  return null;
+}
 
-  const tymAnals=tymChecks.map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const regAnals=regChecks.map(id=>AnalysesModule.find(id)).filter(Boolean);
+function updateESCOSummary() {
+  const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
+  const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
 
   const box=document.getElementById('esco-summary-box');
   if(!box)return;
 
-  if(!tymAnals.length){ box.style.display='none'; return; }
+  if(!anals.length){ box.style.display='none'; window._escoLiveResults=null; return; }
   box.style.display='block';
 
-  // Aggregate TYM results
-  let totalSaved=0, totalMoney=0, totalBase=0, unit='kWh', currency='EUR';
-  tymAnals.forEach(a=>{
+  let totalSaved=0, totalMoney=0, unit='', currency='';
+  const pctVals=[];
+  anals.forEach(a=>{
     const r=a.results||{}, ip=a.inputParams||{};
     if(r.savedEnergy) totalSaved+=Number(r.savedEnergy);
-    if(r.savedMoney) totalMoney+=Number(r.savedMoney);
-    unit=ip.energyUnit||unit;
-    currency=ip.currency||currency;
+    if(r.savedMoney)  totalMoney+=Number(r.savedMoney);
+    if(ip.energyUnit) unit=ip.energyUnit;
+    if(ip.currency)   currency=ip.currency;
+    const p=_escoAnalPct(a); if(p!=null) pctVals.push(p);
   });
-  const pct=tymAnals.length===1&&tymAnals[0].results?.savedEnergyPct!=null?
-    ((tymAnals[0].results.savedEnergyPct<1?tymAnals[0].results.savedEnergyPct*100:tymAnals[0].results.savedEnergyPct)).toFixed(1)+'%':'—';
-
-  const avgReg=regAnals.length>0?(regAnals.reduce((s,a)=>s+(a.results?.avgReductionHeat||0),0)/regAnals.length).toFixed(1)+'%':'—';
+  const pct=pctVals.length?(pctVals.reduce((s,v)=>s+v,0)/pctVals.length).toFixed(1)+'%':'—';
 
   document.getElementById('esco-res-pct').textContent=pct;
-  document.getElementById('esco-res-energy').textContent=totalSaved.toFixed(2)+' '+unit;
-  document.getElementById('esco-res-money').textContent=totalMoney.toFixed(2)+' '+currency;
-  document.getElementById('esco-res-reg').textContent=avgReg;
-  document.getElementById('esco-res-detail').textContent=`Metoda TYM: ${tymAnals.map(a=>a.name).join(', ')}${regAnals.length?' | Regresja: '+regAnals.map(a=>a.name).join(', '):''}`;
+  document.getElementById('esco-res-energy').textContent=totalSaved.toFixed(2)+' '+(unit||'');
+  document.getElementById('esco-res-money').textContent=totalMoney.toFixed(2)+' '+(currency||'');
+  document.getElementById('esco-res-reg').textContent=String(anals.length);
+  document.getElementById('esco-res-detail').textContent=anals.map(a=>{
+    const t=(AnalysesModule.TYPES[a.analysisType]||{}).label||a.analysisType;
+    return `${t}: ${a.name}`;
+  }).join('  |  ');
 
-  window._escoLiveResults={totalSaved, totalMoney, pct, avgReg, unit, currency, tymIds:tymChecks, regIds:regChecks};
+  window._escoLiveResults={totalSaved, totalMoney, pct, unit, currency, analIds:ids};
 }
 
 function saveESCOReport(form) {
+  const clientId=(document.getElementById('esco-client')||{}).value;
+  const objectId=(document.getElementById('esco-object')||{}).value;
+  const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
+
+  if(!clientId){alert('Wybierz klienta.');return;}
+  if(!objectId){alert('Wybierz obiekt.');return;}
+  if(!ids.length){alert('Zaznacz co najmniej jedną analizę powiązaną z tym obiektem.');return;}
+
+  // upewnij się, że podsumowanie jest policzone z aktualnego zaznaczenia
+  updateESCOSummary();
   const r=window._escoLiveResults||{};
-  const tymIds=(r.tymIds||[...document.querySelectorAll('[name="tym_anal"]:checked')].map(c=>Number(c.value)));
-  const regIds=(r.regIds||[...document.querySelectorAll('[name="reg_anal"]:checked')].map(c=>Number(c.value)));
 
-  if(!tymIds.length){alert('Wybierz co najmniej jedną analizę TYM.');return;}
+  const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
+  const tymIds=anals.filter(a=>a.analysisType==='TYM').map(a=>Number(a.id));
+  const regIds=anals.filter(a=>a.analysisType==='REGRESSION').map(a=>Number(a.id));
+  const firstTym=anals.find(a=>a.analysisType==='TYM')||anals[0]||{};
+  const ftIp=firstTym.inputParams||{}, ftR=firstTym.results||{};
 
-  const firstTym=AnalysesModule.find(tymIds[0]);
-  const ip=firstTym?.inputParams||{};
-  const objId=firstTym?.objectId;
-  const clientId=firstTym?.clientId;
+  // okres = od najwcześniejszego do najpóźniejszego okresu rozliczeniowego wybranych analiz
+  const froms=anals.map(a=>(a.inputParams||{}).billingFrom).filter(Boolean).sort();
+  const tos  =anals.map(a=>(a.inputParams||{}).billingTo).filter(Boolean).sort();
+  const regAnals=anals.filter(a=>a.analysisType==='REGRESSION');
+  const avgReg=regAnals.length?regAnals.reduce((s,a)=>s+(a.results?.avgReductionHeat||0),0)/regAnals.length:null;
 
   const report={
     id: 'esco_'+Date.now(),
@@ -1977,21 +2063,22 @@ function saveESCOReport(form) {
     preparedBy: form.preparedBy.value.trim(),
     approvedBy: form.approvedBy.value.trim(),
     clientId: Number(clientId),
-    objectId: Number(objId),
-    periodFrom: ip.billingFrom||'',
-    periodTo: ip.billingTo||'',
+    objectId: Number(objectId),
+    periodFrom: froms[0]||ftIp.billingFrom||'',
+    periodTo: tos[tos.length-1]||ftIp.billingTo||'',
+    analysisIds: ids,
     analysisIdsTYM: tymIds,
     analysisIdsREG: regIds,
     notes: form.reportNotes.value.trim(),
     results:{
       savedEnergyTotal: r.totalSaved||0,
       savedMoneyTotal: r.totalMoney||0,
-      savedEnergyPct: firstTym?.results?.savedEnergyPct||0,
-      energyUnit: r.unit||'kWh',
-      currency: r.currency||'EUR',
-      avgReductionReg: regIds.length>0?Number((r.avgReg||'0').replace('%',''))/100:null,
-      eBill: firstTym?.results?.eBill,
-      eComp: firstTym?.results?.eComp
+      savedEnergyPct: ftR.savedEnergyPct||0,
+      energyUnit: r.unit||ftIp.energyUnit||'',
+      currency: r.currency||ftIp.currency||'',
+      avgReductionReg: avgReg!=null?avgReg/100:null,
+      eBill: ftR.eBill,
+      eComp: ftR.eComp
     }
   };
 
