@@ -3106,7 +3106,23 @@ function renderMeasurementsModule() {
   ${activeMeasurementsTab === 'volume' ? renderPlaceholderMeasTab('⚙️', 'Korekta intensywności', 'volume', 'Dane produkcyjne, wolumen usług, godziny pracy — do normalizacji zużycia względem aktywności obiektu.', '#FFF3E0', '#FFCC80', '#E65100') : ''}
   ${activeMeasurementsTab === 'schedule' ? renderPlaceholderMeasTab('📅', 'Harmonogram', 'schedule', 'Planowane terminy odczytów, analiz i protokołów dla tego obiektu.', '#F3E5F5', '#CE93D8', '#6A1B9A') : ''}
   ${activeMeasurementsTab === 'custom' ? renderPlaceholderMeasTab('🔬', 'Własna analiza', 'custom', 'Dowolne dane pomiarowe i wskaźniki definiowane przez analityka energetycznego.', '#FCE4EC', '#F48FB1', '#880E4F') : ''}
-  ${(activeMeasurementsTab === 'tym' && !showMeasurementForm) ? renderProtocolsTable(protocolsForTabs, selectedMeasurementObjectId) : ''}
+  ${(activeMeasurementsTab === 'tym' && !showMeasurementForm) ? `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+      <div style="flex:1;min-width:200px;">
+        <label style="display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Klient</label>
+        <select onchange="(function(v){var os=ObjectsModule.findByClient(Number(v));selectedMeasurementObjectId=os[0]?Number(os[0].id):null;renderMeasurementsModule();})(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">
+          ${clients.map(c => { const cn = ClientsModule.getNumber(c.id); return `<option value="${c.id}" ${Number(c.id) === selectedClientId ? 'selected' : ''}>${cn ? 'K'+cn+' — ' : ''}${escapeHtml(c.name)}</option>`; }).join('')}
+        </select>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <label style="display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;">Obiekt</label>
+        <select onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsModule();" style="width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;">
+          ${objectsForClient.map(o => { const cn = ClientsModule.getNumber(o.clientId); const on = ObjectsModule.getNumber(o.id); return `<option value="${o.id}" ${Number(o.id) === selectedMeasurementObjectId ? 'selected' : ''}>${(cn&&on) ? 'K'+cn+'-'+on+' — ' : ''}${escapeHtml(o.name || 'Obiekt bez nazwy')}</option>`; }).join('')}
+        </select>
+      </div>
+    </div>
+    ${renderProtocolsTable(protocolsForTabs, selectedMeasurementObjectId)}
+  ` : ''}
   `;
 
   if (activeMeasurementsTab === 'tym' && showMeasurementForm) renderMeasurementsList();
@@ -3156,8 +3172,8 @@ function renderProtocolsTable(protocols, objectId) {
         <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${filtered.length}${q ? ' z ' + protocols.length : ''})</span>
       </h3>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input type="search" placeholder="Szukaj okresu bazowego..." value="${escapeHtml(window._protSearch || '')}"
-          oninput="window._protSearch=this.value;renderMeasurementsModule();"
+        <input id="prot-search-input" type="search" placeholder="Szukaj okresu bazowego..." value="${escapeHtml(window._protSearch || '')}"
+          oninput="window._protSearch=this.value;renderMeasurementsModule();setTimeout(function(){var s=document.getElementById('prot-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
           style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
         <button class="primary-button" onclick="showMeasurementForm=true;editingMeasurementId=null;renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;white-space:nowrap;">
           + Dodaj okres bazowy
