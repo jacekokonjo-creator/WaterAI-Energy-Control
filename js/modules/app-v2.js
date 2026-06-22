@@ -1087,7 +1087,35 @@ const ANAL_STYLE = `<style>
   table.anw-bvs .anw-grp-r{color:#0C447C;background:#EEF4FB;}
   table.anw-bvs .anw-grp-s{color:#633806;background:#FAEEDA;}
   table.anw-bvs th.anw-sep,table.anw-bvs td.anw-sep{border-left:2px solid var(--color-border-tertiary);}
-  @media(max-width:680px){.anw-g4{grid-template-columns:1fr 1fr;}.anw-g3{grid-template-columns:1fr;}}
+  /* ── pełny raport analizy ── */
+  .anw-report{background:var(--color-background-primary);}
+  .anw-rephead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0C447C;padding-bottom:12px;margin-bottom:16px;}
+  .anw-rephead .brand{font-size:20px;font-weight:800;color:#0C447C;letter-spacing:.3px;}
+  .anw-rephead .sub{font-size:12px;color:var(--color-text-secondary);}
+  .anw-rephead .num{font-size:13px;font-weight:700;color:#633806;text-align:right;white-space:nowrap;}
+  .anw-step-card{border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--color-background-primary);}
+  .anw-step-card h4{margin:0 0 6px;font-size:14px;color:#0C447C;display:flex;align-items:center;gap:10px;}
+  .anw-step-num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#0C447C;color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .anw-formula{font-family:'Cambria Math','Times New Roman',Georgia,serif;background:#F4F7FB;border-left:3px solid #0C447C;padding:9px 13px;border-radius:6px;font-size:14.5px;margin:8px 0;overflow-x:auto;color:var(--color-text-primary);}
+  .anw-desc{font-size:12.5px;color:var(--color-text-secondary);line-height:1.55;}
+  .anw-chart-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px;}
+  .anw-chart-wrap canvas{width:100%;height:260px;border:1px solid var(--color-border-tertiary);border-radius:8px;background:#fff;}
+  .anw-sign{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin:30px 4px 8px;}
+  .anw-sign-box{padding-top:40px;}
+  .anw-sign-line{border-top:1px solid var(--color-text-primary);}
+  .anw-sign-cap{font-size:11px;color:var(--color-text-secondary);margin-top:6px;line-height:1.5;}
+  .anw-sign-wateria{position:relative;}
+  .anw-stamp{display:inline-block;border:2px solid #0C447C;color:#0C447C;border-radius:10px;padding:7px 15px;font-weight:800;font-size:13px;transform:rotate(-3deg);letter-spacing:.6px;background:rgba(12,68,124,.04);}
+  @media(max-width:680px){.anw-g4{grid-template-columns:1fr 1fr;}.anw-g3{grid-template-columns:1fr;}.anw-chart-wrap{grid-template-columns:1fr;}.anw-sign{grid-template-columns:1fr;}}
+  @media print{
+    body *{visibility:hidden !important;}
+    #anw-report,#anw-report *{visibility:visible !important;}
+    #anw-report{position:absolute;left:0;top:0;width:100%;margin:0;padding:0;border:none;}
+    .anw-noprint{display:none !important;}
+    .anw-step-card,.anw-sec,.anw-sign,.anw-hero{break-inside:avoid;page-break-inside:avoid;}
+    .anw-chart-wrap canvas{break-inside:avoid;}
+    @page{margin:14mm;}
+  }
 </style>`;
 
 // ── ENTRY POINT (wywoływane przez nawigację: moduleName==='analyses') ──────────
@@ -1106,6 +1134,7 @@ function renderAnalysesModule() {
   container.innerHTML = ANAL_STYLE + _analStepsBar() + (ANAL.step === 1 ? _analTypeSelect() : _analWizard());
 
   if (ANAL.step === 2 && ANAL.type === 'TYM' && ANAL.objectId) _analRecalcLive();
+  if (ANAL.step === 2 && ANAL.results) setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
 }
 
 function _analStepsBar() {
@@ -1618,32 +1647,18 @@ function analRun() {
   const slot = document.getElementById('anw-results');
   if (slot) { slot.innerHTML = _analResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   const bar = document.querySelector('.anw-steps'); if (bar) bar.outerHTML = _analStepsBar();
+  setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
 }
 
 function _analResults() {
-  const r = ANAL.results; if (!r) return '';
-  const u = r.unit, cur = r.currency, pos = r.savedPct >= 0;
+  if (!ANAL.results) return '';
+  const data = _analReportData({ live: true });
   return `
-  <div class="anw-sec" style="border-color:#27500A;">
-    <div class="anw-head anw-after"><span class="ico">✅</span><h3>Wynik analizy — korekta stopniodni</h3></div>
-    <div class="anw-body">
-      <div class="anw-hero">
-        <div><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(r.savedPct), 1)}%</div></div>
-        <div><div class="lbl">Energia zaoszczędzona</div><div class="big">${_fmtA(r.savedEnergy, 2)} <span style="font-size:16px;">${u}</span></div></div>
-        <div><div class="lbl">Wartość oszczędności</div><div class="big">${_fmtA(r.savedMoney, 2)} <span style="font-size:16px;">${cur}</span></div></div>
-      </div>
-      <div class="anw-rgrid">
-        <div class="anw-tile"><div class="v">${_fmtA(r.before.qs, 2)} ${u}</div><div class="k">Qs PRZED (skorygowane) · φ=${_fmtA(r.before.phi, 4)}</div></div>
-        <div class="anw-tile"><div class="v">${_fmtA(r.after.qs, 2)} ${u}</div><div class="k">Qs PO (skorygowane) · φ=${_fmtA(r.after.phi, 4)}</div></div>
-        <div class="anw-tile"><div class="v">${_fmtA(r.escoAmount, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(r.escoShare, 0)}%)</div></div>
-        <div class="anw-tile"><div class="v">${_fmtA(r.clientAmount, 2)} ${cur}</div><div class="k">Udział klienta</div></div>
-      </div>
-      <div class="anw-note" style="margin-top:14px;">OSZ = (Qs<sub>przed</sub> − Qs<sub>po</sub>) / Qs<sub>przed</sub> · 100% &nbsp;|&nbsp; Qs = Qc.o.·φ &nbsp;|&nbsp; φ = ∑SD${_analBaseTi()}_stand / ∑SD${_analBaseTi()}_rzecz &nbsp;|&nbsp; SD${_analBaseTi()} = z₀·(Tᵢ − tₘₑ)</div>
-      <div class="anw-act" style="justify-content:flex-end;margin-top:18px;">
-        <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analSave()">💾 Zapisz analizę</button>
-      </div>
-    </div>
-  </div>`;
+  <div class="anw-act anw-noprint" style="justify-content:flex-end;margin:6px 0 14px;gap:10px;">
+    <button class="small-button" onclick="analPrintPDF()">🖨 Drukuj do PDF</button>
+    <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);font-size:14px;padding:12px 24px;box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analSave()">💾 Zapisz analizę</button>
+  </div>
+  <div id="anw-report" class="anw-report">${_analReportBody(data)}</div>`;
 }
 
 function analSave() {
@@ -1659,6 +1674,7 @@ function analSave() {
     status: 'COMPLETE',
     inputParams: {
       std: ANAL.std, before: ANAL.before, after: ANAL.after,
+      baseTi: ANAL.baseTi,
       energyUnit: ANAL.energy.unit, currency: ANAL.energy.currency,
       energyPrice: ANAL.energy.price, escoShare: ANAL.energy.escoShare,
       priceMode: ANAL.energy.priceMode, priceDescription: ANAL.energy.priceDescription,
@@ -1684,33 +1700,249 @@ function analSave() {
   renderAnalysesModule();
 }
 
+// ── PEŁNY RAPORT ANALIZY (TYM) — krok po kroku, wzory, wykresy, druk PDF ──────────
+
+// Czysty silnik SD per okres (mirror _sd20/_analComputePeriod, dni okresu po obu stronach)
+function _analCalcPeriodRows(months, std, ti, consumption) {
+  let sumR = 0, sumS = 0, days = 0; const rows = [];
+  (months || []).forEach(mo => {
+    const t = (ti != null && ti !== '') ? Number(ti) : ANAL_TI;
+    const d = Number(mo.days || 0);
+    const filled = !(mo.tme === '' || mo.tme == null);
+    const tmeNum = Number(mo.tme || 0);
+    const stdM = (std && std[mo.month]) ? std[mo.month] : [0, 0];
+    const sdR = filled ? Math.max(0, t - tmeNum) * d : 0;
+    const sdS = Math.max(0, t - Number(stdM[0])) * d; // dni OKRESU (poprawione)
+    sumR += sdR; sumS += sdS; days += d;
+    rows.push({ name: mo.name, month: mo.month, days: d, tme: filled ? tmeNum : null, tStd: Number(stdM[0]), sdR, sdS });
+  });
+  const phi = sumR > 0 ? sumS / sumR : null;
+  const q = Number(consumption || 0);
+  const qs = phi != null ? q * phi : null;
+  return { rows, sumR, sumS, days, phi, q, qs };
+}
+
+function _analReportData(source) {
+  let clientId, objectId, std, beforeP, afterP, energy, name, executedAt, number, tiBefore, tiAfter, base, saved, cid;
+  if (source && source.saved) {
+    const a = source.saved, ip = a.inputParams || {}, rr = a.results || {};
+    clientId = a.clientId; objectId = a.objectId; std = ip.std || ANAL_STD_DEFAULT;
+    beforeP = ip.before || { months: [], consumption: '' };
+    afterP = ip.after || { months: [], consumption: '' };
+    energy = { unit: ip.energyUnit || 'GJ', currency: ip.currency || 'PLN', price: ip.energyPrice,
+      escoShare: ip.escoShare, priceMode: ip.priceMode || 'FIXED', priceDescription: ip.priceDescription || '' };
+    tiBefore = (ip.baseTi != null && ip.baseTi !== '') ? ip.baseTi : (afterP.baseTi != null ? afterP.baseTi : ANAL_TI);
+    tiAfter = (afterP.baseTi != null && afterP.baseTi !== '') ? afterP.baseTi : tiBefore;
+    name = a.name; executedAt = a.executedAt;
+    number = (AnalysesModule.getNumber ? AnalysesModule.getNumber(a.id) : null) || ('#' + a.id);
+    base = { savedEnergy: rr.savedEnergy,
+      savedPct: rr.savedEnergyPct != null ? ((rr.savedEnergyPct > -1 && rr.savedEnergyPct < 1) ? rr.savedEnergyPct * 100 : rr.savedEnergyPct) : null,
+      savedMoney: rr.savedMoney, escoShare: ip.escoShare, escoAmount: rr.escoAmount };
+    saved = true; cid = 'anw' + a.id;
+  } else {
+    clientId = ANAL.clientId; objectId = ANAL.objectId; std = ANAL.std;
+    beforeP = ANAL.before; afterP = ANAL.after; energy = ANAL.energy;
+    tiBefore = _analTi('before'); tiAfter = _analTi('after');
+    const o0 = ObjectsModule.find(objectId);
+    name = ((AnalysesModule.TYPES[ANAL.type] || {}).label || 'Analiza') + ' — ' + (o0 ? o0.name : '');
+    executedAt = new Date().toISOString().slice(0, 10);
+    number = ANAL.editingId ? ((AnalysesModule.getNumber && AnalysesModule.getNumber(ANAL.editingId)) || ('#' + ANAL.editingId)) : '— (niezapisana)';
+    const rr = ANAL.results || {};
+    base = { savedEnergy: rr.savedEnergy, savedPct: rr.savedPct, savedMoney: rr.savedMoney, escoShare: rr.escoShare, escoAmount: rr.escoAmount };
+    saved = false; cid = 'anwlive';
+  }
+  const before = _analCalcPeriodRows(beforeP.months, std, tiBefore, beforeP.consumption);
+  const after = _analCalcPeriodRows(afterP.months, std, tiAfter, afterP.consumption);
+  const escoShare = Number(energy.escoShare || 0);
+  const savedEnergy = (base.savedEnergy != null) ? base.savedEnergy : ((before.qs != null && after.qs != null) ? before.qs - after.qs : null);
+  const savedPct = (base.savedPct != null) ? base.savedPct : ((before.qs > 0 && savedEnergy != null) ? savedEnergy / before.qs * 100 : null);
+  const price = Number(energy.price || 0);
+  const savedMoney = (base.savedMoney != null) ? base.savedMoney : ((energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : null));
+  const escoAmount = (base.escoAmount != null) ? base.escoAmount : (savedMoney != null ? savedMoney * escoShare / 100 : null);
+  const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
+  return {
+    client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
+    name, executedAt, number, saved, std, energy, tiBefore, tiAfter, cid,
+    before: Object.assign({}, before, { from: beforeP.from, to: beforeP.to, consumption: beforeP.consumption }),
+    after: Object.assign({}, after, { from: afterP.from, to: afterP.to, consumption: afterP.consumption }),
+    savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount
+  };
+}
+
+function _anwPeriodTable(P, ti) {
+  const rows = (P.rows || []).map(r => `<tr>
+    <td>${_escA(r.name)}</td>
+    <td class="calc">${r.days}</td>
+    <td class="calc">${r.tme == null ? '—' : _fmtA(r.tme, 1)}</td>
+    <td class="calc">${_fmtA(r.sdR, 1)}</td>
+    <td class="calc">${_fmtA(r.tStd, 1)}</td>
+    <td class="calc">${_fmtA(r.sdS, 1)}</td>
+  </tr>`).join('');
+  return `<table class="anw-t"><thead><tr>
+    <th>Miesiąc</th><th>Dni z₀</th><th>t rzecz.</th><th>SD${ti} rzecz.</th><th>t TYM</th><th>SD${ti} std.</th>
+  </tr></thead><tbody>${rows || '<tr><td colspan="6" class="anw-muted">Brak miesięcy</td></tr>'}</tbody>
+  <tfoot><tr><td>∑</td><td class="calc">${P.days}</td><td></td><td class="calc">${_fmtA(P.sumR, 1)}</td><td></td><td class="calc">${_fmtA(P.sumS, 1)}</td></tr></tfoot></table>`;
+}
+
+// Wykres słupkowy (grupowany) na canvas — ostry przy druku (DPR)
+function _anwBar(cv, groups, opts) {
+  if (!cv) return; opts = opts || {};
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 480, H = 260;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#222'; ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left';
+  if (opts.title) ctx.fillText(opts.title, 8, 16);
+  if (opts.unit) { ctx.fillStyle = '#999'; ctx.textAlign = 'right'; ctx.font = '10px sans-serif'; ctx.fillText('[' + opts.unit + ']', W - 12, 16); }
+  const pad = { l: 56, r: 14, t: 30, b: 48 };
+  const vals = []; groups.forEach(g => g.bars.forEach(b => vals.push(Number(b.v) || 0)));
+  const maxV = Math.max(1, ...vals), niceMax = maxV * 1.18;
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+  ctx.textAlign = 'right'; ctx.font = '10px sans-serif';
+  for (let i = 0; i <= 4; i++) {
+    const val = niceMax * i / 4, y = pad.t + plotH - (val / niceMax) * plotH;
+    ctx.strokeStyle = '#ececec'; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    ctx.fillStyle = '#999'; ctx.fillText(_fmtA(val, 0), pad.l - 6, y + 3);
+  }
+  const gw = plotW / groups.length;
+  groups.forEach((g, gi) => {
+    const bn = g.bars.length, bw = Math.min(46, (gw * 0.66) / bn), gx = pad.l + gw * gi + gw / 2;
+    const totalW = bw * bn + (bn - 1) * 8; let bx = gx - totalW / 2;
+    g.bars.forEach(b => {
+      const v = Number(b.v) || 0, h = (v / niceMax) * plotH, y = pad.t + plotH - h;
+      ctx.fillStyle = b.c; ctx.fillRect(bx, y, bw, h);
+      ctx.fillStyle = '#222'; ctx.font = '700 10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(_fmtA(v, v >= 100 ? 0 : 1), bx + bw / 2, y - 4);
+      bx += bw + 8;
+    });
+    ctx.fillStyle = '#555'; ctx.font = '600 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(g.label, gx, H - pad.b + 18);
+  });
+  const seen = {}; let lx = pad.l, ly = H - 12;
+  groups.forEach(g => g.bars.forEach(b => {
+    if (b.n && !seen[b.n]) {
+      seen[b.n] = 1; ctx.fillStyle = b.c; ctx.fillRect(lx, ly - 8, 10, 10);
+      ctx.fillStyle = '#555'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(b.n, lx + 14, ly); lx += ctx.measureText(b.n).width + 32;
+    }
+  }));
+}
+
+function _analDrawCharts(data) {
+  if (!data) return;
+  _anwBar(document.getElementById(data.cid + '-sd'), [
+    { label: 'PRZED', bars: [{ v: data.before.sumR, c: '#185FA5', n: 'SD rzeczywiste' }, { v: data.before.sumS, c: '#FAC775', n: 'SD standard (TYM)' }] },
+    { label: 'PO', bars: [{ v: data.after.sumR, c: '#185FA5', n: 'SD rzeczywiste' }, { v: data.after.sumS, c: '#FAC775', n: 'SD standard (TYM)' }] }
+  ], { title: 'Stopniodni: rzeczywiste vs standard (TYM)', unit: '°C·dni' });
+  _anwBar(document.getElementById(data.cid + '-qs'), [
+    { label: 'PRZED', bars: [{ v: data.before.qs, c: '#0C447C', n: 'Qs przed' }] },
+    { label: 'PO', bars: [{ v: data.after.qs, c: '#27500A', n: 'Qs po' }] }
+  ], { title: 'Zużycie skorygowane do warunków standardowych (Qs)', unit: data.energy.unit });
+}
+
+function _analReportBody(data) {
+  const u = data.energy.unit, cur = data.energy.currency, tiB = data.tiBefore, tiA = data.tiAfter;
+  const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
+  const pos = (data.savedPct || 0) >= 0;
+  const priceLine = data.energy.priceMode === 'VARIABLE'
+    ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
+    : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
+  return `
+  <div class="anw-rephead">
+    <div><div class="brand">WaterAI Energy Control</div><div class="sub">Analiza oszczędności energii — metoda korekty stopniodni (TYM)</div></div>
+    <div class="num">${_escA(data.number)}<br><span class="sub">${_fmtDateA(data.executedAt)}</span></div>
+  </div>
+  <div class="anw-ctx" style="margin-top:0;">
+    <span>Klient: <b>${_escA((data.client && data.client.name) || '—')}</b></span>
+    <span>Obiekt: <b>${_escA((data.object && data.object.name) || '—')}</b></span>
+    <span>Okres PRZED: <b>${_fmtDateA(data.before.from)} → ${_fmtDateA(data.before.to)}</b></span>
+    <span>Okres PO: <b>${_fmtDateA(data.after.from)} → ${_fmtDateA(data.after.to)}</b></span>
+  </div>
+
+  <div class="anw-hero" style="margin-top:16px;">
+    <div><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%</div></div>
+    <div><div class="lbl">Energia zaoszczędzona</div><div class="big">${_fmtA(data.savedEnergy || 0, 2)} <span style="font-size:16px;">${u}</span></div></div>
+    <div><div class="lbl">Wartość oszczędności</div><div class="big">${_fmtA(data.savedMoney || 0, 2)} <span style="font-size:16px;">${cur}</span></div></div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">1</span> Stopniodni grzewcze (SD) — rzeczywiste i standardowe (TYM)</h4>
+    <div class="anw-desc">Dla każdego miesiąca stopniodni to iloczyn liczby dni okresu w danym miesiącu (z₀) oraz różnicy między projektową temperaturą wewnętrzną Tᵢ a średnią temperaturą zewnętrzną. Strona standardowa stosuje temperatury Typowego Roku Meteorologicznego (TYM) przy tej samej liczbie dni okresu — to klucz porównywalności.</div>
+    <div class="anw-formula">SD<sub>Tᵢ</sub> = z₀ · (Tᵢ − t)&nbsp;&nbsp;[°C·dni];&nbsp;&nbsp; Tᵢ(PRZED) = ${tiB} °C,&nbsp; Tᵢ(PO) = ${tiA} °C</div>
+    <div class="anw-g2" style="margin-top:10px;">
+      <div><div class="anw-muted" style="margin-bottom:4px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTable(data.before, tiB)}</div>
+      <div><div class="anw-muted" style="margin-bottom:4px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTable(data.after, tiA)}</div>
+    </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">2</span> Współczynnik korekcyjny φ</h4>
+    <div class="anw-desc">φ normalizuje zużycie do warunków typowego roku. Jest ilorazem sumy stopniodni standardowych i rzeczywistych, liczonych na tych samych dniach okresu (φ&gt;1 → okres cieplejszy od normy).</div>
+    <div class="anw-formula">φ = ∑SD<sub>std</sub> / ∑SD<sub>rzecz</sub></div>
+    <div class="anw-g2">
+      <div class="anw-formula" style="border-color:#0C447C;">φ<sub>PRZED</sub> = ${_fmtA(data.before.sumS, 1)} / ${_fmtA(data.before.sumR, 1)} = <b>${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'}</b></div>
+      <div class="anw-formula" style="border-color:#27500A;">φ<sub>PO</sub> = ${_fmtA(data.after.sumS, 1)} / ${_fmtA(data.after.sumR, 1)} = <b>${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'}</b></div>
+    </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">3</span> Zużycie skorygowane Qs</h4>
+    <div class="anw-desc">Zmierzone zużycie ciepła Qc.o. mnożymy przez φ, otrzymując zużycie, jakie wystąpiłoby w warunkach typowego roku meteorologicznego — dzięki temu oba okresy są w pełni porównywalne, niezależnie od pogody.</div>
+    <div class="anw-formula">Qs = Qc.o. · φ</div>
+    <div class="anw-g2">
+      <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} · ${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'} = <b>${data.before.qs != null ? _fmtA(data.before.qs, 2) : '—'} ${u}</b></div>
+      <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
+    </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">4</span> Oszczędność energii i rozliczenie</h4>
+    <div class="anw-desc">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</div>
+    <div class="anw-formula">OSZ = (Qs<sub>PRZED</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED</sub> · 100%</div>
+    <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.before.qs || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
+    <div class="anw-rgrid" style="margin-top:10px;">
+      <div class="anw-tile"><div class="v">${_fmtA(data.savedMoney || 0, 2)} ${cur}</div><div class="k">Wartość oszczędności</div></div>
+      <div class="anw-tile"><div class="v">${_fmtA(data.escoAmount || 0, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(data.escoShare || 0, 0)}%)</div></div>
+      <div class="anw-tile"><div class="v">${_fmtA(data.clientAmount || 0, 2)} ${cur}</div><div class="k">Udział klienta</div></div>
+    </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">5</span> Wizualizacja</h4>
+    <div class="anw-chart-wrap">
+      <canvas id="${data.cid}-sd"></canvas>
+      <canvas id="${data.cid}-qs"></canvas>
+    </div>
+  </div>
+
+  <div class="anw-sign">
+    <div class="anw-sign-box">
+      <div class="anw-sign-line"></div>
+      <div class="anw-sign-cap">Klient — podpis i data</div>
+    </div>
+    <div class="anw-sign-box anw-sign-wateria">
+      <div class="anw-stamp">WaterAI Energy</div>
+      <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
+      <div class="anw-sign-cap">Analizy energetyczne WaterAI Energy.</div>
+    </div>
+  </div>`;
+}
+
+function analPrintPDF() { window.print(); }
+
 // ── podgląd / raport ────────────────────────────────────────────────────────────
 function analView(id) {
   const a = AnalysesModule.find(id); if (!a) return;
-  const o = ObjectsModule.find(a.objectId), c = ClientsModule.find(a.clientId);
-  const r = a.results || {}, ip = a.inputParams || {};
   const container = document.getElementById('module-content'); if (!container) return;
-  const pct = r.savedEnergyPct != null ? ((r.savedEnergyPct < 1 ? r.savedEnergyPct * 100 : r.savedEnergyPct)).toFixed(1) + '%' : '—';
+  const data = _analReportData({ saved: a });
   container.innerHTML = ANAL_STYLE + `
-    <button class="small-button" onclick="renderAnalysesModule()" style="margin-bottom:16px;">← Lista analiz</button>
-    <div class="anw-sec"><div class="anw-head anw-blue"><span class="ico">${(AnalysesModule.TYPES[a.analysisType] || {}).icon || '📊'}</span><h3>${_escA(a.name)}</h3></div>
-      <div class="anw-body">
-        <div class="anw-ctx" style="margin-top:0;">
-          <span>Klient: <b>${_escA((c && c.name) || '—')}</b></span>
-          <span>Obiekt: <b>${_escA((o && o.name) || '—')}</b></span>
-          <span>Data: <b>${_fmtDateA(a.executedAt)}</b></span>
-          <span>Metoda: <b>${_escA((AnalysesModule.TYPES[a.analysisType] || {}).label || a.analysisType)}</b></span>
-        </div>
-        <div class="anw-rgrid" style="margin-top:16px;">
-          <div class="anw-tile"><div class="v">${pct}</div><div class="k">Oszczędność (OSZ)</div></div>
-          <div class="anw-tile"><div class="v">${r.savedEnergy != null ? Number(r.savedEnergy).toFixed(2) + ' ' + (ip.energyUnit || '') : '—'}</div><div class="k">Energia zaoszczędzona</div></div>
-          <div class="anw-tile"><div class="v">${r.savedMoney != null ? Number(r.savedMoney).toFixed(2) + ' ' + (ip.currency || '') : '—'}</div><div class="k">Wartość oszczędności</div></div>
-          <div class="anw-tile"><div class="v">${r.phiBefore != null ? Number(r.phiBefore).toFixed(4) : '—'} / ${r.phiAfter != null ? Number(r.phiAfter).toFixed(4) : '—'}</div><div class="k">φ PRZED / PO</div></div>
-        </div>
-        <div class="anw-act" style="justify-content:flex-start;">
-          <button class="primary-button" onclick="analGenerateReport(${a.id})">⚡ Generuj raport ESCO</button>
-        </div>
-      </div></div>`;
+    <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
+      <button class="small-button" onclick="renderAnalysesModule()">← Lista analiz</button>
+      <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj do PDF</button>
+    </div>
+    <div id="anw-report" class="anw-report">${_analReportBody(data)}</div>`;
+  setTimeout(() => _analDrawCharts(data), 60);
 }
 
 function analGenerateReport(id) {
