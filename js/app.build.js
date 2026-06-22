@@ -628,7 +628,7 @@ function openObjectProtocols(objectId) {
           </div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="small-button" style="background:#27500A;color:#fff;border-color:#27500A;" onclick="generateESCOReport(${item.id})">⚡ Raport ESCO</button>
-            <button class="small-button" onclick="editMeasurement(${item.id});openModule('measurements');" class="icon-btn" title="Edytuj protokół">✏️</button>
+            <button class="small-button" onclick="editMeasurement(${item.id});" class="icon-btn" title="Edytuj protokół">✏️</button>
             <button class="small-button" onclick="if(confirm('Usuń protokół?')){MeasurementsModule.remove(${item.id});openObjectProtocols(${objectId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
           </div>
         </div>
@@ -780,7 +780,7 @@ function viewObject(id) {
       </td>
       <td style="padding:7px 10px;white-space:nowrap;">
         <button class="small-button" onclick="switchToView('measurements',()=>viewProtocol(${p.id}))" class="icon-btn" title="Podgląd">👁</button>
-        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')" class="icon-btn" title="Edytuj">✏️</button>
+        <button class="small-button" onclick="editMeasurement(${p.id})" class="icon-btn" title="Edytuj">✏️</button>
       </td>
     </tr>`;
   }).join("");
@@ -2292,7 +2292,7 @@ function viewProtocol(id) {
           </h2>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj</button>
+          <button class="small-button" onclick="editMeasurement(${p.id})">✏️ Edytuj</button>
           <button class="small-button" onclick="openModule('measurements')">← Wróć</button>
         </div>
       </div>
@@ -2394,7 +2394,7 @@ function viewProtocol(id) {
       </div>
 
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        <button class="small-button" onclick="editMeasurement(${p.id});openModule('measurements')">✏️ Edytuj protokół</button>
+        <button class="small-button" onclick="editMeasurement(${p.id})">✏️ Edytuj protokół</button>
         ${obj ? `<button class="small-button" onclick="switchToView('objects',()=>viewObject(${obj.id}))">🏗️ Podgląd obiektu</button>` : ""}
       </div>
     </div>
@@ -2404,6 +2404,14 @@ function viewProtocol(id) {
 function editMeasurement(id) {
   const protocol = MeasurementsModule.find(id);
   if (!protocol) return;
+
+  // Aktywuj widok modułu „Okresy bazowe" tutaj, aby NIE wywoływać potem openModule('measurements'),
+  // który robiłby drugi renderMeasurementsModule() i kasował ręcznie wstawione dane miesięczne.
+  const _lbls = (typeof getModuleLabels === 'function') ? getModuleLabels() : {};
+  const _lbl = _lbls['measurements'];
+  const _tEl = document.getElementById('module-title'); if (_tEl && _lbl) _tEl.textContent = _lbl[1];
+  const _dEl = document.getElementById('module-description'); if (_dEl) _dEl.textContent = '';
+  const _mvEl = document.getElementById('module-view'); if (_mvEl) _mvEl.classList.add('active');
 
   editingMeasurementId = Number(id);
   selectedMeasurementObjectId = Number(protocol.objectId);
