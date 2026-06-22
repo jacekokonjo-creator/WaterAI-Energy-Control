@@ -1007,7 +1007,7 @@ function _analResetState() {
     baseTi: 20,
     before: { from: '', to: '', consumption: '', months: [] },
     after:  { from: '', to: '', consumption: '', months: [], baseTi: 20 },
-    energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50 },
+    energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50, priceMode: 'FIXED', priceDescription: '' },
     results: null,
     editingId: null
   };
@@ -1239,7 +1239,9 @@ function analEdit(id) {
     unit: ip.energyUnit || 'GJ',
     currency: ip.currency || 'PLN',
     price: (ip.energyPrice != null) ? ip.energyPrice : '',
-    escoShare: (ip.escoShare != null) ? ip.escoShare : 50
+    escoShare: (ip.escoShare != null) ? ip.escoShare : 50,
+    priceMode: ip.priceMode || 'FIXED',
+    priceDescription: ip.priceDescription || ''
   };
   ANAL.results = null;
   renderAnalysesModule();
@@ -1340,11 +1342,25 @@ function _analTYMSheet() {
           <select onchange="ANAL.energy.currency=this.value;_analRecalcLive()">
             ${['PLN','EUR','CZK','USD'].map(u => `<option ${ANAL.energy.currency === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select></div>
-        <div class="anw-f"><label>Cena energii (za jednostkę)</label>
-          <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 85" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>
+        <div class="anw-f"><label>Sposób wyceny energii</label>
+          <select onchange="ANAL.energy.priceMode=this.value;renderAnalysesModule()">
+            <option value="FIXED" ${ANAL.energy.priceMode !== 'VARIABLE' ? 'selected' : ''}>Cena stała za jednostkę</option>
+            <option value="VARIABLE" ${ANAL.energy.priceMode === 'VARIABLE' ? 'selected' : ''}>Cena zmienna (z opisem)</option>
+          </select></div>
         <div class="anw-f"><label>Udział WaterAI / ESCO [%]</label>
           <input type="number" step="0.1" min="0" max="100" value="${ANAL.energy.escoShare}" oninput="ANAL.energy.escoShare=this.value;_analRecalcLive()"></div>
       </div>
+      <div class="${ANAL.energy.priceMode === 'VARIABLE' ? 'anw-g2' : 'anw-g4'}" style="margin-top:12px;">
+        <div class="anw-f"><label>${ANAL.energy.priceMode === 'VARIABLE' ? 'Cena zmienna za energię (za jednostkę)' : 'Cena energii (za jednostkę)'}</label>
+          <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 0,54" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>
+        ${ANAL.energy.priceMode === 'VARIABLE'
+          ? `<div class="anw-f"><label>Opis ceny zmiennej (np. uwzględnia koszty przesyłu i pozostałe składowe faktury)</label>
+              <input type="text" value="${_escA(ANAL.energy.priceDescription || '')}" placeholder="WaterAI redukuje zużycie, a tym samym koszty przesyłu i inne składowe…" oninput="ANAL.energy.priceDescription=this.value"></div>`
+          : ''}
+      </div>
+      ${ANAL.energy.priceMode === 'VARIABLE'
+        ? `<div class="anw-note">Cena zmienna obejmuje pełny koszt jednostki energii (energia + przesył i pozostałe składowe), które WaterAI redukuje wraz ze zużyciem. Opis trafia do analizy i raportu ESCO.</div>`
+        : ''}
     </div>
   </div>`;
 }
@@ -1400,8 +1416,7 @@ function _analBaseVsStandardSheet() {
           <td class="anw-sep"></td><td></td><td class="calc" id="anw-before-sums">—</td>
         </tr></tfoot>
       </table>
-      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie skorygowane do standardowego sezonu).
-        Standardowy sezon: domyślnie Lublin (<a href="https://www.gov.pl/web/archiwum-inwestycje-rozwoj/dane-do-obliczen-energetycznych-budynkow" target="_blank" rel="noopener">gov.pl</a>) — kolumny „stand" są edytowalne dla innej lokalizacji.</div>
+      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie skorygowane do standardowego sezonu).</div>
     </div>
   </div>`;
 }
@@ -1436,12 +1451,12 @@ function _analPeriodSheet(key, title, headCls, ico, qLabel) {
           <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.${key}.consumption=this.value;_analRecalcLive()"></div>
       </div>
       <table class="anw-t" style="margin-top:6px;">
-        <thead><tr><th style="width:26%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD${_ti}_rzecz</th><th style="text-align:right">SD${_ti}_stand</th></tr></thead>
+        <thead><tr><th style="width:26%">Miesiąc</th><th>śr. temp. tₘₑ [°C]</th><th>dni z₀</th><th style="text-align:right">SD<span class="anw-tilab-${key}">${_ti}</span>_rzecz</th><th style="text-align:right">SD<span class="anw-tilab-${key}">${_ti}</span>_stand</th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td>Suma</td><td></td><td class="calc" id="anw-${key}-days">—</td>
           <td class="calc" id="anw-${key}-sumr">—</td><td class="calc" id="anw-${key}-sums">—</td></tr></tfoot>
       </table>
-      <div class="anw-note">φ = ∑SD${_ti}_stand / ∑SD${_ti}_rzecz · Qs = Qc.o.·φ → <b id="anw-${key}-qs">—</b> ${ANAL.energy.unit} (skorygowane)</div>
+      <div class="anw-note">φ = ∑SD<span class="anw-tilab-${key}">${_ti}</span>_stand / ∑SD<span class="anw-tilab-${key}">${_ti}</span>_rzecz · Qs = Qc.o.·φ → <b id="anw-${key}-qs">—</b> ${ANAL.energy.unit} (skorygowane)</div>
     </div>
   </div>`;
 }
@@ -1574,6 +1589,9 @@ function _analRecalcLive() {
     set(`anw-${key}-sumr`, _fmtA(r.sumR, 1));
     set(`anw-${key}-sums`, _fmtA(r.sumS, 1));
     set(`anw-${key}-qs`, r.qs != null ? _fmtA(r.qs, 2) : '—');
+    // etykiety SD{Tᵢ} odzwierciedlają bieżącą Tᵢ danego okresu (na żywo)
+    const ti = _analTi(key);
+    document.querySelectorAll('.anw-tilab-' + key).forEach(e => { e.textContent = ti; });
   });
   document.querySelectorAll('.anw-u').forEach(e => e.textContent = ANAL.energy.unit);
 }
@@ -1641,6 +1659,7 @@ function analSave() {
       std: ANAL.std, before: ANAL.before, after: ANAL.after,
       energyUnit: ANAL.energy.unit, currency: ANAL.energy.currency,
       energyPrice: ANAL.energy.price, escoShare: ANAL.energy.escoShare,
+      priceMode: ANAL.energy.priceMode, priceDescription: ANAL.energy.priceDescription,
       basePeriod: ANAL.basePeriod
     },
     results: {
