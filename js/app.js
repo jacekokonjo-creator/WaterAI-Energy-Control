@@ -1938,7 +1938,7 @@ function buildRealMonthlyFromForm(form) {
 function calcHDD(months, tempField, daysField, baseTemp) {
   return months.reduce((sum, m) => {
     const diff = baseTemp - Number(m[tempField]);
-    return sum + Math.max(0, diff) * Number(m[daysField]);
+    return sum + diff * Number(m[daysField]);
   }, 0);
 }
 
@@ -1961,14 +1961,14 @@ function calcESCOResults(protocol) {
     if (!tym) return sum;
     const tymTemp = Number(tym.tymTemperature ?? tym.temperature ?? 0);
     const days    = Number(bm.days ?? 0);
-    return sum + Math.max(0, base - tymTemp) * days;
+    return sum + (base - tymTemp) * days;
   }, 0);
 
   // HDD rzeczywiste dla okresu ROZLICZENIOWEGO
   const hddRealBilling = billingMonthly.reduce((sum, bm) => {
     const temp = Number(bm.temperature ?? 0);
     const days = Number(bm.days ?? 0);
-    return sum + Math.max(0, base - temp) * days;
+    return sum + (base - temp) * days;
   }, 0);
 
   // HDD TYM dla okresu PORÓWNAWCZEGO — dni z tabelki porównawczej, temp z TYM
@@ -1977,14 +1977,14 @@ function calcESCOResults(protocol) {
     if (!tym) return sum;
     const tymTemp = Number(tym.tymTemperature ?? tym.temperature ?? 0);
     const days    = Number(cm.days ?? 0);
-    return sum + Math.max(0, base - tymTemp) * days;
+    return sum + (base - tymTemp) * days;
   }, 0);
 
   // HDD rzeczywiste dla okresu PORÓWNAWCZEGO
   const hddRealComparison = comparisonMonthly.reduce((sum, cm) => {
     const temp = Number(cm.temperature ?? 0);
     const days = Number(cm.days ?? 0);
-    return sum + Math.max(0, base - temp) * days;
+    return sum + (base - temp) * days;
   }, 0);
 
   const billingConsumption    = Number(protocol.billingConsumption    ?? 0);
@@ -2204,11 +2204,11 @@ function viewProtocol(id) {
   // TYM — typowy rok meteorologiczny (12 miesięcy)
   const tymMonthly = p.tymMonthly || [];
   const tymTotalDays = tymMonthly.reduce((s, m) => s + Number(m.tymDays ?? m.days ?? 0), 0);
-  const tymTotalHDD = tymMonthly.reduce((s, m) => { const t = m.tymTemperature ?? m.temperature; const d = m.tymDays ?? m.days ?? 0; return s + Math.max(0, (baseTemp - Number(t || 0)) * Number(d || 0)); }, 0);
+  const tymTotalHDD = tymMonthly.reduce((s, m) => { const t = m.tymTemperature ?? m.temperature; const d = m.tymDays ?? m.days ?? 0; return s + ((baseTemp - Number(t || 0)) * Number(d || 0)); }, 0);
   const tymRows = tymMonthly.map(m => {
     const days = m.tymDays ?? m.days ?? "";
     const temp = m.tymTemperature ?? m.temperature;
-    const hdd = fmt2(Math.max(0, (baseTemp - Number(temp || 0)) * Number(days || 0)));
+    const hdd = fmt2(((baseTemp - Number(temp || 0)) * Number(days || 0)));
     return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName || ("M" + m.month))}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
@@ -2220,11 +2220,11 @@ function viewProtocol(id) {
   // Okres porównawczy (bazowy)
   const compMonthly = p.comparisonMonthly || [];
   const compTotalDays = compMonthly.reduce((s, m) => s + Number(m.days ?? 0), 0);
-  const compTotalHDD = compMonthly.reduce((s, m) => s + Math.max(0, (baseTemp - Number(m.temperature || 0)) * Number(m.days || 0)), 0);
+  const compTotalHDD = compMonthly.reduce((s, m) => s + ((baseTemp - Number(m.temperature || 0)) * Number(m.days || 0)), 0);
   const compRows = compMonthly.map(m => {
     const days = m.days ?? "";
     const temp = m.temperature;
-    const hdd = fmt2(Math.max(0, (baseTemp - Number(temp || 0)) * Number(days || 0)));
+    const hdd = fmt2(((baseTemp - Number(temp || 0)) * Number(days || 0)));
     return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${escapeHtml(m.monthName || ("M" + m.month))}</td>
       <td style="padding:5px 8px;font-size:13px;text-align:right;">${temp !== null && temp !== undefined ? fmt2(temp) : "—"}</td>
@@ -2554,7 +2554,7 @@ function refreshPeriodTable(prefix) {
     const prev = existingTemps[key] || {};
     const tempVal = prev.temp !== undefined ? prev.temp : "";
     const daysVal = prev.days !== undefined ? prev.days : m.days;
-    const hddAuto = tempVal !== "" ? Math.max(0, baseTemp - Number(tempVal)) * Number(daysVal) : null;
+    const hddAuto = tempVal !== "" ? (baseTemp - Number(tempVal)) * Number(daysVal) : null;
 
     return `<tr data-key="${key}">
       <td style="padding:5px 8px;font-size:13px;color:var(--color-text-secondary);">${m.monthName}</td>
@@ -2594,7 +2594,7 @@ function refreshPeriodHDD(prefix) {
       return;
     }
     const days = Number(dInput ? dInput.value : 0);
-    const hdd  = Math.max(0, baseTemp - Number(tInput.value)) * days;
+    const hdd  = (baseTemp - Number(tInput.value)) * days;
     total += hdd;
     if (hddCell) hddCell.textContent = hdd.toFixed(1);
   });
@@ -2643,7 +2643,7 @@ function refreshTymHDD() {
       continue;
     }
     const days = Number(dInput ? dInput.value : 0);
-    const hdd  = Math.max(0, baseTemp - Number(tInput.value)) * days;
+    const hdd  = (baseTemp - Number(tInput.value)) * days;
     total += hdd;
     if (hddCell) hddCell.textContent = hdd.toFixed(1);
   }
@@ -3533,7 +3533,7 @@ function buildRegressionData(protocol) {
     .map(m => {
       const days = Number(m.days);
       const avgTemp = Number(m.temperature);
-      const hdd = Math.max(0, base - avgTemp) * days;
+      const hdd = (base - avgTemp) * days;
       // allocate consumption proportionally by days
       const consumption = (days / totalDays) * totalCons;
       return {
