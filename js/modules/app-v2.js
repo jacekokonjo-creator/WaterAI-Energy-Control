@@ -1350,14 +1350,14 @@ function _analTYMSheet() {
         <div class="anw-f"><label>Udział WaterAI / ESCO [%]</label>
           <input type="number" step="0.1" min="0" max="100" value="${ANAL.energy.escoShare}" oninput="ANAL.energy.escoShare=this.value;_analRecalcLive()"></div>
       </div>
-      <div class="${ANAL.energy.priceMode === 'VARIABLE' ? 'anw-g2' : 'anw-g4'}" style="margin-top:12px;">
+      <div class="anw-g2" style="margin-top:12px;">
         ${ANAL.energy.priceMode === 'VARIABLE'
           ? `<div class="anw-f"><label>Koszt zmienny całościowy [${_escA(ANAL.energy.currency)}]</label>
-              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 1 200,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>
-            <div class="anw-f"><label>Opis kosztu zmiennego (np. uwzględnia koszty przesyłu i pozostałe składowe faktury)</label>
-              <input type="text" value="${_escA(ANAL.energy.priceDescription || '')}" placeholder="WaterAI redukuje zużycie, a tym samym koszty przesyłu i inne składowe…" oninput="ANAL.energy.priceDescription=this.value"></div>`
+              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 1 200,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`
           : `<div class="anw-f"><label>Cena energii (za jednostkę)</label>
               <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 0,54" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`}
+        <div class="anw-f"><label>Opis (np. uwzględnia koszty przesyłu i pozostałe składowe faktury)</label>
+          <input type="text" value="${_escA(ANAL.energy.priceDescription || '')}" placeholder="WaterAI redukuje zużycie, a tym samym koszty przesyłu i inne składowe…" oninput="ANAL.energy.priceDescription=this.value"></div>
       </div>
       ${ANAL.energy.priceMode === 'VARIABLE'
         ? `<div class="anw-note">Koszt zmienny całościowy to <b>łączna kwota</b> oszczędności (energia + przesył i pozostałe składowe redukowane przez WaterAI), wpisywana wprost — nie jest mnożona przez zużycie. Udział WaterAI/ESCO liczony jest od tej kwoty. Opis trafia do analizy i raportu ESCO.</div>`
