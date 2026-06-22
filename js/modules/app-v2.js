@@ -1303,6 +1303,7 @@ function _analWizard() {
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
               <option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
               ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
+              ${(ANAL.type === 'VOLUME' && window.IntensityBaseModule && ANAL.objectId) ? IntensityBaseModule.findByObject(ANAL.objectId).map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ Okres bazowy intensywności · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
               <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>
             </select></div>
         </div>
@@ -3125,4 +3126,39 @@ function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBor
       </p>
     </div>
   </div>`;
+}
+
+// ─── Integracja: okresy bazowe intensywności (IntensityBaseModule) w kreatorze Analiz (VOLUME) ───
+function _analApplyIntensityBase(it) {
+  ANAL.before.from = it.periodFrom || '';
+  ANAL.before.to = it.periodTo || '';
+  ANAL.before.months = (it.months || []).map(m => ({
+    month: Number(m.month),
+    name: m.name || (ANAL_MONTHS[(Number(m.month) || 1) - 1] || ''),
+    days: m.days,
+    tme: (m.intRzecz != null) ? m.intRzecz : ''   // slot „tme" przechowuje intensywność rzeczywistą
+  }));
+  const std = {};
+  for (let mo = 1; mo <= 12; mo++) std[mo] = [0, new Date(2025, mo, 0).getDate()];
+  (it.months || []).forEach(m => {
+    const mo = Number(m.month);
+    if (mo >= 1 && mo <= 12) std[mo] = [(m.intRef != null ? m.intRef : 0), (m.days != null ? m.days : std[mo][1])];
+  });
+  ANAL.std = std;
+  ANAL.before.consumption = (it.consumption != null) ? it.consumption : '';
+  if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
+}
+
+function analOnBasePeriod(v) {
+  ANAL.basePeriod = v || null;
+  if (v && v !== 'manual') {
+    if (typeof v === 'string' && v.indexOf('int:') === 0) {
+      const it = window.IntensityBaseModule ? IntensityBaseModule.find(Number(v.slice(4))) : null;
+      if (it) _analApplyIntensityBase(it);
+    } else {
+      const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
+      if (p) _analApplyBaseProtocol(p);
+    }
+  }
+  renderAnalysesModule();
 }
