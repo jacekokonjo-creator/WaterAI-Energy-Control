@@ -1970,7 +1970,7 @@ function calcHDD(months, tempField, daysField, baseTemp) {
 }
 
 function calcESCOResults(protocol) {
-  const base = Number(protocol.baseTemperature ?? 21);
+  const _b = parseFloat(protocol.baseTemperature); const base = (Number.isFinite(_b) && _b > 0) ? _b : 21;
 
   // TYM — 12 miesięcy stałych (hddTym per okres rozliczeniowy i porównawczy)
   const tymMonthly        = protocol.tymMonthly        || [];
@@ -2583,7 +2583,7 @@ function refreshPeriodTable(prefix) {
   const months    = buildMonthsFromDates(startDate, endDate);
 
   const baseTempEl = document.querySelector("[name='baseTemperature']");
-  const baseTemp   = baseTempEl ? Number(baseTempEl.value || 21) : 21;
+  const _bt = baseTempEl ? parseFloat(baseTempEl.value) : NaN; const baseTemp = (Number.isFinite(_bt) && _bt > 0) ? _bt : 21;
 
   if (months.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--color-text-tertiary);padding:14px;font-size:13px;">Wybierz daty aby zobaczyć miesiące</td></tr>`;
@@ -2633,7 +2633,7 @@ function refreshPeriodHDD(prefix) {
   if (!tbody) return;
 
   const baseTempEl = document.querySelector("[name='baseTemperature']");
-  const baseTemp   = baseTempEl ? Number(baseTempEl.value ?? 21) : 21;
+  const _bt = baseTempEl ? parseFloat(baseTempEl.value) : NaN; const baseTemp = (Number.isFinite(_bt) && _bt > 0) ? _bt : 21;
 
   let total = 0;
   tbody.querySelectorAll("tr[data-key]").forEach(tr => {
@@ -2681,7 +2681,7 @@ function refreshConsumption(prefix) {
 
 function refreshTymHDD() {
   const baseTempEl = document.querySelector("[name='baseTemperature']");
-  const baseTemp   = baseTempEl ? Number(baseTempEl.value ?? 21) : 21;
+  const _bt = baseTempEl ? parseFloat(baseTempEl.value) : NaN; const baseTemp = (Number.isFinite(_bt) && _bt > 0) ? _bt : 21;
   const hddEl      = document.getElementById("tym-hdd-display");
 
   let total = 0;
