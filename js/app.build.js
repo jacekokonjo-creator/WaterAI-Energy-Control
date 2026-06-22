@@ -2822,35 +2822,39 @@ function renderMeasurementsModule() {
     .tym-summary { display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;align-items:center; }
   </style>
 
-  <div class="meas-tabs">
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'tym' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='tym'; showMeasurementForm=false; renderMeasurementsModule();">
-      🌡️ Korekta TYM
-    </button>
-    <button type="button" class="meas-tab meas-tab-reg ${activeMeasurementsTab === 'regression' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='regression'; showMeasurementForm=false; renderMeasurementsModule();">
-      📈 Regresja liniowa
-    </button>
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'occupancy' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='occupancy'; showMeasurementForm=false; renderMeasurementsModule();">
-      🏨 Korekta obłożenia
-    </button>
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'area' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='area'; showMeasurementForm=false; renderMeasurementsModule();">
-      📐 Korekta powierzchni
-    </button>
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'volume' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='volume'; showMeasurementForm=false; renderMeasurementsModule();">
-      ⚙️ Korekta intensywności
-    </button>
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'schedule' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='schedule'; showMeasurementForm=false; renderMeasurementsModule();">
-      📅 Harmonogram
-    </button>
-    <button type="button" class="meas-tab ${activeMeasurementsTab === 'custom' ? 'active' : ''}"
-      onclick="activeMeasurementsTab='custom'; showMeasurementForm=false; renderMeasurementsModule();">
-      🔬 Własna
-    </button>
+  <style>
+    .mtc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:22px;}
+    .mtc{position:relative;border:1.5px solid var(--color-border-tertiary);border-radius:14px;padding:16px 14px;cursor:pointer;background:var(--color-background-primary);transition:.15s;display:flex;flex-direction:column;gap:7px;}
+    .mtc:hover{border-color:#B5D4F4;box-shadow:0 4px 14px rgba(12,68,124,.08);transform:translateY(-1px);}
+    .mtc.sel{border-color:#0C447C;background:#E6F1FB;box-shadow:0 4px 16px rgba(12,68,124,.14);}
+    .mtc .ico{font-size:24px;}
+    .mtc .t{font-size:14px;font-weight:600;color:var(--color-text-primary);}
+    .mtc .d{font-size:12px;color:var(--color-text-secondary);line-height:1.35;}
+    .mtc .badge{position:absolute;top:11px;right:11px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+    .mtc .badge.ready{background:#EAF3DE;color:#27500A;}
+    .mtc .badge.soon{background:#FFF1E0;color:#9A5B00;}
+  </style>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 14px;">Wybierz typ okresu bazowego. Typy i opisy są spójne z modułem Analizy.</p>
+  <div class="mtc-grid">
+    ${(function(){
+      const T=[
+        ['tym','🌡️','Korekta TYM','Sprowadzenie zużycia do standardowego sezonu metodą stopniodni.',true],
+        ['regression','📈','Regresja liniowa','Porównanie techniczne PRZED/PO wg równań y = ax + b.',true],
+        ['occupancy','🏨','Korekta obłożenia','Normalizacja zużycia względem obłożenia obiektu.',false],
+        ['area','📐','Korekta powierzchni','Wskaźniki zużycia na m² powierzchni ogrzewanej.',false],
+        ['volume','⚙️','Korekta intensywności','Normalizacja względem wolumenu / intensywności pracy.',true],
+        ['schedule','🕐','Korekta harmonogramu','Uwzględnienie harmonogramu pracy obiektu.',false],
+        ['custom','🔬','Metoda niestandardowa','Dowolny model definiowany przez analityka.',false]
+      ];
+      return T.map(function(x){
+        const sel = activeMeasurementsTab===x[0] ? 'sel' : '';
+        return '<div class="mtc '+sel+'" onclick="activeMeasurementsTab=\''+x[0]+'\'; showMeasurementForm=false; renderMeasurementsModule();">'
+          +'<span class="badge '+(x[4]?'ready':'soon')+'">'+(x[4]?'GOTOWE':'WKRÓTCE')+'</span>'
+          +'<span class="ico">'+x[1]+'</span>'
+          +'<span class="t">'+x[2]+'</span>'
+          +'<span class="d">'+x[3]+'</span></div>';
+      }).join('');
+    })()}
   </div>
 
   ${activeMeasurementsTab === 'regression' ? '' : activeMeasurementsTab !== 'tym' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="createMeasurement(this); return false;">
@@ -3101,11 +3105,11 @@ function renderMeasurementsModule() {
   `)}
 
   ${activeMeasurementsTab === 'regression' ? renderRegressionTab(protocolsForTabs) : ''}
-  ${activeMeasurementsTab === 'occupancy' ? renderPlaceholderMeasTab('🏨', 'Korekta obłożenia', 'occupancy', 'Zbieranie danych o obłożeniu (osobonoce, % wypełnienia, liczba użytkowników) do korekty zużycia energii.', '#E6F1FB', '#B5D4F4', '#0C447C') : ''}
-  ${activeMeasurementsTab === 'area' ? renderPlaceholderMeasTab('📐', 'Korekta powierzchni', 'area', 'Dane o powierzchni ogrzewanej/chłodzonej w poszczególnych okresach — podstawa korekty przy zmianach układu budynku.', '#E8F5E9', '#A5D6A7', '#2E7D32') : ''}
-  ${activeMeasurementsTab === 'volume' ? renderPlaceholderMeasTab('⚙️', 'Korekta intensywności', 'volume', 'Dane produkcyjne, wolumen usług, godziny pracy — do normalizacji zużycia względem aktywności obiektu.', '#FFF3E0', '#FFCC80', '#E65100') : ''}
-  ${activeMeasurementsTab === 'schedule' ? renderPlaceholderMeasTab('📅', 'Harmonogram', 'schedule', 'Planowane terminy odczytów, analiz i protokołów dla tego obiektu.', '#F3E5F5', '#CE93D8', '#6A1B9A') : ''}
-  ${activeMeasurementsTab === 'custom' ? renderPlaceholderMeasTab('🔬', 'Własna analiza', 'custom', 'Dowolne dane pomiarowe i wskaźniki definiowane przez analityka energetycznego.', '#FCE4EC', '#F48FB1', '#880E4F') : ''}
+  ${activeMeasurementsTab === 'occupancy' ? renderPlaceholderMeasTab('🏨', 'Korekta obłożenia', 'occupancy', 'Normalizacja zużycia względem obłożenia obiektu.', '#E6F1FB', '#B5D4F4', '#0C447C') : ''}
+  ${activeMeasurementsTab === 'area' ? renderPlaceholderMeasTab('📐', 'Korekta powierzchni', 'area', 'Wskaźniki zużycia na m² powierzchni ogrzewanej.', '#E8F5E9', '#A5D6A7', '#2E7D32') : ''}
+  ${activeMeasurementsTab === 'volume' ? renderPlaceholderMeasTab('⚙️', 'Korekta intensywności', 'volume', 'Normalizacja względem wolumenu / intensywności pracy.', '#FFF3E0', '#FFCC80', '#E65100') : ''}
+  ${activeMeasurementsTab === 'schedule' ? renderPlaceholderMeasTab('🕐', 'Korekta harmonogramu', 'schedule', 'Uwzględnienie harmonogramu pracy obiektu.', '#F3E5F5', '#CE93D8', '#6A1B9A') : ''}
+  ${activeMeasurementsTab === 'custom' ? renderPlaceholderMeasTab('🔬', 'Metoda niestandardowa', 'custom', 'Dowolny model definiowany przez analityka.', '#FCE4EC', '#F48FB1', '#880E4F') : ''}
   ${(activeMeasurementsTab === 'tym' && !showMeasurementForm) ? `
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
       <div style="flex:1;min-width:200px;">
