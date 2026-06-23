@@ -3195,6 +3195,7 @@ function renderProtocolsTable(protocols, objectId) {
     const client = ClientsModule.find(item.clientId);
     const object = ObjectsModule.find(item.objectId);
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:9px 12px;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(item.protocolNumber || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;font-weight:500;white-space:nowrap;">${escapeHtml(item.protocolDate || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((client && client.name) || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((object && object.name) || '—')}</td>
@@ -3214,6 +3215,7 @@ function renderProtocolsTable(protocols, objectId) {
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
           <tr style="background:var(--color-background-secondary);">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;">Nr protokołu</th>
             ${thS('date', 'Data protokołu')}
             ${thS('client', 'Klient')}
             ${thS('object', 'Obiekt')}
