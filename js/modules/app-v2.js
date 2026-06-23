@@ -1303,7 +1303,7 @@ function _analWizard() {
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
               <option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
               ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
-              ${(ANAL.type === 'VOLUME' && window.IntensityBaseModule && ANAL.objectId) ? IntensityBaseModule.findByObject(ANAL.objectId).map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ Okres bazowy intensywności · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
+              ${(ANAL.type === 'VOLUME' && window.BasePeriodModule && ANAL.objectId) ? BasePeriodModule.findByObjectType(ANAL.objectId, 'volume').map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ ${_escA(it.protocolNumber || 'Okres bazowy intensywności')} · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
               <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>
             </select></div>
         </div>
@@ -3154,6 +3154,344 @@ function analOnBasePeriod(v) {
   if (v && v !== 'manual') {
     if (typeof v === 'string' && v.indexOf('int:') === 0) {
       const it = window.IntensityBaseModule ? IntensityBaseModule.find(Number(v.slice(4))) : null;
+      if (it) _analApplyIntensityBase(it);
+    } else {
+      const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
+      if (p) _analApplyBaseProtocol(p);
+    }
+  }
+  renderAnalysesModule();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNIWERSALNE OKRESY BAZOWE (wszystkie typy poza TYM/Regresją) — przepływ jak w TYM:
+// wybór klienta i obiektu → przycisk „+ Okres bazowy" → lista (Nr protokołu, data,
+// klient, obiekt, okres bazowy, akcje: podgląd/edycja/usuń) → formularz.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const BasePeriodModule = {
+  storageKey: 'waterai_base_periods_v1',
+  getAll() { try { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch (e) { return []; } },
+  saveAll(x) { localStorage.setItem(this.storageKey, JSON.stringify(x)); },
+  add(it) { const a = this.getAll(); const rec = { ...it, id: Date.now(), createdAt: new Date().toISOString() }; a.push(rec); this.saveAll(a); return rec; },
+  update(id, it) { this.saveAll(this.getAll().map(x => Number(x.id) === Number(id) ? { ...x, ...it, id: x.id, updatedAt: new Date().toISOString() } : x)); },
+  remove(id) { this.saveAll(this.getAll().filter(x => Number(x.id) !== Number(id))); },
+  find(id) { return this.getAll().find(x => Number(x.id) === Number(id)); },
+  findByType(type) { return this.getAll().filter(x => x.type === type).sort((a, b) => (b.protocolDate || '').localeCompare(a.protocolDate || '') || Number(b.id) - Number(a.id)); },
+  findByObjectType(objId, type) { return this.findByType(type).filter(x => Number(x.objectId) === Number(objId)); }
+};
+window.BasePeriodModule = BasePeriodModule;
+
+// Jednorazowa migracja danych ze starego magazynu intensywności do nowego uniwersalnego.
+(function _bpMigrate() {
+  try {
+    if (localStorage.getItem('waterai_base_periods_migrated_v1')) return;
+    const old = JSON.parse(localStorage.getItem('waterai_intensity_base_v1') || '[]');
+    if (old.length) {
+      const cur = BasePeriodModule.getAll();
+      old.forEach((it, i) => {
+        cur.push({ ...it, type: 'volume', protocolNumber: it.protocolNumber || ('OB-INT/' + (new Date().getFullYear()) + '/' + String(i + 1).padStart(3, '0')),
+          protocolDate: it.protocolDate || (it.createdAt ? it.createdAt.slice(0, 10) : ''), id: it.id || (Date.now() + i) });
+      });
+      BasePeriodModule.saveAll(cur);
+    }
+    localStorage.setItem('waterai_base_periods_migrated_v1', '1');
+  } catch (e) { /* ignore */ }
+})();
+
+let _bpDraft = null;
+let _bpShow = false;
+let _bpViewId = null;
+
+const _BP_LABELS = {
+  volume: '⚙️ Korekta intensywności', occupancy: '🏨 Korekta obłożenia', area: '📐 Korekta powierzchni',
+  schedule: '🕐 Korekta harmonogramu', custom: '🔬 Metoda niestandardowa'
+};
+function _bpDriverLabel(type) {
+  return ({ volume: 'intensywność pracy (goście / m³ / produkcja / osoby)', occupancy: 'obłożenie (osobonoce / % / liczba użytkowników)',
+    area: 'powierzchnia [m²]', schedule: 'godziny / dni pracy', custom: 'wskaźnik własny' })[type] || 'wskaźnik';
+}
+
+function _bpNextNumber(type) {
+  const pfx = ({ volume: 'INT', occupancy: 'OBL', area: 'POW', schedule: 'HAR', custom: 'CUS' })[type] || 'OB';
+  const yr = new Date().getFullYear();
+  const n = BasePeriodModule.findByType(type).filter(x => (x.protocolNumber || '').indexOf('/' + yr + '/') >= 0).length + 1;
+  return 'OB-' + pfx + '/' + yr + '/' + String(n).padStart(3, '0');
+}
+
+function bpNew(type) {
+  const objId = (typeof selectedMeasurementObjectId !== 'undefined') ? selectedMeasurementObjectId : null;
+  const obj = objId ? ObjectsModule.find(objId) : (getObjects()[0] || null);
+  const clientId = obj ? Number(obj.clientId) : ((getClients()[0] || {}).id || null);
+  _bpDraft = { id: null, type, protocolNumber: _bpNextNumber(type), protocolDate: new Date().toISOString().slice(0, 10),
+    clientId: clientId, objectId: obj ? Number(obj.id) : null, periodFrom: '', periodTo: '',
+    consumption: '', energyUnit: (obj && obj.energyUnit) || 'GJ', months: [], notes: '' };
+  _bpShow = true; _bpViewId = null;
+  renderMeasurementsModule();
+}
+function bpEdit(id) {
+  const it = BasePeriodModule.find(id); if (!it) return;
+  _bpDraft = JSON.parse(JSON.stringify(it));
+  if (!Array.isArray(_bpDraft.months)) _bpDraft.months = [];
+  _bpShow = true; _bpViewId = null; renderMeasurementsModule();
+}
+function bpView(id) { _bpViewId = id; _bpShow = false; renderMeasurementsModule(); }
+function bpBack() { _bpViewId = null; _bpShow = false; _bpDraft = null; renderMeasurementsModule(); }
+function bpDelete(id) { BasePeriodModule.remove(id); if (_bpViewId === id) _bpViewId = null; renderMeasurementsModule(); }
+
+function bpSetClient(v) {
+  if (!_bpDraft) return;
+  _bpDraft.clientId = v ? Number(v) : null;
+  const objs = _bpDraft.clientId ? ObjectsModule.findByClient(_bpDraft.clientId) : [];
+  _bpDraft.objectId = objs[0] ? Number(objs[0].id) : null;
+  if (objs[0] && objs[0].energyUnit) _bpDraft.energyUnit = objs[0].energyUnit;
+  renderMeasurementsModule();
+}
+function bpSetObject(v) { if (_bpDraft) { _bpDraft.objectId = v ? Number(v) : null; renderMeasurementsModule(); } }
+
+function bpSetDate(which, val) {
+  if (!_bpDraft) return;
+  _bpDraft[which] = val;
+  if (_bpDraft.type === 'volume') {
+    const ms = (typeof _analMonthsBetween === 'function') ? _analMonthsBetween(_bpDraft.periodFrom, _bpDraft.periodTo) : [];
+    const old = _bpDraft.months || [];
+    _bpDraft.months = ms.map((m, i) => ({ month: m.month, name: m.name, days: m.days,
+      intRzecz: old[i] ? old[i].intRzecz : '', intRef: old[i] ? old[i].intRef : '' }));
+  }
+  renderMeasurementsModule();
+}
+
+function bpSave() {
+  const d = _bpDraft; if (!d) return;
+  if (!d.clientId || !d.objectId) { alert('Wybierz klienta i obiekt.'); return; }
+  if (!d.periodFrom || !d.periodTo) { alert('Ustaw okres bazowy (data od / do).'); return; }
+  if (d.id) BasePeriodModule.update(d.id, d); else BasePeriodModule.add(d);
+  _bpShow = false; _bpDraft = null;
+  renderMeasurementsModule();
+}
+
+function _bpPhi(it) {
+  let r = 0, s = 0; (it.months || []).forEach(m => { const dd = Number(m.days || 0); r += Math.max(0, Number(m.intRzecz || 0)) * dd; s += Math.max(0, Number(m.intRef || 0)) * dd; });
+  return r > 0 ? s / r : null;
+}
+
+function _bpRecalc() {
+  const d = _bpDraft; if (!d) return;
+  let sumR = 0, sumRef = 0, days = 0;
+  (d.months || []).forEach((m, idx) => {
+    const dd = Number(m.days || 0);
+    const wr = Math.max(0, Number(m.intRzecz || 0)) * dd, wref = Math.max(0, Number(m.intRef || 0)) * dd;
+    sumR += wr; sumRef += wref; days += dd;
+    const er = document.getElementById('bp-wr-' + idx); if (er) er.textContent = _fmtA(wr, 1);
+    const es = document.getElementById('bp-wref-' + idx); if (es) es.textContent = _fmtA(wref, 1);
+  });
+  const phi = sumR > 0 ? sumRef / sumR : null, q = Number(d.consumption || 0), qs = phi != null ? q * phi : null;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('bp-days', days || '—'); set('bp-sumr', _fmtA(sumR, 1)); set('bp-sumref', _fmtA(sumRef, 1));
+  set('bp-phi', phi != null ? _fmtA(phi, 4) : '—'); set('bp-qs', qs != null ? _fmtA(qs, 2) : '—');
+}
+
+function _bpHeaderBox(meta, inner) {
+  return `<div style="border:1px solid ${meta.bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="background:${meta.bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">${meta.icon}</span>
+      <div><h3 style="margin:0;font-size:15px;font-weight:600;color:${meta.textColor};">${meta.title}</h3>
+      <p style="margin:4px 0 0;font-size:12px;color:${meta.textColor};opacity:0.75;">${meta.description}</p></div>
+    </div>${inner}</div>`;
+}
+
+function _bpVolumeTable(d) {
+  const rows = (d.months || []).length ? d.months.map((m, idx) => {
+    const dd = Number(m.days || 0);
+    const wr = Math.max(0, Number(m.intRzecz || 0)) * dd, wref = Math.max(0, Number(m.intRef || 0)) * dd;
+    const inS = 'width:100%;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;';
+    return `<tr>
+      <td style="padding:4px 8px;font-size:13px;white-space:nowrap;">${escapeHtml(m.name)}</td>
+      <td style="padding:4px;"><input type="number" step="0.01" value="${m.intRzecz}" oninput="_bpDraft.months[${idx}].intRzecz=this.value;_bpRecalc()" style="${inS}"></td>
+      <td style="padding:4px;"><input type="number" min="0" max="31" value="${m.days}" oninput="_bpDraft.months[${idx}].days=this.value;_bpRecalc()" style="width:64px;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;"></td>
+      <td style="padding:4px 8px;text-align:right;font-size:13px;color:var(--color-text-secondary);" id="bp-wr-${idx}">${_fmtA(wr, 1)}</td>
+      <td style="padding:4px;border-left:2px solid #FFE0B2;"><input type="number" step="0.01" value="${m.intRef}" oninput="_bpDraft.months[${idx}].intRef=this.value;_bpRecalc()" style="${inS}"></td>
+      <td style="padding:4px 8px;text-align:right;font-size:13px;color:var(--color-text-secondary);" id="bp-wref-${idx}">${_fmtA(wref, 1)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Ustaw daty okresu, aby wygenerować miesiące.</td></tr>`;
+  return `
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+      <thead>
+        <tr style="background:var(--color-background-secondary);">
+          <th rowspan="2" style="padding:6px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">Miesiąc</th>
+          <th colspan="3" style="padding:6px 8px;text-align:center;font-size:11px;color:#0C447C;">Okres bazowy — rzeczywisty</th>
+          <th colspan="2" style="padding:6px 8px;text-align:center;font-size:11px;color:#E65100;border-left:2px solid #FFE0B2;">Poziom referencyjny</th>
+        </tr>
+        <tr style="background:var(--color-background-secondary);">
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">intensywność I</th>
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);">dni z₀</th>
+          <th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--color-text-secondary);">Wsk_rzecz</th>
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--color-text-secondary);border-left:2px solid #FFE0B2;">intensywność I_ref</th>
+          <th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--color-text-secondary);">Wsk_ref</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:1px solid var(--color-border-tertiary);font-weight:600;font-size:13px;">
+        <td style="padding:6px 8px;">Suma</td><td></td><td style="padding:6px 8px;" id="bp-days">—</td>
+        <td style="padding:6px 8px;text-align:right;" id="bp-sumr">—</td>
+        <td style="padding:6px 8px;border-left:2px solid #FFE0B2;"></td><td style="padding:6px 8px;text-align:right;" id="bp-sumref">—</td>
+      </tr></tfoot>
+    </table>
+    <div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:#FFF3E0;border:1px solid #FFCC80;font-size:13px;color:#7A3E00;">
+      φ = ΣWsk_ref / ΣWsk_rzecz = <b id="bp-phi">—</b> · Qs = Qc.o.·φ = <b id="bp-qs">—</b> ${escapeHtml(d.energyUnit || 'GJ')}
+    </div>`;
+}
+
+function _bpFormHtml() {
+  const d = _bpDraft;
+  const clients = getClients();
+  const objs = d.clientId ? ObjectsModule.findByClient(d.clientId) : getObjects();
+  const lbl = 'display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;';
+  const inp = 'width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;';
+  const isVol = d.type === 'volume';
+  return `<div style="padding:16px;background:var(--color-background-primary);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <strong style="font-size:14px;color:var(--color-text-primary);">${d.id ? 'Edycja okresu bazowego' : 'Nowy okres bazowy'} — ${_BP_LABELS[d.type] || ''}</strong>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="flex:1;min-width:170px;"><label style="${lbl}">Klient</label>
+        <select onchange="bpSetClient(this.value)" style="${inp}">
+          ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === Number(d.clientId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+        </select></div>
+      <div style="flex:1;min-width:170px;"><label style="${lbl}">Obiekt</label>
+        <select onchange="bpSetObject(this.value)" style="${inp}">
+          ${objs.map(o => `<option value="${o.id}" ${Number(o.id) === Number(d.objectId) ? 'selected' : ''}>${escapeHtml(o.name || 'Obiekt')}</option>`).join('')}
+        </select></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Numer protokołu</label>
+        <input type="text" value="${escapeHtml(d.protocolNumber || '')}" oninput="_bpDraft.protocolNumber=this.value" style="${inp}"></div>
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Data protokołu</label>
+        <input type="date" value="${d.protocolDate || ''}" oninput="_bpDraft.protocolDate=this.value" style="${inp}"></div>
+      <div style="flex:1;min-width:120px;"><label style="${lbl}">Jednostka energii</label>
+        <select onchange="_bpDraft.energyUnit=this.value;_bpRecalc()" style="${inp}">
+          ${['GJ', 'MWh', 'kWh', 'm³'].map(u => `<option ${u === (d.energyUnit || 'GJ') ? 'selected' : ''}>${u}</option>`).join('')}
+        </select></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Okres bazowy — data od</label>
+        <input type="date" value="${d.periodFrom || ''}" onchange="bpSetDate('periodFrom',this.value)" style="${inp}"></div>
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Okres bazowy — data do</label>
+        <input type="date" value="${d.periodTo || ''}" onchange="bpSetDate('periodTo',this.value)" style="${inp}"></div>
+      <div style="flex:1;min-width:150px;"><label style="${lbl}">Zużycie Qc.o. [${escapeHtml(d.energyUnit || 'GJ')}]</label>
+        <input type="number" step="0.001" value="${d.consumption || ''}" placeholder="z faktur / ciepłomierza" oninput="_bpDraft.consumption=this.value;_bpRecalc()" style="${inp}"></div>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;">Driver dla tego typu: <b>${_bpDriverLabel(d.type)}</b>.${isVol ? ' Jeśli wartość jest już sumą miesięczną, wpisz dni z₀ = 1 → wtedy Wsk = I.' : ''}</div>
+    ${isVol ? _bpVolumeTable(d) : `<div style="margin-bottom:6px;"><label style="${lbl}">Notatki / dane źródłowe</label>
+        <textarea oninput="_bpDraft.notes=this.value" rows="4" placeholder="Opis okresu bazowego, źródło danych, założenia…" style="${inp};resize:vertical;">${escapeHtml(d.notes || '')}</textarea></div>`}
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+      <button class="small-button" onclick="bpBack()">Anuluj</button>
+      <button class="primary-button" onclick="bpSave()">💾 Zapisz okres bazowy</button>
+    </div>
+  </div>`;
+}
+
+function _bpViewHtml(it) {
+  const c = ClientsModule.find(it.clientId), o = ObjectsModule.find(it.objectId);
+  const row = (k, v) => `<tr><td style="padding:6px 10px;color:var(--color-text-secondary);font-size:12px;width:160px;">${k}</td><td style="padding:6px 10px;font-size:13px;font-weight:500;">${v}</td></tr>`;
+  const phi = it.type === 'volume' ? _bpPhi(it) : null;
+  const qs = phi != null ? Number(it.consumption || 0) * phi : null;
+  return `<div style="padding:16px;background:var(--color-background-primary);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <strong style="font-size:14px;">Podgląd okresu bazowego — ${_BP_LABELS[it.type] || ''}</strong>
+      <div><button class="small-button" onclick="bpEdit(${it.id})">✏️ Edytuj</button> <button class="small-button" onclick="bpBack()">← Lista</button></div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;border:1px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;">
+      ${row('Numer protokołu', escapeHtml(it.protocolNumber || '—'))}
+      ${row('Data protokołu', escapeHtml(it.protocolDate || '—'))}
+      ${row('Klient', escapeHtml((c && c.name) || '—'))}
+      ${row('Obiekt', escapeHtml((o && o.name) || '—'))}
+      ${row('Okres bazowy', escapeHtml(it.periodFrom || '') + ' → ' + escapeHtml(it.periodTo || ''))}
+      ${row('Zużycie Qc.o.', _fmtA(Number(it.consumption || 0), 3) + ' ' + escapeHtml(it.energyUnit || 'GJ'))}
+      ${phi != null ? row('Współczynnik φ', _fmtA(phi, 4)) : ''}
+      ${qs != null ? row('Qs (skorygowane)', _fmtA(qs, 2) + ' ' + escapeHtml(it.energyUnit || 'GJ')) : ''}
+      ${it.notes ? row('Notatki', escapeHtml(it.notes)) : ''}
+    </table>
+  </div>`;
+}
+
+function renderBasePeriodTab(type, meta) {
+  if (_bpViewId) { const it = BasePeriodModule.find(_bpViewId); if (it && it.type === type) return _bpHeaderBox(meta, _bpViewHtml(it)); }
+  if (_bpShow && _bpDraft && _bpDraft.type === type) return _bpHeaderBox(meta, _bpFormHtml());
+
+  const list = BasePeriodModule.findByType(type);
+  const th = 'padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;';
+  const rows = list.length ? list.map(it => {
+    const c = ClientsModule.find(it.clientId), o = ObjectsModule.find(it.objectId);
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:9px 12px;font-size:13px;font-weight:600;white-space:nowrap;">${escapeHtml(it.protocolNumber || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(it.protocolDate || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;">${escapeHtml((c && c.name) || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;">${escapeHtml((o && o.name) || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(it.periodFrom || '')} → ${escapeHtml(it.periodTo || '')}</td>
+      <td style="padding:9px 12px;white-space:nowrap;"><div style="display:flex;gap:4px;">
+        <button class="small-button" onclick="bpView(${it.id})" title="Podgląd">👁</button>
+        <button class="small-button" onclick="bpEdit(${it.id})" title="Edytuj">✏️</button>
+        <button class="small-button" onclick="if(confirm('Usunąć ten okres bazowy?'))bpDelete(${it.id})" style="color:#c00;border-color:#c00;" title="Usuń">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak okresów bazowych. Kliknij „+ Okres bazowy".</td></tr>`;
+
+  const body = `<div style="padding:16px;background:var(--color-background-primary);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
+      <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">Okresy bazowe <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${list.length})</span></h3>
+      <button class="primary-button" onclick="bpNew('${type}')" style="font-size:13px;padding:7px 16px;white-space:nowrap;">+ Okres bazowy</button>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--color-background-secondary);">
+          <th style="${th}">Nr protokołu</th><th style="${th}">Data protokołu</th><th style="${th}">Klient</th>
+          <th style="${th}">Obiekt</th><th style="${th}">Okres bazowy</th><th style="${th}">Akcje</th>
+        </tr></thead><tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+  return _bpHeaderBox(meta, body);
+}
+
+// Routing: wszystkie typy poza TYM/Regresją dostają uniwersalny przepływ okresów bazowych.
+function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
+  const meta = { icon, title, description, bgLight, bgBorder, textColor };
+  if (['volume', 'occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
+  return `
+  <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
+    <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:22px;">${icon}</span>
+      <div><h3 style="margin:0;font-size:15px;font-weight:600;color:${textColor};">${title}</h3>
+      <p style="margin:4px 0 0;font-size:12px;color:${textColor};opacity:0.75;">${description}</p></div>
+    </div>
+    <div style="padding:32px 20px;background:var(--color-background-primary);text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🚧</div>
+      <p style="font-size:14px;font-weight:500;color:var(--color-text-primary);margin:0 0 8px;">Moduł w przygotowaniu</p>
+    </div>
+  </div>`;
+}
+
+// Analizy (VOLUME): wczytanie okresu bazowego intensywności z BasePeriodModule.
+function _analApplyIntensityBase(it) {
+  ANAL.before.from = it.periodFrom || '';
+  ANAL.before.to = it.periodTo || '';
+  ANAL.before.months = (it.months || []).map(m => ({ month: Number(m.month),
+    name: m.name || (ANAL_MONTHS[(Number(m.month) || 1) - 1] || ''), days: m.days,
+    tme: (m.intRzecz != null) ? m.intRzecz : '' }));
+  const std = {};
+  for (let mo = 1; mo <= 12; mo++) std[mo] = [0, new Date(2025, mo, 0).getDate()];
+  (it.months || []).forEach(m => { const mo = Number(m.month); if (mo >= 1 && mo <= 12) std[mo] = [(m.intRef != null ? m.intRef : 0), (m.days != null ? m.days : std[mo][1])]; });
+  ANAL.std = std;
+  ANAL.before.consumption = (it.consumption != null) ? it.consumption : '';
+  if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
+}
+
+function analOnBasePeriod(v) {
+  ANAL.basePeriod = v || null;
+  if (v && v !== 'manual') {
+    if (typeof v === 'string' && v.indexOf('int:') === 0) {
+      const it = window.BasePeriodModule ? BasePeriodModule.find(Number(v.slice(4))) : null;
       if (it) _analApplyIntensityBase(it);
     } else {
       const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
