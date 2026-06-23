@@ -3500,3 +3500,36 @@ function analOnBasePeriod(v) {
   }
   renderAnalysesModule();
 }
+
+// ─── Regresja liniowa: przycisk „+ Dodaj okres bazowy" odsłaniający formularz danych czasowych ───
+function _regTabHeader() {
+  const show = !!window._regShowForm;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;gap:10px;flex-wrap:wrap;">
+    <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📈 Okres bazowy — regresja liniowa</h3>
+    <button class="primary-button" onclick="window._regShowForm=${show ? 'false' : 'true'};renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;white-space:nowrap;">${show ? '✕ Zamknij' : '+ Dodaj okres bazowy'}</button>
+  </div>`;
+}
+
+function _regCsvHelp() {
+  const r = (h, m, e) => `<tr style="border-bottom:0.5px solid #D7E6F5;">
+    <td style="padding:5px 8px;"><code style="background:#fff;border:1px solid #B5D4F4;border-radius:4px;padding:1px 5px;font-size:11px;">${h}</code></td>
+    <td style="padding:5px 8px;">${m}</td><td style="padding:5px 8px;color:var(--color-text-secondary);">${e}</td></tr>`;
+  return `<div style="border:1px solid #B5D4F4;border-radius:10px;background:#F7FAFE;padding:14px 16px;margin-bottom:14px;font-size:12px;color:#33475B;line-height:1.55;">
+    <div style="font-weight:600;color:#0C447C;margin-bottom:6px;">📄 Jak przygotować plik CSV / Excel</div>
+    Pierwszy wiersz to nagłówki kolumn. Wielkość liter, spacje, podkreślenia i myślniki w nagłówkach nie mają znaczenia — np. <code>tOutdoor</code>, <code>t_outdoor</code> i <code>T Outdoor</code> są równoważne. Rozpoznawane kolumny:
+    <table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:12px;">
+      <thead><tr style="background:#E6F1FB;">
+        <th style="text-align:left;padding:5px 8px;">Nagłówek w pliku</th><th style="text-align:left;padding:5px 8px;">Znaczenie</th><th style="text-align:left;padding:5px 8px;">Przykład</th></tr></thead>
+      <tbody>
+        ${r('readTime', 'Data i czas odczytu', '2026-01-15 08:00')}
+        ${r('tOutdoor', 'Temperatura zewnętrzna [°C]', '0,4')}
+        ${r('tSupply', 'Temperatura zasilania [°C]', '54,2')}
+        ${r('tReturn', 'Temperatura powrotu [°C]', '43,7')}
+        ${r('vFlow', 'Przepływ [m³/h]', '3827')}
+        ${r('heatPower', 'Moc cieplna [W]', '46012')}
+        ${r('heatConsumption', 'Zużycie ciepła [kWh]', '2826')}
+      </tbody>
+    </table>
+    <b>Separator:</b> przecinek, średnik lub tabulator. &nbsp;<b>Liczby dziesiętne:</b> kropka lub przecinek (<code>0,4</code> = <code>0.4</code>). &nbsp;<b>Kolejność kolumn:</b> dowolna; brakujące pola zostaw puste. &nbsp;<b>Excel:</b> zapisz arkusz jako <b>CSV UTF-8</b> (Plik → Zapisz jako → CSV UTF-8), nagłówki jak wyżej; bezpośredni import <code>.xlsx</code> nie jest jeszcze wspierany.
+  </div>`;
+}
