@@ -3467,12 +3467,14 @@ function renderRegressionTab(protocols) {
   const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
 
   if (regressionProtocols.length === 0) {
-    return `<div class="reminder-card"><strong>Brak protokołów z regresją</strong>
-      <div class="reminder-meta">Zaznacz "Dołącz analizę regresji liniowej" w protokole TYM aby aktywować ten moduł.</div>
-    </div>` + renderRegressionSensorData(selectedMeasurementObjectId);
+    return _regTabHeader() + (window._regShowForm
+      ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId))
+      : `<div class="reminder-card"><strong>Brak okresów bazowych regresji</strong>
+      <div class="reminder-meta">Kliknij „+ Dodaj okres bazowy", aby wprowadzić dane czasowe z czujników (ręcznie lub import CSV/Excel).</div>
+    </div>`);
   }
 
-  return regressionProtocols.map(p => {
+  const _regResultsHtml = regressionProtocols.map(p => {
     const unit = p.energyUnit || "GJ";
     const rows = buildRegressionData(p);
     if (rows.length < 2) {
@@ -3595,7 +3597,8 @@ function renderRegressionTab(protocols) {
       </div>
     </div>
     <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
-  }).join("") + renderRegressionSensorData(selectedMeasurementObjectId);
+  }).join("");
+  return _regTabHeader() + (window._regShowForm ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId)) : '') + _regResultsHtml;
 }
 
 function buildRegressionData(protocol) {
