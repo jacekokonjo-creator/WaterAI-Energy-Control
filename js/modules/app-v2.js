@@ -3419,7 +3419,7 @@ function renderBasePeriodTab(type, meta) {
   if (_bpViewId) { const it = BasePeriodModule.find(_bpViewId); if (it && it.type === type) return _bpHeaderBox(meta, _bpViewHtml(it)); }
   if (_bpShow && _bpDraft && _bpDraft.type === type) return _bpHeaderBox(meta, _bpFormHtml());
 
-  const list = BasePeriodModule.findByType(type);
+  const list = BasePeriodModule.findByObjectType(selectedMeasurementObjectId, type);
   const th = 'padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;';
   const rows = list.length ? list.map(it => {
     const c = ClientsModule.find(it.clientId), o = ObjectsModule.find(it.objectId);
@@ -3435,12 +3435,13 @@ function renderBasePeriodTab(type, meta) {
         <button class="small-button" onclick="if(confirm('Usunąć ten okres bazowy?'))bpDelete(${it.id})" style="color:#c00;border-color:#c00;" title="Usuń">🗑</button>
       </div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak okresów bazowych. Kliknij „+ Okres bazowy".</td></tr>`;
+  }).join('') : `<tr><td colspan="6" style="padding:18px;text-align:center;color:var(--color-text-secondary);font-size:13px;">Brak okresów bazowych dla tego obiektu. Kliknij „+ Dodaj okres bazowy".</td></tr>`;
 
   const body = `<div style="padding:16px;background:var(--color-background-primary);">
+    ${_bpSelectors()}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;color:var(--color-text-primary);">Okresy bazowe <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${list.length})</span></h3>
-      <button class="primary-button" onclick="bpNew('${type}')" style="font-size:13px;padding:7px 16px;white-space:nowrap;">+ Okres bazowy</button>
+      <button class="primary-button" onclick="bpNew('${type}')" style="font-size:13px;padding:7px 16px;white-space:nowrap;">+ Dodaj okres bazowy</button>
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -3504,7 +3505,7 @@ function analOnBasePeriod(v) {
 // ─── Regresja liniowa: przycisk „+ Dodaj okres bazowy" odsłaniający formularz danych czasowych ───
 function _regTabHeader() {
   const show = !!window._regShowForm;
-  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;gap:10px;flex-wrap:wrap;">
+  return _bpSelectors() + `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 16px;gap:10px;flex-wrap:wrap;">
     <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📈 Okres bazowy — regresja liniowa</h3>
     <button class="primary-button" onclick="window._regShowForm=${show ? 'false' : 'true'};renderMeasurementsModule();" style="font-size:13px;padding:7px 16px;white-space:nowrap;">${show ? '✕ Zamknij' : '+ Dodaj okres bazowy'}</button>
   </div>`;
@@ -3532,4 +3533,34 @@ function _regCsvHelp() {
     </table>
     <b>Separator:</b> przecinek, średnik lub tabulator. &nbsp;<b>Liczby dziesiętne:</b> kropka lub przecinek (<code>0,4</code> = <code>0.4</code>). &nbsp;<b>Kolejność kolumn:</b> dowolna; brakujące pola zostaw puste. &nbsp;<b>Excel:</b> zapisz arkusz jako <b>CSV UTF-8</b> (Plik → Zapisz jako → CSV UTF-8), nagłówki jak wyżej; bezpośredni import <code>.xlsx</code> nie jest jeszcze wspierany.
   </div>`;
+}
+
+// ─── Wspólny selektor klienta i obiektu na górze każdej zakładki okresu bazowego ───
+function _bpSelectors() {
+  const objs = (typeof getObjects === 'function') ? getObjects() : [];
+  if (!objs.length) return '';
+  let sel = selectedMeasurementObjectId ? ObjectsModule.find(selectedMeasurementObjectId) : objs[0];
+  if (!sel) sel = objs[0];
+  if (sel) selectedMeasurementObjectId = Number(sel.id);
+  const clientId = sel ? Number(sel.clientId) : null;
+  const clients = (typeof getClients === 'function') ? getClients() : [];
+  const objsForClient = clientId ? ObjectsModule.findByClient(clientId) : objs;
+  const lbl = 'display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;';
+  const inp = 'width:100%;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;';
+  return `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:14px 16px;background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;">
+    <div style="flex:1;min-width:200px;"><label style="${lbl}">Klient</label>
+      <select onchange="_bpSelectClient(this.value)" style="${inp}">
+        ${clients.map(c => `<option value="${c.id}" ${Number(c.id) === clientId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+      </select></div>
+    <div style="flex:1;min-width:200px;"><label style="${lbl}">Obiekt</label>
+      <select onchange="selectedMeasurementObjectId=Number(this.value);renderMeasurementsModule();" style="${inp}">
+        ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(selectedMeasurementObjectId) ? 'selected' : ''}>${escapeHtml(o.name || 'Obiekt')}</option>`).join('')}
+      </select></div>
+  </div>`;
+}
+
+function _bpSelectClient(v) {
+  const objs = ObjectsModule.findByClient(Number(v));
+  selectedMeasurementObjectId = objs[0] ? Number(objs[0].id) : selectedMeasurementObjectId;
+  renderMeasurementsModule();
 }
