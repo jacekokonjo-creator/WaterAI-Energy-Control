@@ -1339,7 +1339,7 @@ function _analWizard() {
     <div class="anw-act" style="justify-content:space-between;align-items:center;">
       <span class="anw-muted">${ANAL.type === 'VOLUME'
         ? 'Wsk = I·z₀ · φ = ΣWsk_ref / ΣWsk_rzecz · Qs = Q·φ (zużycie sprowadzone do referencyjnej intensywności)'
-        : ('Tᵢ = ' + _analBaseTi() + ' °C · SD' + _analBaseTi() + ' = z₀·(Tᵢ−tₘₑ) · φ = ΣSD_stand / ΣSD_rzecz · Qs = Q·φ')}</span>
+        : ''}</span>
       <button class="anw-run" onclick="analRun()">⚡ Wykonaj analizę</button>
     </div>
     <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>` : '';
