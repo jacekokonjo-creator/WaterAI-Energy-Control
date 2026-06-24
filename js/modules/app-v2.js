@@ -1102,6 +1102,7 @@ const ANAL_STYLE = `<style>
   .anw-step-num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#0C447C;color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
   .anw-formula{font-family:'Cambria Math','Times New Roman',Georgia,serif;background:#F4F7FB;border-left:3px solid #0C447C;padding:9px 13px;border-radius:6px;font-size:14.5px;margin:8px 0;overflow-x:auto;color:var(--color-text-primary);}
   .anw-desc{font-size:12.5px;color:var(--color-text-secondary);line-height:1.55;}
+  .anw-desc li{margin:3px 0;}
   .anw-chart-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px;}
   .anw-chart-wrap canvas{width:100%;height:260px;border:1px solid var(--color-border-tertiary);border-radius:8px;background:#fff;}
   .anw-sign{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin:30px 4px 8px;}
@@ -1923,8 +1924,24 @@ function _analReportBody(data) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">1</span> Stopniodni grzewcze (SD) — rzeczywiste i standardowe (TYM)</h4>
-    <div class="anw-desc">Dla każdego miesiąca stopniodni to iloczyn liczby dni okresu w danym miesiącu (z₀) oraz różnicy między projektową temperaturą wewnętrzną Tᵢ a średnią temperaturą zewnętrzną. Strona standardowa stosuje temperatury Typowego Roku Meteorologicznego (TYM) przy tej samej liczbie dni okresu — to klucz porównywalności.</div>
-    <div class="anw-formula">SD<sub>Tᵢ</sub> = z₀ · (Tᵢ − t)&nbsp;&nbsp;[°C·dni];&nbsp;&nbsp; Tᵢ(PRZED) = ${tiB} °C,&nbsp; Tᵢ(PO) = ${tiA} °C</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;">Stopniodni grzewcze (SD) są miarą warunków pogodowych wpływających na zapotrzebowanie obiektu na ciepło do ogrzewania. W analizie wykorzystuje się je do przeliczenia zużycia energii cieplnej do porównywalnych warunków temperaturowych.</p>
+      <p style="margin:0;">Dla każdego miesiąca stopniodni oblicza się jako iloczyn liczby dni ogrzewania w danym miesiącu oraz różnicy pomiędzy przyjętą temperaturą wewnętrzną w obiekcie a średnią temperaturą zewnętrzną:</p>
+    </div>
+    <div class="anw-formula">SD = z · (Tᵢ − t)&nbsp;&nbsp;[°C·dni]</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 4px;">gdzie:</p>
+      <ul style="margin:0 0 8px 18px;padding:0;">
+        <li><b>SD</b> — liczba stopniodni grzewczych [°C·dni],</li>
+        <li><b>z</b> — liczba dni ogrzewania w danym miesiącu,</li>
+        <li><b>Tᵢ</b> — temperatura wewnętrzna przyjęta do obliczeń [°C] &nbsp;(PRZED: <b>${tiB} °C</b>, PO: <b>${tiA} °C</b>),</li>
+        <li><b>t</b> — średnia temperatura zewnętrzna w danym miesiącu [°C].</li>
+      </ul>
+      <p style="margin:0 0 6px;">W analizie wyznacza się dwa rodzaje stopniodni:</p>
+      <p style="margin:0 0 6px;"><b>a) Stopniodni rzeczywiste</b> — obliczane na podstawie rzeczywistych średnich temperatur zewnętrznych występujących w analizowanym okresie.</p>
+      <p style="margin:0 0 6px;"><b>b) Stopniodni standardowe</b> — obliczane na podstawie średnich temperatur zewnętrznych pochodzących z Typowego Roku Meteorologicznego (TYM) dla lokalizacji obiektu. Wartość ta odzwierciedla standardowe warunki pogodowe, do których przelicza się zużycie ciepła w celu zapewnienia porównywalności wyników.</p>
+      <p style="margin:0;">W zależności od przyjętych założeń temperatura wewnętrzna Tᵢ może być taka sama lub różna dla okresu PRZED i PO wdrożeniu, jeżeli zmianie uległy warunki eksploatacji lub standard utrzymywanego komfortu cieplnego w obiekcie.</p>
+    </div>
     <div class="anw-g2" style="margin-top:10px;">
       <div><div class="anw-muted" style="margin-bottom:4px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTable(data.before, tiB)}</div>
       <div><div class="anw-muted" style="margin-bottom:4px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTable(data.after, tiA)}</div>
@@ -1933,8 +1950,20 @@ function _analReportBody(data) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">2</span> Współczynnik korekcyjny φ</h4>
-    <div class="anw-desc">φ normalizuje zużycie do warunków typowego roku. Jest ilorazem sumy stopniodni standardowych i rzeczywistych, liczonych na tych samych dniach okresu (φ&gt;1 → okres cieplejszy od normy).</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;">Współczynnik korekcyjny φ służy do przeliczenia zużycia energii cieplnej z warunków rzeczywistych na warunki standardowe, odpowiadające Typowemu Rokowi Meteorologicznemu (TYM). Uwzględnia różnice pomiędzy rzeczywistymi warunkami pogodowymi w analizowanym okresie a warunkami standardowymi.</p>
+      <p style="margin:0;">Wyznacza się go jako iloraz sumy stopniodni standardowych oraz sumy stopniodni rzeczywistych dla analizowanego okresu:</p>
+    </div>
     <div class="anw-formula">φ = ∑SD<sub>std</sub> / ∑SD<sub>rzecz</sub></div>
+    <div class="anw-desc">
+      <p style="margin:0 0 4px;">gdzie <b>ΣSD<sub>std</sub></b> — suma stopniodni z temperatur Typowego Roku Meteorologicznego (TYM), <b>ΣSD<sub>rzecz</sub></b> — suma stopniodni z rzeczywistych temperatur zewnętrznych. Interpretacja:</p>
+      <ul style="margin:0 0 8px 18px;padding:0;">
+        <li><b>φ &gt; 1</b> — analizowany okres był cieplejszy od warunków standardowych, a zużycie należy skorygować w górę,</li>
+        <li><b>φ &lt; 1</b> — analizowany okres był chłodniejszy od warunków standardowych, a zużycie należy skorygować w dół,</li>
+        <li><b>φ = 1</b> — warunki rzeczywiste odpowiadały warunkom standardowym.</li>
+      </ul>
+      <p style="margin:0;">Dla analizowanego obiektu wyznaczono następujące wartości współczynnika korekcyjnego:</p>
+    </div>
     <div class="anw-g2">
       <div class="anw-formula" style="border-color:#0C447C;">φ<sub>PRZED</sub> = ${_fmtA(data.before.sumS, 1)} / ${_fmtA(data.before.sumR, 1)} = <b>${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'}</b></div>
       <div class="anw-formula" style="border-color:#27500A;">φ<sub>PO</sub> = ${_fmtA(data.after.sumS, 1)} / ${_fmtA(data.after.sumR, 1)} = <b>${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'}</b></div>
@@ -1944,8 +1973,20 @@ function _analReportBody(data) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">3</span> Zużycie skorygowane Qs</h4>
-    <div class="anw-desc">Zmierzone zużycie ciepła Qc.o. mnożymy przez φ, otrzymując zużycie, jakie wystąpiłoby w warunkach typowego roku meteorologicznego — dzięki temu oba okresy są w pełni porównywalne, niezależnie od pogody.</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;">W celu zapewnienia porównywalności wyników zużycie ciepła w analizowanych okresach przelicza się do warunków standardowych, odpowiadających Typowemu Rokowi Meteorologicznemu (TYM). Korekta polega na przemnożeniu rzeczywistego zużycia ciepła na potrzeby centralnego ogrzewania przez współczynnik korekcyjny φ.</p>
+      <p style="margin:0;">W wyniku otrzymuje się zużycie skorygowane Qs — zużycie ciepła odpowiadające standardowym warunkom pogodowym. Pozwala to na bezpośrednie porównanie okresu PRZED i PO wdrożeniu, niezależnie od różnic temperatur zewnętrznych występujących w analizowanych sezonach.</p>
+    </div>
     <div class="anw-formula">Qs = Qc.o. · φ</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 4px;">gdzie:</p>
+      <ul style="margin:0 0 8px 18px;padding:0;">
+        <li><b>Qs</b> — zużycie ciepła skorygowane do warunków standardowych [${u}],</li>
+        <li><b>Qc.o.</b> — rzeczywiste zużycie ciepła na potrzeby centralnego ogrzewania w analizowanym okresie [${u}],</li>
+        <li><b>φ</b> — współczynnik korekcyjny uwzględniający różnice pomiędzy warunkami rzeczywistymi a standardowymi.</li>
+      </ul>
+      <p style="margin:0;">Dla analizowanego obiektu otrzymano następujące wartości zużycia skorygowanego:</p>
+    </div>
     <div class="anw-g2">
       <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} · ${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'} = <b>${data.before.qs != null ? _fmtA(data.before.qs, 2) : '—'} ${u}</b></div>
       <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
@@ -1955,7 +1996,10 @@ function _analReportBody(data) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">4</span> Oszczędność energii i rozliczenie</h4>
-    <div class="anw-desc">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;">Po sprowadzeniu zużycia obu okresów do wspólnej bazy (TYM) oszczędność energii wynika wprost z różnicy zużycia skorygowanego PRZED i PO wdrożeniu — niezależnie od tego, czy dany sezon był cieplejszy, czy chłodniejszy od normy. Wartość oszczędności oraz jej podział pomiędzy WaterAI/ESCO a klienta zależą od przyjętego sposobu wyceny energii.</p>
+      <p style="margin:0;">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</p>
+    </div>
     <div class="anw-formula">OSZ = (Qs<sub>PRZED</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED</sub> · 100%</div>
     <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.before.qs || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
     <div class="anw-rgrid" style="margin-top:10px;">
