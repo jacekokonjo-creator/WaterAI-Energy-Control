@@ -3467,11 +3467,13 @@ function renderRegressionTab(protocols) {
   const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
 
   if (regressionProtocols.length === 0) {
-    return _regTabHeader() + (window._regShowForm
+    const baseline = renderRegressionBaselineCurves(selectedMeasurementObjectId);
+    const formPart = window._regShowForm
       ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId))
-      : `<div class="reminder-card"><strong>Brak okresów bazowych regresji</strong>
+      : (baseline ? '' : `<div class="reminder-card"><strong>Brak okresów bazowych regresji</strong>
       <div class="reminder-meta">Kliknij „+ Dodaj okres bazowy", aby wprowadzić dane czasowe z czujników (ręcznie lub import CSV/Excel).</div>
     </div>`);
+    return _regTabHeader() + formPart + baseline;
   }
 
   const _regResultsHtml = regressionProtocols.map(p => {
@@ -3598,7 +3600,7 @@ function renderRegressionTab(protocols) {
     </div>
     <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
   }).join("");
-  return _regTabHeader() + (window._regShowForm ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId)) : '') + _regResultsHtml;
+  return _regTabHeader() + (window._regShowForm ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId)) : '') + renderRegressionBaselineCurves(selectedMeasurementObjectId) + _regResultsHtml;
 }
 
 function buildRegressionData(protocol) {
@@ -3641,6 +3643,196 @@ function calcLinearRegression(rows) {
   const ssTot = ys.reduce((s, y) => s + (y - yMean) ** 2, 0);
   const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
   return { a, b, r2 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Krzywe bazowe regresji liczone WPROST z danych z czujników
+// (waterai_regression_sensors_<objectId>). Dwie krzywe jak we wzorcu Excel:
+//   • zużycie ciepła (Δ heatConsumption między odczytami) vs T zewnętrzna
+//   • temperatura zasilania (tSupply, odczyt chwilowy) vs T zewnętrzna
+// Filtr od–do zawęża TYLKO wejście regresji (niedestrukcyjnie).
+// ─────────────────────────────────────────────────────────────────────────
+function _olsFit(pts) {
+  const n = pts.length;
+  if (n < 2) return { a: 0, b: 0, r2: 0, n, rmse: 0 };
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const xm = xs.reduce((s, v) => s + v, 0) / n;
+  const ym = ys.reduce((s, v) => s + v, 0) / n;
+  const sxy = xs.reduce((s, x, i) => s + (x - xm) * (ys[i] - ym), 0);
+  const sxx = xs.reduce((s, x) => s + (x - xm) ** 2, 0);
+  const a = sxx !== 0 ? sxy / sxx : 0;
+  const b = ym - a * xm;
+  const ssRes = ys.reduce((s, y, i) => s + (y - (a * xs[i] + b)) ** 2, 0);
+  const ssTot = ys.reduce((s, y) => s + (y - ym) ** 2, 0);
+  const r2 = ssTot !== 0 ? 1 - ssRes / ssTot : 0;
+  const rmse = Math.sqrt(ssRes / n);
+  return { a, b, r2, n, rmse };
+}
+
+function _regParseTime(rt) {
+  if (!rt) return null;
+  const t = Date.parse(String(rt).replace(' ', 'T'));
+  return isNaN(t) ? null : t;
+}
+
+function buildSensorBaseline(objectId, from, to) {
+  const raw = JSON.parse(localStorage.getItem('waterai_regression_sensors_' + objectId) || '[]');
+  const fromMs = from ? Date.parse(from + 'T00:00:00') : -Infinity;
+  const toMs   = to   ? Date.parse(to   + 'T23:59:59') :  Infinity;
+
+  const sorted = raw
+    .map(r => ({ r, ms: _regParseTime(r.readTime) }))
+    .sort((p, q) => (p.ms == null ? 0 : p.ms) - (q.ms == null ? 0 : q.ms));
+
+  const inRange = sorted.filter(({ ms }) => {
+    if (ms == null) return (!from && !to);    // bez parsowalnego czasu — tylko gdy brak filtra
+    return ms >= fromMs && ms <= toMs;
+  }).map(x => x.r);
+
+  // Krzywa zasilania: tSupply vs tOutdoor (odczyty chwilowe)
+  const supplyPts = inRange
+    .filter(r => r.tOutdoor != null && r.tSupply != null)
+    .map(r => ({ x: Number(r.tOutdoor), y: Number(r.tSupply), label: r.readTime || '' }));
+
+  // Krzywa zużycia: Δ heatConsumption (licznik narastający) vs tOutdoor odczytu końcowego
+  const consPts = [];
+  for (let i = 1; i < inRange.length; i++) {
+    const prev = inRange[i - 1], cur = inRange[i];
+    if (cur.heatConsumption == null || prev.heatConsumption == null || cur.tOutdoor == null) continue;
+    const d = Number(cur.heatConsumption) - Number(prev.heatConsumption);
+    if (!(d > 0)) continue;                    // reset licznika / brak przyrostu — pomijamy
+    consPts.push({ x: Number(cur.tOutdoor), y: d, label: cur.readTime || '' });
+  }
+
+  return { supplyPts, consPts, used: inRange.length, total: raw.length };
+}
+
+function _baselineCard(opts) {
+  const { title, icon, pts, xLabel, yLabel, accent, chartId } = opts;
+  if (pts.length < 2) {
+    return `<div class="reminder-card" style="border-left:4px solid ${accent};margin-bottom:14px;">
+      <strong>${icon} ${title}</strong>
+      <div class="reminder-meta">Za mało punktów po filtrze (min. 2). Dodaj dane lub poszerz zakres dat.</div>
+    </div>`;
+  }
+  const lr = _olsFit(pts);
+  const f4 = v => Number(v || 0).toFixed(4);
+  const f2 = v => Number(v || 0).toFixed(2);
+  const outTh = 2 * lr.rmse;
+  const bad = pts.map(p => { const yp = lr.a * p.x + lr.b; return { p, yp, resid: p.y - yp }; })
+                 .filter(o => outTh > 0 && Math.abs(o.resid) > outTh)
+                 .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
+  const shown = bad.slice(0, 60);
+  const corr = lr.r2 >= 0.9 ? '✅ bardzo dobra' : lr.r2 >= 0.75 ? '🟡 dobra' : '🔴 słaba';
+
+  const tableRows = shown.length ? shown.map(o => `<tr style="background:#FDECEC;">
+      <td style="padding:3px 8px;font-size:11px;color:var(--color-text-tertiary);">${escapeHtml(String(o.p.label).slice(0, 16))}</td>
+      <td style="padding:3px 8px;font-size:12px;text-align:right;">${f2(o.p.x)}</td>
+      <td style="padding:3px 8px;font-size:12px;text-align:right;">${f2(o.p.y)}</td>
+      <td style="padding:3px 8px;font-size:12px;text-align:right;color:#888;">${f2(o.yp)}</td>
+      <td style="padding:3px 8px;font-size:12px;text-align:right;color:#c00;font-weight:600;">${f2(o.resid)} ⚠</td>
+    </tr>`).join('') : `<tr><td colspan="5" style="padding:10px;text-align:center;font-size:12px;color:var(--color-text-secondary);">Brak odchyłek powyżej 2·RMSE — dane spójne.</td></tr>`;
+
+  return `
+  <div style="border:1px solid ${accent};border-radius:10px;overflow:hidden;margin-bottom:16px;">
+    <div style="padding:12px 14px;background:${accent}1f;display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+      <div style="font-size:14px;font-weight:600;">${icon} ${title}</div>
+      <div style="font-size:15px;font-weight:600;">y = <strong>${f4(lr.a)}</strong> · x + <strong>${f4(lr.b)}</strong></div>
+      <div style="font-size:13px;">R² = <strong>${f4(lr.r2)}</strong> ${corr}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">n = ${lr.n} · RMSE = ${f2(lr.rmse)} · odchyłek: ${bad.length}</div>
+    </div>
+    <div style="padding:12px 14px;background:var(--color-background-primary);">
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Odchyłki (kandydaci do wycięcia)${bad.length > 60 ? ` — pokazano 60 z ${bad.length}` : ''}</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px;">
+          <thead><tr style="background:var(--color-background-secondary);">
+            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
+            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${xLabel}</th>
+            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${yLabel}</th>
+            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">y prognoza</th>
+            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odchyłka</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px;">
+        <canvas id="${chartId}" width="560" height="260" style="max-width:100%;border:1px solid ${accent};border-radius:8px;background:#fff;display:block;"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRegressionBaselineCurves(objectId) {
+  if (!objectId) return '';
+  const raw = JSON.parse(localStorage.getItem('waterai_regression_sensors_' + objectId) || '[]');
+  if (raw.length < 2) return '';
+
+  const from = window._regBaseFrom || '';
+  const to   = window._regBaseTo   || '';
+  const { supplyPts, consPts, used, total } = buildSensorBaseline(objectId, from, to);
+
+  const consChart = 'reg-base-cons-' + objectId;
+  const supChart  = 'reg-base-sup-'  + objectId;
+
+  const consCard = _baselineCard({
+    title: 'Krzywa bazowa — zużycie ciepła vs T zewnętrzna', icon: '📉', pts: consPts,
+    xLabel: 'T zewn. [°C]', yLabel: 'Δ zużycie [kWh]', accent: '#185FA5', chartId: consChart
+  });
+  const supCard = _baselineCard({
+    title: 'Krzywa bazowa — temperatura zasilania vs T zewnętrzna', icon: '🌡️', pts: supplyPts,
+    xLabel: 'T zewn. [°C]', yLabel: 'T zasil. [°C]', accent: '#C77F1A', chartId: supChart
+  });
+
+  const subsample = arr => (arr.length > 1500) ? arr.filter((_, i) => i % Math.ceil(arr.length / 1500) === 0) : arr;
+  const consPlot = subsample(consPts), supPlot = subsample(supplyPts);
+  const consFit = _olsFit(consPts), supFit = _olsFit(supplyPts);
+
+  const drawScript = `
+  (function(){
+    function draw(id, pts, a, b, color){
+      const c = document.getElementById(id); if(!c) return;
+      const ctx = c.getContext('2d'); const W=c.width,H=c.height;
+      if(!pts.length) return;
+      const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+      let xMin=Math.min.apply(null,xs), xMax=Math.max.apply(null,xs);
+      if(xMin===xMax){xMin-=1;xMax+=1;}
+      let yMin=Math.min(Math.min.apply(null,ys), a*xMin+b, a*xMax+b);
+      let yMax=Math.max(Math.max.apply(null,ys), a*xMin+b, a*xMax+b);
+      if(yMin===yMax){yMin-=1;yMax+=1;}
+      const pad={l:54,r:16,t:14,b:34};
+      const sX=x=>pad.l+(x-xMin)/(xMax-xMin)*(W-pad.l-pad.r);
+      const sY=y=>H-pad.b-(y-yMin)/(yMax-yMin)*(H-pad.t-pad.b);
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='#e8e8e8';ctx.lineWidth=0.5;
+      for(let i=0;i<=4;i++){const y=yMin+i*(yMax-yMin)/4;ctx.beginPath();ctx.moveTo(pad.l,sY(y));ctx.lineTo(W-pad.r,sY(y));ctx.stroke();ctx.fillStyle='#999';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText(y.toFixed(1),pad.l-4,sY(y)+4);}
+      for(let i=0;i<=4;i++){const x=xMin+i*(xMax-xMin)/4;ctx.beginPath();ctx.moveTo(sX(x),pad.t);ctx.lineTo(sX(x),H-pad.b);ctx.stroke();ctx.fillStyle='#999';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(x.toFixed(1),sX(x),H-pad.b+14);}
+      ctx.globalAlpha=0.5;ctx.fillStyle=color;
+      pts.forEach(pt=>{ctx.beginPath();ctx.arc(sX(pt.x),sY(pt.y),3,0,2*Math.PI);ctx.fill();});
+      ctx.globalAlpha=1;
+      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sX(xMin),sY(a*xMin+b));ctx.lineTo(sX(xMax),sY(a*xMax+b));ctx.stroke();
+    }
+    draw('${consChart}', ${JSON.stringify(consPlot)}, ${consFit.a}, ${consFit.b}, '#185FA5');
+    draw('${supChart}', ${JSON.stringify(supPlot)}, ${supFit.a}, ${supFit.b}, '#C77F1A');
+  })();`;
+
+  return `
+  <div style="margin-top:22px;">
+    <div style="display:flex;align-items:flex-end;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;">
+      <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📐 Krzywe bazowe (z danych z czujników)</h3>
+      <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;">
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od</label><input type="date" id="reg-base-from" value="${from}" style="font-size:12px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do</label><input type="date" id="reg-base-to" value="${to}" style="font-size:12px;"></div>
+        <button class="small-button" onclick="window._regBaseFrom=document.getElementById('reg-base-from').value;window._regBaseTo=document.getElementById('reg-base-to').value;renderMeasurementsModule();">Zastosuj</button>
+        ${(from || to) ? `<button class="small-button" onclick="window._regBaseFrom='';window._regBaseTo='';renderMeasurementsModule();" style="color:#c00;border-color:#c00;">Wyczyść filtr</button>` : ''}
+      </div>
+    </div>
+    <div class="reminder-meta" style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px;">
+      Użyto ${used} z ${total} odczytów${(from || to) ? ' (po filtrze dat)' : ''}. Zużycie = przyrost licznika <code>heatConsumption</code> między kolejnymi odczytami; ⚠ oznacza odchyłkę &gt; 2·RMSE (kandydat do wycięcia ✕ w tabeli danych powyżej).
+    </div>
+    ${consCard}
+    ${supCard}
+  </div>
+  <script>(function(){ setTimeout(function(){ ${drawScript} }, 90); })();<\/script>`;
 }
 
 function renderMeasurementsList() {
