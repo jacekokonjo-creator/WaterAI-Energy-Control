@@ -1582,26 +1582,33 @@ function _analApplyBaseProtocol(p) {
     });
     ANAL.std = std;
   }
-  // PRZED instalacją = okres porównawczy (bazowy)
-  ANAL.before.from = p.comparisonPeriodStartDate || '';
-  ANAL.before.to = p.comparisonPeriodEndDate || '';
-  const comp = p.comparisonMonthly || [];
-  if (comp.length) {
-    ANAL.before.months = comp.map(m => {
+  // PRZED instalacją = okres porównawczy (bazowy). Dni i temperatury bierzemy z ZAPISANYCH
+  // miesięcy protokołu (comparisonMonthly, awaryjnie realMonthly) — zachowując 0 dla miesięcy
+  // poza sezonem grzewczym. Dni regenerujemy z dat dopiero, gdy protokół nie ma żadnych miesięcy.
+  ANAL.before.from = p.comparisonPeriodStartDate || p.billingPeriodStartDate || '';
+  ANAL.before.to = p.comparisonPeriodEndDate || p.billingPeriodEndDate || '';
+  const stored = (Array.isArray(p.comparisonMonthly) && p.comparisonMonthly.length)
+    ? p.comparisonMonthly
+    : ((Array.isArray(p.realMonthly) && p.realMonthly.length) ? p.realMonthly : []);
+  if (stored.length) {
+    ANAL.before.months = stored.map(m => {
       const mo = Number(m.month) || 1;
       const yr = Number(m.year) || (m.monthName && /\d{4}/.test(m.monthName) ? Number(m.monthName.match(/\d{4}/)[0]) : '');
+      const dRaw = (m.days != null && m.days !== '') ? m.days : ((m.realDays != null && m.realDays !== '') ? m.realDays : null);
+      const tRaw = (m.temperature != null && m.temperature !== '') ? m.temperature : ((m.realTemperature != null && m.realTemperature !== '') ? m.realTemperature : null);
       return {
         year: yr,
         month: mo,
         name: m.monthName || (ANAL_MONTHS[mo - 1] + (yr ? ' ' + yr : '')),
-        days: (m.days !== null && m.days !== undefined) ? Number(m.days) : '',
-        tme: (m.temperature !== null && m.temperature !== undefined) ? Number(m.temperature) : ''
+        days: (dRaw != null) ? Number(dRaw) : 0,
+        tme: (tRaw != null) ? Number(tRaw) : ''
       };
     });
   } else {
     ANAL.before.months = _analMonthsBetween(ANAL.before.from, ANAL.before.to);
   }
-  ANAL.before.consumption = (p.comparisonConsumption !== null && p.comparisonConsumption !== undefined) ? p.comparisonConsumption : '';
+  ANAL.before.consumption = (p.comparisonConsumption != null && p.comparisonConsumption !== '') ? p.comparisonConsumption
+    : ((p.billingConsumption != null && p.billingConsumption !== '') ? p.billingConsumption : '');
   // jednostka / waluta / cena / udział z protokołu (jeśli ustawione)
   if (p.energyUnit) ANAL.energy.unit = p.energyUnit;
   if (p.currency) ANAL.energy.currency = p.currency;
