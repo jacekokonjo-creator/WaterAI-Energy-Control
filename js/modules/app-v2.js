@@ -1154,10 +1154,17 @@ const ANAL_STYLE = `<style>
     #anw-report,#anw-report *{visibility:visible !important;}
     #anw-report{position:absolute;left:0;top:0;width:100%;margin:0;padding:0;border:none;}
     .anw-noprint{display:none !important;}
-    .anw-step-card,.anw-sec,.anw-sign,.anw-hero{break-inside:avoid;page-break-inside:avoid;}
+    /* Okładka = pełna strona 1 */
     .anw-cover{min-height:244mm;box-shadow:none;page-break-after:always;break-after:page;border:1px solid #dbe5f0;}
-    .anw-chart-wrap canvas{break-inside:avoid;}
-    @page{margin:14mm;}
+    /* Treść płynie i gęsto wypełnia strony — karty mogą się dzielić między stronami */
+    .anw-step-card{break-inside:auto;page-break-inside:auto;margin-bottom:10px;padding:12px 14px;}
+    .anw-step-card h4{break-after:avoid;page-break-after:avoid;}
+    .anw-desc{orphans:3;widows:3;}
+    /* Atomowe bloki, których nie wolno rozcinać */
+    .anw-formula,.anw-pair,.anw-pair-col,table.anw-t,table.anw-bvs,.anw-g2,.anw-rgrid,.anw-tile,.anw-sign,.anw-chart-wrap canvas{break-inside:avoid;page-break-inside:avoid;}
+    .anw-chart-wrap{gap:12px;margin-top:4px;}
+    .anw-sign{margin-top:18px;}
+    @page{margin:12mm;}
   }
 </style>`;
 
