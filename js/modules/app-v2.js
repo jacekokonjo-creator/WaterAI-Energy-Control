@@ -1068,6 +1068,8 @@ const ANAL_STYLE = `<style>
   table.anw-t td{padding:4px 6px;border-bottom:1px solid var(--color-border-tertiary);}
   table.anw-t td.calc{font-variant-numeric:tabular-nums;color:var(--color-text-secondary);text-align:right;}
   table.anw-t input{width:100%;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;text-align:right;box-sizing:border-box;}
+  .anw-f input.anw-ro,table.anw-t input.anw-ro,input.anw-ro{background:var(--color-background-secondary);color:var(--color-text-secondary);cursor:not-allowed;opacity:.9;}
+  .anw-lock{background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap;}
   table.anw-t tfoot td{font-weight:700;padding:8px;border-top:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
   .anw-muted{color:var(--color-text-tertiary);font-size:12px;}
   .anw-note{font-size:11px;color:var(--color-text-tertiary);margin-top:8px;}
@@ -1408,17 +1410,21 @@ function _analBaseVsStandardSheet() {
   const P = ANAL.before;
   const _ti = _analTi('before');
   const months = Array.isArray(P.months) ? P.months : [];
+  // Dane PRZED (rzecz) i Standardowy sezon (stand) pochodzą z wyznaczonego okresu
+  // bazowego → tylko do odczytu. Wyjątek: „✏️ Ręczne wprowadzenie".
+  const locked = !!(ANAL.basePeriod && ANAL.basePeriod !== 'manual');
+  const ro = locked ? ' disabled class="anw-ro"' : '';
   const rows = months.length ? months.map((mo, idx) => {
     const stdM = ANAL.std[mo.month] || [0, 0];
     const sdR = _sd20(mo.tme, mo.days, _ti);
     const sdS = _sd20(stdM[0], mo.days, _ti);
     return `<tr>
       <td>${mo.name}</td>
-      <td><input type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>
-      <td><input type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.before.months[${idx}].days=this.value;_analRecalcLive()"></td>
+      <td><input${ro} type="number" step="0.01" value="${mo.tme}" placeholder="°C" oninput="ANAL.before.months[${idx}].tme=this.value;_analRecalcLive()"></td>
+      <td><input${ro} type="number" min="0" max="31" value="${mo.days}" oninput="ANAL.before.months[${idx}].days=this.value;_analRecalcLive()"></td>
       <td class="calc" id="anw-before-sdr-${idx}">${_fmtA(sdR, 1)}</td>
-      <td class="anw-sep"><input type="number" step="0.1" value="${stdM[0]}" placeholder="°C" oninput="ANAL.std[${mo.month}][0]=this.value;_analRecalcLive()"></td>
-      <td><input type="number" min="0" max="31" value="${stdM[1]}" oninput="ANAL.std[${mo.month}][1]=this.value;_analRecalcLive()"></td>
+      <td class="anw-sep"><input${ro} type="number" step="0.1" value="${stdM[0]}" placeholder="°C" oninput="ANAL.std[${mo.month}][0]=this.value;_analRecalcLive()"></td>
+      <td><input${ro} type="number" min="0" max="31" value="${stdM[1]}" oninput="ANAL.std[${mo.month}][1]=this.value;_analRecalcLive()"></td>
       <td class="calc" id="anw-before-sds-${idx}">${_fmtA(sdS, 1)}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="7" class="anw-muted" style="padding:12px;text-align:center;">Ustaw zakres dat okresu bazowego, aby wygenerować miesiące</td></tr>`;
@@ -1426,13 +1432,14 @@ function _analBaseVsStandardSheet() {
   return `
   <div class="anw-sec">
     <div class="anw-head anw-before"><span class="ico">📉</span><h3>Okres bazowy — PRZED instalacją (rzecz) &nbsp;·&nbsp; Standardowy sezon ogrzewczy (stand)</h3>
+      ${locked ? '<span class="anw-lock">🔒 z okresu bazowego · tylko odczyt</span>' : ''}
       <span class="pill" style="background:var(--color-background-primary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">φ = <b id="anw-before-phi">—</b></span></div>
     <div class="anw-body">
       <div class="anw-g3">
-        <div class="anw-f"><label>Okres bazowy — data od</label><input type="date" value="${P.from}" onchange="analOnDates('before','from',this.value)"></div>
-        <div class="anw-f"><label>Okres bazowy — data do</label><input type="date" value="${P.to}" onchange="analOnDates('before','to',this.value)"></div>
+        <div class="anw-f"><label>Okres bazowy — data od</label><input${ro} type="date" value="${P.from}" onchange="analOnDates('before','from',this.value)"></div>
+        <div class="anw-f"><label>Okres bazowy — data do</label><input${ro} type="date" value="${P.to}" onchange="analOnDates('before','to',this.value)"></div>
         <div class="anw-f"><label>Zużycie okresu bazowego Qc.o. [<span class="anw-u">${ANAL.energy.unit}</span>]</label>
-          <input type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.before.consumption=this.value;_analRecalcLive()"></div>
+          <input${ro} type="number" step="0.001" value="${P.consumption}" placeholder="z faktur / ciepłomierza" oninput="ANAL.before.consumption=this.value;_analRecalcLive()"></div>
       </div>
       <table class="anw-t anw-bvs" style="margin-top:6px;">
         <thead>
@@ -1453,7 +1460,6 @@ function _analBaseVsStandardSheet() {
           <td class="anw-sep"></td><td></td><td class="calc" id="anw-before-sums">—</td>
         </tr></tfoot>
       </table>
-      <div class="anw-note">φ = ∑SD_stand / ∑SD_rzecz · Qs = Qc.o.·φ → <b id="anw-before-qs">—</b> ${ANAL.energy.unit} (zużycie skorygowane do standardowego sezonu).</div>
     </div>
   </div>`;
 }
