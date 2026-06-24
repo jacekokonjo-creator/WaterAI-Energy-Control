@@ -1116,6 +1116,38 @@ const ANAL_STYLE = `<style>
   .anw-sign-cap{font-size:11px;color:var(--color-text-secondary);margin-top:6px;line-height:1.5;}
   .anw-sign-wateria{position:relative;}
   .anw-stamp{display:inline-block;border:2px solid #0C447C;color:#0C447C;border-radius:10px;padding:7px 15px;font-weight:800;font-size:13px;transform:rotate(-3deg);letter-spacing:.6px;background:rgba(12,68,124,.04);}
+  /* ── strona tytułowa (cover) ── */
+  .anw-cover{display:flex;flex-direction:column;min-height:240mm;box-sizing:border-box;}
+  .anw-cover *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
+  .anw-cover-top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:3px solid #0C447C;padding-bottom:16px;}
+  .anw-cover-logo{height:56px;width:auto;display:block;}
+  .anw-cover-logofallback{font-size:22px;font-weight:800;color:#0C447C;letter-spacing:.3px;}
+  .anw-cover-org{font-size:12px;color:var(--color-text-secondary);margin-top:6px;}
+  .anw-cover-meta{text-align:right;font-size:12px;color:var(--color-text-secondary);line-height:1.7;white-space:nowrap;}
+  .anw-cover-meta b{display:block;color:#0C447C;font-size:16px;}
+  .anw-cover-title{margin:38px 0 6px;font-size:32px;font-weight:800;color:#0C447C;line-height:1.12;letter-spacing:.2px;}
+  .anw-cover-subtitle{font-size:14px;color:var(--color-text-secondary);margin-bottom:30px;}
+  .anw-cover-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px;}
+  .anw-cover-card{border:1px solid #d9e2ec;border-left:4px solid #0C447C;border-radius:10px;padding:14px 16px;background:#f6fafd;}
+  .anw-cover-card.green{border-left-color:#27500A;background:#f4f9ee;}
+  .anw-cover-card h5{margin:0 0 9px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#0C447C;font-weight:700;}
+  .anw-cover-card.green h5{color:#27500A;}
+  .anw-cover-card .ln{font-size:13.5px;color:var(--color-text-primary);margin:4px 0;}
+  .anw-cover-card .ln em{font-style:normal;color:var(--color-text-secondary);display:inline-block;min-width:96px;}
+  .anw-cover-card .ln b{color:var(--color-text-primary);}
+  .anw-cover-resblock{margin-top:auto;}
+  .anw-cover-resblock .hd{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:#27500A;font-weight:700;margin:30px 0 12px;}
+  .anw-cover-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .anw-kpi{border-radius:14px;padding:22px 18px;color:#fff;}
+  .anw-kpi.k-osz{background:linear-gradient(135deg,#0C447C,#1a6bb5);}
+  .anw-kpi.k-en{background:linear-gradient(135deg,#15607a,#2a93b5);}
+  .anw-kpi.k-val{background:linear-gradient(135deg,#27500A,#4f8a1f);}
+  .anw-kpi .lbl{font-size:11px;opacity:.92;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;}
+  .anw-kpi .big{font-size:30px;font-weight:800;line-height:1.05;}
+  .anw-kpi .big .u{font-size:15px;font-weight:700;}
+  .anw-cover-esco{margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--color-text-secondary);background:#f6fafd;border:1px solid #d9e2ec;border-radius:10px;padding:11px 16px;}
+  .anw-cover-esco b{color:#0C447C;}
+  .anw-cover-foot{margin-top:20px;border-top:1px solid #d9e2ec;padding-top:10px;font-size:11px;color:var(--color-text-secondary);display:flex;justify-content:space-between;gap:12px;}
   @media(max-width:680px){.anw-g4{grid-template-columns:1fr 1fr;}.anw-g3{grid-template-columns:1fr;}.anw-chart-wrap{grid-template-columns:1fr;}.anw-sign{grid-template-columns:1fr;}}
   @media print{
     body *{visibility:hidden !important;}
@@ -1123,6 +1155,8 @@ const ANAL_STYLE = `<style>
     #anw-report{position:absolute;left:0;top:0;width:100%;margin:0;padding:0;border:none;}
     .anw-noprint{display:none !important;}
     .anw-step-card,.anw-sec,.anw-sign,.anw-hero{break-inside:avoid;page-break-inside:avoid;}
+    .anw-cover{page-break-after:always;break-after:page;min-height:240mm;}
+    .anw-kpi,.anw-cover *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
     .anw-chart-wrap canvas{break-inside:avoid;}
     @page{margin:14mm;}
   }
@@ -1722,11 +1756,11 @@ function _analResults() {
   if (!ANAL.results) return '';
   const data = _analReportData({ live: true });
   return `
-  <div class="anw-act anw-noprint" style="justify-content:flex-end;margin:6px 0 14px;gap:10px;">
-    <button class="small-button" onclick="analPrintPDF()">🖨 Drukuj do PDF</button>
+  <div id="anw-report" class="anw-report">${_analReportBody(data)}</div>
+  <div class="anw-act anw-noprint" style="justify-content:center;margin:20px 0 8px;gap:12px;">
+    <button class="small-button" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj</button>
     <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);font-size:14px;padding:12px 24px;box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analSave()">💾 Zapisz analizę</button>
-  </div>
-  <div id="anw-report" class="anw-report">${_analReportBody(data)}</div>`;
+  </div>`;
 }
 
 function analSave() {
@@ -1739,6 +1773,7 @@ function analSave() {
     name: `${AnalysesModule.TYPES[ANAL.type].label} — ${o ? o.name : ''}`,
     analysisType: ANAL.type,
     executedAt: new Date().toISOString().slice(0, 10),
+    author: (typeof window !== 'undefined' && window.wateraiUser) ? window.wateraiUser : '',
     status: 'COMPLETE',
     inputParams: {
       std: ANAL.std, before: ANAL.before, after: ANAL.after,
@@ -1792,7 +1827,7 @@ function _analCalcPeriodRows(months, std, ti, consumption) {
 }
 
 function _analReportData(source) {
-  let clientId, objectId, std, beforeP, afterP, energy, name, executedAt, number, tiBefore, tiAfter, base, saved, cid;
+  let clientId, objectId, std, beforeP, afterP, energy, name, executedAt, number, tiBefore, tiAfter, base, saved, cid, author;
   if (source && source.saved) {
     const a = source.saved, ip = a.inputParams || {}, rr = a.results || {};
     clientId = a.clientId; objectId = a.objectId; std = ip.std || ANAL_STD_DEFAULT;
@@ -1807,7 +1842,7 @@ function _analReportData(source) {
     base = { savedEnergy: rr.savedEnergy,
       savedPct: rr.savedEnergyPct != null ? ((rr.savedEnergyPct > -1 && rr.savedEnergyPct < 1) ? rr.savedEnergyPct * 100 : rr.savedEnergyPct) : null,
       savedMoney: rr.savedMoney, escoShare: ip.escoShare, escoAmount: rr.escoAmount };
-    saved = true; cid = 'anw' + a.id;
+    saved = true; cid = 'anw' + a.id; author = a.author || '';
   } else {
     clientId = ANAL.clientId; objectId = ANAL.objectId; std = ANAL.std;
     beforeP = ANAL.before; afterP = ANAL.after; energy = ANAL.energy;
@@ -1818,7 +1853,7 @@ function _analReportData(source) {
     number = ANAL.editingId ? ((AnalysesModule.getNumber && AnalysesModule.getNumber(ANAL.editingId)) || ('#' + ANAL.editingId)) : '— (niezapisana)';
     const rr = ANAL.results || {};
     base = { savedEnergy: rr.savedEnergy, savedPct: rr.savedPct, savedMoney: rr.savedMoney, escoShare: rr.escoShare, escoAmount: rr.escoAmount };
-    saved = false; cid = 'anwlive';
+    saved = false; cid = 'anwlive'; author = (typeof window !== 'undefined' && window.wateraiUser) ? window.wateraiUser : '';
   }
   const _isVol = (source && source.saved) ? (source.saved.analysisType === 'VOLUME') : (ANAL.type === 'VOLUME');
   const before = _isVol ? _analCalcPeriodRowsVOL(beforeP.months, std, beforeP.consumption) : _analCalcPeriodRows(beforeP.months, std, tiBefore, beforeP.consumption);
@@ -1835,7 +1870,7 @@ function _analReportData(source) {
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
   return {
     client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
-    name, executedAt, number, saved, std, energy, tiBefore, tiAfter, cid,
+    name, executedAt, number, saved, author, std, energy, tiBefore, tiAfter, cid,
     type: _isVol ? 'VOLUME' : ((source && source.saved) ? source.saved.analysisType : ANAL.type),
     before: Object.assign({}, before, { from: beforeP.from, to: beforeP.to, consumption: beforeP.consumption }),
     after: Object.assign({}, after, { from: afterP.from, to: afterP.to, consumption: afterP.consumption }),
@@ -1987,22 +2022,62 @@ function _analReportBody(data) {
   const priceLine = data.energy.priceMode === 'VARIABLE'
     ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
     : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
+  const authorTxt = data.author ? _escA(data.author) : '—';
+  const escoLine = (Number(data.escoShare) || 0) > 0
+    ? `<div class="anw-cover-esco"><span>Udział ESCO: <b>${_fmtA(data.escoShare, 0)}%</b></span><span>Część ESCO: <b>${_fmtA(data.escoAmount || 0, 2)} ${cur}</b></span><span>Część Klienta: <b>${_fmtA(data.clientAmount || 0, 2)} ${cur}</b></span></div>`
+    : '';
   return `
-  <div class="anw-rephead">
-    <div><div class="brand">WaterAI Energy Control</div><div class="sub">Analiza oszczędności energii — metoda korekty stopniodni (TYM)</div></div>
-    <div class="num">${_escA(data.number)}<br><span class="sub">${_fmtDateA(data.executedAt)}</span></div>
-  </div>
-  <div class="anw-ctx" style="margin-top:0;">
-    <span>Klient: <b>${_escA((data.client && data.client.name) || '—')}</b></span>
-    <span>Obiekt: <b>${_escA((data.object && data.object.name) || '—')}</b></span>
-    <span>Okres PRZED: <b>${_fmtDateA(data.before.from)} → ${_fmtDateA(data.before.to)}</b></span>
-    <span>Okres PO: <b>${_fmtDateA(data.after.from)} → ${_fmtDateA(data.after.to)}</b></span>
-  </div>
+  <div class="anw-cover">
+    <div class="anw-cover-top">
+      <div>
+        <img src="logo-waterai.png" alt="WaterAI Energy Control" class="anw-cover-logo" onerror="this.style.display='none';if(this.nextElementSibling){this.nextElementSibling.style.display='block';}">
+        <div class="anw-cover-logofallback" style="display:none;">WaterAI Energy Control</div>
+        <div class="anw-cover-org">System pomiaru i rozliczeń oszczędności energii w modelu ESCO</div>
+      </div>
+      <div class="anw-cover-meta">
+        Nr analizy<b>${_escA(data.number)}</b>
+        Data wykonania: ${_fmtDateA(data.executedAt)}
+      </div>
+    </div>
 
-  <div class="anw-hero" style="margin-top:16px;">
-    <div><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%</div></div>
-    <div><div class="lbl">Energia zaoszczędzona</div><div class="big">${_fmtA(data.savedEnergy || 0, 2)} <span style="font-size:16px;">${u}</span></div></div>
-    <div><div class="lbl">Wartość oszczędności</div><div class="big">${_fmtA(data.savedMoney || 0, 2)} <span style="font-size:16px;">${cur}</span></div></div>
+    <div class="anw-cover-title">Analiza oszczędności energii</div>
+    <div class="anw-cover-subtitle">Metoda korekty stopniodni grzewczych — Typowy Rok Meteorologiczny (TYM)</div>
+
+    <div class="anw-cover-grid">
+      <div class="anw-cover-card">
+        <h5>Dla kogo</h5>
+        <div class="ln"><em>Klient</em><b>${_escA((data.client && data.client.name) || '—')}</b></div>
+        <div class="ln"><em>Obiekt</em><b>${_escA((data.object && data.object.name) || '—')}</b></div>
+      </div>
+      <div class="anw-cover-card green">
+        <h5>Kto i kiedy</h5>
+        <div class="ln"><em>Wykonał</em><b>${authorTxt}</b></div>
+        <div class="ln"><em>Data wykonania</em><b>${_fmtDateA(data.executedAt)}</b></div>
+        <div class="ln"><em>Wygenerowano</em><b>${genDate}</b></div>
+      </div>
+      <div class="anw-cover-card">
+        <h5>Okres bazowy — PRZED instalacją</h5>
+        <div class="ln"><b>${_fmtDateA(data.before.from)} → ${_fmtDateA(data.before.to)}</b></div>
+      </div>
+      <div class="anw-cover-card green">
+        <h5>Okres analizowany — PO instalacji</h5>
+        <div class="ln"><b>${_fmtDateA(data.after.from)} → ${_fmtDateA(data.after.to)}</b></div>
+      </div>
+    </div>
+
+    <div class="anw-cover-resblock">
+      <div class="hd">Wyniki końcowe</div>
+      <div class="anw-cover-kpis">
+        <div class="anw-kpi k-osz"><div class="lbl">Oszczędność (OSZ)</div><div class="big">${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%</div></div>
+        <div class="anw-kpi k-en"><div class="lbl">Energia zaoszczędzona</div><div class="big">${_fmtA(data.savedEnergy || 0, 2)} <span class="u">${u}</span></div></div>
+        <div class="anw-kpi k-val"><div class="lbl">Wartość oszczędności</div><div class="big">${_fmtA(data.savedMoney || 0, 2)} <span class="u">${cur}</span></div></div>
+      </div>
+      ${escoLine}
+      <div class="anw-cover-foot">
+        <span>WaterAI Energy Control · control.waterai.cloud</span>
+        <span>Dokument wygenerowany automatycznie · ${genDate}</span>
+      </div>
+    </div>
   </div>
 
   <div class="anw-step-card">
@@ -2125,7 +2200,7 @@ function analView(id) {
   container.innerHTML = ANAL_STYLE + `
     <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
       <button class="small-button" onclick="renderAnalysesModule()">← Lista analiz</button>
-      <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj do PDF</button>
+      <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj</button>
     </div>
     <div id="anw-report" class="anw-report">${_analReportBody(data)}</div>`;
   setTimeout(() => _analDrawCharts(data), 60);
