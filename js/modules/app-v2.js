@@ -1665,8 +1665,11 @@ function analRun() {
     alert('Uzupełnij temperatury i dni dla obu okresów (PRZED i PO) oraz zużycie Qc.o., aby wyznaczyć współczynniki korekcyjne.');
     return;
   }
-  const savedEnergy = before.qs - after.qs;
-  const savedPct = before.qs > 0 ? savedEnergy / before.qs * 100 : 0;
+  // Sprowadzenie bazy (PRZED) do długości/warunków okresu PO — stosunek standardowych stopniodni
+  const normF = (ANAL.type === 'TYM' && before.sumS > 0) ? after.sumS / before.sumS : 1;
+  const qsBeforeNorm = before.qs * normF;
+  const savedEnergy = qsBeforeNorm - after.qs;
+  const savedPct = qsBeforeNorm > 0 ? savedEnergy / qsBeforeNorm * 100 : 0;
   const price = Number(ANAL.energy.price || 0);
   // FIXED: cena za jednostkę × zaoszczędzona energia. VARIABLE: koszt zmienny całościowy wpisany wprost.
   const savedMoney = (ANAL.energy.priceMode === 'VARIABLE') ? price : savedEnergy * price;
@@ -1674,7 +1677,7 @@ function analRun() {
   const escoAmount = savedMoney * escoShare / 100;
   const clientAmount = savedMoney - escoAmount;
 
-  ANAL.results = { before, after, savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount,
+  ANAL.results = { before, after, normF, qsBeforeNorm, savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount,
     unit: ANAL.energy.unit, currency: ANAL.energy.currency, at: new Date().toISOString() };
   const slot = document.getElementById('anw-results');
   if (slot) { slot.innerHTML = _analResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -1718,7 +1721,8 @@ function analSave() {
       savedMoney: r.savedMoney,
       escoAmount: r.escoAmount,
       phiBefore: r.before.phi, phiAfter: r.after.phi,
-      qsBefore: r.before.qs, qsAfter: r.after.qs
+      qsBefore: r.before.qs, qsAfter: r.after.qs,
+      qsBeforeNorm: r.qsBeforeNorm, normFactor: r.normF
     }
   };
   if (ANAL.editingId) {
@@ -1787,11 +1791,14 @@ function _analReportData(source) {
   const before = _isVol ? _analCalcPeriodRowsVOL(beforeP.months, std, beforeP.consumption) : _analCalcPeriodRows(beforeP.months, std, tiBefore, beforeP.consumption);
   const after = _isVol ? _analCalcPeriodRowsVOL(afterP.months, std, afterP.consumption) : _analCalcPeriodRows(afterP.months, std, tiAfter, afterP.consumption);
   const escoShare = Number(energy.escoShare || 0);
-  const savedEnergy = (base.savedEnergy != null) ? base.savedEnergy : ((before.qs != null && after.qs != null) ? before.qs - after.qs : null);
-  const savedPct = (base.savedPct != null) ? base.savedPct : ((before.qs > 0 && savedEnergy != null) ? savedEnergy / before.qs * 100 : null);
+  // Normalizacja bazy (PRZED) do długości/warunków okresu PO — stosunek standardowych stopniodni
+  const normF = (!_isVol && before.sumS > 0) ? after.sumS / before.sumS : 1;
+  const qsBeforeNorm = (before.qs != null) ? before.qs * normF : null;
+  const savedEnergy = (qsBeforeNorm != null && after.qs != null) ? qsBeforeNorm - after.qs : null;
+  const savedPct = (qsBeforeNorm > 0 && savedEnergy != null) ? savedEnergy / qsBeforeNorm * 100 : null;
   const price = Number(energy.price || 0);
-  const savedMoney = (base.savedMoney != null) ? base.savedMoney : ((energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : null));
-  const escoAmount = (base.escoAmount != null) ? base.escoAmount : (savedMoney != null ? savedMoney * escoShare / 100 : null);
+  const savedMoney = (energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : null);
+  const escoAmount = (savedMoney != null) ? savedMoney * escoShare / 100 : null;
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
   return {
     client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
@@ -1799,7 +1806,7 @@ function _analReportData(source) {
     type: _isVol ? 'VOLUME' : ((source && source.saved) ? source.saved.analysisType : ANAL.type),
     before: Object.assign({}, before, { from: beforeP.from, to: beforeP.to, consumption: beforeP.consumption }),
     after: Object.assign({}, after, { from: afterP.from, to: afterP.to, consumption: afterP.consumption }),
-    savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount
+    normF, qsBeforeNorm, savedEnergy, savedPct, savedMoney, escoShare, escoAmount, clientAmount
   };
 }
 
@@ -1876,10 +1883,10 @@ function _analDrawCharts(data) {
   ], { title: 'Zużycie skorygowane do warunków standardowych (Qs)', unit: data.energy.unit });
   // Oszczędność energii — Qs PRZED vs Qs PO + zaoszczędzona energia (skorygowana do TYM)
   _anwBar(document.getElementById(data.cid + '-save'), [
-    { label: 'Qs PRZED', bars: [{ v: data.before.qs, c: '#0C447C' }] },
-    { label: 'Qs PO', bars: [{ v: data.after.qs, c: '#27500A' }] },
+    { label: 'Baza PRZED→PO', bars: [{ v: data.qsBeforeNorm, c: '#0C447C' }] },
+    { label: 'PO', bars: [{ v: data.after.qs, c: '#27500A' }] },
     { label: 'Zaoszczędzono', bars: [{ v: data.savedEnergy, c: '#22a35a' }] }
-  ], { title: 'Oszczędność energii (skorygowana do TYM)', unit: data.energy.unit });
+  ], { title: 'Oszczędność energii (baza sprowadzona do okresu PO)', unit: data.energy.unit });
   // Koszty — wartość oszczędności i jej podział WaterAI/ESCO vs klient
   _anwBar(document.getElementById(data.cid + '-cost'), [
     { label: 'Oszczędność', bars: [{ v: data.savedMoney, c: '#0C447C' }] },
@@ -1991,7 +1998,10 @@ function _analReportBody(data) {
       <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} · ${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'} = <b>${data.before.qs != null ? _fmtA(data.before.qs, 2) : '—'} ${u}</b></div>
       <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
     </div>
-    <div class="anw-desc" style="margin-top:8px;">Po sprowadzeniu obu okresów do warunków Typowego Roku Meteorologicznego wynik nie zależy już od różnic pogody między sezonami — okresy PRZED i PO są w pełni porównywalne, co umożliwia rzetelną ocenę efektu wdrożenia.</div>
+    <div class="anw-desc" style="margin-top:8px;">Po sprowadzeniu obu okresów do warunków Typowego Roku Meteorologicznego wynik nie zależy już od różnic pogody między sezonami. Pozostaje jednak różnica długości — okres PRZED (baza) obejmuje znacznie dłuższy przedział niż okres PO.</div>
+    <div class="anw-formula" style="margin-top:10px;">Sprowadzenie bazy do długości i warunków okresu PO:&nbsp; Qs<sub>PRZED→PO</sub> = Qs<sub>PRZED</sub> · (∑SD<sub>std,PO</sub> / ∑SD<sub>std,PRZED</sub>)</div>
+    <div class="anw-desc"><p style="margin:0;">Aby porównanie było rzetelne, skorygowane zużycie bazy sprowadza się do takiej samej ekspozycji na warunki grzewcze, jaką miał okres PO — w stosunku sumy standardowych stopniodni obu okresów. Uwzględnia to zarówno długość, jak i sezonowość (39 dni zimy ≠ 39 dni lata).</p></div>
+    <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED→PO</sub> = ${_fmtA(data.before.qs || 0, 2)} · (${_fmtA(data.after.sumS, 1)} / ${_fmtA(data.before.sumS, 1)}) = <b>${_fmtA(data.qsBeforeNorm || 0, 2)} ${u}</b></div>
   </div>
 
   <div class="anw-step-card">
@@ -2000,8 +2010,8 @@ function _analReportBody(data) {
       <p style="margin:0 0 8px;">Po sprowadzeniu zużycia obu okresów do wspólnej bazy (TYM) oszczędność energii wynika wprost z różnicy zużycia skorygowanego PRZED i PO wdrożeniu — niezależnie od tego, czy dany sezon był cieplejszy, czy chłodniejszy od normy. Wartość oszczędności oraz jej podział pomiędzy WaterAI/ESCO a klienta zależą od przyjętego sposobu wyceny energii.</p>
       <p style="margin:0;">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</p>
     </div>
-    <div class="anw-formula">OSZ = (Qs<sub>PRZED</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED</sub> · 100%</div>
-    <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.before.qs || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
+    <div class="anw-formula">OSZ = (Qs<sub>PRZED→PO</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED→PO</sub> · 100%</div>
+    <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.qsBeforeNorm || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
     <div class="anw-rgrid" style="margin-top:10px;">
       <div class="anw-tile"><div class="v">${_fmtA(data.savedMoney || 0, 2)} ${cur}</div><div class="k">Wartość oszczędności</div></div>
       <div class="anw-tile"><div class="v">${_fmtA(data.escoAmount || 0, 2)} ${cur}</div><div class="k">Udział WaterAI/ESCO (${_fmtA(data.escoShare || 0, 0)}%)</div></div>
