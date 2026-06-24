@@ -1059,6 +1059,11 @@ const ANAL_STYLE = `<style>
   .anw-before{background:#EEF4FB;} .anw-before h3{color:#0C447C;}
   .anw-after{background:#EAF3DE;} .anw-after h3{color:#27500A;}
   .anw-g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .anw-pair{display:flex;align-items:flex-start;gap:18px;}
+  .anw-pair-col{flex:1;min-width:0;border:1px solid #e6ebf2;border-radius:8px;padding:10px 10px 4px;background:var(--color-background-primary);box-sizing:border-box;}
+  .anw-pair-before{border-top:3px solid #0C447C;}
+  .anw-pair-after{border-top:3px solid #27500A;}
+  table.anw-t tr.anw-blank td{color:transparent;background:#fafbfc;}
   .anw-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
   .anw-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
   .anw-f label{display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:4px;font-weight:500;}
@@ -1853,6 +1858,49 @@ function _anwPeriodTable(P, ti) {
   <tfoot><tr><td>∑</td><td class="calc">${P.days}</td><td></td><td class="calc">${_fmtA(P.sumR, 1)}</td><td></td><td class="calc">${_fmtA(P.sumS, 1)}</td></tr></tfoot></table>`;
 }
 
+// Wspólna oś miesięcy dla obu okresów — kolejność wg okresu PRZED, miesiące tylko z PO dopisane na końcu.
+function _anwMonthAxis(before, after) {
+  const order = [], seen = {};
+  (before && before.rows || []).forEach(r => { const m = r.month; if (m != null && !seen[m]) { seen[m] = 1; order.push(m); } });
+  (after && after.rows || []).forEach(r => { const m = r.month; if (m != null && !seen[m]) { seen[m] = 1; order.push(m); } });
+  return order;
+}
+
+// Tabela okresu renderowana na wspólnej osi miesięcy — ten sam miesiąc trafia w ten sam wiersz
+// w obu tabelach (puste wiersze wyrównujące, bez wierszy pustych poniżej ostatniego miesiąca okresu).
+function _anwPeriodTableAligned(P, ti, axis) {
+  const byMonth = {};
+  (P.rows || []).forEach(r => { if (r.month != null) byMonth[r.month] = r; });
+  let lastIdx = -1;
+  axis.forEach((m, i) => { if (byMonth[m]) lastIdx = i; });
+  let body = '';
+  for (let i = 0; i <= lastIdx; i++) {
+    const r = byMonth[axis[i]];
+    body += r ? `<tr>
+      <td>${_escA(r.name)}</td>
+      <td class="calc">${r.days}</td>
+      <td class="calc">${r.tme == null ? '—' : _fmtA(r.tme, 1)}</td>
+      <td class="calc">${_fmtA(r.sdR, 1)}</td>
+      <td class="calc">${_fmtA(r.tStd, 1)}</td>
+      <td class="calc">${_fmtA(r.sdS, 1)}</td>
+    </tr>` : `<tr class="anw-blank"><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>`;
+  }
+  if (lastIdx < 0) body = '<tr><td colspan="6" class="anw-muted">Brak miesięcy</td></tr>';
+  return `<table class="anw-t"><thead><tr>
+    <th>Miesiąc</th><th>Dni z₀</th><th>t rzecz.</th><th>SD${ti} rzecz.</th><th>t TYM</th><th>SD${ti} std.</th>
+  </tr></thead><tbody>${body}</tbody>
+  <tfoot><tr><td>∑</td><td class="calc">${P.days}</td><td></td><td class="calc">${_fmtA(P.sumR, 1)}</td><td></td><td class="calc">${_fmtA(P.sumS, 1)}</td></tr></tfoot></table>`;
+}
+
+// Para paneli PRZED / PO obok siebie: rozdzielone graficznie i wyrównane wg miesięcy.
+function _anwPeriodPair(data, tiB, tiA) {
+  const axis = _anwMonthAxis(data.before, data.after);
+  return `<div class="anw-pair" style="margin-top:10px;">
+    <div class="anw-pair-col anw-pair-before"><div class="anw-muted" style="margin-bottom:6px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTableAligned(data.before, tiB, axis)}</div>
+    <div class="anw-pair-col anw-pair-after"><div class="anw-muted" style="margin-bottom:6px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTableAligned(data.after, tiA, axis)}</div>
+  </div>`;
+}
+
 // Wykres słupkowy (grupowany) na canvas — ostry przy druku (DPR)
 function _anwBar(cv, groups, opts) {
   if (!cv) return; opts = opts || {};
@@ -1977,10 +2025,7 @@ function _analReportBody(data) {
       <p style="margin:0 0 6px;"><b>b) Stopniodni standardowe</b> — obliczane na podstawie średnich temperatur zewnętrznych pochodzących z Typowego Roku Meteorologicznego (TYM) dla lokalizacji obiektu. Wartość ta odzwierciedla standardowe warunki pogodowe, do których przelicza się zużycie ciepła w celu zapewnienia porównywalności wyników.</p>
       <p style="margin:0;">W zależności od przyjętych założeń temperatura wewnętrzna Tᵢ może być taka sama lub różna dla okresu PRZED i PO wdrożeniu, jeżeli zmianie uległy warunki eksploatacji lub standard utrzymywanego komfortu cieplnego w obiekcie.</p>
     </div>
-    <div class="anw-g2" style="margin-top:10px;">
-      <div><div class="anw-muted" style="margin-bottom:4px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTable(data.before, tiB)}</div>
-      <div><div class="anw-muted" style="margin-bottom:4px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTable(data.after, tiA)}</div>
-    </div>
+    ${_anwPeriodPair(data, tiB, tiA)}
   </div>
 
   <div class="anw-step-card">
