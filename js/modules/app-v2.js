@@ -1277,6 +1277,27 @@ function analEdit(id) {
     priceMode: ip.priceMode || 'FIXED',
     priceDescription: ip.priceDescription || ''
   };
+  // ── Synchronizacja okresu bazowego 1:1 z protokołem ───────────────────────
+  // Jeśli analiza jest powiązana z protokołem okresu bazowego (a nie „Ręczne
+  // wprowadzenie"), NIE ufamy zapisanej migawce miesięcy — pobieramy okres
+  // bazowy 1:1 z AKTUALNEGO protokołu. Dzięki temu dni i temperatury (w tym
+  // 0 dni poza sezonem grzewczym) zawsze zgadzają się z zakładką „Okres
+  // bazowy", a stare, błędnie zapisane analizy (np. lato uzupełnione dniami
+  // kalendarzowymi) same się naprawiają po otwarciu. Okres analizowany (after)
+  // oraz parametry energii pozostają nietknięte.
+  const _bpId = ANAL.basePeriod;
+  const _isProtocolBacked = _bpId != null && _bpId !== 'manual'
+    && !String(_bpId).startsWith('int:') && ANAL.type !== 'VOLUME';
+  if (_isProtocolBacked && window.MeasurementsModule) {
+    const _p = MeasurementsModule.find(Number(_bpId));
+    if (_p) {
+      const _savedAfter  = ANAL.after  ? JSON.parse(JSON.stringify(ANAL.after))  : null;
+      const _savedEnergy = ANAL.energy ? JSON.parse(JSON.stringify(ANAL.energy)) : null;
+      _analApplyBaseProtocol(_p);                    // odśwież before / std / baseTi 1:1
+      if (_savedAfter)  ANAL.after  = _savedAfter;   // zachowaj okres analizowany
+      if (_savedEnergy) ANAL.energy = _savedEnergy;  // zachowaj parametry energii analizy
+    }
+  }
   ANAL.results = null;
   renderAnalysesModule();
   setTimeout(function () { try { _analRecalcLive(); } catch (e) {} }, 0);
