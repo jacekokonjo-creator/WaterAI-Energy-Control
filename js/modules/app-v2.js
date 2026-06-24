@@ -1873,6 +1873,26 @@ function _analDrawCharts(data) {
     { label: 'PRZED', bars: [{ v: data.before.qs, c: '#0C447C', n: 'Qs przed' }] },
     { label: 'PO', bars: [{ v: data.after.qs, c: '#27500A', n: 'Qs po' }] }
   ], { title: 'Zużycie skorygowane do warunków standardowych (Qs)', unit: data.energy.unit });
+  // Oszczędność energii — Qs PRZED vs Qs PO + zaoszczędzona energia (skorygowana do TYM)
+  _anwBar(document.getElementById(data.cid + '-save'), [
+    { label: 'Qs PRZED', bars: [{ v: data.before.qs, c: '#0C447C' }] },
+    { label: 'Qs PO', bars: [{ v: data.after.qs, c: '#27500A' }] },
+    { label: 'Zaoszczędzono', bars: [{ v: data.savedEnergy, c: '#22a35a' }] }
+  ], { title: 'Oszczędność energii (skorygowana do TYM)', unit: data.energy.unit });
+  // Koszty — wartość oszczędności i jej podział WaterAI/ESCO vs klient
+  _anwBar(document.getElementById(data.cid + '-cost'), [
+    { label: 'Oszczędność', bars: [{ v: data.savedMoney, c: '#0C447C' }] },
+    { label: 'WaterAI / ESCO', bars: [{ v: data.escoAmount, c: '#7B1FA2' }] },
+    { label: 'Klient', bars: [{ v: data.clientAmount, c: '#E65100' }] }
+  ], { title: 'Koszty: wartość oszczędności i podział', unit: data.energy.currency });
+}
+
+// Interpretacja współczynnika korekcyjnego φ (φ>1 cieplej, φ<1 chłodniej, φ≈1 jak norma)
+function _phiInterp(phi, label) {
+  if (phi == null) return '';
+  if (phi > 1.0005) return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} &gt; 1 — okres ${label} był <b>cieplejszy</b> od warunków standardowych, dlatego zmierzone zużycie koryguje się <b>w górę</b>.`;
+  if (phi < 0.9995) return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} &lt; 1 — okres ${label} był <b>chłodniejszy</b> od warunków standardowych, dlatego zmierzone zużycie koryguje się <b>w dół</b>.`;
+  return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} ≈ 1 — warunki rzeczywiste odpowiadały standardowym.`;
 }
 
 function _analReportBody(data) {
@@ -1919,6 +1939,7 @@ function _analReportBody(data) {
       <div class="anw-formula" style="border-color:#0C447C;">φ<sub>PRZED</sub> = ${_fmtA(data.before.sumS, 1)} / ${_fmtA(data.before.sumR, 1)} = <b>${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'}</b></div>
       <div class="anw-formula" style="border-color:#27500A;">φ<sub>PO</sub> = ${_fmtA(data.after.sumS, 1)} / ${_fmtA(data.after.sumR, 1)} = <b>${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'}</b></div>
     </div>
+    <div class="anw-desc" style="margin-top:8px;">${_phiInterp(data.before.phi, 'PRZED')}<br>${_phiInterp(data.after.phi, 'PO')}</div>
   </div>
 
   <div class="anw-step-card">
@@ -1929,6 +1950,7 @@ function _analReportBody(data) {
       <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED</sub> = ${_fmtA(Number(data.before.consumption || 0), 2)} · ${data.before.phi != null ? _fmtA(data.before.phi, 4) : '—'} = <b>${data.before.qs != null ? _fmtA(data.before.qs, 2) : '—'} ${u}</b></div>
       <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
     </div>
+    <div class="anw-desc" style="margin-top:8px;">Po sprowadzeniu obu okresów do warunków Typowego Roku Meteorologicznego wynik nie zależy już od różnic pogody między sezonami — okresy PRZED i PO są w pełni porównywalne, co umożliwia rzetelną ocenę efektu wdrożenia.</div>
   </div>
 
   <div class="anw-step-card">
@@ -1948,6 +1970,8 @@ function _analReportBody(data) {
     <div class="anw-chart-wrap">
       <canvas id="${data.cid}-sd"></canvas>
       <canvas id="${data.cid}-qs"></canvas>
+      <canvas id="${data.cid}-save"></canvas>
+      <canvas id="${data.cid}-cost"></canvas>
     </div>
   </div>
 
