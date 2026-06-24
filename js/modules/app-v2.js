@@ -1069,6 +1069,8 @@ const ANAL_STYLE = `<style>
   table.anw-t td.calc{font-variant-numeric:tabular-nums;color:var(--color-text-secondary);text-align:right;}
   table.anw-t input{width:100%;padding:5px 7px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:13px;text-align:right;box-sizing:border-box;}
   .anw-f input.anw-ro,table.anw-t input.anw-ro,input.anw-ro{background:var(--color-background-secondary);color:var(--color-text-secondary);cursor:not-allowed;opacity:.9;}
+  input.anw-ro::-webkit-outer-spin-button,input.anw-ro::-webkit-inner-spin-button{-webkit-appearance:none;appearance:none;margin:0;}
+  input.anw-ro[type=number]{-moz-appearance:textfield;appearance:textfield;}
   .anw-lock{background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap;}
   table.anw-t tfoot td{font-weight:700;padding:8px;border-top:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
   .anw-muted{color:var(--color-text-tertiary);font-size:12px;}
