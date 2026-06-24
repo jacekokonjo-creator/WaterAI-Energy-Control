@@ -28,3 +28,4 @@ System do pomiaru, analizy i rozliczania oszczędności energii.
 ## Status
 
 Projekt w fazie projektowania.
+test deploy
