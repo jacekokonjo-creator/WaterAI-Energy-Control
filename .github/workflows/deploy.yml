@@ -1,0 +1,30 @@
+name: Deploy to control.waterai.cloud
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  web-deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Wgraj pliki na serwer (FTP)
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: waterai.cloud
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/*.md
+            token.txt
