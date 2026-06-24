@@ -1402,11 +1402,11 @@ function _analTYMSheet() {
     <div class="anw-body">
       <div class="anw-g4">
         <div class="anw-f"><label>Jednostka energii</label>
-          <select onchange="ANAL.energy.unit=this.value;_analRecalcLive()">
+          <select onchange="ANAL.energy.unit=this.value;renderAnalysesModule()">
             ${['GJ','MWh','kWh','m³'].map(u => `<option ${ANAL.energy.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select></div>
         <div class="anw-f"><label>Waluta</label>
-          <select onchange="ANAL.energy.currency=this.value;_analRecalcLive()">
+          <select onchange="ANAL.energy.currency=this.value;renderAnalysesModule()">
             ${['PLN','EUR','CZK','USD'].map(u => `<option ${ANAL.energy.currency === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select></div>
         <div class="anw-f"><label>Sposób wyceny energii</label>
@@ -2803,11 +2803,11 @@ function _analEnergyBlock() {
     <div class="anw-body">
       <div class="anw-g4">
         <div class="anw-f"><label>Jednostka energii</label>
-          <select onchange="ANAL.energy.unit=this.value;_analRecalcLive()">
+          <select onchange="ANAL.energy.unit=this.value;renderAnalysesModule()">
             ${['GJ','MWh','kWh','m³'].map(u => `<option ${ANAL.energy.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select></div>
         <div class="anw-f"><label>Waluta</label>
-          <select onchange="ANAL.energy.currency=this.value;_analRecalcLive()">
+          <select onchange="ANAL.energy.currency=this.value;renderAnalysesModule()">
             ${['PLN','EUR','CZK','USD'].map(u => `<option ${ANAL.energy.currency === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select></div>
         <div class="anw-f"><label>Sposób wyceny energii</label>
