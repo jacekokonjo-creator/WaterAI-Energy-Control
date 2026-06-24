@@ -6,25 +6,20 @@ on:
       - main
 
 jobs:
-  web-deploy:
+  deploy:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
       - name: Pobierz kod
         uses: actions/checkout@v4
 
-      - name: Wgraj pliki na serwer (FTP)
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+      - name: Wgraj pliki na serwer (SFTP)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
         with:
-          server: waterai.cloud
           username: ${{ secrets.FTP_USERNAME }}
+          server: waterai.cloud
+          port: 22
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: 21
-          server-dir: ./
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/*.md
-            token.txt
+          local_path: './*'
+          remote_path: './'
+          sftp_only: true
