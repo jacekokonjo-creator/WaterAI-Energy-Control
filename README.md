@@ -29,3 +29,4 @@ System do pomiaru, analizy i rozliczania oszczędności energii.
 
 Projekt w fazie projektowania.
 test deploy
+Hosting: control.waterai.cloud
