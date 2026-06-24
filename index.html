@@ -810,6 +810,7 @@
 
     let currentLanguage = "pl";
     let currentRole = "admin";
+    let realRole = "admin";        // faktyczna rola zalogowanego (docelowo z Supabase)
     let previewClientId = null;
     let reminders = JSON.parse(localStorage.getItem(storageKey) || "[]");
 
@@ -881,7 +882,7 @@
 
       // Show role test panel only for admin
       const rolePanel = document.getElementById("role-test-panel");
-      if (rolePanel) rolePanel.style.display = currentRole === "admin" ? "block" : "none";
+      if (rolePanel) rolePanel.style.display = realRole === "admin" ? "block" : "none";
 
       tilesContainer.innerHTML = "";
 
