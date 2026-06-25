@@ -3129,7 +3129,19 @@ function renderMeasurementsModule() {
   ` : ''}
   `;
 
+  _runMeasurementsScripts(container);
   if (activeMeasurementsTab === 'tym' && showMeasurementForm) renderMeasurementsList();
+}
+
+// innerHTML nie uruchamia <script> — re-tworzymy je, by wykresy (Canvas) się narysowały.
+function _runMeasurementsScripts(container) {
+  try {
+    container.querySelectorAll('script').forEach(old => {
+      const s = document.createElement('script');
+      if (old.src) s.src = old.src; else s.textContent = old.textContent;
+      old.parentNode.replaceChild(s, old);
+    });
+  } catch (e) { /* ignore */ }
 }
 
 function renderProtocolsTable(protocols, objectId) {
@@ -3523,8 +3535,9 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
   const pageSize = window._regPageSize;
 
   const _rt = _regTs;
+  const removedCount = rawRows.filter(r => r.removed).length;
   const sortKey = window._regSortKey, sortDir = window._regSortDir === 'desc' ? -1 : 1;
-  const indexed = rawRows.map((r, idx) => ({ r, idx }));
+  const indexed = rawRows.map((r, idx) => ({ r, idx })).filter(o => !o.r.removed);
   indexed.sort((A, B) => {
     let a, b;
     if (sortKey === 'readTime') {
@@ -3555,7 +3568,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
   const rows = indexed.slice(page * pageSize, (page + 1) * pageSize);
 
   // Δ zużycie = różnica wskazań licznika między kolejnymi odczytami (chronologicznie), niezależnie od sortowania wyświetlania
-  const chrono = rawRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+  const chrono = rawRows.map((r, idx) => ({ r, idx })).filter(o => !o.r.removed).sort((A, B) => {
     const am = _rt(A.r.readTime), bm = _rt(B.r.readTime);
     if (am != null && bm != null) return am - bm;
     if (am != null) return -1;
@@ -3596,7 +3609,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
       <option value="100" ${pageSize === 100 ? 'selected' : ''}>100 / stronę</option>
     </select>`;
 
-  const paginationHtml = rawRows.length === 0 ? '' : `
+  const paginationHtml = indexed.length === 0 ? '' : `
     <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;flex-wrap:wrap;">
       ${navBtn('« Pierwsza', 0, page === 0)}
       ${navBtn('‹ Poprzednia', 'Math.max(0,window._regPage-1)', page === 0)}
@@ -3606,9 +3619,11 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
         / ${totalPages}</span>
       ${navBtn('Następna ›', 'Math.min(' + (totalPages - 1) + ',window._regPage+1)', page === totalPages - 1)}
       ${navBtn('Ostatnia »', totalPages - 1, page === totalPages - 1)}
-      <span style="color:var(--color-text-tertiary);">· ${rawRows.length} wierszy</span>
+      <span style="color:var(--color-text-tertiary);">· ${indexed.length} wierszy${removedCount ? ` · usunięte: ${removedCount}` : ''}</span>
       <span style="margin-left:auto;">${pageSizeSel}</span>
     </div>`;
+
+  const restoreBar = removedCount ? `<button class="small-button" onclick="regRestoreAll(${objectId})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">♻ Przywróć usunięte (${removedCount})</button>` : '';
 
   return `
   <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-top:24px;">
@@ -3618,6 +3633,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
         <h3 style="margin:0;font-size:14px;font-weight:600;color:#0C447C;">Dane z czujników — dane czasowe</h3>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        ${restoreBar}
         <label style="font-size:12px;color:#0C447C;background:#fff;border:1px solid #B5D4F4;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:500;">
           📂 Importuj CSV/Excel
           <input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importRegressionSensorFile(this, ${objectId})" />
@@ -3666,10 +3682,10 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
 
     <!-- Tabela danych -->
     <div style="padding:12px 16px;background:var(--color-background-primary);">
-      ${rawRows.length === 0 ? `
+      ${indexed.length === 0 ? `
         <div style="text-align:center;padding:28px;color:var(--color-text-secondary);font-size:13px;">
           <div style="font-size:32px;margin-bottom:8px;">📊</div>
-          Brak danych. Dodaj wiersze ręcznie lub zaimportuj plik CSV/Excel.
+          ${removedCount ? `Wszystkie odczyty usunięte. <a href="#" onclick="regRestoreAll(${objectId});return false;" style="color:#1E7B34;">♻ Przywróć usunięte (${removedCount})</a>` : 'Brak danych. Dodaj wiersze ręcznie lub zaimportuj plik CSV/Excel.'}
           <div style="font-size:11px;margin-top:8px;color:var(--color-text-tertiary);">
             Wymagane kolumny: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>
           </div>
@@ -3739,8 +3755,21 @@ function regToggleSort(key) {
 
 function deleteRegressionRow(objectId, index) {
   const rows = RegressionBaseModule.getRows(objectId);
-  rows.splice(index, 1);
-  RegressionBaseModule.saveRows(objectId, rows);
+  if (rows[index]) { rows[index].removed = true; RegressionBaseModule.saveRows(objectId, rows); }
+  renderMeasurementsModule();
+}
+
+function regRestoreAll(pid) {
+  const rows = RegressionBaseModule.getRows(pid);
+  rows.forEach(r => { if (r.removed) delete r.removed; });
+  RegressionBaseModule.saveRows(pid, rows);
+  renderMeasurementsModule();
+}
+
+function regClearAccepted(pid) {
+  const rows = RegressionBaseModule.getRows(pid);
+  rows.forEach(r => { if (r.accepted) delete r.accepted; });
+  RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
 
@@ -3810,11 +3839,10 @@ function regAcceptRow(pid, idx) {
   renderMeasurementsModule();
 }
 function regDeleteAllOutliers(pid) {
-  if (!confirm('Usunąć z danych wszystkie odczyty odstające?')) return;
+  if (!confirm('Usunąć z danych wszystkie odczyty odstające? (Można je przywrócić.)')) return;
   const { outliers } = _regComputeOutliers(pid);
-  const idxs = outliers.map(o => o.idx).sort((a, b) => b - a);   // od końca, by indeksy się nie przesuwały
   const rows = RegressionBaseModule.getRows(pid);
-  idxs.forEach(i => rows.splice(i, 1));
+  outliers.forEach(o => { if (rows[o.idx]) rows[o.idx].removed = true; });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
@@ -3837,13 +3865,13 @@ function _regComputeOutliers(pid) {
     if (ms == null) return (!from && !to);
     return ms >= fromMs && ms <= toMs;
   };
-  const chrono = rows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+  const chrono = rows.map((r, idx) => ({ r, idx })).filter(o => !o.r.removed).sort((A, B) => {
     const am = _regTs(A.r.readTime), bm = _regTs(B.r.readTime);
     if (am != null && bm != null) return am - bm;
     if (am != null) return -1; if (bm != null) return 1; return A.idx - B.idx;
   });
   const sup = [], cons = [];
-  rows.forEach((r, idx) => { if (inRange(idx) && r.tOutdoor != null && r.tSupply != null) sup.push({ idx, x: +r.tOutdoor, y: +r.tSupply }); });
+  rows.forEach((r, idx) => { if (!r.removed && inRange(idx) && r.tOutdoor != null && r.tSupply != null) sup.push({ idx, x: +r.tOutdoor, y: +r.tSupply }); });
   for (let j = 1; j < chrono.length; j++) {
     const cur = chrono[j], prev = chrono[j - 1];
     if (!inRange(cur.idx)) continue;
@@ -3880,12 +3908,15 @@ function renderRegressionSelection(pid) {
   const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
   const resOpen = !!window._regResultsOpen;
   const from = window._regBaseFrom || '', to = window._regBaseTo || '';
+  const removedCount = RegressionBaseModule.getRows(pid).filter(r => r.removed).length;
+  const accBar = accCount ? ` · <button class="small-button" onclick="regClearAccepted(${pid})" style="font-size:11px;padding:1px 8px;">↩ Przywróć zostawione (${accCount})</button>` : '';
+  const remBar = removedCount ? ` · <button class="small-button" onclick="regRestoreAll(${pid})" style="font-size:11px;padding:1px 8px;color:#1E7B34;border-color:#1E7B34;">♻ Przywróć usunięte (${removedCount})</button>` : '';
 
   // ── Krok 1: przegląd odchyłek ──
   let outlierBlock;
   if (!outliers.length) {
     outlierBlock = `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-      <div style="font-size:13px;color:#1E7B34;">✅ Brak odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zaakceptowanych wcześniej: ${accCount}` : ''} — dane gotowe.</div></div>`;
+      <div style="font-size:13px;color:#1E7B34;">✅ Brak nowych odczytów odstających (&gt; 2·RMSE) — dane gotowe.${accBar}${remBar}</div></div>`;
   } else {
     const rowsHtml = outliers.map(o => {
       const reasons = o.items.map(i => `${i.metric}: ${f2(i.value)} (odchyłka ${f2(i.resid)})`).join(' · ');
@@ -3901,7 +3932,7 @@ function renderRegressionSelection(pid) {
     outlierBlock = `<div style="border:1px solid #F3C9C9;border-radius:10px;overflow:hidden;margin-bottom:12px;">
       <div style="background:#FDECEC;padding:12px 16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-          <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zostawionych wcześniej: ${accCount}` : ''}.</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE).${accBar}${remBar}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="small-button" onclick="regDeleteAllOutliers(${pid})" style="font-size:12px;color:#c00;border-color:#c00;">✕ Usuń wszystkie</button>
             <button class="small-button" onclick="regAcceptAllOutliers(${pid})" style="font-size:12px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
@@ -4166,7 +4197,7 @@ function _regParseTime(rt) {
 }
 
 function buildSensorBaseline(objectId, from, to) {
-  const raw = RegressionBaseModule.getRows(objectId);
+  const raw = RegressionBaseModule.getRows(objectId).filter(r => !r.removed);
   const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
   const toMs   = to   ? Date.parse(to.length   <= 10 ? to   + 'T23:59:59' : to)   :  Infinity;
 
