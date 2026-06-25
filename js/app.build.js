@@ -3888,7 +3888,14 @@ function regOutPageSize(sz) { window._regOutPageSize = Number(sz) || 50; window.
 function regDeleteVisible(pid, viewKey) {
   const { rows } = _regOutlierPage(pid, viewKey);
   if (!rows.length) return;
-  if (!confirm(`Usunąć ${rows.length} widocznych odczytów? Znikną z obliczeń i wykresów (można przywrócić).`)) return;
+  const armKey = viewKey + ':visible';
+  if (window._regDelArm !== armKey) {            // 1. klik — uzbrojenie (bez confirm())
+    window._regDelArm = armKey;
+    renderMeasurementsModule();
+    try { setTimeout(function () { if (window._regDelArm === armKey) { window._regDelArm = null; renderMeasurementsModule(); } }, 4000); } catch (e) {}
+    return;
+  }
+  window._regDelArm = null;                       // 2. klik — wykonanie
   const data = RegressionBaseModule.getRows(pid);
   rows.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
   RegressionBaseModule.saveRows(pid, data);
@@ -3897,7 +3904,14 @@ function regDeleteVisible(pid, viewKey) {
 function regDeleteAllOutliers(pid, viewKey) {
   const list = _regOutlierList(pid, viewKey);
   if (!list.length) return;
-  if (!confirm(`Usunąć ${list.length} odczytów odstających? Znikną z obliczeń i wykresów (można przywrócić).`)) return;
+  const armKey = viewKey + ':all';
+  if (window._regDelArm !== armKey) {            // 1. klik — uzbrojenie (bez confirm())
+    window._regDelArm = armKey;
+    renderMeasurementsModule();
+    try { setTimeout(function () { if (window._regDelArm === armKey) { window._regDelArm = null; renderMeasurementsModule(); } }, 4000); } catch (e) {}
+    return;
+  }
+  window._regDelArm = null;                       // 2. klik — wykonanie
   const data = RegressionBaseModule.getRows(pid);
   list.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
   RegressionBaseModule.saveRows(pid, data);
@@ -4025,8 +4039,8 @@ function renderRegressionSelection(pid) {
       <div style="background:${v.accent}1f;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
         <div style="font-size:13px;font-weight:600;">${head} — <span style="color:#c00;">${total}</span> odchyłek</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="small-button" onclick="regDeleteVisible(${pid},'${viewKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń widoczne (${pageRows.length})</button>
-          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${viewKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie (${total})</button>
+          <button class="small-button" onclick="regDeleteVisible(${pid},'${viewKey}')" style="font-size:11px;${window._regDelArm === (viewKey + ':visible') ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}">${window._regDelArm === (viewKey + ':visible') ? '⚠️ Kliknij ponownie' : '✕ Usuń widoczne (' + pageRows.length + ')'}</button>
+          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${viewKey}')" style="font-size:11px;${window._regDelArm === (viewKey + ':all') ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}">${window._regDelArm === (viewKey + ':all') ? '⚠️ Kliknij ponownie' : '✕ Usuń wszystkie (' + total + ')'}</button>
           <button class="small-button" onclick="regAcceptAllOutliers(${pid},'${viewKey}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
         </div>
       </div>
