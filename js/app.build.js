@@ -3576,11 +3576,8 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
     return A.idx - B.idx;
   });
   const deltaByIdx = {};
-  for (let j = 0; j < chrono.length; j++) {
-    const cur = chrono[j].r, prev = j > 0 ? chrono[j - 1].r : null;
-    deltaByIdx[chrono[j].idx] = (prev && cur.heatConsumption != null && prev.heatConsumption != null)
-      ? (Number(cur.heatConsumption) - Number(prev.heatConsumption)) : null;
-  }
+  const _chainRows = chrono.map(o => Object.assign({}, o.r, { _idx: o.idx }));
+  _consDeltas(_chainRows).forEach(d => { deltaByIdx[d.idx] = d.y; });
 
   const fmtVal = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const fmtT   = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -3844,14 +3841,47 @@ function _regOutlierList(pid, which) {
   if (which === 'cons')   return o.consOutliers;
   return [...o.supplyOutliers, ...o.consOutliers];
 }
+function _regOutlierSorted(pid, which) {
+  const list = _regOutlierList(pid, which);
+  const key = window._regOutSortKey || 'resid';
+  const dir = window._regOutSortDir === 'asc' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    if (key === 'date') return ((_regTs(a.readTime) || 0) - (_regTs(b.readTime) || 0)) * dir;
+    return (Math.abs(a.resid) - Math.abs(b.resid)) * dir;
+  });
+}
+function _regOutlierPage(pid, which) {
+  const sorted = _regOutlierSorted(pid, which);
+  const ps = window._regOutPageSize || 50;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ps));
+  let pg = (window._regOutPage && window._regOutPage[which]) || 0;
+  if (pg >= totalPages) pg = totalPages - 1; if (pg < 0) pg = 0;
+  return { sorted, ps, totalPages, pg, rows: sorted.slice(pg * ps, (pg + 1) * ps), total: sorted.length };
+}
+function regOutSort(key) {
+  if (window._regOutSortKey === key) window._regOutSortDir = window._regOutSortDir === 'asc' ? 'desc' : 'asc';
+  else { window._regOutSortKey = key; window._regOutSortDir = key === 'date' ? 'asc' : 'desc'; }
+  window._regOutPage = {};
+  renderMeasurementsModule();
+}
+function regOutSetPage(which, p) { window._regOutPage = window._regOutPage || {}; window._regOutPage[which] = p; renderMeasurementsModule(); }
+function regOutPageSize(sz) { window._regOutPageSize = Number(sz) || 50; window._regOutPage = {}; renderMeasurementsModule(); }
+function regDeleteVisible(pid, which) {
+  const { rows } = _regOutlierPage(pid, which);
+  if (!rows.length) return;
+  if (!confirm(`Usunąć ${rows.length} widocznych odczytów? (Można je przywrócić.)`)) return;
+  const data = RegressionBaseModule.getRows(pid);
+  rows.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
+  RegressionBaseModule.saveRows(pid, data);
+  renderMeasurementsModule();
+}
 function regDeleteAllOutliers(pid, which) {
   const list = _regOutlierList(pid, which);
   if (!list.length) return;
-  if (!confirm(`Usunąć ${list.length} odczytów odstających? (Można je przywrócić.)`)) return;
-  const rows = RegressionBaseModule.getRows(pid);
-  const seen = new Set();
-  list.forEach(o => { if (!seen.has(o.idx)) { seen.add(o.idx); if (rows[o.idx]) rows[o.idx].removed = true; } });
-  RegressionBaseModule.saveRows(pid, rows);
+  if (!confirm(`Usunąć ${list.length} odczytów odstających? Zostaną oznaczone jako usunięte — można je przywrócić.`)) return;
+  const data = RegressionBaseModule.getRows(pid);
+  list.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
+  RegressionBaseModule.saveRows(pid, data);
   renderMeasurementsModule();
 }
 function regAcceptAllOutliers(pid, which) {
@@ -3878,29 +3908,24 @@ function _regComputeOutliers(pid) {
     if (am != null && bm != null) return am - bm;
     if (am != null) return -1; if (bm != null) return 1; return A.idx - B.idx;
   });
-  const sup = [], cons = [];
+  const sup = [];
   rows.forEach((r, idx) => { if (!r.removed && inRange(idx) && r.tOutdoor != null && r.tSupply != null) sup.push({ idx, x: +r.tOutdoor, y: +r.tSupply }); });
-  for (let j = 1; j < chrono.length; j++) {
-    const cur = chrono[j], prev = chrono[j - 1];
-    if (!inRange(cur.idx)) continue;
-    if (cur.r.heatConsumption != null && prev.r.heatConsumption != null && cur.r.tOutdoor != null) {
-      const d = +cur.r.heatConsumption - +prev.r.heatConsumption;
-      if (d > 0) cons.push({ idx: cur.idx, x: +cur.r.tOutdoor, y: d });
-    }
-  }
+  // Zużycie: łańcuch tylko po rosnących, niezerowych odczytach licznika (w zakresie dat)
+  const consChain = chrono.filter(o => inRange(o.idx)).map(o => Object.assign({}, o.r, { _idx: o.idx }));
+  const cons = _consDeltas(consChain);
   const fSup = _olsFit(sup.map(p => ({ x: p.x, y: p.y })));
   const fCons = _olsFit(cons.map(p => ({ x: p.x, y: p.y })));
   const median = arr => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
   // Detekcja ODPORNA (MAD) — próg się nie „rozjeżdża" po usunięciu kilku punktów, więc „Usuń wszystkie" się zbiega.
   const detect = (pts, f, metric) => {
-    if (pts.length < 4) return [];
+    if (pts.length < 5) return [];
     const res = pts.map(p => p.y - (f.a * p.x + f.b));
     const med = median(res);
     let mad = 1.4826 * median(res.map(r => Math.abs(r - med)));
-    if (!(mad > 0)) mad = f.rmse;                 // gdy rozrzut zerowy
+    if (!(mad > 1e-9)) mad = f.rmse;              // bulk niemal stały → użyj RMSE (nie flaguj normalnych punktów)
     const th = 3.5 * mad; if (!(th > 0)) return [];
     return pts.map((p, i) => ({ idx: p.idx, metric, readTime: rows[p.idx].readTime, x: p.x, y: p.y, predicted: f.a * p.x + f.b, resid: res[i] }))
-              .filter(o => Math.abs(o.resid) > th)
+              .filter(o => Math.abs(o.resid - med) > th)     // odległość od MEDIANY reszt (centrowane)
               .filter(o => !(rows[o.idx] && rows[o.idx].accepted))
               .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
   };
@@ -3910,25 +3935,27 @@ function _regComputeOutliers(pid) {
 }
 
 function renderRegressionSelection(pid) {
-  const { supplyOutliers, consOutliers } = _regComputeOutliers(pid);
   const f2 = v => Number(v || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const f1 = v => Number(v || 0).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
   const removedCount = RegressionBaseModule.getRows(pid).filter(r => r.removed).length;
   const resOpen = !!window._regResultsOpen;
   const from = window._regBaseFrom || '', to = window._regBaseTo || '';
-  const dir = window._regOutSortDir === 'asc' ? 'asc' : 'desc';
-  const arrow = dir === 'asc' ? '▲' : '▼';
+  window._regOutSortKey = window._regOutSortKey || 'resid';
+  window._regOutSortDir = window._regOutSortDir || 'desc';
+  window._regOutPageSize = window._regOutPageSize || 50;
+  const sortKey = window._regOutSortKey, sortDir = window._regOutSortDir;
   const accBar = accCount ? ` · <button class="small-button" onclick="regClearAccepted(${pid})" style="font-size:11px;padding:1px 8px;">↩ Przywróć zostawione (${accCount})</button>` : '';
   const remBar = removedCount ? ` · <button class="small-button" onclick="regRestoreAll(${pid})" style="font-size:11px;padding:1px 8px;color:#1E7B34;border-color:#1E7B34;">♻ Przywróć usunięte (${removedCount})</button>` : '';
+  const sa = key => sortKey === key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
 
-  const table = (title, icon, list, which, accent, yLabel) => {
-    if (!list.length) {
+  const table = (title, icon, which, accent, yLabel) => {
+    const { rows: pageRows, total, totalPages, pg, ps } = _regOutlierPage(pid, which);
+    if (!total) {
       return `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:11px 14px;margin-bottom:12px;">
         <div style="font-size:13px;color:#1E7B34;">${icon} ${title}: ✅ brak odchyłek.</div></div>`;
     }
-    const sorted = [...list].sort((a, b) => dir === 'asc' ? Math.abs(a.resid) - Math.abs(b.resid) : Math.abs(b.resid) - Math.abs(a.resid));
-    const rowsHtml = sorted.map(o => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
+    const rowsHtml = pageRows.map(o => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
         <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
         <td style="padding:6px 10px;font-size:12px;text-align:right;">${f1(o.x)}</td>
         <td style="padding:6px 10px;font-size:12px;text-align:right;">${f2(o.y)}</td>
@@ -3939,32 +3966,48 @@ function renderRegressionSelection(pid) {
           <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
         </td>
       </tr>`).join('');
+    const navBtn = (label, page, disabled) => `<button class="small-button" ${disabled ? 'disabled' : `onclick="regOutSetPage('${which}', ${page})"`} style="font-size:11px;padding:2px 7px;${disabled ? 'opacity:.4;' : ''}">${label}</button>`;
+    const pageSizeSel = `<select onchange="regOutPageSize(this.value)" style="font-size:11px;padding:2px 4px;">
+        <option value="50" ${ps === 50 ? 'selected' : ''}>50</option>
+        <option value="100" ${ps === 100 ? 'selected' : ''}>100</option>
+      </select>`;
+    const pagination = `<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:12px;flex-wrap:wrap;background:var(--color-background-primary);border-top:1px solid var(--color-border-tertiary);">
+        ${navBtn('« Pierwsza', 0, pg === 0)}
+        ${navBtn('‹ Poprzednia', Math.max(0, pg - 1), pg === 0)}
+        <span style="color:var(--color-text-secondary);">Strona ${pg + 1} / ${totalPages}</span>
+        ${navBtn('Następna ›', Math.min(totalPages - 1, pg + 1), pg === totalPages - 1)}
+        ${navBtn('Ostatnia »', totalPages - 1, pg === totalPages - 1)}
+        <span style="color:var(--color-text-tertiary);">· ${total} odchyłek</span>
+        <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;">na stronę ${pageSizeSel}</span>
+      </div>`;
     return `<div style="border:1px solid ${accent};border-radius:10px;overflow:hidden;margin-bottom:12px;">
       <div style="background:${accent}1f;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div style="font-size:13px;font-weight:600;">${icon} ${title} — <span style="color:#c00;">${list.length}</span> odchyłek</div>
+        <div style="font-size:13px;font-weight:600;">${icon} ${title} — <span style="color:#c00;">${total}</span> odchyłek</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${which}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie</button>
+          <button class="small-button" onclick="regDeleteVisible(${pid},'${which}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń widoczne (${pageRows.length})</button>
+          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${which}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie (${total})</button>
           <button class="small-button" onclick="regAcceptAllOutliers(${pid},'${which}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
         </div>
       </div>
       <div style="overflow-x:auto;background:var(--color-background-primary);">
         <table style="width:100%;border-collapse:collapse;min-width:560px;">
           <thead><tr style="background:var(--color-background-secondary);">
-            <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
+            <th onclick="regOutSort('date')" title="Sortuj po dacie odczytu" style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#0C447C;cursor:pointer;user-select:none;white-space:nowrap;">Odczyt${sa('date')}</th>
             <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">T zewn. [°C]</th>
             <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${yLabel}</th>
             <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">prognoza</th>
-            <th onclick="window._regOutSortDir='${dir === 'asc' ? 'desc' : 'asc'}';renderMeasurementsModule();" title="Sortuj po wielkości odchyłki" style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:#0C447C;cursor:pointer;user-select:none;white-space:nowrap;">Odchyłka ${arrow}</th>
+            <th onclick="regOutSort('resid')" title="Sortuj po wielkości odchyłki" style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:#0C447C;cursor:pointer;user-select:none;white-space:nowrap;">Odchyłka${sa('resid')}</th>
             <th style="padding:6px 10px;"></th>
           </tr></thead><tbody>${rowsHtml}</tbody>
         </table>
       </div>
+      ${pagination}
     </div>`;
   };
 
-  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki (odporna detekcja MAD; kliknij „Odchyłka ${arrow}", aby zmienić sortowanie).${accBar}${remBar}</div>`;
-  const consTable = table('Zużycie ciepła vs T zewnętrzna', '📉', consOutliers, 'cons', '#185FA5', 'Δ zużycie [MJ]');
-  const supTable  = table('T zasilania vs T zewnętrzna', '🌡️', supplyOutliers, 'supply', '#C77F1A', 'T zasil. [°C]');
+  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki (odporna detekcja MAD; kliknij nagłówek „Odczyt" lub „Odchyłka", aby sortować ↑/↓).${accBar}${remBar}</div>`;
+  const consTable = table('Zużycie ciepła vs T zewnętrzna', '📉', 'cons', '#185FA5', 'Δ zużycie [MJ]');
+  const supTable  = table('T zasilania vs T zewnętrzna', '🌡️', 'supply', '#C77F1A', 'T zasil. [°C]');
 
   // ── Zakres dat i godzin (od–do) ──
   const dateBlock = `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
@@ -4219,6 +4262,23 @@ function _binnedFit(pts) {
   return { fit: _olsFit(bins.map(b => ({ x: b.x, y: b.y }))), bins };
 }
 
+// Różnice zużycia z licznika NARASTAJĄCEGO, odporne na puste/zerowe/nie-rosnące odczyty.
+// rows: wiersze w kolejności chronologicznej. Zwraca [{x:tOutdoor, y:Δ, readTime, idx}].
+function _consDeltas(rows) {
+  const out = [];
+  let lastHc = null;
+  for (const r of rows) {
+    if (r.heatConsumption == null || r.tOutdoor == null) continue;
+    const hc = Number(r.heatConsumption);
+    if (!isFinite(hc) || hc <= 0) continue;          // pusty/zerowy odczyt licznika — pomijamy
+    if (lastHc == null) { lastHc = hc; continue; }
+    const d = hc - lastHc;
+    if (d > 0) { out.push({ x: Number(r.tOutdoor), y: d, readTime: r.readTime, idx: r._idx }); lastHc = hc; }
+    else { lastHc = hc; }                             // spadek (reset / po skoku) — resync bez emisji, nie psuje reszty
+  }
+  return out;
+}
+
 function buildSensorBaseline(objectId, from, to) {
   const raw = RegressionBaseModule.getRows(objectId).filter(r => !r.removed);
   const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
@@ -4238,15 +4298,8 @@ function buildSensorBaseline(objectId, from, to) {
     .filter(r => r.tOutdoor != null && r.tSupply != null)
     .map(r => ({ x: Number(r.tOutdoor), y: Number(r.tSupply), label: r.readTime || '' }));
 
-  // Krzywa zużycia: Δ heatConsumption (licznik narastający) vs tOutdoor odczytu końcowego
-  const consPts = [];
-  for (let i = 1; i < inRange.length; i++) {
-    const prev = inRange[i - 1], cur = inRange[i];
-    if (cur.heatConsumption == null || prev.heatConsumption == null || cur.tOutdoor == null) continue;
-    const d = Number(cur.heatConsumption) - Number(prev.heatConsumption);
-    if (!(d > 0)) continue;                    // reset licznika / brak przyrostu — pomijamy
-    consPts.push({ x: Number(cur.tOutdoor), y: d, label: cur.readTime || '' });
-  }
+  // Krzywa zużycia: Δ heatConsumption (licznik narastający) — łańcuch tylko po rosnących, niezerowych odczytach
+  const consPts = _consDeltas(inRange).map(d => ({ x: d.x, y: d.y, label: d.readTime || '' }));
 
   return { supplyPts, consPts, used: inRange.length, total: raw.length };
 }
