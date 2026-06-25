@@ -3648,7 +3648,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
           📂 Importuj CSV/Excel
           <input type="file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importRegressionSensorFile(this, ${objectId})" />
         </label>
-        <button class="small-button" onclick="clearRegressionSensorData(${objectId})" style="font-size:11px;color:#c00;border-color:#c00;" ${rawRows.length === 0 ? 'disabled' : ''}>🗑 Wyczyść wszystko</button>
+        <button class="small-button" onclick="clearRegressionSensorData(${objectId})" style="font-size:11px;${window._regClearArm == objectId ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}" ${rawRows.length === 0 ? 'disabled' : ''}>${window._regClearArm == objectId ? '⚠️ Kliknij ponownie, aby usunąć WSZYSTKO' : '🗑 Wyczyść wszystko'}</button>
       </div>
     </div>
 
@@ -3784,7 +3784,14 @@ function regClearAccepted(pid) {
 }
 
 function clearRegressionSensorData(objectId) {
-  if (!confirm('Czy na pewno chcesz usunąć wszystkie dane z czujników w tym okresie bazowym?')) return;
+  // Dwustopniowe potwierdzenie BEZ natywnego confirm() — działa nawet gdy przeglądarka blokuje okna dialogowe.
+  if (window._regClearArm != objectId) {
+    window._regClearArm = objectId;
+    renderMeasurementsModule();
+    try { setTimeout(function () { if (window._regClearArm == objectId) { window._regClearArm = null; renderMeasurementsModule(); } }, 4000); } catch (e) {}
+    return;
+  }
+  window._regClearArm = null;
   RegressionBaseModule.saveRows(objectId, []);
   window._regPage = 0;
   renderMeasurementsModule();
