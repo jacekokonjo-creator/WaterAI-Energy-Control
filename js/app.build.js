@@ -3725,8 +3725,8 @@ function _regParseTime(rt) {
 
 function buildSensorBaseline(objectId, from, to) {
   const raw = JSON.parse(localStorage.getItem('waterai_regression_sensors_' + objectId) || '[]');
-  const fromMs = from ? Date.parse(from + 'T00:00:00') : -Infinity;
-  const toMs   = to   ? Date.parse(to   + 'T23:59:59') :  Infinity;
+  const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
+  const toMs   = to   ? Date.parse(to.length   <= 10 ? to   + 'T23:59:59' : to)   :  Infinity;
 
   const sorted = raw
     .map(r => ({ r, ms: _regParseTime(r.readTime) }))
@@ -3868,8 +3868,8 @@ function renderRegressionBaselineCurves(objectId) {
     <div style="display:flex;align-items:flex-end;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;">
       <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📐 Krzywe bazowe (z danych z czujników)</h3>
       <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;">
-        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od</label><input type="date" id="reg-base-from" value="${from}" style="font-size:12px;"></div>
-        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do</label><input type="date" id="reg-base-to" value="${to}" style="font-size:12px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od</label><input type="datetime-local" id="reg-base-from" value="${from}" style="font-size:12px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do</label><input type="datetime-local" id="reg-base-to" value="${to}" style="font-size:12px;"></div>
         <button class="small-button" onclick="window._regBaseFrom=document.getElementById('reg-base-from').value;window._regBaseTo=document.getElementById('reg-base-to').value;renderMeasurementsModule();">Zastosuj</button>
         ${(from || to) ? `<button class="small-button" onclick="window._regBaseFrom='';window._regBaseTo='';renderMeasurementsModule();" style="color:#c00;border-color:#c00;">Wyczyść filtr</button>` : ''}
       </div>
