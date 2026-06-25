@@ -387,6 +387,9 @@ function renderInvoicingModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
 
+  if (window.BillingEntitiesModule) BillingEntitiesModule.seedDefaults();
+  const issuers = window.BillingEntitiesModule ? BillingEntitiesModule.getAll() : [];
+
   const clients = ClientsModule.getAll();
   const allInvoices = InvoicingModule.getAll();
   const dash = InvoicingModule.getDashboard();
@@ -424,13 +427,23 @@ function renderInvoicingModule() {
 
   const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
+  const defIssuer = window.BillingEntitiesModule ? BillingEntitiesModule.getDefault() : null;
+  const issuerOptions = issuers.map(e => {
+    const c = (BillingEntitiesModule.COUNTRIES[e.country] || {});
+    const sel = defIssuer && Number(defIssuer.id) === Number(e.id) ? 'selected' : '';
+    return `<option value="${e.id}" data-currency="${e.defaultCurrency}" data-vat="${e.defaultVatRate}" ${sel}>${c.flag || ''} ${escapeHtml(e.name || '(bez nazwy)')}</option>`;
+  }).join('');
+
   const invoiceRows = invoices.map(inv => {
     const client = ClientsModule.find(inv.clientId);
     const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
     const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
+    const issuer = inv.issuerId && window.BillingEntitiesModule ? BillingEntitiesModule.find(inv.issuerId) : null;
+    const issuerFlag = issuer ? ((BillingEntitiesModule.COUNTRIES[issuer.country] || {}).flag || '') : '';
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber || '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${issuer ? issuerFlag + ' ' + escapeHtml(issuer.name) : '—'}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${typeInfo.icon} ${typeInfo.label}</td>
       <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.issueDate)}</td>
@@ -472,6 +485,11 @@ function renderInvoicingModule() {
         <button class="small-button" onclick="document.getElementById('inv-form-area').style.display='none'">✕</button>
       </div>
       <div class="calendar-form">
+        <div style="grid-column:1/-1;"><label>Podmiot wystawiający (sprzedawca)</label>
+          <select id="inv-issuer" onchange="onInvIssuerChange()">
+            ${issuers.length ? issuerOptions : '<option value="">— najpierw dodaj podmiot (⚙ Podmioty) —</option>'}
+          </select>
+        </div>
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
         <div><label>Obiekt (opcjonalnie)</label><select id="inv-object"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
         <div><label>Typ faktury</label><select id="inv-type">${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
@@ -479,13 +497,15 @@ function renderInvoicingModule() {
         <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
         <div><label>Termin płatności</label><input id="inv-due-date" type="date" /></div>
         <div><label>Kwota netto</label><input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" /></div>
-        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="8">8%</option><option value="0">0%</option></select></div>
-        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option></select></div>
+        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="21">21%</option><option value="20">20%</option><option value="19">19%</option><option value="8">8%</option><option value="0">0%</option></select></div>
+        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="GBP">GBP</option></select></div>
         <div><label>Status</label><select id="inv-status">${Object.entries(InvoicingModule.STATUSES).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
         <div style="grid-column:1/-1;"><label>Uwagi</label><input id="inv-notes" placeholder="opcjonalne uwagi" /></div>
         <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveInvoice()" style="width:auto;padding:10px 24px;margin:0;">Zapisz fakturę</button></div>
       </div>
     </div>
+
+    <div id="billing-entities-area" style="display:none;border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;"></div>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
       <h3 style="margin:0;font-size:15px;font-weight:500;">Faktury (${invoices.length}${q ? ' z '+allInvoices.length : ''})</h3>
@@ -493,6 +513,7 @@ function renderInvoicingModule() {
         <input type="search" placeholder="Szukaj faktury..." value="${escapeHtml(q)}"
           oninput="window._invSearch=this.value;renderInvoicingModule();"
           style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <button class="small-button" style="font-size:13px;padding:8px 14px;white-space:nowrap;" onclick="toggleBillingEntities()">⚙ Podmioty</button>
         <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;" onclick="document.getElementById('inv-form-area').style.display='block'">+ Nowa faktura</button>
       </div>
     </div>
@@ -504,6 +525,7 @@ function renderInvoicingModule() {
             <thead><tr style="background:var(--color-background-secondary);">
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
               ${thS('client','Klient')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Podmiot</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ faktury</th>
               ${thS('date','Data wyst.')}
@@ -536,10 +558,12 @@ function saveInvoice() {
   const numberEl = document.getElementById('inv-number');
   const dueDate = document.getElementById('inv-due-date').value;
   const objectId = document.getElementById('inv-object').value || null;
+  const issuerId = (document.getElementById('inv-issuer') || {}).value || null;
 
   InvoicingModule.add({
     clientId,
     objectId,
+    issuerId,
     invoiceNumber: numberEl.value.trim() || undefined,
     invoiceType: document.getElementById('inv-type').value,
     issueDate: document.getElementById('inv-issue-date').value,
@@ -581,6 +605,7 @@ function viewInvoice(id) {
   if (!inv) return;
   const client = ClientsModule.find(inv.clientId);
   const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+  const issuer = inv.issuerId && window.BillingEntitiesModule ? BillingEntitiesModule.find(inv.issuerId) : null;
   const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
   const s = InvoicingModule.STATUSES[inv.status] || { label: inv.status, color: '#666', bg: '#eee' };
   const container = document.getElementById('module-content');
@@ -596,6 +621,13 @@ function viewInvoice(id) {
         <span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+        ${issuer ? `<div style="grid-column:1/-1;background:var(--color-background-secondary);border-radius:10px;padding:10px 12px;">
+          <span style="color:var(--color-text-secondary);font-size:11px;display:block;">Sprzedawca (podmiot wystawiający)</span>
+          <strong>${(BillingEntitiesModule.COUNTRIES[issuer.country]||{}).flag||''} ${escapeHtml(issuer.name)}</strong>
+          ${[issuer.addressLine, issuer.postalCity].filter(Boolean).length ? `<div style="font-size:12px;color:var(--color-text-secondary);">${[issuer.addressLine, issuer.postalCity].filter(Boolean).map(escapeHtml).join(', ')}</div>` : ''}
+          ${(issuer.taxNo || issuer.vatId) ? `<div style="font-size:12px;color:var(--color-text-secondary);">${issuer.taxNo ? `${escapeHtml((BillingEntitiesModule.COUNTRIES[issuer.country]||{}).taxNoLabel||'NIP')}: ${escapeHtml(issuer.taxNo)}` : ''}${issuer.taxNo && issuer.vatId ? ' · ' : ''}${issuer.vatId ? `${escapeHtml((BillingEntitiesModule.COUNTRIES[issuer.country]||{}).vatIdLabel||'VAT')}: ${escapeHtml(issuer.vatId)}` : ''}</div>` : ''}
+          ${issuer.iban ? `<div style="font-size:12px;color:var(--color-text-secondary);">IBAN: ${escapeHtml(issuer.iban)}${issuer.swift ? ` · SWIFT: ${escapeHtml(issuer.swift)}` : ''}</div>` : ''}
+        </div>` : ''}
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Klient</span><strong>${escapeHtml((client && client.name) || '—')}</strong></div>
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Obiekt</span><strong>${escapeHtml((obj && obj.name) || '—')}</strong></div>
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Data wystawienia</span><strong>${fmtDate(inv.issueDate)}</strong></div>
@@ -627,6 +659,7 @@ function editInvoice(id) {
     const btn = form.querySelector('button[onclick="saveInvoice()"]');
     if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveInvoiceEdit(${id})`); }
     document.getElementById('inv-client').value = inv.clientId || '';
+    if (document.getElementById('inv-issuer')) document.getElementById('inv-issuer').value = inv.issuerId || '';
     updateInvObjects(inv.clientId);
     setTimeout(() => { if (document.getElementById('inv-object')) document.getElementById('inv-object').value = inv.objectId || ''; }, 50);
     document.getElementById('inv-number').value = inv.invoiceNumber || '';
@@ -650,6 +683,7 @@ function saveInvoiceEdit(id) {
   InvoicingModule.update(id, {
     clientId: document.getElementById('inv-client').value,
     objectId: document.getElementById('inv-object').value || null,
+    issuerId: (document.getElementById('inv-issuer') || {}).value || null,
     invoiceNumber: document.getElementById('inv-number').value.trim(),
     invoiceType: document.getElementById('inv-type').value,
     issueDate: document.getElementById('inv-issue-date').value,
@@ -665,6 +699,145 @@ function saveInvoiceEdit(id) {
 function markInvoicePaid(id) {
   InvoicingModule.updateStatus(id, 'PAID', InvoicingModule.find(id)?.grossAmount || 0);
   renderInvoicingModule();
+}
+
+// ── Podmioty wystawiające (firmy) ──────────────────────────────────────────────
+
+// Po wybraniu sprzedawcy: podpowiedz jego domyślną walutę i stawkę VAT.
+function onInvIssuerChange() {
+  const sel = document.getElementById('inv-issuer');
+  if (!sel || !sel.value) return;
+  const opt = sel.options[sel.selectedIndex];
+  const apply = (id, val, suffix) => {
+    if (val === null || val === undefined || val === '') return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (![...el.options].some(o => o.value === String(val))) {
+      el.add(new Option((suffix ? val + suffix : val), String(val)));
+    }
+    el.value = String(val);
+  };
+  apply('inv-currency', opt.getAttribute('data-currency'));
+  apply('inv-vat', opt.getAttribute('data-vat'), '%');
+}
+
+function toggleBillingEntities() {
+  const area = document.getElementById('billing-entities-area');
+  if (!area) return;
+  const show = area.style.display === 'none' || !area.style.display;
+  area.style.display = show ? 'block' : 'none';
+  if (show) { window._billingEditId = undefined; renderBillingEntitiesPanel(); area.scrollIntoView({ behavior: 'smooth' }); }
+}
+
+function renderBillingEntitiesPanel() {
+  const area = document.getElementById('billing-entities-area');
+  if (!area || !window.BillingEntitiesModule) return;
+  const list = BillingEntitiesModule.getAll();
+  const editing = window._billingEditId;
+
+  const rows = list.map(e => {
+    const c = BillingEntitiesModule.COUNTRIES[e.country] || {};
+    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+      <td style="padding:8px 12px;font-size:13px;">${c.flag || ''} ${escapeHtml(e.name || '(bez nazwy)')} ${e.isDefault ? '<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 7px;border-radius:10px;margin-left:4px;">domyślny</span>' : ''}</td>
+      <td style="padding:8px 12px;font-size:13px;">${c.name || e.country}</td>
+      <td style="padding:8px 12px;font-size:13px;">${escapeHtml(e.vatId || '—')}</td>
+      <td style="padding:8px 12px;font-size:13px;white-space:nowrap;">${escapeHtml(e.defaultCurrency)} · VAT ${e.defaultVatRate}%</td>
+      <td style="padding:8px 12px;white-space:nowrap;">
+        <button class="small-button" onclick="editBillingEntity(${e.id})" title="Edytuj">✏️</button>
+        <button class="small-button icon-btn-del" onclick="if(confirm('Usunąć podmiot? Wystawione faktury pozostaną, ale stracą powiązanie ze sprzedawcą.')){BillingEntitiesModule.remove(${e.id});window._billingEditId=undefined;renderBillingEntitiesPanel();}" title="Usuń">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  area.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h4 style="margin:0;font-size:15px;color:#0C447C;">Podmioty wystawiające faktury (firmy)</h4>
+      <div style="display:flex;gap:8px;">
+        <button class="primary-button" style="font-size:13px;padding:7px 14px;margin:0;width:auto;" onclick="editBillingEntity('new')">+ Dodaj podmiot</button>
+        <button class="small-button" onclick="document.getElementById('billing-entities-area').style.display='none'">✕</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:12px;">Wybierasz tu spółkę, która wystawia fakturę (PL / SK / CZ / DE / AT / UK). Dane rejestrowe, walutę i stawkę VAT uzupełnij i edytuj wedle potrzeb.</div>
+    ${list.length ? `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:14px;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--color-background-secondary);">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Nazwa</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Kraj</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Nr VAT</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;">Waluta / VAT</th>
+          <th style="padding:8px 12px;font-size:11px;font-weight:600;">Akcje</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>`
+      : `<div class="reminder-card"><strong>Brak podmiotów</strong><div class="reminder-meta">Dodaj pierwszą firmę wystawiającą faktury.</div></div>`}
+    ${editing !== undefined ? billingEntityForm(editing === 'new' ? null : BillingEntitiesModule.find(editing)) : ''}
+  `;
+}
+
+function editBillingEntity(id) { window._billingEditId = id; renderBillingEntitiesPanel(); }
+
+function onBillingCountryChange() {
+  const code = (document.getElementById('be-country') || {}).value || 'PL';
+  const c = BillingEntitiesModule.COUNTRIES[code] || {};
+  const taxLbl = document.getElementById('be-taxno-label');
+  const vatLbl = document.getElementById('be-vatid-label');
+  if (taxLbl) taxLbl.textContent = c.taxNoLabel || 'Nr identyfikacyjny';
+  if (vatLbl) vatLbl.textContent = c.vatIdLabel || 'Nr VAT';
+  const cur = document.getElementById('be-currency'); if (cur) cur.value = c.currency || 'EUR';
+  const vat = document.getElementById('be-vat'); if (vat) vat.value = (c.vat != null ? c.vat : 23);
+  const pref = document.getElementById('be-prefix'); if (pref && /^FV-[A-Z]{2}$/.test(pref.value || '')) pref.value = 'FV-' + code;
+}
+
+function billingEntityForm(e) {
+  const isNew = !e;
+  const code = e ? e.country : 'PL';
+  const c = BillingEntitiesModule.COUNTRIES[code] || {};
+  const countryOpts = Object.entries(BillingEntitiesModule.COUNTRIES)
+    .map(([k, v]) => `<option value="${k}" ${k === code ? 'selected' : ''}>${v.flag} ${v.name}</option>`).join('');
+  const val = (k, d = '') => (e && e[k] != null && e[k] !== '') ? String(e[k]) : d;
+  return `
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;background:var(--color-background-secondary);">
+      <h5 style="margin:0 0 12px;font-size:14px;color:#0C447C;">${isNew ? 'Nowy podmiot' : 'Edytuj podmiot'}</h5>
+      <div class="calendar-form">
+        <div style="grid-column:1/-1;"><label>Nazwa firmy</label><input id="be-name" value="${escapeHtml(val('name'))}" placeholder="np. WaterAI Polska Sp. z o.o." /></div>
+        <div><label>Kraj</label><select id="be-country" onchange="onBillingCountryChange()">${countryOpts}</select></div>
+        <div><label><span id="be-taxno-label">${c.taxNoLabel || 'NIP'}</span></label><input id="be-taxno" value="${escapeHtml(val('taxNo'))}" /></div>
+        <div><label><span id="be-vatid-label">${c.vatIdLabel || 'VAT-UE'}</span></label><input id="be-vatid" value="${escapeHtml(val('vatId'))}" /></div>
+        <div style="grid-column:1/-1;"><label>Adres (ulica, nr)</label><input id="be-address" value="${escapeHtml(val('addressLine'))}" /></div>
+        <div><label>Kod i miasto</label><input id="be-postalcity" value="${escapeHtml(val('postalCity'))}" placeholder="np. 00-001 Warszawa" /></div>
+        <div><label>E-mail</label><input id="be-email" value="${escapeHtml(val('email'))}" /></div>
+        <div><label>Telefon</label><input id="be-phone" value="${escapeHtml(val('phone'))}" /></div>
+        <div><label>Bank</label><input id="be-bankname" value="${escapeHtml(val('bankName'))}" /></div>
+        <div><label>IBAN</label><input id="be-iban" value="${escapeHtml(val('iban'))}" /></div>
+        <div><label>SWIFT / BIC</label><input id="be-swift" value="${escapeHtml(val('swift'))}" /></div>
+        <div><label>Waluta domyślna</label><select id="be-currency">${['PLN', 'EUR', 'CZK', 'GBP'].map(x => `<option value="${x}" ${(e ? e.defaultCurrency : c.currency) === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+        <div><label>VAT domyślny (%)</label><input id="be-vat" type="number" step="1" min="0" value="${e ? e.defaultVatRate : (c.vat != null ? c.vat : 23)}" /></div>
+        <div><label>Prefiks numeru FV</label><input id="be-prefix" value="${escapeHtml(val('numberPrefix', 'FV-' + code))}" placeholder="np. FV-PL" /></div>
+        <div style="grid-column:1/-1;"><label>Stopka / dane rejestrowe (na fakturze)</label><input id="be-footer" value="${escapeHtml(val('footerNote'))}" placeholder="np. KRS, sąd rejestrowy, kapitał zakładowy" /></div>
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;"><input type="checkbox" id="be-default" ${e && e.isDefault ? 'checked' : ''} style="width:auto;margin:0;" /><label style="margin:0;">Podmiot domyślny (podpowiadany przy nowej fakturze)</label></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;">
+          <button class="primary-button" type="button" style="width:auto;padding:9px 22px;margin:0;" onclick="saveBillingEntity(${isNew ? 'null' : e.id})">${isNew ? 'Dodaj' : 'Zapisz'}</button>
+          <button class="small-button" type="button" onclick="window._billingEditId=undefined;renderBillingEntitiesPanel();">Anuluj</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function saveBillingEntity(id) {
+  const g = i => (document.getElementById(i) || {}).value;
+  const data = {
+    name: g('be-name'), country: g('be-country'),
+    taxNo: g('be-taxno'), vatId: g('be-vatid'),
+    addressLine: g('be-address'), postalCity: g('be-postalcity'),
+    email: g('be-email'), phone: g('be-phone'),
+    bankName: g('be-bankname'), iban: g('be-iban'), swift: g('be-swift'),
+    defaultCurrency: g('be-currency'), defaultVatRate: g('be-vat'),
+    numberPrefix: g('be-prefix'), footerNote: g('be-footer'),
+    isDefault: (document.getElementById('be-default') || {}).checked
+  };
+  if (!(data.name || '').trim()) { alert('Podaj nazwę firmy.'); return; }
+  if (id === null || id === undefined) BillingEntitiesModule.add(data);
+  else BillingEntitiesModule.update(id, data);
+  window._billingEditId = undefined;
+  renderBillingEntitiesPanel();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
