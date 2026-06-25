@@ -2435,7 +2435,7 @@ function escoObjectOptions(clientId, selectedId){
   if(!clientId) return `<option value="">— najpierw wybierz klienta —</option>`;
   const objs=ObjectsModule.findByClient(clientId);
   if(!objs.length) return `<option value="">— brak obiektów dla klienta —</option>`;
-  return `<option value="">— wybierz obiekt —</option>`+
+  return `<option value="">— wszystkie obiekty klienta —</option>`+
     objs.map(o=>`<option value="${o.id}" ${Number(selectedId)===Number(o.id)?'selected':''}>${escapeHtml(o.name)}</option>`).join('');
 }
 
@@ -2471,23 +2471,38 @@ function escoClientUserOptions(clientId, selectedName){
   return `<option value="">— (uzupełnimy na końcu) —</option>`+opts;
 }
 
-// Tabela analiz przypisanych WYŁĄCZNIE do wybranego obiektu — wszystkie typy
-function escoAnalysesTableHTML(objectId, preselectIds){
-  if(!objectId) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Najpierw wybierz <b>klienta</b> i <b>obiekt</b> — pojawią się tu analizy przypisane do tego obiektu.</div>`;
-  const anals=AnalysesModule.findByObject(objectId);
-  if(!anals.length) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Brak analiz dla tego obiektu. Dodaj analizę w module <b>Analizy</b>.</div>`;
+// Zaznaczenie analizy jako rozliczeniowej (nadrzędnej) automatycznie włącza ją do raportu.
+function escoPickMaster(radio){
+  const cb=document.querySelector('input[name="esco_anal"][value="'+radio.value+'"]');
+  if(cb) cb.checked=true;
+  updateESCOSummary();
+}
+
+// Tabela analiz wybranego KLIENTA (opcjonalnie zawężona do obiektu) — wszystkie typy.
+// Każda zaznaczona analiza wchodzi do raportu; DOKŁADNIE JEDNA jest oznaczona jako
+// "rozliczeniowa" (nadrzędna) — jej wynik jest podstawą faktury ESCO. Pozostałe są techniczne.
+function escoAnalysesTableHTML(clientId, objectId, preselectIds, masterId){
+  if(!clientId) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Najpierw wybierz <b>klienta</b> — pojawią się tu wszystkie jego analizy (ze wszystkich obiektów). Obiekt jest opcjonalnym filtrem.</div>`;
+  let anals=AnalysesModule.findByClient(clientId);
+  if(objectId) anals=anals.filter(a=>Number(a.objectId)===Number(objectId));
+  if(!anals.length) return `<div style="font-size:13px;color:var(--color-text-secondary);padding:12px;background:var(--color-background-secondary);border-radius:8px;">Brak analiz dla tego klienta. Dodaj analizy w module <b>Analizy</b>.</div>`;
   const pre=(preselectIds||[]).map(Number);
+  const mid=masterId!=null?Number(masterId):null;
   const rows=anals.map(a=>{
     const t=AnalysesModule.TYPES[a.analysisType]||{label:a.analysisType,icon:'📊'};
     const st=AnalysesModule.STATUSES[a.status]||{label:a.status,color:'#666'};
     const r=a.results||{}, ip=a.inputParams||{};
+    const obj=ObjectsModule.find(a.objectId);
     const p=_escoAnalPct(a);
     const pct=p!=null?p.toFixed(1)+'%':'—';
     const energy=r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2)+' '+(ip.energyUnit||''):'—';
     const period=(ip.billingFrom||ip.billingTo)?`${fmtDate(ip.billingFrom)} → ${fmtDate(ip.billingTo)}`:fmtDate(a.executedAt);
     const checked=pre.includes(Number(a.id));
+    const isMaster=mid===Number(a.id);
     return `<tr style="border-bottom:.5px solid var(--color-border-tertiary);">
+      <td style="padding:6px 10px;text-align:center;"><input type="radio" name="esco_master" value="${a.id}" ${isMaster?'checked':''} onchange="escoPickMaster(this)" title="Analiza nadrzędna (rozliczeniowa)"/></td>
       <td style="padding:6px 10px;text-align:center;"><input type="checkbox" name="esco_anal" value="${a.id}" ${checked?'checked':''} onchange="updateESCOSummary()"/></td>
+      <td style="padding:6px 10px;white-space:nowrap;">${escapeHtml((obj&&obj.name)||'—')}</td>
       <td style="padding:6px 10px;white-space:nowrap;">${t.icon} ${escapeHtml(t.label)}</td>
       <td style="padding:6px 10px;">${escapeHtml(a.name)}</td>
       <td style="padding:6px 10px;white-space:nowrap;">${period}</td>
@@ -2499,7 +2514,9 @@ function escoAnalysesTableHTML(objectId, preselectIds){
   return `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="background:var(--color-background-secondary);">
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Rozlicz.</th>
         <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);">Wybierz</th>
+        <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
         <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Typ analizy</th>
         <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Nazwa</th>
         <th style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);text-align:left;">Okres / data</th>
@@ -2509,6 +2526,9 @@ function escoAnalysesTableHTML(objectId, preselectIds){
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    <div style="font-size:11px;color:var(--color-text-secondary);padding:8px 10px;background:var(--color-background-secondary);border-top:1px solid var(--color-border-tertiary);">
+      Zaznacz <b>min. 2</b> analizy. Kolumna <b>Rozlicz.</b> = analiza <b>nadrzędna</b> (podstawa rozliczeń/faktury ESCO). Pozostałe zaznaczone analizy są traktowane jako <b>techniczne</b> — dowód osiągniętego wyniku inną metodą.
+    </div>
   </div>`;
 }
 
@@ -2518,7 +2538,7 @@ function escoOnClientChange(){
   const objSel=document.getElementById('esco-object');
   if(objSel) objSel.innerHTML=escoObjectOptions(cid,null);
   const list=document.getElementById('esco-anal-list');
-  if(list) list.innerHTML=escoAnalysesTableHTML(null,[]);
+  if(list) list.innerHTML=escoAnalysesTableHTML(cid,null,[],null);
   const num=document.getElementById('esco-number');
   if(num) num.value=escoSuggestNumber(cid,null);
   const appr=document.getElementById('esco-approved');
@@ -2533,7 +2553,7 @@ function escoOnObjectChange(){
   const cid=(document.getElementById('esco-client')||{}).value;
   const oid=(document.getElementById('esco-object')||{}).value;
   const list=document.getElementById('esco-anal-list');
-  if(list) list.innerHTML=escoAnalysesTableHTML(oid,[]);
+  if(list) list.innerHTML=escoAnalysesTableHTML(cid,oid,[],null);
   const num=document.getElementById('esco-number');
   if(num) num.value=escoSuggestNumber(cid,oid);
   const box=document.getElementById('esco-summary-box');
@@ -2553,6 +2573,7 @@ function renderESCOReports() {
   const initClientId=prefillAnal?Number(prefillAnal.clientId):'';
   const initObjectId=prefillAnal?Number(prefillAnal.objectId):'';
   const preselectIds=prefillAnal?[Number(prefillAnal.id)]:[];
+  const initMasterId=prefillAnal?Number(prefillAnal.id):'';
 
   const reportRows=allReports.map(rep=>{
     const client=ClientsModule.find(rep.clientId);
@@ -2590,7 +2611,7 @@ function renderESCOReports() {
     <button class="primary-button" onclick="document.getElementById('esco-form-wrap').style.display='block';window.scrollTo({top:0,behavior:'smooth'});" style="font-size:13px;padding:8px 18px;">+ Nowy raport ESCO</button>
   </div>
 
-  ${allReports.length===0?`<div class="reminder-card"><strong>Brak raportów ESCO</strong><div class="reminder-meta">Wybierz klienta i obiekt, zaznacz powiązane analizy (TYM, regresja, obłożenie itd.) i wykonaj raport ESCO. Raport jest podstawą do wystawienia faktury za oszczędności.</div></div>`:`
+  ${allReports.length===0?`<div class="reminder-card"><strong>Brak raportów ESCO</strong><div class="reminder-meta">Wybierz klienta, zaznacz <b>min. 2</b> analizy, wskaż jedną jako <b>rozliczeniową</b> (nadrzędną), a pozostałe pozostaw jako techniczne (dowód). Wynik analizy nadrzędnej jest podstawą faktury za oszczędności.</div></div>`:`
   <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:var(--color-background-secondary);">
@@ -2624,8 +2645,8 @@ function renderESCOReports() {
           <div class="esco-grid2">
             <div class="esco-field"><label>Klient *</label>
               <select id="esco-client" name="escoClient" required onchange="escoOnClientChange()">${escoClientOptions(initClientId)}</select></div>
-            <div class="esco-field"><label>Obiekt *</label>
-              <select id="esco-object" name="escoObject" required onchange="escoOnObjectChange()">${escoObjectOptions(initClientId,initObjectId)}</select></div>
+            <div class="esco-field"><label>Obiekt (opcjonalnie — filtr / gdy raport dotyczy 1 obiektu)</label>
+              <select id="esco-object" name="escoObject" onchange="escoOnObjectChange()">${escoObjectOptions(initClientId,initObjectId)}</select></div>
           </div>
           <div class="esco-grid3">
             <div class="esco-field"><label>Numer raportu</label><input id="esco-number" name="reportNumber" required placeholder="ESCO/rok/nr klienta/nr obiektu/nr" value="${escoSuggestNumber(initClientId,initObjectId)}"/></div>
@@ -2649,8 +2670,8 @@ function renderESCOReports() {
           <span style="font-size:18px;">🔬</span><h3 style="margin:0;font-size:15px;font-weight:500;color:#1A6B3C;">Powiązane analizy</h3>
         </div>
         <div class="esco-body">
-          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Wyświetlane są wszystkie analizy przypisane do wybranego obiektu (korekta TYM, regresja liniowa, korekta obłożenia, powierzchni i pozostałe). Zaznacz te, które mają wejść do raportu.</div>
-          <div id="esco-anal-list">${escoAnalysesTableHTML(initObjectId,preselectIds)}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Wyświetlane są wszystkie analizy wybranego <b>klienta</b> (ze wszystkich obiektów; obiekt powyżej działa jak filtr). Zaznacz <b>min. 2</b>, a jednej z nich nadaj rolę <b>rozliczeniowej</b> (kolumna „Rozlicz.") — to ona jest podstawą faktury. Reszta wchodzi jako analizy techniczne (dowód).</div>
+          <div id="esco-anal-list">${escoAnalysesTableHTML(initClientId,initObjectId,preselectIds,initMasterId)}</div>
         </div>
       </div>
 
@@ -2658,9 +2679,9 @@ function renderESCOReports() {
       <div id="esco-summary-box" style="display:none;" class="anal-result-box" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);">
         <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.7;margin-bottom:12px;">PODSUMOWANIE RAPORTU ESCO</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji (śr.)</div></div>
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-energy">—</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-money">—</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji (rozliczeniowa)</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-energy">—</div><div style="font-size:11px;opacity:.8;">Σ oszczędność energii</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-money">—</div><div style="font-size:11px;opacity:.8;">Σ wartość oszczędności</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-reg">—</div><div style="font-size:11px;opacity:.8;">wybrane analizy</div></div>
         </div>
         <div style="margin-top:12px;font-size:12px;opacity:.8;" id="esco-res-detail"></div>
@@ -2694,6 +2715,8 @@ function _escoAnalPct(a){
 
 function updateESCOSummary() {
   const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
+  const masterEl=document.querySelector('input[name="esco_master"]:checked');
+  const masterId=masterEl?Number(masterEl.value):null;
   const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
 
   const box=document.getElementById('esco-summary-box');
@@ -2702,54 +2725,69 @@ function updateESCOSummary() {
   if(!anals.length){ box.style.display='none'; window._escoLiveResults=null; return; }
   box.style.display='block';
 
-  let totalSaved=0, totalMoney=0, unit='', currency='';
-  const pctVals=[];
+  // SUMA wyników ze wszystkich wybranych analiz
+  let sumEnergy=0, sumMoney=0, unit='', currency='';
   anals.forEach(a=>{
     const r=a.results||{}, ip=a.inputParams||{};
-    if(r.savedEnergy) totalSaved+=Number(r.savedEnergy);
-    if(r.savedMoney)  totalMoney+=Number(r.savedMoney);
+    if(r.savedEnergy) sumEnergy+=Number(r.savedEnergy);
+    if(r.savedMoney)  sumMoney+=Number(r.savedMoney);
     if(ip.energyUnit) unit=ip.energyUnit;
     if(ip.currency)   currency=ip.currency;
-    const p=_escoAnalPct(a); if(p!=null) pctVals.push(p);
   });
-  const pct=pctVals.length?(pctVals.reduce((s,v)=>s+v,0)/pctVals.length).toFixed(1)+'%':'—';
 
-  document.getElementById('esco-res-pct').textContent=pct;
-  document.getElementById('esco-res-energy').textContent=totalSaved.toFixed(2)+' '+(unit||'');
-  document.getElementById('esco-res-money').textContent=totalMoney.toFixed(2)+' '+(currency||'');
+  // ROZLICZENIE = analiza nadrzędna (jeśli wskazana i znajduje się wśród wybranych)
+  const master=(masterId&&ids.includes(masterId))?AnalysesModule.find(masterId):null;
+  const mR=master?(master.results||{}):{};
+  const mPct=master?_escoAnalPct(master):null;
+  const mEnergy=mR.savedEnergy!=null?Number(mR.savedEnergy):null;
+  const mMoney =mR.savedMoney!=null?Number(mR.savedMoney):null;
+
+  document.getElementById('esco-res-pct').textContent=mPct!=null?mPct.toFixed(1)+'%':'—';
+  document.getElementById('esco-res-energy').textContent=sumEnergy.toFixed(2)+' '+(unit||'');
+  document.getElementById('esco-res-money').textContent=sumMoney.toFixed(2)+' '+(currency||'');
   document.getElementById('esco-res-reg').textContent=String(anals.length);
-  document.getElementById('esco-res-detail').textContent=anals.map(a=>{
-    const t=(AnalysesModule.TYPES[a.analysisType]||{}).label||a.analysisType;
-    return `${t}: ${a.name}`;
-  }).join('  |  ');
 
-  window._escoLiveResults={totalSaved, totalMoney, pct, unit, currency, analIds:ids};
+  const techCount=anals.filter(a=>Number(a.id)!==masterId).length;
+  document.getElementById('esco-res-detail').innerHTML =
+    (master
+      ? `Nadrzędna (rozliczeniowa): <strong>${escapeHtml(master.name)}</strong>`
+      : `⚠ Wskaż analizę <strong>rozliczeniową</strong> (kolumna „Rozlicz.")`)
+    + `  ·  Techniczne (dowód): ${techCount}`;
+
+  window._escoLiveResults={sumEnergy, sumMoney, unit, currency, masterId, masterPct:mPct, masterEnergy:mEnergy, masterMoney:mMoney, analIds:ids};
 }
 
 function saveESCOReport(form) {
   const clientId=(document.getElementById('esco-client')||{}).value;
-  const objectId=(document.getElementById('esco-object')||{}).value;
+  const objSel=(document.getElementById('esco-object')||{}).value;
   const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
+  const masterEl=document.querySelector('input[name="esco_master"]:checked');
+  const masterId=masterEl?Number(masterEl.value):null;
 
   if(!clientId){alert('Wybierz klienta.');return;}
-  if(!objectId){alert('Wybierz obiekt.');return;}
-  if(!ids.length){alert('Zaznacz co najmniej jedną analizę powiązaną z tym obiektem.');return;}
+  if(ids.length<2){alert('Zaznacz co najmniej DWIE analizy: jedną nadrzędną (rozliczeniową) oraz min. jedną techniczną na dowód wyniku.');return;}
+  if(!masterId){alert('Wskaż analizę nadrzędną (rozliczeniową) — kolumna „Rozlicz." w tabeli analiz.');return;}
+  if(!ids.includes(masterId)){alert('Analiza nadrzędna musi być również zaznaczona w kolumnie „Wybierz".');return;}
 
   // upewnij się, że podsumowanie jest policzone z aktualnego zaznaczenia
   updateESCOSummary();
   const r=window._escoLiveResults||{};
 
   const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const tymIds=anals.filter(a=>a.analysisType==='TYM').map(a=>Number(a.id));
-  const regIds=anals.filter(a=>a.analysisType==='REGRESSION').map(a=>Number(a.id));
-  const firstTym=anals.find(a=>a.analysisType==='TYM')||anals[0]||{};
-  const ftIp=firstTym.inputParams||{}, ftR=firstTym.results||{};
+  const master=AnalysesModule.find(masterId)||{};
+  const mIp=master.inputParams||{}, mR=master.results||{};
+  const techIds=ids.filter(id=>id!==masterId);
 
-  // okres = od najwcześniejszego do najpóźniejszego okresu rozliczeniowego wybranych analiz
+  // okres: z analizy nadrzędnej, a w razie braku — z zakresu wszystkich wybranych
   const froms=anals.map(a=>(a.inputParams||{}).billingFrom).filter(Boolean).sort();
   const tos  =anals.map(a=>(a.inputParams||{}).billingTo).filter(Boolean).sort();
-  const regAnals=anals.filter(a=>a.analysisType==='REGRESSION');
-  const avgReg=regAnals.length?regAnals.reduce((s,a)=>s+(a.results?.avgReductionHeat||0),0)/regAnals.length:null;
+
+  // obiekt: jawnie wybrany filtr, a gdy pusty — z analizy nadrzędnej
+  const objectId=objSel?Number(objSel):(Number(master.objectId)||null);
+
+  // pomocniczo: średnia redukcja z technicznych analiz regresyjnych (zgodność z podglądem)
+  const regTech=anals.filter(a=>a.analysisType==='REGRESSION'&&Number(a.id)!==masterId);
+  const avgReg=regTech.length?regTech.reduce((s,a)=>s+(a.results?.avgReductionHeat||0),0)/regTech.length:null;
 
   const report={
     id: 'esco_'+Date.now(),
@@ -2760,22 +2798,26 @@ function saveESCOReport(form) {
     preparedBy: form.preparedBy.value.trim(),
     approvedBy: form.approvedBy.value.trim(),
     clientId: Number(clientId),
-    objectId: Number(objectId),
-    periodFrom: froms[0]||ftIp.billingFrom||'',
-    periodTo: tos[tos.length-1]||ftIp.billingTo||'',
+    objectId: objectId,
+    periodFrom: mIp.billingFrom||froms[0]||'',
+    periodTo: mIp.billingTo||tos[tos.length-1]||'',
     analysisIds: ids,
-    analysisIdsTYM: tymIds,
-    analysisIdsREG: regIds,
+    masterAnalysisId: masterId,
+    technicalAnalysisIds: techIds,
     notes: form.reportNotes.value.trim(),
     results:{
-      savedEnergyTotal: r.totalSaved||0,
-      savedMoneyTotal: r.totalMoney||0,
-      savedEnergyPct: ftR.savedEnergyPct||0,
-      energyUnit: r.unit||ftIp.energyUnit||'',
-      currency: r.currency||ftIp.currency||'',
+      // ROZLICZENIE = analiza nadrzędna
+      savedEnergyPct: mR.savedEnergyPct||0,
+      savedEnergyBilling: r.masterEnergy!=null?r.masterEnergy:(mR.savedEnergy||0),
+      savedMoneyBilling:  r.masterMoney!=null?r.masterMoney:(mR.savedMoney||0),
+      // SUMA wszystkich wybranych analiz
+      savedEnergyTotal: r.sumEnergy||0,
+      savedMoneyTotal: r.sumMoney||0,
+      energyUnit: r.unit||mIp.energyUnit||'',
+      currency: r.currency||mIp.currency||'',
       avgReductionReg: avgReg!=null?avgReg/100:null,
-      eBill: ftR.eBill,
-      eComp: ftR.eComp
+      eBill: mR.eBill,
+      eComp: mR.eComp
     }
   };
 
@@ -2794,8 +2836,43 @@ function viewESCOReport(id) {
   const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
   const r=rep.results||{};
   const pct=r.savedEnergyPct!=null?((r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct)).toFixed(1)+'%':'—';
-  const tymAnals=(rep.analysisIdsTYM||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const regAnals=(rep.analysisIdsREG||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
+
+  // Analiza nadrzędna (rozliczeniowa) z fallbackiem dla starych raportów (TYM → pierwsza wybrana)
+  let masterId=rep.masterAnalysisId!=null?Number(rep.masterAnalysisId):null;
+  if(masterId==null){
+    const t=(rep.analysisIdsTYM||[]);
+    masterId=t.length?Number(t[0]):(((rep.analysisIds||[])[0])!=null?Number(rep.analysisIds[0]):null);
+  }
+  const masterAnal=masterId!=null?AnalysesModule.find(masterId):null;
+  const allIds=(rep.analysisIds||[]).map(Number);
+  const techAnals=allIds.filter(id=>id!==masterId).map(id=>AnalysesModule.find(id)).filter(Boolean);
+
+  // wartości rozliczeniowe (z nadrzędnej) z fallbackiem na stare pola sumaryczne
+  const billEnergy=r.savedEnergyBilling!=null?r.savedEnergyBilling:r.savedEnergyTotal;
+  const billMoney =r.savedMoneyBilling!=null?r.savedMoneyBilling:r.savedMoneyTotal;
+
+  // karta pojedynczej analizy (wspólna dla nadrzędnej i technicznych)
+  const escoCard=(a)=>{
+    const ar=a.results||{}, ai=a.inputParams||{};
+    const t=(AnalysesModule.TYPES[a.analysisType]||{label:a.analysisType,icon:'📊'});
+    const ap=_escoAnalPct(a); const apct=ap!=null?ap.toFixed(1)+'%':'—';
+    const objc=ObjectsModule.find(a.objectId);
+    let extra='';
+    if(a.analysisType==='REGRESSION'){
+      extra=`<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FAC775;color:#633806;">Śr. redukcja temp.: <strong>${ar.avgReductionSupply!=null?Number(ar.avgReductionSupply).toFixed(1)+'%':'—'}</strong></span>
+        <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FAEEDA;color:#633806;">Śr. redukcja zużycia: <strong>${ar.avgReductionHeat!=null?Number(ar.avgReductionHeat).toFixed(1)+'%':'—'}</strong></span>
+      </div>`;
+    }
+    return `<div style="padding:10px;background:var(--color-background-secondary);border-radius:8px;margin-bottom:8px;font-size:13px;">
+      <div style="font-weight:600;margin-bottom:6px;">${t.icon} ${escapeHtml(a.name)} <span style="font-weight:400;color:var(--color-text-secondary);font-size:11px;">· ${escapeHtml(t.label)}${objc?(' · '+escapeHtml(objc.name)):''}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        <div><span style="font-size:11px;color:var(--color-text-secondary);">Redukcja</span><div style="color:#27500A;font-weight:700;">${apct}</div></div>
+        <div><span style="font-size:11px;color:var(--color-text-secondary);">Oszczędność</span><div>${ar.savedEnergy!=null?Number(ar.savedEnergy).toFixed(2)+' '+(ai.energyUnit||'kWh'):'—'}</div></div>
+        <div><span style="font-size:11px;color:var(--color-text-secondary);">Wartość</span><div>${ar.savedMoney!=null?Number(ar.savedMoney).toFixed(2)+' '+(ai.currency||'EUR'):'—'}</div></div>
+      </div>${extra}
+    </div>`;
+  };
 
   container.innerHTML=`
     <button class="small-button" onclick="renderESCOReports()" style="margin-bottom:16px;">← Lista raportów</button>
@@ -2818,10 +2895,10 @@ function viewESCOReport(id) {
 
       <!-- GŁÓWNE WYNIKI -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;padding:16px 0;border-top:1px solid rgba(255,255,255,.2);border-bottom:1px solid rgba(255,255,255,.2);">
-        <div><div style="font-size:36px;font-weight:700;">${pct}</div><div style="font-size:11px;opacity:.8;">redukcja zużycia (TYM)</div></div>
-        <div><div style="font-size:30px;font-weight:700;">${r.savedEnergyTotal!=null?Number(r.savedEnergyTotal).toFixed(1):'-'}</div><div style="font-size:11px;opacity:.8;">oszczędność (${r.energyUnit||'kWh'})</div></div>
-        <div><div style="font-size:30px;font-weight:700;">${r.savedMoneyTotal!=null?Number(r.savedMoneyTotal).toFixed(2):'-'}</div><div style="font-size:11px;opacity:.8;">wartość (${r.currency||'EUR'})</div></div>
-        <div><div style="font-size:30px;font-weight:700;">${r.avgReductionReg!=null?(r.avgReductionReg*100).toFixed(1)+'%':'—'}</div><div style="font-size:11px;opacity:.8;">redukcja (regresja)</div></div>
+        <div><div style="font-size:36px;font-weight:700;">${pct}</div><div style="font-size:11px;opacity:.8;">redukcja (analiza nadrzędna)</div></div>
+        <div><div style="font-size:30px;font-weight:700;">${billEnergy!=null?Number(billEnergy).toFixed(1):'-'}</div><div style="font-size:11px;opacity:.8;">oszczędność rozlicz. (${r.energyUnit||'kWh'})</div></div>
+        <div><div style="font-size:30px;font-weight:700;">${billMoney!=null?Number(billMoney).toFixed(2):'-'}</div><div style="font-size:11px;opacity:.8;">wartość rozlicz. (${r.currency||'EUR'})</div></div>
+        <div><div style="font-size:30px;font-weight:700;">${r.savedEnergyTotal!=null?Number(r.savedEnergyTotal).toFixed(1):'-'}</div><div style="font-size:11px;opacity:.8;">Σ wszystkie analizy (${r.energyUnit||'kWh'})</div></div>
       </div>
 
       <!-- WSKAŹNIKI E -->
@@ -2831,68 +2908,42 @@ function viewESCOReport(id) {
       </div>`:''}
     </div>
 
-    <!-- METODA GŁÓWNA TYM -->
+    <!-- ANALIZA NADRZĘDNA (ROZLICZENIOWA) -->
     <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-bottom:16px;">
       <div style="background:#E6F1FB;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">🌡️</span>
+        <span style="font-size:18px;">⭐</span>
         <div>
-          <div style="font-size:14px;font-weight:600;color:#0C447C;">Metoda 1 — GŁÓWNA: Korekta do TYM</div>
-          <div style="font-size:11px;color:#0C447C;opacity:.8;">Podstawa do rozliczeń i faktur</div>
+          <div style="font-size:14px;font-weight:600;color:#0C447C;">Analiza nadrzędna — PODSTAWA ROZLICZEŃ</div>
+          <div style="font-size:11px;color:#0C447C;opacity:.8;">Wynik tej analizy jest podstawą faktury ESCO</div>
         </div>
       </div>
       <div style="padding:14px;">
-        ${tymAnals.map(a=>{
-          const ar=a.results||{}, ai=a.inputParams||{};
-          const apct=ar.savedEnergyPct!=null?((ar.savedEnergyPct<1?ar.savedEnergyPct*100:ar.savedEnergyPct)).toFixed(1)+'%':'—';
-          return `<div style="padding:10px;background:var(--color-background-secondary);border-radius:8px;margin-bottom:8px;font-size:13px;">
-            <div style="font-weight:600;margin-bottom:6px;">${escapeHtml(a.name)}</div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Redukcja</span><div style="color:#27500A;font-weight:700;">${apct}</div></div>
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Oszczędność</span><div>${ar.savedEnergy!=null?Number(ar.savedEnergy).toFixed(2)+' '+(ai.energyUnit||'kWh'):'—'}</div></div>
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Wartość</span><div>${ar.savedMoney!=null?Number(ar.savedMoney).toFixed(2)+' '+(ai.currency||'EUR'):'—'}</div></div>
-            </div>
-          </div>`;
-        }).join('')}
+        ${masterAnal?escoCard(masterAnal):'<div style="font-size:13px;color:var(--color-text-secondary);">Nie wskazano analizy nadrzędnej.</div>'}
       </div>
     </div>
 
-    <!-- METODA POMOCNICZA REGRESJA -->
-    ${regAnals.length?`
+    <!-- ANALIZY TECHNICZNE (DOWÓD) -->
+    ${techAnals.length?`
     <div style="border:1px solid #FAC775;border-radius:10px;overflow:hidden;margin-bottom:16px;">
       <div style="background:#FAEEDA;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">📈</span>
+        <span style="font-size:18px;">🔬</span>
         <div>
-          <div style="font-size:14px;font-weight:600;color:#633806;">Metoda 2 — POMOCNICZA: Regresja liniowa</div>
-          <div style="font-size:11px;color:#633806;opacity:.8;">Techniczny dowód działania systemu — nie zastępuje TYM w rozliczeniach</div>
+          <div style="font-size:14px;font-weight:600;color:#633806;">Analizy techniczne — DOWÓD WYNIKU (${techAnals.length})</div>
+          <div style="font-size:11px;color:#633806;opacity:.8;">Potwierdzają osiągniętą oszczędność inną metodą — nie zastępują analizy nadrzędnej w rozliczeniu</div>
         </div>
       </div>
       <div style="padding:14px;">
-        ${regAnals.map(a=>{
-          const ar=a.results||{}, ai=a.inputParams||{};
-          return `<div style="padding:10px;background:var(--color-background-secondary);border-radius:8px;margin-bottom:8px;font-size:13px;">
-            <div style="font-weight:600;margin-bottom:6px;">${escapeHtml(a.name)}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Temp. zasilania PRZED</span><div>${escapeHtml(ai.supplyBefore||'—')}</div></div>
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Temp. zasilania PO</span><div>${escapeHtml(ai.supplyAfter||'—')}</div></div>
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Zużycie PRZED</span><div>${escapeHtml(ai.heatBefore||'—')}</div></div>
-              <div><span style="font-size:11px;color:var(--color-text-secondary);">Zużycie PO</span><div>${escapeHtml(ai.heatAfter||'—')}</div></div>
-            </div>
-            <div style="margin-top:8px;display:flex;gap:12px;">
-              <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FAC775;color:#633806;">Śr. redukcja temp.: <strong>${ar.avgReductionSupply!=null?Number(ar.avgReductionSupply).toFixed(1)+'%':'—'}</strong></span>
-              <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:#FAEEDA;color:#633806;">Śr. redukcja zużycia: <strong>${ar.avgReductionHeat!=null?Number(ar.avgReductionHeat).toFixed(1)+'%':'—'}</strong></span>
-            </div>
-          </div>`;
-        }).join('')}
+        ${techAnals.map(escoCard).join('')}
       </div>
     </div>`:''}
 
     <!-- PORÓWNANIE METOD -->
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px;margin-bottom:16px;background:var(--color-background-secondary);">
-      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">⚖️ Porównanie metod</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;">⚖️ Analiza nadrzędna a analizy techniczne</div>
       <div style="font-size:12px;color:var(--color-text-secondary);">
-        TYM porównuje CAŁKOWITE zużycie (skor. do tych samych warunków pogodowych) — obejmuje efekty dzienne i sezonowe.<br/>
-        Regresja analizuje INTENSYWNOŚĆ grzewczą (zużycie na jednostkę temperatury) — izoluje czysty efekt sterowania.<br/>
-        <strong>Różnica nie jest błędem. Obie metody mierzą inny aspekt tej samej oszczędności i wzajemnie się sprawdzają.</strong>
+        Kwotę rozliczenia ESCO wyznacza wyłącznie <strong>analiza nadrzędna</strong>.<br/>
+        Analizy techniczne mierzą tę samą oszczędność inną metodą (np. regresja izoluje czysty efekt sterowania, TYM obejmuje pełne zużycie skorygowane pogodowo) i służą jako <strong>dowód</strong>.<br/>
+        <strong>Zbieżność wyników różnymi metodami uwiarygadnia rozliczenie. Rozbieżność nie jest błędem — to inny aspekt tej samej oszczędności.</strong>
       </div>
     </div>
 
