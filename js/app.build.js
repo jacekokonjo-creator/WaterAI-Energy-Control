@@ -3248,9 +3248,247 @@ function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBor
   </div>`;
 }
 
-function renderRegressionSensorData(objectId) {
-  const storageKey = 'waterai_regression_sensors_' + objectId;
-  const rawRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+// ═══════════════════════════════════════════════════════════════════════════
+// OKRESY BAZOWE REGRESJI — dyskretne protokoły per obiekt.
+// Każdy protokół ma własne dane z czujników + dane klimatyczne (źródło, data pobrania).
+// Powód: zmiana w obiekcie (np. wymiana okien) zmienia charakterystykę cieplną →
+// trzeba nowy okres bazowy, a stary zachować. Spłaca też dług techniczny:
+// dawne waterai_regression_sensors_<objectId> → opakowane w moduł.
+// ═══════════════════════════════════════════════════════════════════════════
+const RegressionBaseModule = {
+  protoKey: oid => 'waterai_regression_protocols_' + oid,
+  rowsKey:  pid => 'waterai_regression_rows_' + pid,
+
+  listByObject(oid) { try { return JSON.parse(localStorage.getItem(this.protoKey(oid)) || '[]'); } catch (e) { return []; } },
+  saveList(oid, list) { localStorage.setItem(this.protoKey(oid), JSON.stringify(list)); },
+  find(oid, pid) { return this.listByObject(oid).find(p => Number(p.id) === Number(pid)) || null; },
+
+  nextNumber(oid) {
+    const yr = new Date().getFullYear();
+    const n = this.listByObject(oid).filter(p => (p.number || '').indexOf('/' + yr + '/') >= 0).length + 1;
+    return 'REG/' + yr + '/' + String(n).padStart(3, '0');
+  },
+
+  add(oid, data) {
+    const list = this.listByObject(oid);
+    const rec = {
+      id: Date.now() * 1000 + Math.floor(Math.random() * 1000),
+      number: data.number || this.nextNumber(oid),
+      protocolDate: data.protocolDate || new Date().toISOString().slice(0, 10),
+      periodFrom: data.periodFrom || '', periodTo: data.periodTo || '',
+      climateSource: data.climateSource || '', climateFetchDate: data.climateFetchDate || '',
+      notes: data.notes || '', createdAt: new Date().toISOString()
+    };
+    list.push(rec); this.saveList(oid, list);
+    this.saveRows(rec.id, Array.isArray(data.rows) ? data.rows : []);
+    return rec;
+  },
+
+  update(oid, pid, data) {
+    this.saveList(oid, this.listByObject(oid).map(p =>
+      Number(p.id) === Number(pid) ? { ...p, ...data, id: p.id, updatedAt: new Date().toISOString() } : p));
+  },
+
+  remove(oid, pid) {
+    this.saveList(oid, this.listByObject(oid).filter(p => Number(p.id) !== Number(pid)));
+    localStorage.removeItem(this.rowsKey(pid));
+  },
+
+  getRows(pid)  { try { return JSON.parse(localStorage.getItem(this.rowsKey(pid)) || '[]'); } catch (e) { return []; } },
+  saveRows(pid, rows) { localStorage.setItem(this.rowsKey(pid), JSON.stringify(rows)); }
+};
+window.RegressionBaseModule = RegressionBaseModule;
+
+// Jednorazowa migracja: dawny płaski zestaw per obiekt → protokół #1 tego obiektu.
+(function _regProtoMigrate() {
+  try {
+    if (localStorage.getItem('waterai_regression_protocols_migrated_v1')) return;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf('waterai_regression_sensors_') === 0) keys.push(k);
+    }
+    keys.forEach(k => {
+      const oid = k.slice('waterai_regression_sensors_'.length);
+      let rows = []; try { rows = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
+      if (rows.length && !RegressionBaseModule.listByObject(oid).length) {
+        RegressionBaseModule.add(oid, {
+          number: 'REG/' + new Date().getFullYear() + '/001',
+          protocolDate: new Date().toISOString().slice(0, 10),
+          notes: 'Zmigrowano z poprzedniej wersji (jeden zestaw danych → protokół #1)',
+          rows
+        });
+      }
+    });
+    localStorage.setItem('waterai_regression_protocols_migrated_v1', '1');
+  } catch (e) { /* ignore */ }
+})();
+
+// ─── CRUD / nawigacja protokołów regresji (stan w window) ───
+function regProtoNew() {
+  const objId = selectedMeasurementObjectId;
+  if (!objId) { alert('Wybierz obiekt.'); return; }
+  window._regProtoForm = {
+    objectId: Number(objId), id: null, number: RegressionBaseModule.nextNumber(objId),
+    protocolDate: new Date().toISOString().slice(0, 10), periodFrom: '', periodTo: '',
+    climateSource: '', climateFetchDate: '', notes: '', _copyRows: null, _copyFromNumber: ''
+  };
+  window._regActiveProtocolId = null;
+  renderMeasurementsModule();
+}
+
+function regProtoCopyPrev() {
+  const f = window._regProtoForm; if (!f) return;
+  const prev = RegressionBaseModule.listByObject(f.objectId)
+    .slice().sort((a, b) => Number(b.id) - Number(a.id))
+    .find(p => Number(p.id) !== Number(f.id || 0));
+  if (!prev) { alert('Brak poprzedniego protokołu okresu bazowego dla tego obiektu.'); return; }
+  f.periodFrom = prev.periodFrom || ''; f.periodTo = prev.periodTo || '';
+  f.climateSource = prev.climateSource || ''; f.climateFetchDate = prev.climateFetchDate || '';
+  f.notes = prev.notes || '';
+  f._copyRows = RegressionBaseModule.getRows(prev.id);
+  f._copyFromNumber = prev.number || '';
+  renderMeasurementsModule();
+}
+
+function regProtoEdit(pid) {
+  const objId = selectedMeasurementObjectId;
+  const p = RegressionBaseModule.find(objId, pid); if (!p) return;
+  window._regProtoForm = {
+    objectId: Number(objId), id: p.id, number: p.number || '', protocolDate: p.protocolDate || '',
+    periodFrom: p.periodFrom || '', periodTo: p.periodTo || '', climateSource: p.climateSource || '',
+    climateFetchDate: p.climateFetchDate || '', notes: p.notes || '', _copyRows: null, _copyFromNumber: ''
+  };
+  renderMeasurementsModule();
+}
+
+function regProtoSetField(field, val) { if (window._regProtoForm) window._regProtoForm[field] = val; }
+
+function regProtoSave() {
+  const f = window._regProtoForm; if (!f) return;
+  const payload = {
+    number: f.number, protocolDate: f.protocolDate, periodFrom: f.periodFrom, periodTo: f.periodTo,
+    climateSource: f.climateSource, climateFetchDate: f.climateFetchDate, notes: f.notes
+  };
+  if (f.id) {
+    RegressionBaseModule.update(f.objectId, f.id, payload);
+    window._regActiveProtocolId = f.id;
+  } else {
+    const rec = RegressionBaseModule.add(f.objectId, { ...payload, rows: f._copyRows || [] });
+    window._regActiveProtocolId = rec.id;
+  }
+  window._regProtoForm = null;
+  window._regPage = 0;
+  renderMeasurementsModule();
+}
+
+function regProtoOpen(pid) { window._regActiveProtocolId = Number(pid); window._regProtoForm = null; window._regPage = 0; renderMeasurementsModule(); }
+function regProtoBack() { window._regActiveProtocolId = null; window._regProtoForm = null; renderMeasurementsModule(); }
+function regProtoDelete(pid) {
+  if (!confirm('Usunąć ten okres bazowy regresji wraz z danymi z czujników? Tej operacji nie można cofnąć.')) return;
+  RegressionBaseModule.remove(selectedMeasurementObjectId, pid);
+  if (Number(window._regActiveProtocolId) === Number(pid)) window._regActiveProtocolId = null;
+  renderMeasurementsModule();
+}
+
+// ─── Renderery: lista / formularz / aktywny protokół ───
+function _regProtocolListHtml(objId) {
+  const list = RegressionBaseModule.listByObject(objId).slice().sort((a, b) => Number(b.id) - Number(a.id));
+  const rows = list.map(p => {
+    const n = RegressionBaseModule.getRows(p.id).length;
+    const per = (p.periodFrom || p.periodTo) ? `${(p.periodFrom || '—').replace('T', ' ')} → ${(p.periodTo || '—').replace('T', ' ')}` : '—';
+    return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
+      <td style="padding:8px 10px;font-size:12px;font-weight:600;color:#0C447C;">${escapeHtml(p.number || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;">${p.protocolDate || '—'}</td>
+      <td style="padding:8px 10px;font-size:12px;">${escapeHtml(per)}</td>
+      <td style="padding:8px 10px;font-size:12px;">${escapeHtml(p.climateSource || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;text-align:right;">${n}</td>
+      <td style="padding:8px 10px;text-align:right;white-space:nowrap;">
+        <button class="small-button" onclick="regProtoOpen(${p.id})" style="font-size:11px;">Otwórz</button>
+        <button class="small-button" onclick="regProtoEdit(${p.id})" style="font-size:11px;">✏️</button>
+        <button class="small-button" onclick="regProtoDelete(${p.id})" style="font-size:11px;color:#c00;border-color:#c00;">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 14px;gap:10px;flex-wrap:wrap;">
+      <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📈 Okresy bazowe — regresja liniowa</h3>
+      <button class="primary-button" onclick="regProtoNew()" style="font-size:13px;padding:7px 16px;white-space:nowrap;">+ Nowy okres bazowy</button>
+    </div>
+    ${list.length === 0
+      ? `<div class="reminder-card"><strong>Brak okresów bazowych regresji dla tego obiektu</strong>
+           <div class="reminder-meta">Kliknij „+ Nowy okres bazowy", aby utworzyć protokół i wprowadzić dane z czujników.</div></div>`
+      : `<div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:hidden;">
+          <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:680px;">
+            <thead><tr style="background:var(--color-background-secondary);">
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Nr protokołu</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Data</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Okres bazowy</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Źródło klimatu</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyty</th>
+              <th style="padding:8px 10px;"></th>
+            </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
+}
+
+function _regProtocolFormHtml(objId) {
+  const f = window._regProtoForm;
+  const isNew = !f.id;
+  const lbl = 'display:block;font-size:11px;color:var(--color-text-secondary);margin-bottom:3px;';
+  const inp = 'width:100%;padding:7px 9px;border:1px solid var(--color-border-tertiary);border-radius:7px;font-size:13px;box-sizing:border-box;';
+  const copyNote = f._copyRows
+    ? `<div style="font-size:11px;color:#0C447C;background:#E6F1FB;border-radius:6px;padding:7px 10px;margin-bottom:12px;">↪ Skopiowano z protokołu <strong>${escapeHtml(f._copyFromNumber || '')}</strong>: ${f._copyRows.length} odczytów + dane klimatyczne i okres. Edytuj wg potrzeb i zapisz, aby utworzyć nowy protokół.</div>`
+    : '';
+  return `<div style="border:1px solid #B5D4F4;border-radius:12px;overflow:hidden;margin-bottom:18px;">
+    <div style="background:#E6F1FB;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <h3 style="margin:0;font-size:14px;font-weight:600;color:#0C447C;">${isNew ? '➕ Nowy okres bazowy regresji' : '✏️ Edycja okresu bazowego'}</h3>
+      ${isNew ? `<button class="small-button" onclick="regProtoCopyPrev()" style="font-size:12px;">📋 Kopiuj z poprzedniego protokołu</button>` : ''}
+    </div>
+    <div style="padding:16px;background:var(--color-background-primary);">
+      ${copyNote}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label style="${lbl}">Nr protokołu</label><input style="${inp}" value="${escapeHtml(f.number || '')}" onchange="regProtoSetField('number',this.value)"></div>
+        <div><label style="${lbl}">Data protokołu</label><input type="date" style="${inp}" value="${f.protocolDate || ''}" onchange="regProtoSetField('protocolDate',this.value)"></div>
+        <div><label style="${lbl}">Okres bazowy — od</label><input type="datetime-local" style="${inp}" value="${f.periodFrom || ''}" onchange="regProtoSetField('periodFrom',this.value)"></div>
+        <div><label style="${lbl}">Okres bazowy — do</label><input type="datetime-local" style="${inp}" value="${f.periodTo || ''}" onchange="regProtoSetField('periodTo',this.value)"></div>
+      </div>
+      <div style="margin-top:14px;border-top:1px dashed var(--color-border-tertiary);padding-top:12px;">
+        <div style="font-size:11px;font-weight:600;color:#0C447C;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🌍 Dane klimatyczne</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+          <div><label style="${lbl}">Źródło danych</label><input style="${inp}" placeholder="np. WeatherOnline / Robot Klimatu" value="${escapeHtml(f.climateSource || '')}" onchange="regProtoSetField('climateSource',this.value)"></div>
+          <div><label style="${lbl}">Data pobrania danych</label><input type="date" style="${inp}" value="${f.climateFetchDate || ''}" onchange="regProtoSetField('climateFetchDate',this.value)"></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;"><label style="${lbl}">Notatki</label><textarea style="${inp}min-height:54px;resize:vertical;" onchange="regProtoSetField('notes',this.value)">${escapeHtml(f.notes || '')}</textarea></div>
+      <div style="margin-top:16px;display:flex;gap:8px;">
+        <button class="primary-button" onclick="regProtoSave()" style="font-size:13px;">${isNew ? 'Utwórz protokół' : 'Zapisz zmiany'}</button>
+        <button class="small-button" onclick="regProtoBack()" style="font-size:13px;">Anuluj</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _regProtocolActiveHtml(objId, pid) {
+  const p = RegressionBaseModule.find(objId, pid);
+  if (!p) { window._regActiveProtocolId = null; return _regProtocolListHtml(objId); }
+  const per = (p.periodFrom || p.periodTo) ? `${(p.periodFrom || '—').replace('T', ' ')} → ${(p.periodTo || '—').replace('T', ' ')}` : '—';
+  const meta = `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--color-text-secondary);">
+      <span>📅 Okres: <strong style="color:var(--color-text-primary);">${escapeHtml(per)}</strong></span>
+      <span>🌍 Źródło klimatu: <strong style="color:var(--color-text-primary);">${escapeHtml(p.climateSource || '—')}</strong></span>
+      <span>⬇ Pobrano: <strong style="color:var(--color-text-primary);">${p.climateFetchDate || '—'}</strong></span>
+    </div>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 12px;gap:10px;flex-wrap:wrap;">
+      <div>
+        <button class="small-button" onclick="regProtoBack()" style="font-size:12px;margin-bottom:8px;">← Lista okresów bazowych</button>
+        <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📈 ${escapeHtml(p.number || 'Okres bazowy')}</h3>
+      </div>
+      <button class="small-button" onclick="regProtoEdit(${pid})" style="font-size:12px;white-space:nowrap;">✏️ Edytuj nagłówek / dane klimatyczne</button>
+    </div>
+    <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:8px;">${meta}</div>
+    ${renderRegressionSensorData(pid)}
+    ${renderRegressionBaselineCurves(pid)}`;
+}
+
+function renderRegressionSensorData(objectId) { // objectId = id protokołu regresji
+  const rawRows = RegressionBaseModule.getRows(objectId);
 
   // Sortowanie + paginacja (stan w window)
   window._regSortKey  = window._regSortKey  || 'readTime';
@@ -3424,8 +3662,7 @@ function addRegressionSensorRow(objectId) {
     return;
   }
 
-  const storageKey = 'waterai_regression_sensors_' + objectId;
-  const rows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  const rows = RegressionBaseModule.getRows(objectId);
   rows.push({
     readTime: readTime || null,
     tOutdoor: tOutdoor !== '' ? Number(tOutdoor) : null,
@@ -3435,7 +3672,7 @@ function addRegressionSensorRow(objectId) {
     heatPower: heatPower !== '' ? Number(heatPower) : null,
     heatConsumption: heatConsumption !== '' ? Number(heatConsumption) : null,
   });
-  localStorage.setItem(storageKey, JSON.stringify(rows));
+  RegressionBaseModule.saveRows(objectId, rows);
   window._regPage = Math.floor((rows.length - 1) / (window._regPageSize || 50));
   renderMeasurementsModule();
 }
@@ -3451,16 +3688,15 @@ function regToggleSort(key) {
 }
 
 function deleteRegressionRow(objectId, index) {
-  const storageKey = 'waterai_regression_sensors_' + objectId;
-  const rows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  const rows = RegressionBaseModule.getRows(objectId);
   rows.splice(index, 1);
-  localStorage.setItem(storageKey, JSON.stringify(rows));
+  RegressionBaseModule.saveRows(objectId, rows);
   renderMeasurementsModule();
 }
 
 function clearRegressionSensorData(objectId) {
-  if (!confirm('Czy na pewno chcesz usunąć wszystkie dane z czujników dla tego obiektu?')) return;
-  localStorage.removeItem('waterai_regression_sensors_' + objectId);
+  if (!confirm('Czy na pewno chcesz usunąć wszystkie dane z czujników w tym okresie bazowym?')) return;
+  RegressionBaseModule.saveRows(objectId, []);
   window._regPage = 0;
   renderMeasurementsModule();
 }
@@ -3469,8 +3705,6 @@ function importRegressionSensorFile(input, objectId) {
   const file = input.files[0];
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
-
-  const storageKey = 'waterai_regression_sensors_' + objectId;
 
   if (ext === 'csv') {
     const reader = new FileReader();
@@ -3482,7 +3716,7 @@ function importRegressionSensorFile(input, objectId) {
       const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
       const colMap = { readtime: 'readTime', toutdoor: 'tOutdoor', tsupply: 'tSupply', treturn: 'tReturn', vflow: 'vFlow', heatpower: 'heatPower', heatconsumption: 'heatConsumption' };
 
-      const existingRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      const existingRows = RegressionBaseModule.getRows(objectId);
       let added = 0;
 
       for (let i = 1; i < lines.length; i++) {
@@ -3499,7 +3733,7 @@ function importRegressionSensorFile(input, objectId) {
         if (Object.keys(row).length > 0) { existingRows.push(row); added++; }
       }
 
-      localStorage.setItem(storageKey, JSON.stringify(existingRows));
+      RegressionBaseModule.saveRows(objectId, existingRows);
       window._regPage = Math.floor((existingRows.length - 1) / (window._regPageSize || 50));
       renderMeasurementsModule();
       alert(`Zaimportowano ${added} wierszy z pliku CSV.`);
@@ -3514,15 +3748,7 @@ function importRegressionSensorFile(input, objectId) {
 function renderRegressionTab(protocols) {
   const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
 
-  if (regressionProtocols.length === 0) {
-    const baseline = renderRegressionBaselineCurves(selectedMeasurementObjectId);
-    const formPart = window._regShowForm
-      ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId))
-      : (baseline ? '' : `<div class="reminder-card"><strong>Brak okresów bazowych regresji</strong>
-      <div class="reminder-meta">Kliknij „+ Dodaj okres bazowy", aby wprowadzić dane czasowe z czujników (ręcznie lub import CSV/Excel).</div>
-    </div>`);
-    return _regTabHeader() + formPart + baseline;
-  }
+  // Sekcja protokołów regresji (lista / formularz / aktywny protokół) renderowana w return na dole.
 
   const _regResultsHtml = regressionProtocols.map(p => {
     const unit = p.energyUnit || "GJ";
@@ -3648,7 +3874,20 @@ function renderRegressionTab(protocols) {
     </div>
     <script>(function(){ setTimeout(function(){ ${chartScript} }, 80); })();<\/script>`;
   }).join("");
-  return _regTabHeader() + (window._regShowForm ? (_regCsvHelp() + renderRegressionSensorData(selectedMeasurementObjectId)) : '') + renderRegressionBaselineCurves(selectedMeasurementObjectId) + _regResultsHtml;
+  const selectorsHtml = (typeof _bpSelectors === 'function') ? _bpSelectors() : '';
+  const objId = selectedMeasurementObjectId;
+  let mainHtml;
+  if (!objId) {
+    mainHtml = `<div class="reminder-card">Wybierz obiekt, aby zarządzać okresami bazowymi regresji.</div>`;
+  } else if (window._regProtoForm && Number(window._regProtoForm.objectId) === Number(objId)) {
+    mainHtml = _regProtocolFormHtml(objId);
+  } else if (window._regActiveProtocolId && RegressionBaseModule.find(objId, window._regActiveProtocolId)) {
+    mainHtml = _regProtocolActiveHtml(objId, window._regActiveProtocolId);
+  } else {
+    window._regActiveProtocolId = null;
+    mainHtml = _regProtocolListHtml(objId);
+  }
+  return selectorsHtml + mainHtml + _regResultsHtml;
 }
 
 function buildRegressionData(protocol) {
@@ -3724,7 +3963,7 @@ function _regParseTime(rt) {
 }
 
 function buildSensorBaseline(objectId, from, to) {
-  const raw = JSON.parse(localStorage.getItem('waterai_regression_sensors_' + objectId) || '[]');
+  const raw = RegressionBaseModule.getRows(objectId);
   const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
   const toMs   = to   ? Date.parse(to.length   <= 10 ? to   + 'T23:59:59' : to)   :  Infinity;
 
@@ -3812,7 +4051,7 @@ function _baselineCard(opts) {
 
 function renderRegressionBaselineCurves(objectId) {
   if (!objectId) return '';
-  const raw = JSON.parse(localStorage.getItem('waterai_regression_sensors_' + objectId) || '[]');
+  const raw = RegressionBaseModule.getRows(objectId);
   if (raw.length < 2) return '';
 
   const from = window._regBaseFrom || '';
