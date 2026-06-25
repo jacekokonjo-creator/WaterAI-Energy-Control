@@ -3252,38 +3252,76 @@ function renderRegressionSensorData(objectId) {
   const storageKey = 'waterai_regression_sensors_' + objectId;
   const rawRows = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
-  // Pagination state
-  const pageSize = 50;
+  // Sortowanie + paginacja (stan w window)
+  window._regSortKey  = window._regSortKey  || 'readTime';
+  window._regSortDir  = window._regSortDir  || 'asc';
+  window._regPageSize = window._regPageSize || 50;
+  const pageSize = window._regPageSize;
+
+  const _rt = v => { const t = Date.parse(String(v || '').replace(' ', 'T')); return isNaN(t) ? null : t; };
+  const sortKey = window._regSortKey, sortDir = window._regSortDir === 'desc' ? -1 : 1;
+  const indexed = rawRows.map((r, idx) => ({ r, idx }));
+  indexed.sort((A, B) => {
+    let a, b;
+    if (sortKey === 'readTime') { a = _rt(A.r.readTime); b = _rt(B.r.readTime); }
+    else {
+      a = (A.r[sortKey] == null || A.r[sortKey] === '') ? null : Number(A.r[sortKey]);
+      b = (B.r[sortKey] == null || B.r[sortKey] === '') ? null : Number(B.r[sortKey]);
+    }
+    if (a == null && b == null) return A.idx - B.idx;
+    if (a == null) return 1;          // brakujące wartości zawsze na końcu
+    if (b == null) return -1;
+    if (a < b) return -1 * sortDir;
+    if (a > b) return  1 * sortDir;
+    return A.idx - B.idx;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(indexed.length / pageSize));
   window._regPage = window._regPage || 0;
-  const totalPages = Math.max(1, Math.ceil(rawRows.length / pageSize));
   if (window._regPage >= totalPages) window._regPage = totalPages - 1;
+  if (window._regPage < 0) window._regPage = 0;
   const page = window._regPage;
-  const rows = rawRows.slice(page * pageSize, (page + 1) * pageSize);
+  const rows = indexed.slice(page * pageSize, (page + 1) * pageSize);
 
   const fmtVal = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+  const fmtT   = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const sortArrow = key => window._regSortKey === key ? (window._regSortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
+  const th = (key, label, align) => `<th onclick="regToggleSort('${key}')" title="Kliknij, aby sortować" style="padding:6px 8px;text-align:${align};font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);cursor:pointer;user-select:none;white-space:nowrap;">${label}<span style="opacity:.55;">${sortArrow(key)}</span></th>`;
 
-  const tableRows = rows.map((r, i) => {
-    const absIdx = page * pageSize + i;
+  const tableRows = rows.map(({ r, idx }) => {
     return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
       <td style="padding:4px 8px;font-size:11px;color:var(--color-text-tertiary);">${escapeHtml(r.readTime || '—')}</td>
-      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tOutdoor)}</td>
-      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tSupply)}</td>
-      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.tReturn)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT(r.tOutdoor)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT(r.tSupply)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT(r.tReturn)}</td>
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.vFlow)}</td>
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatPower)}</td>
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatConsumption)}</td>
       <td style="padding:4px 8px;">
-        <button class="small-button" onclick="deleteRegressionRow(${objectId}, ${absIdx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button>
+        <button class="small-button" onclick="deleteRegressionRow(${objectId}, ${idx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button>
       </td>
     </tr>`;
   }).join('');
 
-  const paginationHtml = totalPages > 1 ? `
-    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;">
-      <button class="small-button" onclick="window._regPage=Math.max(0,window._regPage-1);renderMeasurementsModule();" ${page === 0 ? 'disabled' : ''}>← Poprzednia</button>
-      <span style="color:var(--color-text-secondary);">Strona ${page + 1} / ${totalPages} (${rawRows.length} wierszy)</span>
-      <button class="small-button" onclick="window._regPage=Math.min(${totalPages-1},window._regPage+1);renderMeasurementsModule();" ${page === totalPages - 1 ? 'disabled' : ''}>Następna →</button>
-    </div>` : rawRows.length > 0 ? `<p style="font-size:11px;color:var(--color-text-tertiary);margin-top:8px;">${rawRows.length} wierszy danych</p>` : '';
+  const navBtn = (label, target, disabled) => `<button class="small-button" onclick="window._regPage=${target};renderMeasurementsModule();" ${disabled ? 'disabled' : ''} style="font-size:11px;">${label}</button>`;
+  const pageSizeSel = `<select onchange="window._regPageSize=Number(this.value);window._regPage=0;renderMeasurementsModule();" style="font-size:12px;padding:3px 6px;border:1px solid var(--color-border-tertiary);border-radius:6px;">
+      <option value="50"  ${pageSize === 50  ? 'selected' : ''}>50 / stronę</option>
+      <option value="100" ${pageSize === 100 ? 'selected' : ''}>100 / stronę</option>
+    </select>`;
+
+  const paginationHtml = rawRows.length === 0 ? '' : `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;flex-wrap:wrap;">
+      ${navBtn('« Pierwsza', 0, page === 0)}
+      ${navBtn('‹ Poprzednia', 'Math.max(0,window._regPage-1)', page === 0)}
+      <span style="color:var(--color-text-secondary);display:inline-flex;align-items:center;gap:4px;">Strona
+        <input type="number" min="1" max="${totalPages}" value="${page + 1}" style="width:56px;font-size:12px;padding:3px 6px;text-align:center;border:1px solid var(--color-border-tertiary);border-radius:6px;"
+          onchange="var p=Math.min(${totalPages},Math.max(1,Number(this.value)||1));window._regPage=p-1;renderMeasurementsModule();" />
+        / ${totalPages}</span>
+      ${navBtn('Następna ›', 'Math.min(' + (totalPages - 1) + ',window._regPage+1)', page === totalPages - 1)}
+      ${navBtn('Ostatnia »', totalPages - 1, page === totalPages - 1)}
+      <span style="color:var(--color-text-tertiary);">· ${rawRows.length} wierszy</span>
+      <span style="margin-left:auto;">${pageSizeSel}</span>
+    </div>`;
 
   return `
   <div style="border:1px solid #B5D4F4;border-radius:10px;overflow:hidden;margin-top:24px;">
@@ -3322,15 +3360,15 @@ function renderRegressionSensorData(objectId) {
           <input id="reg-tReturn" type="number" step="0.01" placeholder="np. 43.7" style="width:100%;font-size:12px;box-sizing:border-box;" />
         </div>
         <div>
-          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Przepływ [m³/h]</label>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Przepływ [dm³/h]</label>
           <input id="reg-vFlow" type="number" step="1" placeholder="np. 3827" style="width:100%;font-size:12px;box-sizing:border-box;" />
         </div>
         <div>
-          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Moc cieplna [W]</label>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Moc dostarczona [W]</label>
           <input id="reg-heatPower" type="number" step="0.01" placeholder="np. 46012" style="width:100%;font-size:12px;box-sizing:border-box;" />
         </div>
         <div>
-          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Zużycie ciepła [kWh]</label>
+          <label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Zużycie ciepła [MJ]</label>
           <input id="reg-heatConsumption" type="number" step="0.01" placeholder="np. 28263" style="width:100%;font-size:12px;box-sizing:border-box;" />
         </div>
         <div style="display:flex;align-items:flex-end;">
@@ -3353,13 +3391,13 @@ function renderRegressionSensorData(objectId) {
           <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
             <thead>
               <tr style="background:var(--color-background-secondary);">
-                <th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Data odczytu</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T zewn. [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T zasil. [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">T powrotu [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Przepływ [m³/h]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Moc cieplna [W]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);">Zużycie ciepła [kWh]</th>
+                ${th('readTime', 'Data odczytu', 'left')}
+                ${th('tOutdoor', 'T zewn. [°C]', 'right')}
+                ${th('tSupply', 'T zasil. [°C]', 'right')}
+                ${th('tReturn', 'T powrotu [°C]', 'right')}
+                ${th('vFlow', 'Przepływ [dm³/h]', 'right')}
+                ${th('heatPower', 'Moc dostarczona [W]', 'right')}
+                ${th('heatConsumption', 'Zużycie ciepła [MJ]', 'right')}
                 <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
               </tr>
             </thead>
@@ -3398,7 +3436,17 @@ function addRegressionSensorRow(objectId) {
     heatConsumption: heatConsumption !== '' ? Number(heatConsumption) : null,
   });
   localStorage.setItem(storageKey, JSON.stringify(rows));
-  window._regPage = Math.floor((rows.length - 1) / 50);
+  window._regPage = Math.floor((rows.length - 1) / (window._regPageSize || 50));
+  renderMeasurementsModule();
+}
+
+function regToggleSort(key) {
+  if (window._regSortKey === key) {
+    window._regSortDir = window._regSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    window._regSortKey = key;
+    window._regSortDir = 'asc';
+  }
   renderMeasurementsModule();
 }
 
@@ -3452,7 +3500,7 @@ function importRegressionSensorFile(input, objectId) {
       }
 
       localStorage.setItem(storageKey, JSON.stringify(existingRows));
-      window._regPage = Math.floor((existingRows.length - 1) / 50);
+      window._regPage = Math.floor((existingRows.length - 1) / (window._regPageSize || 50));
       renderMeasurementsModule();
       alert(`Zaimportowano ${added} wierszy z pliku CSV.`);
     };
@@ -3776,7 +3824,7 @@ function renderRegressionBaselineCurves(objectId) {
 
   const consCard = _baselineCard({
     title: 'Krzywa bazowa — zużycie ciepła vs T zewnętrzna', icon: '📉', pts: consPts,
-    xLabel: 'T zewn. [°C]', yLabel: 'Δ zużycie [kWh]', accent: '#185FA5', chartId: consChart
+    xLabel: 'T zewn. [°C]', yLabel: 'Δ zużycie [MJ]', accent: '#185FA5', chartId: consChart
   });
   const supCard = _baselineCard({
     title: 'Krzywa bazowa — temperatura zasilania vs T zewnętrzna', icon: '🌡️', pts: supplyPts,
