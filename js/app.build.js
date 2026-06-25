@@ -3778,14 +3778,14 @@ function deleteRegressionRow(objectId, index) {
 
 function regRestoreAll(pid) {
   const rows = RegressionBaseModule.getRows(pid);
-  rows.forEach(r => { if (r.removed) delete r.removed; });
+  rows.forEach(r => { delete r.removed; delete r.removedCons; delete r.removedSup; });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
 
 function regClearAccepted(pid) {
   const rows = RegressionBaseModule.getRows(pid);
-  rows.forEach(r => { if (r.accepted) delete r.accepted; });
+  rows.forEach(r => { delete r.accepted; delete r.acceptedCons; delete r.acceptedSup; });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
@@ -3857,14 +3857,26 @@ function importRegressionSensorFile(input, objectId) {
 // ─── Selekcja danych (przegląd odchyłek) → Wykonaj regresję ───
 function regToggleSelection() { window._regSelectionOpen = !window._regSelectionOpen; renderMeasurementsModule(); }
 function regRunRegression() { window._regResultsOpen = true; renderMeasurementsModule(); }
-function regAcceptRow(pid, idx) {
+function regAcceptRow(pid, idx, metricKey) {
   const rows = RegressionBaseModule.getRows(pid);
-  if (rows[idx]) { rows[idx].accepted = true; RegressionBaseModule.saveRows(pid, rows); }
+  if (rows[idx]) { rows[idx][metricKey === 'sup' ? 'acceptedSup' : 'acceptedCons'] = true; RegressionBaseModule.saveRows(pid, rows); }
+  renderMeasurementsModule();
+}
+// Usunięcie odczytu TYLKO z danej metryki (cons/sup) — nie rusza drugiej tabeli ani drugiego wykresu.
+function regRemoveMetricRow(pid, idx, metricKey) {
+  const rows = RegressionBaseModule.getRows(pid);
+  if (rows[idx]) { rows[idx][metricKey === 'sup' ? 'removedSup' : 'removedCons'] = true; RegressionBaseModule.saveRows(pid, rows); }
   renderMeasurementsModule();
 }
 function _regOutlierList(pid, metricKey) {
   const mo = _regViews(pid).metricOutliers || {};
-  return mo[metricKey] || [];   // metricKey: 'cons' albo 'sup' — odchyłki RAZ na metrykę
+  const rows = RegressionBaseModule.getRows(pid);
+  const rk = metricKey === 'sup' ? 'removedSup' : 'removedCons';
+  const ak = metricKey === 'sup' ? 'acceptedSup' : 'acceptedCons';
+  return (mo[metricKey] || []).filter(o => {   // lista stabilna; usunięcie/„zostaw" tylko zdejmuje wiersz w TEJ metryce
+    const r = rows[o.idx]; if (!r) return false;
+    return !r[rk] && !r[ak];
+  });
 }
 function _regOutlierSorted(pid, viewKey) {
   const list = _regOutlierList(pid, viewKey);
@@ -3895,7 +3907,8 @@ function regDeleteVisible(pid, viewKey) {
   const { rows } = _regOutlierPage(pid, viewKey);
   if (!rows.length) return;
   const data = RegressionBaseModule.getRows(pid);
-  rows.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
+  const rk = viewKey === 'sup' ? 'removedSup' : 'removedCons';
+  rows.forEach(o => { if (data[o.idx]) data[o.idx][rk] = true; });
   RegressionBaseModule.saveRows(pid, data);
   renderMeasurementsModule();   // odwracalne przez „♻ Przywróć usunięte"
 }
@@ -3903,7 +3916,8 @@ function regDeleteAllOutliers(pid, viewKey) {
   const list = _regOutlierList(pid, viewKey);
   if (!list.length) return;
   const data = RegressionBaseModule.getRows(pid);
-  list.forEach(o => { if (data[o.idx]) data[o.idx].removed = true; });
+  const rk = viewKey === 'sup' ? 'removedSup' : 'removedCons';
+  list.forEach(o => { if (data[o.idx]) data[o.idx][rk] = true; });
   RegressionBaseModule.saveRows(pid, data);
   renderMeasurementsModule();   // odwracalne przez „♻ Przywróć usunięte"
 }
@@ -3911,7 +3925,8 @@ function regAcceptAllOutliers(pid, viewKey) {
   const list = _regOutlierList(pid, viewKey);
   if (!list.length) return;
   const rows = RegressionBaseModule.getRows(pid);
-  list.forEach(o => { if (rows[o.idx]) rows[o.idx].accepted = true; });
+  const ak = viewKey === 'sup' ? 'acceptedSup' : 'acceptedCons';
+  list.forEach(o => { if (rows[o.idx]) rows[o.idx][ak] = true; });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
@@ -3926,14 +3941,24 @@ function _regBaseData(pid) {
     if (ms == null) return (!from && !to);
     return ms >= fromMs && ms <= toMs;
   };
-  const supplyPts = [];
-  rows.forEach((r, idx) => { if (!r.removed && inRange(idx) && r.tOutdoor != null && r.tSupply != null) supplyPts.push({ idx, x: +r.tOutdoor, y: +r.tSupply, readTime: r.readTime }); });
-  const chrono = rows.map((r, idx) => ({ r, idx })).filter(o => !o.r.removed && inRange(o.idx)).sort((A, B) => {
-    const am = _regTs(A.r.readTime), bm = _regTs(B.r.readTime);
-    return (am == null ? 0 : am) - (bm == null ? 0 : bm);
+  // ALL = baza DETEKCJI odchyłek (ignoruje usunięcia per-metryka → lista stabilna, nic nie „dorzuca").
+  // WORK = baza WYKRESÓW/REGRESJI (wyklucza punkty usunięte w danej metryce).
+  const supplyPtsAll = [], supplyPtsWork = [];
+  rows.forEach((r, idx) => {
+    if (r.removed || !inRange(idx) || r.tOutdoor == null || r.tSupply == null) return;
+    const p = { idx, x: +r.tOutdoor, y: +r.tSupply, readTime: r.readTime };
+    supplyPtsAll.push(p);
+    if (!r.removedSup) supplyPtsWork.push(p);
   });
-  const consPts = _consDeltas(chrono.map(o => Object.assign({}, o.r, { _idx: o.idx })));
-  return { rows, supplyPts, consPts };
+  const chronoOf = excludeMetric => rows.map((r, idx) => ({ r, idx }))
+    .filter(o => !o.r.removed && inRange(o.idx) && !(excludeMetric && o.r.removedCons))
+    .sort((A, B) => {
+      const am = _regTs(A.r.readTime), bm = _regTs(B.r.readTime);
+      return (am == null ? 0 : am) - (bm == null ? 0 : bm);
+    });
+  const consPtsAll  = _consDeltas(chronoOf(false).map(o => Object.assign({}, o.r, { _idx: o.idx })));
+  const consPtsWork = _consDeltas(chronoOf(true ).map(o => Object.assign({}, o.r, { _idx: o.idx })));
+  return { rows, supplyPtsAll, supplyPtsWork, consPtsAll, consPtsWork };
 }
 
 function _regMedian(arr) { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
@@ -3948,7 +3973,6 @@ function _madOutliers(pts, fit, rows) {
   const th = 3.5 * mad; if (!(th > 0)) return [];
   return pts.map((p, i) => ({ idx: p.idx, readTime: (rows[p.idx] || {}).readTime, x: p.x, y: p.y, predicted: fit.a * p.x + fit.b, resid: res[i] }))
             .filter(o => Math.abs(o.resid - med) > th)
-            .filter(o => !(rows[o.idx] && rows[o.idx].accepted))
             .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
 }
 
@@ -3956,30 +3980,36 @@ function _madOutliers(pts, fit, rows) {
 let _regViewsCache = null, _regViewsCacheKey = '';
 function _regViews(pid) {
   const rows = RegressionBaseModule.getRows(pid);
-  const key = pid + '|' + (window._regBaseFrom || '') + '|' + (window._regBaseTo || '') + '|' + rows.length + '|' + rows.filter(r => r.removed).length + '|' + rows.filter(r => r.accepted).length;
+  const key = pid + '|' + (window._regBaseFrom || '') + '|' + (window._regBaseTo || '') + '|' + rows.length
+    + '|' + rows.filter(r => r.removed).length
+    + '|' + rows.filter(r => r.removedCons).length
+    + '|' + rows.filter(r => r.removedSup).length;
   if (_regViewsCacheKey === key && _regViewsCache) return _regViewsCache;
-  const { supplyPts, consPts } = _regBaseData(pid);
+  const { supplyPtsAll, supplyPtsWork, consPtsAll, consPtsWork } = _regBaseData(pid);
   const build = (metric, method, pts, binned, meta) => {
     const fit = method === 'raw' ? _olsFit(pts.map(p => ({ x: p.x, y: p.y }))) : binned.fit;
     return Object.assign({ key: metric + '_' + method, metric, method, pts, fit, binPts: binned.bins, nBins: binned.bins.length }, meta);
   };
-  const consBin = _binnedFit(consPts.map(p => ({ x: p.x, y: p.y })));
-  const supBin  = _binnedFit(supplyPts.map(p => ({ x: p.x, y: p.y })));
-  // Odchyłki RAZ na metrykę — względem stabilnego trendu uśrednionego (Metoda 2). Zły odczyt jest zły niezależnie od metody.
-  const consDetectFit = consBin.fit && consBin.fit.n >= 2 ? consBin.fit : _olsFit(consPts.map(p => ({ x: p.x, y: p.y })));
-  const supDetectFit  = supBin.fit  && supBin.fit.n  >= 2 ? supBin.fit  : _olsFit(supplyPts.map(p => ({ x: p.x, y: p.y })));
+  // Wykresy/regresja: baza WORK (po usunięciach danej metryki).
+  const consBin = _binnedFit(consPtsWork.map(p => ({ x: p.x, y: p.y })));
+  const supBin  = _binnedFit(supplyPtsWork.map(p => ({ x: p.x, y: p.y })));
+  // Detekcja odchyłek: baza ALL (stabilna — niezależna od usunięć per-metryka). Zły odczyt jest zły niezależnie od metody.
+  const consBinAll = _binnedFit(consPtsAll.map(p => ({ x: p.x, y: p.y })));
+  const supBinAll  = _binnedFit(supplyPtsAll.map(p => ({ x: p.x, y: p.y })));
+  const consDetectFit = consBinAll.fit && consBinAll.fit.n >= 2 ? consBinAll.fit : _olsFit(consPtsAll.map(p => ({ x: p.x, y: p.y })));
+  const supDetectFit  = supBinAll.fit  && supBinAll.fit.n  >= 2 ? supBinAll.fit  : _olsFit(supplyPtsAll.map(p => ({ x: p.x, y: p.y })));
   const out = {
-    cons_raw:    build('cons', 'raw',    consPts, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]' }),
-    cons_binned: build('cons', 'binned', consPts, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Δ zużycie [MJ]' }),
-    sup_raw:     build('sup',  'raw',    supplyPts, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]' }),
-    sup_binned:  build('sup',  'binned', supplyPts, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '🌡️', accent: '#E59866', yLabel: 'T zasilania [°C]' }),
+    cons_raw:    build('cons', 'raw',    consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]' }),
+    cons_binned: build('cons', 'binned', consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Δ zużycie [MJ]' }),
+    sup_raw:     build('sup',  'raw',    supplyPtsWork, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]' }),
+    sup_binned:  build('sup',  'binned', supplyPtsWork, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '🌡️', accent: '#E59866', yLabel: 'T zasilania [°C]' }),
     metricOutliers: {
-      cons: _madOutliers(consPts, consDetectFit, rows),
-      sup:  _madOutliers(supplyPts, supDetectFit, rows)
+      cons: _madOutliers(consPtsAll, consDetectFit, rows),
+      sup:  _madOutliers(supplyPtsAll, supDetectFit, rows)
     },
     metricMeta: {
-      cons: { title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]', n: consPts.length },
-      sup:  { title: 'Temperatura zasilania vs T zewnętrzna', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]', n: supplyPts.length }
+      cons: { title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]', n: consPtsWork.length },
+      sup:  { title: 'Temperatura zasilania vs T zewnętrzna', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]', n: supplyPtsWork.length }
     }
   };
   _regViewsCache = out; _regViewsCacheKey = key;
@@ -3990,8 +4020,9 @@ const _REG_VIEW_KEYS = ['cons_raw', 'cons_binned', 'sup_raw', 'sup_binned'];
 function renderRegressionSelection(pid) {
   const f2 = v => Number(v || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const f1 = v => Number(v || 0).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
-  const removedCount = RegressionBaseModule.getRows(pid).filter(r => r.removed).length;
+  const _selRows = RegressionBaseModule.getRows(pid);
+  const accCount = _selRows.filter(r => r.accepted || r.acceptedCons || r.acceptedSup).length;
+  const removedCount = _selRows.filter(r => r.removed || r.removedCons || r.removedSup).length;
   const resOpen = !!window._regResultsOpen;
   const from = window._regBaseFrom || '', to = window._regBaseTo || '';
   window._regOutSortKey = window._regOutSortKey || 'resid';
@@ -4018,8 +4049,8 @@ function renderRegressionSelection(pid) {
         <td style="padding:6px 10px;font-size:12px;text-align:right;color:#888;">${f2(o.predicted)}</td>
         <td style="padding:6px 10px;font-size:12px;text-align:right;color:#c00;font-weight:600;">${f2(o.resid)}</td>
         <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
-          <button class="small-button" onclick="deleteRegressionRow(${pid}, ${o.idx})" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
-          <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
+          <button class="small-button" onclick="regRemoveMetricRow(${pid}, ${o.idx}, '${metricKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
+          <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx}, '${metricKey}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
         </td>
       </tr>`).join('');
     const navBtn = (label, page, disabled) => `<button class="small-button" ${disabled ? 'disabled' : `onclick="regOutSetPage('${metricKey}', ${page})"`} style="font-size:11px;padding:2px 7px;${disabled ? 'opacity:.4;' : ''}">${label}</button>`;
@@ -4061,7 +4092,7 @@ function renderRegressionSelection(pid) {
     </div>`;
   };
 
-  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki = błędne/odstające odczyty, liczone <strong>raz na metrykę</strong> (odporna detekcja MAD względem stabilnego trendu). Usunięcie odczytu wyklucza go ze wszystkich obliczeń i z 4 wykresów. Kliknij „Odczyt" lub „Odchyłka", aby sortować ↑/↓.${accBar}${remBar}</div>`;
+  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki = błędne/odstające odczyty (odporna detekcja MAD względem stabilnego trendu). Lista liczona <strong>raz na pełnych danych</strong> — usunięcie odczytu tylko zdejmuje go z tej listy, <strong>nie dorzuca nowych</strong>. Usuwasz <strong>niezależnie</strong> w każdej metryce (Zużycie / Temperatura zasilania) — nie wpływa to na drugą tabelę ani jej wykresy. Kliknij „Odczyt" lub „Odchyłka", aby sortować ↑/↓.${accBar}${remBar}</div>`;
   const allTables = ['cons', 'sup'].map(table).join('');
 
   // ── Zakres dat i godzin (od–do) — z podpowiedzią dostępnego zakresu ──
