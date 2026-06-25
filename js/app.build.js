@@ -3266,7 +3266,14 @@ const RegressionBaseModule = {
   nextNumber(oid) {
     const yr = new Date().getFullYear();
     const n = this.listByObject(oid).filter(p => (p.number || '').indexOf('/' + yr + '/') >= 0).length + 1;
-    return 'REG/' + yr + '/' + String(n).padStart(3, '0');
+    let pfx = '';
+    try {
+      const obj = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.find(oid) : null;
+      const cn = (obj && typeof ClientsModule !== 'undefined') ? ClientsModule.getNumber(obj.clientId) : null;
+      const on = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.getNumber(oid) : null;
+      if (cn) pfx = 'K' + cn + (on ? '-' + on : '') + '/';
+    } catch (e) { /* ignore */ }
+    return pfx + 'REG/' + yr + '/' + String(n).padStart(3, '0');
   },
 
   add(oid, data) {
@@ -3313,8 +3320,9 @@ window.RegressionBaseModule = RegressionBaseModule;
       let rows = []; try { rows = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
       if (rows.length && !RegressionBaseModule.listByObject(oid).length) {
         RegressionBaseModule.add(oid, {
-          number: 'REG/' + new Date().getFullYear() + '/001',
+          number: RegressionBaseModule.nextNumber(oid),
           protocolDate: new Date().toISOString().slice(0, 10),
+          climateSource: 'Odczyt z instalacji / Water AI',
           notes: 'Zmigrowano z poprzedniej wersji (jeden zestaw danych → protokół #1)',
           rows
         });
@@ -3331,7 +3339,7 @@ function regProtoNew() {
   window._regProtoForm = {
     objectId: Number(objId), id: null, number: RegressionBaseModule.nextNumber(objId),
     protocolDate: new Date().toISOString().slice(0, 10), periodFrom: '', periodTo: '',
-    climateSource: '', climateFetchDate: '', notes: '', _copyRows: null, _copyFromNumber: ''
+    climateSource: 'Odczyt z instalacji / Water AI', climateFetchDate: '', notes: '', _copyRows: null, _copyFromNumber: ''
   };
   window._regActiveProtocolId = null;
   renderMeasurementsModule();
@@ -3496,13 +3504,32 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
   window._regPageSize = window._regPageSize || 50;
   const pageSize = window._regPageSize;
 
-  const _rt = v => { const t = Date.parse(String(v || '').replace(' ', 'T')); return isNaN(t) ? null : t; };
+  const _rt = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const s = String(v).trim();
+    let t = Date.parse(s.replace(' ', 'T'));
+    if (!isNaN(t)) return t;
+    // format polski: DD.MM.YYYY [HH:MM[:SS]]  (separatory . lub /)
+    const m = s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      t = Date.parse(`${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T${(m[4] || '0').padStart(2, '0')}:${m[5] || '00'}:${m[6] || '00'}`);
+      if (!isNaN(t)) return t;
+    }
+    return null;
+  };
   const sortKey = window._regSortKey, sortDir = window._regSortDir === 'desc' ? -1 : 1;
   const indexed = rawRows.map((r, idx) => ({ r, idx }));
   indexed.sort((A, B) => {
     let a, b;
-    if (sortKey === 'readTime') { a = _rt(A.r.readTime); b = _rt(B.r.readTime); }
-    else {
+    if (sortKey === 'readTime') {
+      a = _rt(A.r.readTime); b = _rt(B.r.readTime);
+      if (a == null && b == null) {   // nieparsowalne daty → porównanie tekstowe, by sort działał
+        const as = String(A.r.readTime || ''), bs = String(B.r.readTime || '');
+        if (as < bs) return -1 * sortDir;
+        if (as > bs) return  1 * sortDir;
+        return A.idx - B.idx;
+      }
+    } else {
       a = (A.r[sortKey] == null || A.r[sortKey] === '') ? null : Number(A.r[sortKey]);
       b = (B.r[sortKey] == null || B.r[sortKey] === '') ? null : Number(B.r[sortKey]);
     }
@@ -3521,6 +3548,21 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
   const page = window._regPage;
   const rows = indexed.slice(page * pageSize, (page + 1) * pageSize);
 
+  // Δ zużycie = różnica wskazań licznika między kolejnymi odczytami (chronologicznie), niezależnie od sortowania wyświetlania
+  const chrono = rawRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+    const am = _rt(A.r.readTime), bm = _rt(B.r.readTime);
+    if (am != null && bm != null) return am - bm;
+    if (am != null) return -1;
+    if (bm != null) return 1;
+    return A.idx - B.idx;
+  });
+  const deltaByIdx = {};
+  for (let j = 0; j < chrono.length; j++) {
+    const cur = chrono[j].r, prev = j > 0 ? chrono[j - 1].r : null;
+    deltaByIdx[chrono[j].idx] = (prev && cur.heatConsumption != null && prev.heatConsumption != null)
+      ? (Number(cur.heatConsumption) - Number(prev.heatConsumption)) : null;
+  }
+
   const fmtVal = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const fmtT   = v => (v === null || v === undefined || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const sortArrow = key => window._regSortKey === key ? (window._regSortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
@@ -3535,6 +3577,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.vFlow)}</td>
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatPower)}</td>
       <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtVal(r.heatConsumption)}</td>
+      <td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:600;color:#185FA5;">${deltaByIdx[idx] == null ? '—' : fmtVal(deltaByIdx[idx])}</td>
       <td style="padding:4px 8px;">
         <button class="small-button" onclick="deleteRegressionRow(${objectId}, ${idx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button>
       </td>
@@ -3626,7 +3669,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
           </div>
         </div>` : `
         <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px;">
             <thead>
               <tr style="background:var(--color-background-secondary);">
                 ${th('readTime', 'Data odczytu', 'left')}
@@ -3636,6 +3679,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
                 ${th('vFlow', 'Przepływ [dm³/h]', 'right')}
                 ${th('heatPower', 'Moc dostarczona [W]', 'right')}
                 ${th('heatConsumption', 'Zużycie ciepła [MJ]', 'right')}
+                <th title="Faktyczne zużycie = różnica wskazań licznika między kolejnymi odczytami" style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:#185FA5;white-space:nowrap;">Δ [MJ]</th>
                 <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
               </tr>
             </thead>
@@ -3713,24 +3757,30 @@ function importRegressionSensorFile(input, objectId) {
       const lines = text.trim().split(/\r?\n/);
       if (lines.length < 2) { alert('Plik CSV jest pusty lub nie zawiera nagłówka.'); return; }
 
-      const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-      const colMap = { readtime: 'readTime', toutdoor: 'tOutdoor', tsupply: 'tSupply', treturn: 'tReturn', vflow: 'vFlow', heatpower: 'heatPower', heatconsumption: 'heatConsumption' };
+      // Separator: ; lub tab mają priorytet (przy nich przecinek to separator dziesiętny, np. 0,4)
+      const delim = lines[0].indexOf(';') >= 0 ? ';' : (lines[0].indexOf('\t') >= 0 ? '\t' : ',');
+      const num = s => {
+        s = (s || '').trim().replace(/\s/g, '').replace(',', '.');
+        return (s !== '' && !isNaN(Number(s))) ? Number(s) : null;
+      };
+      // Stała kolejność kolumn: readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption.
+      // Mapowanie POZYCYJNE (nie wg nagłówków). Pierwszy wiersz to nagłówek, jeśli poz. tOutdoor nie jest liczbą.
+      const firstCells = lines[0].split(delim);
+      const hasHeader = firstCells.length > 1 && num(firstCells[1]) === null;
+      const startIdx = hasHeader ? 1 : 0;
 
       const existingRows = RegressionBaseModule.getRows(objectId);
       let added = 0;
 
-      for (let i = 1; i < lines.length; i++) {
-        const cells = lines[i].split(/[,;\t]/);
+      for (let i = startIdx; i < lines.length; i++) {
+        const cells = lines[i].split(delim);
         if (cells.length < 2) continue;
-        const row = {};
-        header.forEach((h, idx) => {
-          const key = colMap[h];
-          if (!key) return;
-          const val = (cells[idx] || '').trim().replace(',', '.');
-          if (key === 'readTime') row[key] = val || null;
-          else row[key] = val !== '' && !isNaN(Number(val)) ? Number(val) : null;
+        existingRows.push({
+          readTime: (cells[0] || '').trim() || null,
+          tOutdoor: num(cells[1]), tSupply: num(cells[2]), tReturn: num(cells[3]),
+          vFlow: num(cells[4]), heatPower: num(cells[5]), heatConsumption: num(cells[6])
         });
-        if (Object.keys(row).length > 0) { existingRows.push(row); added++; }
+        added++;
       }
 
       RegressionBaseModule.saveRows(objectId, existingRows);
