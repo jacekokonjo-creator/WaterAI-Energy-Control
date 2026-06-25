@@ -38,6 +38,7 @@ const InvoicingModule = {
 
       clientId: Number(inv.clientId),
       objectId: inv.objectId ? Number(inv.objectId) : null,
+      issuerId: inv.issuerId ? Number(inv.issuerId) : null,
 
       invoiceNumber: inv.invoiceNumber || this.generateNumber(),
       invoiceType: inv.invoiceType || 'INVOICE',
