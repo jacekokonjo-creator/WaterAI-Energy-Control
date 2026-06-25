@@ -3809,6 +3809,16 @@ function regAcceptRow(pid, idx) {
   if (rows[idx]) { rows[idx].accepted = true; RegressionBaseModule.saveRows(pid, rows); }
   renderMeasurementsModule();
 }
+function regDeleteAllOutliers(pid) {
+  if (!confirm('Usunąć z danych wszystkie odczyty odstające?')) return;
+  const { outliers } = _regComputeOutliers(pid);
+  const idxs = outliers.map(o => o.idx).sort((a, b) => b - a);   // od końca, by indeksy się nie przesuwały
+  const rows = RegressionBaseModule.getRows(pid);
+  idxs.forEach(i => rows.splice(i, 1));
+  RegressionBaseModule.saveRows(pid, rows);
+  renderMeasurementsModule();
+}
+
 function regAcceptAllOutliers(pid) {
   const { outliers } = _regComputeOutliers(pid);
   const rows = RegressionBaseModule.getRows(pid);
@@ -3868,53 +3878,76 @@ function renderRegressionSelection(pid) {
   const { outliers } = _regComputeOutliers(pid);
   const f2 = v => Number(v || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
-  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-      <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zaakceptowanych wcześniej: ${accCount}` : ''}.</div>
-      ${outliers.length ? `<button class="small-button" onclick="regAcceptAllOutliers(${pid})" style="font-size:12px;">✓ Zaakceptuj wszystkie</button>` : ''}
-    </div>`;
+  const resOpen = !!window._regResultsOpen;
+  const from = window._regBaseFrom || '', to = window._regBaseTo || '';
+
+  // ── Krok 1: przegląd odchyłek ──
+  let outlierBlock;
   if (!outliers.length) {
-    return `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:14px 16px;margin-bottom:8px;">
-      ${head}<div style="font-size:13px;color:#1E7B34;">✅ Brak odchyłek do przeglądu — dane gotowe do regresji. Kliknij „▶ Wykonaj regresję".</div></div>`;
+    outlierBlock = `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+      <div style="font-size:13px;color:#1E7B34;">✅ Brak odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zaakceptowanych wcześniej: ${accCount}` : ''} — dane gotowe.</div></div>`;
+  } else {
+    const rowsHtml = outliers.map(o => {
+      const reasons = o.items.map(i => `${i.metric}: ${f2(i.value)} (odchyłka ${f2(i.resid)})`).join(' · ');
+      return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
+        <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
+        <td style="padding:6px 10px;font-size:12px;color:#c00;">${escapeHtml(reasons)}</td>
+        <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
+          <button class="small-button" onclick="deleteRegressionRow(${pid}, ${o.idx})" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
+          <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
+        </td>
+      </tr>`;
+    }).join('');
+    outlierBlock = `<div style="border:1px solid #F3C9C9;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:#FDECEC;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zostawionych wcześniej: ${accCount}` : ''}.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="small-button" onclick="regDeleteAllOutliers(${pid})" style="font-size:12px;color:#c00;border-color:#c00;">✕ Usuń wszystkie</button>
+            <button class="small-button" onclick="regAcceptAllOutliers(${pid})" style="font-size:12px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--color-text-secondary);">„✕ Usuń" wycina odczyt z danych. „Zostaw" pozostawia go w regresji (znika z listy odchyłek).</div>
+      </div>
+      <div style="overflow-x:auto;background:var(--color-background-primary);">
+        <table style="width:100%;border-collapse:collapse;min-width:520px;">
+          <thead><tr style="background:var(--color-background-secondary);">
+            <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
+            <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Powód (odchyłka)</th>
+            <th style="padding:6px 10px;"></th>
+          </tr></thead><tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>`;
   }
-  const rowsHtml = outliers.map(o => {
-    const reasons = o.items.map(i => `${i.metric}: ${f2(i.value)} (odchyłka ${f2(i.resid)})`).join(' · ');
-    return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
-      <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
-      <td style="padding:6px 10px;font-size:12px;color:#c00;">${escapeHtml(reasons)}</td>
-      <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
-        <button class="small-button" onclick="deleteRegressionRow(${pid}, ${o.idx})" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
-        <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">✓ Zostaw</button>
-      </td>
-    </tr>`;
-  }).join('');
-  return `<div style="border:1px solid #F3C9C9;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-    <div style="background:#FDECEC;padding:12px 16px;">${head}
-      <div style="font-size:11px;color:var(--color-text-secondary);">„✕ Usuń" wycina odczyt z danych. „✓ Zostaw" akceptuje go (zostaje w regresji, znika z listy odchyłek).</div>
-    </div>
-    <div style="overflow-x:auto;background:var(--color-background-primary);">
-      <table style="width:100%;border-collapse:collapse;min-width:520px;">
-        <thead><tr style="background:var(--color-background-secondary);">
-          <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
-          <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Powód (odchyłka)</th>
-          <th style="padding:6px 10px;"></th>
-        </tr></thead><tbody>${rowsHtml}</tbody>
-      </table>
-    </div>
-  </div>`;
+
+  // ── Krok 2: zakres dat i godzin (od–do) ──
+  const dateBlock = `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:600;color:#0C447C;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">📅 Zakres okresu bazowego (data i godzina)</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;">
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od</label><input type="datetime-local" id="reg-base-from" value="${from}" style="font-size:12px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do</label><input type="datetime-local" id="reg-base-to" value="${to}" style="font-size:12px;"></div>
+        <button class="small-button" onclick="window._regBaseFrom=document.getElementById('reg-base-from').value;window._regBaseTo=document.getElementById('reg-base-to').value;renderMeasurementsModule();" style="font-size:12px;">Zastosuj</button>
+        ${(from || to) ? `<button class="small-button" onclick="window._regBaseFrom='';window._regBaseTo='';renderMeasurementsModule();" style="font-size:12px;color:#c00;border-color:#c00;">Wyczyść</button>` : ''}
+      </div>
+    </div>`;
+
+  // ── Krok 3: wykonaj regresję (na końcu) + wyniki ──
+  const runBlock = `<div style="margin-bottom:8px;">
+      <button class="primary-button" onclick="regRunRegression()" style="font-size:14px;padding:9px 20px;">▶ Wykonaj regresję</button>
+    </div>`;
+
+  return outlierBlock + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '');
 }
 
 function _regWorkflowHtml(pid) {
   const rowsN = RegressionBaseModule.getRows(pid).length;
   if (rowsN < 2) return '';
   const selOpen = !!window._regSelectionOpen;
-  const resOpen = !!window._regResultsOpen;
-  const bar = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 8px;">
-      <button class="${selOpen ? 'primary-button' : 'small-button'}" onclick="regToggleSelection()" style="font-size:13px;">🔍 Selekcja danych (odchyłki)</button>
-      <button class="primary-button" onclick="regRunRegression()" style="font-size:13px;">▶ Wykonaj regresję</button>
+  const bar = `<div style="margin:18px 0 8px;">
+      <button class="${selOpen ? 'primary-button' : 'small-button'}" onclick="regToggleSelection()" style="font-size:13px;">🔍 Selekcja danych${selOpen ? ' ✕' : ''}</button>
     </div>`;
-  return bar
-    + (selOpen ? renderRegressionSelection(pid) : '')
-    + (resOpen ? renderRegressionBaselineCurves(pid) : '');
+  return bar + (selOpen ? renderRegressionSelection(pid) : '');
 }
 
 function renderRegressionTab(protocols) {
@@ -4165,56 +4198,27 @@ function buildSensorBaseline(objectId, from, to) {
 }
 
 function _baselineCard(opts) {
-  const { title, icon, pts, xLabel, yLabel, accent, chartId } = opts;
+  const { title, icon, pts, accent, chartId } = opts;
   if (pts.length < 2) {
     return `<div class="reminder-card" style="border-left:4px solid ${accent};margin-bottom:14px;">
       <strong>${icon} ${title}</strong>
-      <div class="reminder-meta">Za mało punktów po filtrze (min. 2). Dodaj dane lub poszerz zakres dat.</div>
+      <div class="reminder-meta">Za mało punktów (min. 2). Dodaj dane lub poszerz zakres dat.</div>
     </div>`;
   }
   const lr = _olsFit(pts);
   const f4 = v => Number(v || 0).toFixed(4);
   const f2 = v => Number(v || 0).toFixed(2);
-  const outTh = 2 * lr.rmse;
-  const bad = pts.map(p => { const yp = lr.a * p.x + lr.b; return { p, yp, resid: p.y - yp }; })
-                 .filter(o => outTh > 0 && Math.abs(o.resid) > outTh)
-                 .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
-  const shown = bad.slice(0, 60);
   const corr = lr.r2 >= 0.9 ? '✅ bardzo dobra' : lr.r2 >= 0.75 ? '🟡 dobra' : '🔴 słaba';
-
-  const tableRows = shown.length ? shown.map(o => `<tr style="background:#FDECEC;">
-      <td style="padding:3px 8px;font-size:11px;color:var(--color-text-tertiary);">${escapeHtml(String(o.p.label).slice(0, 16))}</td>
-      <td style="padding:3px 8px;font-size:12px;text-align:right;">${f2(o.p.x)}</td>
-      <td style="padding:3px 8px;font-size:12px;text-align:right;">${f2(o.p.y)}</td>
-      <td style="padding:3px 8px;font-size:12px;text-align:right;color:#888;">${f2(o.yp)}</td>
-      <td style="padding:3px 8px;font-size:12px;text-align:right;color:#c00;font-weight:600;">${f2(o.resid)} ⚠</td>
-    </tr>`).join('') : `<tr><td colspan="5" style="padding:10px;text-align:center;font-size:12px;color:var(--color-text-secondary);">Brak odchyłek powyżej 2·RMSE — dane spójne.</td></tr>`;
-
   return `
   <div style="border:1px solid ${accent};border-radius:10px;overflow:hidden;margin-bottom:16px;">
     <div style="padding:12px 14px;background:${accent}1f;display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
       <div style="font-size:14px;font-weight:600;">${icon} ${title}</div>
-      <div style="font-size:15px;font-weight:600;">y = <strong>${f4(lr.a)}</strong> · x + <strong>${f4(lr.b)}</strong></div>
+      <div style="font-size:16px;font-weight:700;">y = <strong>${f4(lr.a)}</strong> · x + <strong>${f4(lr.b)}</strong></div>
       <div style="font-size:13px;">R² = <strong>${f4(lr.r2)}</strong> ${corr}</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);">n = ${lr.n} · RMSE = ${f2(lr.rmse)} · odchyłek: ${bad.length}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);">n = ${lr.n} · RMSE = ${f2(lr.rmse)}</div>
     </div>
     <div style="padding:12px 14px;background:var(--color-background-primary);">
-      <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Odchyłki (kandydaci do wycięcia)${bad.length > 60 ? ` — pokazano 60 z ${bad.length}` : ''}</div>
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px;">
-          <thead><tr style="background:var(--color-background-secondary);">
-            <th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
-            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${xLabel}</th>
-            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${yLabel}</th>
-            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">y prognoza</th>
-            <th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odchyłka</th>
-          </tr></thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </div>
-      <div style="margin-top:14px;">
-        <canvas id="${chartId}" width="560" height="260" style="max-width:100%;border:1px solid ${accent};border-radius:8px;background:#fff;display:block;"></canvas>
-      </div>
+      <canvas id="${chartId}" width="560" height="300" style="max-width:100%;border:1px solid ${accent};border-radius:8px;background:#fff;display:block;"></canvas>
     </div>
   </div>`;
 }
@@ -4273,18 +4277,10 @@ function renderRegressionBaselineCurves(objectId) {
   })();`;
 
   return `
-  <div style="margin-top:22px;">
-    <div style="display:flex;align-items:flex-end;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;">
-      <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📐 Krzywe bazowe (z danych z czujników)</h3>
-      <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;">
-        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od</label><input type="datetime-local" id="reg-base-from" value="${from}" style="font-size:12px;"></div>
-        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do</label><input type="datetime-local" id="reg-base-to" value="${to}" style="font-size:12px;"></div>
-        <button class="small-button" onclick="window._regBaseFrom=document.getElementById('reg-base-from').value;window._regBaseTo=document.getElementById('reg-base-to').value;renderMeasurementsModule();">Zastosuj</button>
-        ${(from || to) ? `<button class="small-button" onclick="window._regBaseFrom='';window._regBaseTo='';renderMeasurementsModule();" style="color:#c00;border-color:#c00;">Wyczyść filtr</button>` : ''}
-      </div>
-    </div>
+  <div style="margin-top:18px;">
+    <h3 style="margin:0 0 10px;font-size:15px;font-weight:600;color:#0C447C;">📐 Wynik regresji — krzywe bazowe</h3>
     <div class="reminder-meta" style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px;">
-      Użyto ${used} z ${total} odczytów${(from || to) ? ' (po filtrze dat)' : ''}. Zużycie = przyrost licznika <code>heatConsumption</code> między kolejnymi odczytami; ⚠ oznacza odchyłkę &gt; 2·RMSE (kandydat do wycięcia ✕ w tabeli danych powyżej).
+      Użyto ${used} z ${total} odczytów${(from || to) ? ' (po filtrze dat)' : ''}. Zużycie = przyrost licznika <code>heatConsumption</code> między kolejnymi odczytami. Punkty = odczyty, linia = regresja liniowa.
     </div>
     ${consCard}
     ${supCard}
