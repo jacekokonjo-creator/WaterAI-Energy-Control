@@ -3405,7 +3405,14 @@ function regProtoSave() {
 function regProtoOpen(pid) { window._regActiveProtocolId = Number(pid); window._regProtoForm = null; window._regPage = 0; window._regSelectionOpen = false; window._regResultsOpen = false; renderMeasurementsModule(); }
 function regProtoBack() { window._regActiveProtocolId = null; window._regProtoForm = null; renderMeasurementsModule(); }
 function regProtoDelete(pid) {
-  if (!confirm('Usunąć ten okres bazowy regresji wraz z danymi z czujników? Tej operacji nie można cofnąć.')) return;
+  // Dwustopniowo, bez confirm() (działa przy zablokowanych oknach dialogowych).
+  if (window._regProtoDelArm != pid) {
+    window._regProtoDelArm = pid;
+    renderMeasurementsModule();
+    try { setTimeout(function () { if (window._regProtoDelArm == pid) { window._regProtoDelArm = null; renderMeasurementsModule(); } }, 4000); } catch (e) {}
+    return;
+  }
+  window._regProtoDelArm = null;
   RegressionBaseModule.remove(selectedMeasurementObjectId, pid);
   if (Number(window._regActiveProtocolId) === Number(pid)) window._regActiveProtocolId = null;
   renderMeasurementsModule();
@@ -3426,7 +3433,7 @@ function _regProtocolListHtml(objId) {
       <td style="padding:8px 10px;text-align:right;white-space:nowrap;">
         <button class="small-button" onclick="regProtoOpen(${p.id})" style="font-size:11px;">Otwórz</button>
         <button class="small-button" onclick="regProtoEdit(${p.id})" style="font-size:11px;">✏️</button>
-        <button class="small-button" onclick="regProtoDelete(${p.id})" style="font-size:11px;color:#c00;border-color:#c00;">🗑</button>
+        <button class="small-button" onclick="regProtoDelete(${p.id})" style="font-size:11px;${window._regProtoDelArm == p.id ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}">${window._regProtoDelArm == p.id ? '⚠️ usuń?' : '🗑'}</button>
       </td>
     </tr>`;
   }).join('');
@@ -4064,7 +4071,7 @@ function renderRegressionSelection(pid) {
   const toInp = ms => { const d = new Date(ms), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
   const minInp = minMs != null ? toInp(minMs) : '', maxInp = maxMs != null ? toInp(maxMs) : '';
   const rangeHint = minMs != null ? `Dostępny zakres danych: <strong>${new Date(minMs).toLocaleString('pl-PL')}</strong> – <strong>${new Date(maxMs).toLocaleString('pl-PL')}</strong>` : 'Brak odczytów z parsowalną datą.';
-  const minMaxAttr = (minInp && maxInp) ? `min="${minInp}" max="${maxInp}"` : '';
+  const minMaxAttr = '';   // BEZ min/max — przeglądarka nie „dociąga" ręcznie wpisywanych dat do zakresu
   const dateBlock = `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
       <div style="font-size:11px;font-weight:600;color:#0C447C;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">📅 Zakres okresu bazowego (data i godzina)</div>
       <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;">${rangeHint}</div>
