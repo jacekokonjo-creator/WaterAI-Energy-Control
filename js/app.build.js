@@ -3855,10 +3855,9 @@ function regAcceptRow(pid, idx) {
   if (rows[idx]) { rows[idx].accepted = true; RegressionBaseModule.saveRows(pid, rows); }
   renderMeasurementsModule();
 }
-function _regOutlierList(pid, viewKey) {
-  const views = _regViews(pid);
-  if (views[viewKey]) return views[viewKey].outliers;
-  return [];   // 'all' nie ma sensu przy 4 metodach — każdy widok osobno
+function _regOutlierList(pid, metricKey) {
+  const mo = _regViews(pid).metricOutliers || {};
+  return mo[metricKey] || [];   // metricKey: 'cons' albo 'sup' — odchyłki RAZ na metrykę
 }
 function _regOutlierSorted(pid, viewKey) {
   const list = _regOutlierList(pid, viewKey);
@@ -3946,24 +3945,35 @@ function _madOutliers(pts, fit, rows) {
             .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
 }
 
-// 4 widoki: {metryka} × {metoda}. Każdy ma własną linię, własne odchyłki i własny wykres.
+// 4 widoki do WYKRESÓW: {metryka}×{metoda} (każdy ma własną linię). Odchyłki liczone RAZ na metrykę.
 let _regViewsCache = null, _regViewsCacheKey = '';
 function _regViews(pid) {
   const rows = RegressionBaseModule.getRows(pid);
   const key = pid + '|' + (window._regBaseFrom || '') + '|' + (window._regBaseTo || '') + '|' + rows.length + '|' + rows.filter(r => r.removed).length + '|' + rows.filter(r => r.accepted).length;
   if (_regViewsCacheKey === key && _regViewsCache) return _regViewsCache;
   const { supplyPts, consPts } = _regBaseData(pid);
-  const build = (metric, method, pts, meta) => {
-    const plain = pts.map(p => ({ x: p.x, y: p.y }));
-    const binned = _binnedFit(plain);
-    const fit = method === 'raw' ? _olsFit(plain) : binned.fit;
-    return Object.assign({ key: metric + '_' + method, metric, method, pts, fit, binPts: binned.bins, nBins: binned.bins.length, outliers: _madOutliers(pts, fit, rows) }, meta);
+  const build = (metric, method, pts, binned, meta) => {
+    const fit = method === 'raw' ? _olsFit(pts.map(p => ({ x: p.x, y: p.y }))) : binned.fit;
+    return Object.assign({ key: metric + '_' + method, metric, method, pts, fit, binPts: binned.bins, nBins: binned.bins.length }, meta);
   };
+  const consBin = _binnedFit(consPts.map(p => ({ x: p.x, y: p.y })));
+  const supBin  = _binnedFit(supplyPts.map(p => ({ x: p.x, y: p.y })));
+  // Odchyłki RAZ na metrykę — względem stabilnego trendu uśrednionego (Metoda 2). Zły odczyt jest zły niezależnie od metody.
+  const consDetectFit = consBin.fit && consBin.fit.n >= 2 ? consBin.fit : _olsFit(consPts.map(p => ({ x: p.x, y: p.y })));
+  const supDetectFit  = supBin.fit  && supBin.fit.n  >= 2 ? supBin.fit  : _olsFit(supplyPts.map(p => ({ x: p.x, y: p.y })));
   const out = {
-    cons_raw:    build('cons', 'raw',    consPts, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]' }),
-    cons_binned: build('cons', 'binned', consPts, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Δ zużycie [MJ]' }),
-    sup_raw:     build('sup',  'raw',    supplyPts, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]' }),
-    sup_binned:  build('sup',  'binned', supplyPts, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '🌡️', accent: '#E59866', yLabel: 'T zasilania [°C]' })
+    cons_raw:    build('cons', 'raw',    consPts, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]' }),
+    cons_binned: build('cons', 'binned', consPts, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Δ zużycie [MJ]' }),
+    sup_raw:     build('sup',  'raw',    supplyPts, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]' }),
+    sup_binned:  build('sup',  'binned', supplyPts, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '🌡️', accent: '#E59866', yLabel: 'T zasilania [°C]' }),
+    metricOutliers: {
+      cons: _madOutliers(consPts, consDetectFit, rows),
+      sup:  _madOutliers(supplyPts, supDetectFit, rows)
+    },
+    metricMeta: {
+      cons: { title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]', n: consPts.length },
+      sup:  { title: 'Temperatura zasilania vs T zewnętrzna', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]', n: supplyPts.length }
+    }
   };
   _regViewsCache = out; _regViewsCacheKey = key;
   return out;
@@ -3986,13 +3996,13 @@ function renderRegressionSelection(pid) {
   const sa = key => sortKey === key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
   const views = _regViews(pid);
 
-  const table = (viewKey) => {
-    const v = views[viewKey];
-    const { rows: pageRows, total, totalPages, pg, ps } = _regOutlierPage(pid, viewKey);
-    const head = `${v.icon} ${escapeHtml(v.title)} · <span style="font-weight:500;color:var(--color-text-secondary);">${escapeHtml(v.sub)}</span>`;
+  const table = (metricKey) => {
+    const v = views.metricMeta[metricKey];
+    const { rows: pageRows, total, totalPages, pg, ps } = _regOutlierPage(pid, metricKey);
+    const head = `${v.icon} ${escapeHtml(v.title)}`;
     if (!total) {
       return `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:11px 14px;margin-bottom:12px;">
-        <div style="font-size:13px;color:#1E7B34;">${head}: ✅ brak odchyłek (${v.pts.length} pkt).</div></div>`;
+        <div style="font-size:13px;color:#1E7B34;">${head}: ✅ brak odchyłek (${v.n} pkt).</div></div>`;
     }
     const rowsHtml = pageRows.map(o => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
         <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
@@ -4005,7 +4015,7 @@ function renderRegressionSelection(pid) {
           <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
         </td>
       </tr>`).join('');
-    const navBtn = (label, page, disabled) => `<button class="small-button" ${disabled ? 'disabled' : `onclick="regOutSetPage('${viewKey}', ${page})"`} style="font-size:11px;padding:2px 7px;${disabled ? 'opacity:.4;' : ''}">${label}</button>`;
+    const navBtn = (label, page, disabled) => `<button class="small-button" ${disabled ? 'disabled' : `onclick="regOutSetPage('${metricKey}', ${page})"`} style="font-size:11px;padding:2px 7px;${disabled ? 'opacity:.4;' : ''}">${label}</button>`;
     const pageSizeSel = `<select onchange="regOutPageSize(this.value)" style="font-size:11px;padding:2px 4px;">
         <option value="50" ${ps === 50 ? 'selected' : ''}>50</option>
         <option value="100" ${ps === 100 ? 'selected' : ''}>100</option>
@@ -4023,9 +4033,9 @@ function renderRegressionSelection(pid) {
       <div style="background:${v.accent}1f;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
         <div style="font-size:13px;font-weight:600;">${head} — <span style="color:#c00;">${total}</span> odchyłek</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="small-button" onclick="regDeleteVisible(${pid},'${viewKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń widoczne (${pageRows.length})</button>
-          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${viewKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie (${total})</button>
-          <button class="small-button" onclick="regAcceptAllOutliers(${pid},'${viewKey}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
+          <button class="small-button" onclick="regDeleteVisible(${pid},'${metricKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń widoczne (${pageRows.length})</button>
+          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${metricKey}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie (${total})</button>
+          <button class="small-button" onclick="regAcceptAllOutliers(${pid},'${metricKey}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
         </div>
       </div>
       <div style="overflow-x:auto;background:var(--color-background-primary);">
@@ -4044,8 +4054,8 @@ function renderRegressionSelection(pid) {
     </div>`;
   };
 
-  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">4 zestawy odchyłek: zużycie i zasilanie, każde w 2 metodach. Odchyłki liczone <strong>osobno dla każdej metody</strong> (odporna detekcja MAD). Kliknij nagłówek „Odczyt" lub „Odchyłka", aby sortować ↑/↓. Usunięcie odczytu wyklucza go ze wszystkich obliczeń i wykresów.${accBar}${remBar}</div>`;
-  const allTables = _REG_VIEW_KEYS.map(table).join('');
+  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki = błędne/odstające odczyty, liczone <strong>raz na metrykę</strong> (odporna detekcja MAD względem stabilnego trendu). Usunięcie odczytu wyklucza go ze wszystkich obliczeń i z 4 wykresów. Kliknij „Odczyt" lub „Odchyłka", aby sortować ↑/↓.${accBar}${remBar}</div>`;
+  const allTables = ['cons', 'sup'].map(table).join('');
 
   // ── Zakres dat i godzin (od–do) — z podpowiedzią dostępnego zakresu ──
   const allMs = RegressionBaseModule.getRows(pid).map(r => _regTs(r.readTime)).filter(x => x != null);
