@@ -3838,19 +3838,27 @@ function regAcceptRow(pid, idx) {
   if (rows[idx]) { rows[idx].accepted = true; RegressionBaseModule.saveRows(pid, rows); }
   renderMeasurementsModule();
 }
-function regDeleteAllOutliers(pid) {
-  if (!confirm('Usunąć z danych wszystkie odczyty odstające? (Można je przywrócić.)')) return;
-  const { outliers } = _regComputeOutliers(pid);
+function _regOutlierList(pid, which) {
+  const o = _regComputeOutliers(pid);
+  if (which === 'supply') return o.supplyOutliers;
+  if (which === 'cons')   return o.consOutliers;
+  return [...o.supplyOutliers, ...o.consOutliers];
+}
+function regDeleteAllOutliers(pid, which) {
+  const list = _regOutlierList(pid, which);
+  if (!list.length) return;
+  if (!confirm(`Usunąć ${list.length} odczytów odstających? (Można je przywrócić.)`)) return;
   const rows = RegressionBaseModule.getRows(pid);
-  outliers.forEach(o => { if (rows[o.idx]) rows[o.idx].removed = true; });
+  const seen = new Set();
+  list.forEach(o => { if (!seen.has(o.idx)) { seen.add(o.idx); if (rows[o.idx]) rows[o.idx].removed = true; } });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
-
-function regAcceptAllOutliers(pid) {
-  const { outliers } = _regComputeOutliers(pid);
+function regAcceptAllOutliers(pid, which) {
+  const list = _regOutlierList(pid, which);
+  if (!list.length) return;
   const rows = RegressionBaseModule.getRows(pid);
-  outliers.forEach(o => { if (rows[o.idx]) rows[o.idx].accepted = true; });
+  list.forEach(o => { if (rows[o.idx]) rows[o.idx].accepted = true; });
   RegressionBaseModule.saveRows(pid, rows);
   renderMeasurementsModule();
 }
@@ -3882,77 +3890,83 @@ function _regComputeOutliers(pid) {
   }
   const fSup = _olsFit(sup.map(p => ({ x: p.x, y: p.y })));
   const fCons = _olsFit(cons.map(p => ({ x: p.x, y: p.y })));
-  const flag = (pts, f, metric) => {
-    const th = 2 * f.rmse; if (!(th > 0)) return [];
-    return pts.filter(p => Math.abs(p.y - (f.a * p.x + f.b)) > th)
-              .map(p => ({ idx: p.idx, metric, value: p.y, resid: p.y - (f.a * p.x + f.b) }));
+  const median = arr => { if (!arr.length) return 0; const s = [...arr].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  // Detekcja ODPORNA (MAD) — próg się nie „rozjeżdża" po usunięciu kilku punktów, więc „Usuń wszystkie" się zbiega.
+  const detect = (pts, f, metric) => {
+    if (pts.length < 4) return [];
+    const res = pts.map(p => p.y - (f.a * p.x + f.b));
+    const med = median(res);
+    let mad = 1.4826 * median(res.map(r => Math.abs(r - med)));
+    if (!(mad > 0)) mad = f.rmse;                 // gdy rozrzut zerowy
+    const th = 3.5 * mad; if (!(th > 0)) return [];
+    return pts.map((p, i) => ({ idx: p.idx, metric, readTime: rows[p.idx].readTime, x: p.x, y: p.y, predicted: f.a * p.x + f.b, resid: res[i] }))
+              .filter(o => Math.abs(o.resid) > th)
+              .filter(o => !(rows[o.idx] && rows[o.idx].accepted))
+              .sort((a, b) => Math.abs(b.resid) - Math.abs(a.resid));
   };
-  const all = [...flag(sup, fSup, 'T zasilania'), ...flag(cons, fCons, 'Δ zużycie')];
-  const byIdx = {};
-  all.forEach(o => {
-    if (rows[o.idx] && rows[o.idx].accepted) return;
-    if (!byIdx[o.idx]) byIdx[o.idx] = { idx: o.idx, readTime: rows[o.idx].readTime, items: [] };
-    byIdx[o.idx].items.push(o);
-  });
-  const outliers = Object.values(byIdx).sort((a, b) => {
-    const ma = Math.max.apply(null, a.items.map(i => Math.abs(i.resid)));
-    const mb = Math.max.apply(null, b.items.map(i => Math.abs(i.resid)));
-    return mb - ma;
-  });
-  return { outliers, supN: sup.length, consN: cons.length };
+  const supplyOutliers = detect(sup, fSup, 'T zasilania');
+  const consOutliers   = detect(cons, fCons, 'Δ zużycie');
+  return { supplyOutliers, consOutliers, supN: sup.length, consN: cons.length };
 }
 
 function renderRegressionSelection(pid) {
-  const { outliers } = _regComputeOutliers(pid);
+  const { supplyOutliers, consOutliers } = _regComputeOutliers(pid);
   const f2 = v => Number(v || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+  const f1 = v => Number(v || 0).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
+  const removedCount = RegressionBaseModule.getRows(pid).filter(r => r.removed).length;
   const resOpen = !!window._regResultsOpen;
   const from = window._regBaseFrom || '', to = window._regBaseTo || '';
-  const removedCount = RegressionBaseModule.getRows(pid).filter(r => r.removed).length;
+  const dir = window._regOutSortDir === 'asc' ? 'asc' : 'desc';
+  const arrow = dir === 'asc' ? '▲' : '▼';
   const accBar = accCount ? ` · <button class="small-button" onclick="regClearAccepted(${pid})" style="font-size:11px;padding:1px 8px;">↩ Przywróć zostawione (${accCount})</button>` : '';
   const remBar = removedCount ? ` · <button class="small-button" onclick="regRestoreAll(${pid})" style="font-size:11px;padding:1px 8px;color:#1E7B34;border-color:#1E7B34;">♻ Przywróć usunięte (${removedCount})</button>` : '';
 
-  // ── Krok 1: przegląd odchyłek ──
-  let outlierBlock;
-  if (!outliers.length) {
-    outlierBlock = `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-      <div style="font-size:13px;color:#1E7B34;">✅ Brak nowych odczytów odstających (&gt; 2·RMSE) — dane gotowe.${accBar}${remBar}</div></div>`;
-  } else {
-    const rowsHtml = outliers.map(o => {
-      const reasons = o.items.map(i => `${i.metric}: ${f2(i.value)} (odchyłka ${f2(i.resid)})`).join(' · ');
-      return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
+  const table = (title, icon, list, which, accent, yLabel) => {
+    if (!list.length) {
+      return `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:11px 14px;margin-bottom:12px;">
+        <div style="font-size:13px;color:#1E7B34;">${icon} ${title}: ✅ brak odchyłek.</div></div>`;
+    }
+    const sorted = [...list].sort((a, b) => dir === 'asc' ? Math.abs(a.resid) - Math.abs(b.resid) : Math.abs(b.resid) - Math.abs(a.resid));
+    const rowsHtml = sorted.map(o => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
         <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
-        <td style="padding:6px 10px;font-size:12px;color:#c00;">${escapeHtml(reasons)}</td>
+        <td style="padding:6px 10px;font-size:12px;text-align:right;">${f1(o.x)}</td>
+        <td style="padding:6px 10px;font-size:12px;text-align:right;">${f2(o.y)}</td>
+        <td style="padding:6px 10px;font-size:12px;text-align:right;color:#888;">${f2(o.predicted)}</td>
+        <td style="padding:6px 10px;font-size:12px;text-align:right;color:#c00;font-weight:600;">${f2(o.resid)}</td>
         <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
           <button class="small-button" onclick="deleteRegressionRow(${pid}, ${o.idx})" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
           <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw</button>
         </td>
-      </tr>`;
-    }).join('');
-    outlierBlock = `<div style="border:1px solid #F3C9C9;border-radius:10px;overflow:hidden;margin-bottom:12px;">
-      <div style="background:#FDECEC;padding:12px 16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-          <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE).${accBar}${remBar}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="small-button" onclick="regDeleteAllOutliers(${pid})" style="font-size:12px;color:#c00;border-color:#c00;">✕ Usuń wszystkie</button>
-            <button class="small-button" onclick="regAcceptAllOutliers(${pid})" style="font-size:12px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
-          </div>
+      </tr>`).join('');
+    return `<div style="border:1px solid ${accent};border-radius:10px;overflow:hidden;margin-bottom:12px;">
+      <div style="background:${accent}1f;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:13px;font-weight:600;">${icon} ${title} — <span style="color:#c00;">${list.length}</span> odchyłek</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="small-button" onclick="regDeleteAllOutliers(${pid},'${which}')" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń wszystkie</button>
+          <button class="small-button" onclick="regAcceptAllOutliers(${pid},'${which}')" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">Zostaw wszystkie</button>
         </div>
-        <div style="font-size:11px;color:var(--color-text-secondary);">„✕ Usuń" wycina odczyt z danych. „Zostaw" pozostawia go w regresji (znika z listy odchyłek).</div>
       </div>
       <div style="overflow-x:auto;background:var(--color-background-primary);">
-        <table style="width:100%;border-collapse:collapse;min-width:520px;">
+        <table style="width:100%;border-collapse:collapse;min-width:560px;">
           <thead><tr style="background:var(--color-background-secondary);">
             <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
-            <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Powód (odchyłka)</th>
+            <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">T zewn. [°C]</th>
+            <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">${yLabel}</th>
+            <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:var(--color-text-secondary);">prognoza</th>
+            <th onclick="window._regOutSortDir='${dir === 'asc' ? 'desc' : 'asc'}';renderMeasurementsModule();" title="Sortuj po wielkości odchyłki" style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:#0C447C;cursor:pointer;user-select:none;white-space:nowrap;">Odchyłka ${arrow}</th>
             <th style="padding:6px 10px;"></th>
           </tr></thead><tbody>${rowsHtml}</tbody>
         </table>
       </div>
     </div>`;
-  }
+  };
 
-  // ── Krok 2: zakres dat i godzin (od–do) ──
+  const headBar = `<div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:10px;">Odchyłki (odporna detekcja MAD; kliknij „Odchyłka ${arrow}", aby zmienić sortowanie).${accBar}${remBar}</div>`;
+  const consTable = table('Zużycie ciepła vs T zewnętrzna', '📉', consOutliers, 'cons', '#185FA5', 'Δ zużycie [MJ]');
+  const supTable  = table('T zasilania vs T zewnętrzna', '🌡️', supplyOutliers, 'supply', '#C77F1A', 'T zasil. [°C]');
+
+  // ── Zakres dat i godzin (od–do) ──
   const dateBlock = `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
       <div style="font-size:11px;font-weight:600;color:#0C447C;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">📅 Zakres okresu bazowego (data i godzina)</div>
       <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;">
@@ -3963,12 +3977,11 @@ function renderRegressionSelection(pid) {
       </div>
     </div>`;
 
-  // ── Krok 3: wykonaj regresję (na końcu) + wyniki ──
   const runBlock = `<div style="margin-bottom:8px;">
       <button class="primary-button" onclick="regRunRegression()" style="font-size:14px;padding:9px 20px;">▶ Wykonaj regresję</button>
     </div>`;
 
-  return outlierBlock + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '');
+  return headBar + consTable + supTable + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '');
 }
 
 function _regWorkflowHtml(pid) {
@@ -4196,6 +4209,16 @@ function _regParseTime(rt) {
   return _regTs(rt);
 }
 
+// Wersja 2 regresji: dopasowanie do ŚREDNICH wartości Y per zaokrąglony stopień T zewnętrznej (jak trend w Excelu).
+function _binnedFit(pts) {
+  if (!pts || !pts.length) return { fit: { a: 0, b: 0, r2: 0, n: 0, rmse: 0 }, bins: [] };
+  const m = {};
+  pts.forEach(p => { const k = Math.round(p.x); (m[k] = m[k] || []).push(p.y); });
+  const bins = Object.keys(m).map(Number).sort((a, b) => a - b)
+    .map(k => ({ x: k, y: m[k].reduce((s, v) => s + v, 0) / m[k].length, count: m[k].length }));
+  return { fit: _olsFit(bins.map(b => ({ x: b.x, y: b.y }))), bins };
+}
+
 function buildSensorBaseline(objectId, from, to) {
   const raw = RegressionBaseModule.getRows(objectId).filter(r => !r.removed);
   const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
@@ -4229,27 +4252,33 @@ function buildSensorBaseline(objectId, from, to) {
 }
 
 function _baselineCard(opts) {
-  const { title, icon, pts, accent, chartId } = opts;
+  const { title, icon, pts, accent, chartId, fitA, fitB, nBins } = opts;
   if (pts.length < 2) {
     return `<div class="reminder-card" style="border-left:4px solid ${accent};margin-bottom:14px;">
       <strong>${icon} ${title}</strong>
       <div class="reminder-meta">Za mało punktów (min. 2). Dodaj dane lub poszerz zakres dat.</div>
     </div>`;
   }
-  const lr = _olsFit(pts);
   const f4 = v => Number(v || 0).toFixed(4);
-  const f2 = v => Number(v || 0).toFixed(2);
-  const corr = lr.r2 >= 0.9 ? '✅ bardzo dobra' : lr.r2 >= 0.75 ? '🟡 dobra' : '🔴 słaba';
+  const f3 = v => Number(v || 0).toFixed(3);
+  const corr = r2 => r2 >= 0.9 ? '✅' : r2 >= 0.6 ? '🟡' : '🔴';
   return `
   <div style="border:1px solid ${accent};border-radius:10px;overflow:hidden;margin-bottom:16px;">
-    <div style="padding:12px 14px;background:${accent}1f;display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
-      <div style="font-size:14px;font-weight:600;">${icon} ${title}</div>
-      <div style="font-size:16px;font-weight:700;">y = <strong>${f4(lr.a)}</strong> · x + <strong>${f4(lr.b)}</strong></div>
-      <div style="font-size:13px;">R² = <strong>${f4(lr.r2)}</strong> ${corr}</div>
-      <div style="font-size:12px;color:var(--color-text-secondary);">n = ${lr.n} · RMSE = ${f2(lr.rmse)}</div>
+    <div style="padding:10px 14px;background:${accent}1f;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:6px;">${icon} ${title}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="font-size:14px;font-weight:600;color:${accent};">
+          <span style="display:inline-block;width:26px;border-top:3px solid ${accent};vertical-align:middle;margin-right:6px;"></span>
+          Wersja 1 — wszystkie punkty: y = ${f4(fitA.a)}·x + ${f4(fitA.b)} &nbsp; R²=${f3(fitA.r2)} ${corr(fitA.r2)} · n=${fitA.n}
+        </div>
+        <div style="font-size:14px;font-weight:600;color:#222;">
+          <span style="display:inline-block;width:26px;border-top:3px dashed #222;vertical-align:middle;margin-right:6px;"></span>
+          Wersja 2 — średnie per °C (jak Excel): y = ${f4(fitB.a)}·x + ${f4(fitB.b)} &nbsp; R²=${f3(fitB.r2)} ${corr(fitB.r2)} · ${nBins} średnich
+        </div>
+      </div>
     </div>
     <div style="padding:12px 14px;background:var(--color-background-primary);">
-      <canvas id="${chartId}" width="560" height="300" style="max-width:100%;border:1px solid ${accent};border-radius:8px;background:#fff;display:block;"></canvas>
+      <canvas id="${chartId}" width="600" height="320" style="max-width:100%;border:1px solid ${accent};border-radius:8px;background:#fff;display:block;"></canvas>
     </div>
   </div>`;
 }
@@ -4266,52 +4295,68 @@ function renderRegressionBaselineCurves(objectId) {
   const consChart = 'reg-base-cons-' + objectId;
   const supChart  = 'reg-base-sup-'  + objectId;
 
+  const consFitA = _olsFit(consPts), supFitA = _olsFit(supplyPts);
+  const consB = _binnedFit(consPts), supB = _binnedFit(supplyPts);
+
   const consCard = _baselineCard({
-    title: 'Krzywa bazowa — zużycie ciepła vs T zewnętrzna', icon: '📉', pts: consPts,
-    xLabel: 'T zewn. [°C]', yLabel: 'Δ zużycie [MJ]', accent: '#185FA5', chartId: consChart
+    title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', pts: consPts,
+    accent: '#185FA5', chartId: consChart, fitA: consFitA, fitB: consB.fit, nBins: consB.bins.length
   });
   const supCard = _baselineCard({
-    title: 'Krzywa bazowa — temperatura zasilania vs T zewnętrzna', icon: '🌡️', pts: supplyPts,
-    xLabel: 'T zewn. [°C]', yLabel: 'T zasil. [°C]', accent: '#C77F1A', chartId: supChart
+    title: 'Temperatura zasilania vs T zewnętrzna', icon: '🌡️', pts: supplyPts,
+    accent: '#C77F1A', chartId: supChart, fitA: supFitA, fitB: supB.fit, nBins: supB.bins.length
   });
 
   const subsample = arr => (arr.length > 1500) ? arr.filter((_, i) => i % Math.ceil(arr.length / 1500) === 0) : arr;
   const consPlot = subsample(consPts), supPlot = subsample(supplyPts);
-  const consFit = _olsFit(consPts), supFit = _olsFit(supplyPts);
 
   const drawScript = `
   (function(){
-    function draw(id, pts, a, b, color){
+    function draw(id, pts, aA, bA, aB, bB, color, xLabel, yLabel){
       const c = document.getElementById(id); if(!c) return;
       const ctx = c.getContext('2d'); const W=c.width,H=c.height;
       if(!pts.length) return;
       const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
       let xMin=Math.min.apply(null,xs), xMax=Math.max.apply(null,xs);
       if(xMin===xMax){xMin-=1;xMax+=1;}
-      let yMin=Math.min(Math.min.apply(null,ys), a*xMin+b, a*xMax+b);
-      let yMax=Math.max(Math.max.apply(null,ys), a*xMin+b, a*xMax+b);
+      const lys=[aA*xMin+bA,aA*xMax+bA,aB*xMin+bB,aB*xMax+bB];
+      let yMin=Math.min(Math.min.apply(null,ys), Math.min.apply(null,lys));
+      let yMax=Math.max(Math.max.apply(null,ys), Math.max.apply(null,lys));
       if(yMin===yMax){yMin-=1;yMax+=1;}
-      const pad={l:54,r:16,t:14,b:34};
+      const pad={l:64,r:16,t:30,b:48};
       const sX=x=>pad.l+(x-xMin)/(xMax-xMin)*(W-pad.l-pad.r);
       const sY=y=>H-pad.b-(y-yMin)/(yMax-yMin)*(H-pad.t-pad.b);
       ctx.clearRect(0,0,W,H);
       ctx.strokeStyle='#e8e8e8';ctx.lineWidth=0.5;
-      for(let i=0;i<=4;i++){const y=yMin+i*(yMax-yMin)/4;ctx.beginPath();ctx.moveTo(pad.l,sY(y));ctx.lineTo(W-pad.r,sY(y));ctx.stroke();ctx.fillStyle='#999';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText(y.toFixed(1),pad.l-4,sY(y)+4);}
-      for(let i=0;i<=4;i++){const x=xMin+i*(xMax-xMin)/4;ctx.beginPath();ctx.moveTo(sX(x),pad.t);ctx.lineTo(sX(x),H-pad.b);ctx.stroke();ctx.fillStyle='#999';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(x.toFixed(1),sX(x),H-pad.b+14);}
-      ctx.globalAlpha=0.5;ctx.fillStyle=color;
-      pts.forEach(pt=>{ctx.beginPath();ctx.arc(sX(pt.x),sY(pt.y),3,0,2*Math.PI);ctx.fill();});
+      for(let i=0;i<=4;i++){const y=yMin+i*(yMax-yMin)/4;ctx.beginPath();ctx.moveTo(pad.l,sY(y));ctx.lineTo(W-pad.r,sY(y));ctx.stroke();ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillText(y.toFixed(1),pad.l-5,sY(y)+3);}
+      for(let i=0;i<=5;i++){const x=xMin+i*(xMax-xMin)/5;ctx.beginPath();ctx.moveTo(sX(x),pad.t);ctx.lineTo(sX(x),H-pad.b);ctx.stroke();ctx.fillStyle='#777';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(x.toFixed(1),sX(x),H-pad.b+14);}
+      // opisy osi
+      ctx.fillStyle='#333';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+      ctx.fillText(xLabel, pad.l+(W-pad.l-pad.r)/2, H-8);
+      ctx.save();ctx.translate(14, pad.t+(H-pad.t-pad.b)/2);ctx.rotate(-Math.PI/2);ctx.fillText(yLabel,0,0);ctx.restore();
+      // punkty
+      ctx.globalAlpha=0.4;ctx.fillStyle=color;
+      pts.forEach(pt=>{ctx.beginPath();ctx.arc(sX(pt.x),sY(pt.y),2.6,0,2*Math.PI);ctx.fill();});
       ctx.globalAlpha=1;
-      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sX(xMin),sY(a*xMin+b));ctx.lineTo(sX(xMax),sY(a*xMax+b));ctx.stroke();
+      // Wersja 1 (ciągła) i Wersja 2 (przerywana)
+      ctx.strokeStyle=color;ctx.lineWidth=2.4;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(sX(xMin),sY(aA*xMin+bA));ctx.lineTo(sX(xMax),sY(aA*xMax+bA));ctx.stroke();
+      ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(sX(xMin),sY(aB*xMin+bB));ctx.lineTo(sX(xMax),sY(aB*xMax+bB));ctx.stroke();ctx.setLineDash([]);
+      // legenda
+      ctx.font='10px sans-serif';ctx.textAlign='left';
+      ctx.strokeStyle=color;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(pad.l+2,pad.t-16);ctx.lineTo(pad.l+20,pad.t-16);ctx.stroke();
+      ctx.fillStyle='#333';ctx.fillText('Wersja 1 (wszystkie punkty)',pad.l+24,pad.t-13);
+      ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(pad.l+2,pad.t-4);ctx.lineTo(pad.l+20,pad.t-4);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#333';ctx.fillText('Wersja 2 (średnie per °C)',pad.l+24,pad.t-1);
     }
-    draw('${consChart}', ${JSON.stringify(consPlot)}, ${consFit.a}, ${consFit.b}, '#185FA5');
-    draw('${supChart}', ${JSON.stringify(supPlot)}, ${supFit.a}, ${supFit.b}, '#C77F1A');
+    draw('${consChart}', ${JSON.stringify(consPlot)}, ${consFitA.a}, ${consFitA.b}, ${consB.fit.a}, ${consB.fit.b}, '#185FA5', 'Temperatura zewnętrzna [°C]', 'Δ zużycie ciepła [MJ]');
+    draw('${supChart}', ${JSON.stringify(supPlot)}, ${supFitA.a}, ${supFitA.b}, ${supB.fit.a}, ${supB.fit.b}, '#C77F1A', 'Temperatura zewnętrzna [°C]', 'Temperatura zasilania [°C]');
   })();`;
 
   return `
   <div style="margin-top:18px;">
-    <h3 style="margin:0 0 10px;font-size:15px;font-weight:600;color:#0C447C;">📐 Wynik regresji — krzywe bazowe</h3>
+    <h3 style="margin:0 0 10px;font-size:15px;font-weight:600;color:#0C447C;">📐 Wynik regresji — dwie wersje do porównania</h3>
     <div class="reminder-meta" style="font-size:11px;color:var(--color-text-secondary);margin-bottom:12px;">
-      Użyto ${used} z ${total} odczytów${(from || to) ? ' (po filtrze dat)' : ''}. Zużycie = przyrost licznika <code>heatConsumption</code> między kolejnymi odczytami. Punkty = odczyty, linia = regresja liniowa.
+      Użyto ${used} z ${total} odczytów${(from || to) ? ' (po filtrze dat)' : ''}. <strong>Wersja 1</strong> — regresja przez wszystkie punkty (klasyczny OLS). <strong>Wersja 2</strong> — regresja przez średnie wartości per stopień T zewnętrznej (metoda jak linia trendu w Excelu). Zużycie = przyrost licznika <code>heatConsumption</code> między odczytami.
     </div>
     ${consCard}
     ${supCard}
