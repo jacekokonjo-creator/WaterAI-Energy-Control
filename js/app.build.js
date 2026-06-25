@@ -3390,7 +3390,7 @@ function regProtoSave() {
   renderMeasurementsModule();
 }
 
-function regProtoOpen(pid) { window._regActiveProtocolId = Number(pid); window._regProtoForm = null; window._regPage = 0; renderMeasurementsModule(); }
+function regProtoOpen(pid) { window._regActiveProtocolId = Number(pid); window._regProtoForm = null; window._regPage = 0; window._regSelectionOpen = false; window._regResultsOpen = false; renderMeasurementsModule(); }
 function regProtoBack() { window._regActiveProtocolId = null; window._regProtoForm = null; renderMeasurementsModule(); }
 function regProtoDelete(pid) {
   if (!confirm('Usunąć ten okres bazowy regresji wraz z danymi z czujników? Tej operacji nie można cofnąć.')) return;
@@ -3492,7 +3492,25 @@ function _regProtocolActiveHtml(objId, pid) {
     </div>
     <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:8px;">${meta}</div>
     ${renderRegressionSensorData(pid)}
-    ${renderRegressionBaselineCurves(pid)}`;
+    ${_regWorkflowHtml(pid)}`;
+}
+
+// Odporny parser daty/godziny odczytu — toleruje dowolne separatory (., /, -, przecinek, spacje).
+// Wyciąga grupy cyfr: [D,M,Y(,H,M,S)] lub [Y,M,D,...] gdy pierwsza ma 4 cyfry.
+function _regTs(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const s = String(v).trim();
+  let t = Date.parse(s.replace(' ', 'T'));
+  if (!isNaN(t)) return t;
+  const nums = s.match(/\d+/g);
+  if (!nums || nums.length < 3) return null;
+  let y, mo, d;
+  if (nums[0].length === 4) { y = +nums[0]; mo = +nums[1]; d = +nums[2]; }
+  else { d = +nums[0]; mo = +nums[1]; y = +nums[2]; }
+  const H = +(nums[3] || 0), Mi = +(nums[4] || 0), S = +(nums[5] || 0);
+  if (!(y >= 1900 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return null;
+  const dt = new Date(y, mo - 1, d, H, Mi, S);
+  return isNaN(dt.getTime()) ? null : dt.getTime();
 }
 
 function renderRegressionSensorData(objectId) { // objectId = id protokołu regresji
@@ -3504,19 +3522,7 @@ function renderRegressionSensorData(objectId) { // objectId = id protokołu regr
   window._regPageSize = window._regPageSize || 50;
   const pageSize = window._regPageSize;
 
-  const _rt = v => {
-    if (v === null || v === undefined || v === '') return null;
-    const s = String(v).trim();
-    let t = Date.parse(s.replace(' ', 'T'));
-    if (!isNaN(t)) return t;
-    // format polski: DD.MM.YYYY [HH:MM[:SS]]  (separatory . lub /)
-    const m = s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-    if (m) {
-      t = Date.parse(`${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T${(m[4] || '0').padStart(2, '0')}:${m[5] || '00'}:${m[6] || '00'}`);
-      if (!isNaN(t)) return t;
-    }
-    return null;
-  };
+  const _rt = _regTs;
   const sortKey = window._regSortKey, sortDir = window._regSortDir === 'desc' ? -1 : 1;
   const indexed = rawRows.map((r, idx) => ({ r, idx }));
   indexed.sort((A, B) => {
@@ -3795,6 +3801,122 @@ function importRegressionSensorFile(input, objectId) {
   input.value = '';
 }
 
+// ─── Selekcja danych (przegląd odchyłek) → Wykonaj regresję ───
+function regToggleSelection() { window._regSelectionOpen = !window._regSelectionOpen; renderMeasurementsModule(); }
+function regRunRegression() { window._regResultsOpen = true; renderMeasurementsModule(); }
+function regAcceptRow(pid, idx) {
+  const rows = RegressionBaseModule.getRows(pid);
+  if (rows[idx]) { rows[idx].accepted = true; RegressionBaseModule.saveRows(pid, rows); }
+  renderMeasurementsModule();
+}
+function regAcceptAllOutliers(pid) {
+  const { outliers } = _regComputeOutliers(pid);
+  const rows = RegressionBaseModule.getRows(pid);
+  outliers.forEach(o => { if (rows[o.idx]) rows[o.idx].accepted = true; });
+  RegressionBaseModule.saveRows(pid, rows);
+  renderMeasurementsModule();
+}
+
+function _regComputeOutliers(pid) {
+  const rows = RegressionBaseModule.getRows(pid);
+  const from = window._regBaseFrom || '', to = window._regBaseTo || '';
+  const fromMs = from ? Date.parse(from.length <= 10 ? from + 'T00:00:00' : from) : -Infinity;
+  const toMs   = to   ? Date.parse(to.length   <= 10 ? to   + 'T23:59:59' : to)   :  Infinity;
+  const inRange = i => {
+    const ms = _regTs(rows[i].readTime);
+    if (ms == null) return (!from && !to);
+    return ms >= fromMs && ms <= toMs;
+  };
+  const chrono = rows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+    const am = _regTs(A.r.readTime), bm = _regTs(B.r.readTime);
+    if (am != null && bm != null) return am - bm;
+    if (am != null) return -1; if (bm != null) return 1; return A.idx - B.idx;
+  });
+  const sup = [], cons = [];
+  rows.forEach((r, idx) => { if (inRange(idx) && r.tOutdoor != null && r.tSupply != null) sup.push({ idx, x: +r.tOutdoor, y: +r.tSupply }); });
+  for (let j = 1; j < chrono.length; j++) {
+    const cur = chrono[j], prev = chrono[j - 1];
+    if (!inRange(cur.idx)) continue;
+    if (cur.r.heatConsumption != null && prev.r.heatConsumption != null && cur.r.tOutdoor != null) {
+      const d = +cur.r.heatConsumption - +prev.r.heatConsumption;
+      if (d > 0) cons.push({ idx: cur.idx, x: +cur.r.tOutdoor, y: d });
+    }
+  }
+  const fSup = _olsFit(sup.map(p => ({ x: p.x, y: p.y })));
+  const fCons = _olsFit(cons.map(p => ({ x: p.x, y: p.y })));
+  const flag = (pts, f, metric) => {
+    const th = 2 * f.rmse; if (!(th > 0)) return [];
+    return pts.filter(p => Math.abs(p.y - (f.a * p.x + f.b)) > th)
+              .map(p => ({ idx: p.idx, metric, value: p.y, resid: p.y - (f.a * p.x + f.b) }));
+  };
+  const all = [...flag(sup, fSup, 'T zasilania'), ...flag(cons, fCons, 'Δ zużycie')];
+  const byIdx = {};
+  all.forEach(o => {
+    if (rows[o.idx] && rows[o.idx].accepted) return;
+    if (!byIdx[o.idx]) byIdx[o.idx] = { idx: o.idx, readTime: rows[o.idx].readTime, items: [] };
+    byIdx[o.idx].items.push(o);
+  });
+  const outliers = Object.values(byIdx).sort((a, b) => {
+    const ma = Math.max.apply(null, a.items.map(i => Math.abs(i.resid)));
+    const mb = Math.max.apply(null, b.items.map(i => Math.abs(i.resid)));
+    return mb - ma;
+  });
+  return { outliers, supN: sup.length, consN: cons.length };
+}
+
+function renderRegressionSelection(pid) {
+  const { outliers } = _regComputeOutliers(pid);
+  const f2 = v => Number(v || 0).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+  const accCount = RegressionBaseModule.getRows(pid).filter(r => r.accepted).length;
+  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="font-size:13px;color:var(--color-text-secondary);">Wykryto <strong style="color:var(--color-text-primary);">${outliers.length}</strong> odczytów odstających (&gt; 2·RMSE)${accCount ? ` · zaakceptowanych wcześniej: ${accCount}` : ''}.</div>
+      ${outliers.length ? `<button class="small-button" onclick="regAcceptAllOutliers(${pid})" style="font-size:12px;">✓ Zaakceptuj wszystkie</button>` : ''}
+    </div>`;
+  if (!outliers.length) {
+    return `<div style="border:1px solid #BFE3C8;background:#F0F9F2;border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+      ${head}<div style="font-size:13px;color:#1E7B34;">✅ Brak odchyłek do przeglądu — dane gotowe do regresji. Kliknij „▶ Wykonaj regresję".</div></div>`;
+  }
+  const rowsHtml = outliers.map(o => {
+    const reasons = o.items.map(i => `${i.metric}: ${f2(i.value)} (odchyłka ${f2(i.resid)})`).join(' · ');
+    return `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);background:#FDECEC;">
+      <td style="padding:6px 10px;font-size:12px;">${escapeHtml(String(o.readTime || '—'))}</td>
+      <td style="padding:6px 10px;font-size:12px;color:#c00;">${escapeHtml(reasons)}</td>
+      <td style="padding:6px 10px;text-align:right;white-space:nowrap;">
+        <button class="small-button" onclick="deleteRegressionRow(${pid}, ${o.idx})" style="font-size:11px;color:#c00;border-color:#c00;">✕ Usuń</button>
+        <button class="small-button" onclick="regAcceptRow(${pid}, ${o.idx})" style="font-size:11px;color:#1E7B34;border-color:#1E7B34;">✓ Zostaw</button>
+      </td>
+    </tr>`;
+  }).join('');
+  return `<div style="border:1px solid #F3C9C9;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+    <div style="background:#FDECEC;padding:12px 16px;">${head}
+      <div style="font-size:11px;color:var(--color-text-secondary);">„✕ Usuń" wycina odczyt z danych. „✓ Zostaw" akceptuje go (zostaje w regresji, znika z listy odchyłek).</div>
+    </div>
+    <div style="overflow-x:auto;background:var(--color-background-primary);">
+      <table style="width:100%;border-collapse:collapse;min-width:520px;">
+        <thead><tr style="background:var(--color-background-secondary);">
+          <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Odczyt</th>
+          <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--color-text-secondary);">Powód (odchyłka)</th>
+          <th style="padding:6px 10px;"></th>
+        </tr></thead><tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function _regWorkflowHtml(pid) {
+  const rowsN = RegressionBaseModule.getRows(pid).length;
+  if (rowsN < 2) return '';
+  const selOpen = !!window._regSelectionOpen;
+  const resOpen = !!window._regResultsOpen;
+  const bar = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 8px;">
+      <button class="${selOpen ? 'primary-button' : 'small-button'}" onclick="regToggleSelection()" style="font-size:13px;">🔍 Selekcja danych (odchyłki)</button>
+      <button class="primary-button" onclick="regRunRegression()" style="font-size:13px;">▶ Wykonaj regresję</button>
+    </div>`;
+  return bar
+    + (selOpen ? renderRegressionSelection(pid) : '')
+    + (resOpen ? renderRegressionBaselineCurves(pid) : '');
+}
+
 function renderRegressionTab(protocols) {
   const regressionProtocols = protocols.filter(p => p.includeLinearRegression);
 
@@ -4007,9 +4129,7 @@ function _olsFit(pts) {
 }
 
 function _regParseTime(rt) {
-  if (!rt) return null;
-  const t = Date.parse(String(rt).replace(' ', 'T'));
-  return isNaN(t) ? null : t;
+  return _regTs(rt);
 }
 
 function buildSensorBaseline(objectId, from, to) {
