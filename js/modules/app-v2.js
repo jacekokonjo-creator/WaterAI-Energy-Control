@@ -1050,6 +1050,8 @@ const ANAL_STYLE = `<style>
   .anw-type .badge.ready{background:#EAF3DE;color:#27500A;}
   .anw-type .badge.soon{background:#FFF1E0;color:#9A5B00;}
   .anw-type .chk{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#0C447C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .anw-chk-inline{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#0C447C;color:#fff;font-size:11px;line-height:1;flex:none;}
+  .anw-f.sel select{border-color:#0C447C;box-shadow:0 0 0 2px rgba(12,68,124,.14);}
   .anw-act{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
   .anw-sec{border:1px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;margin-bottom:18px;}
   .anw-head{padding:12px 16px;display:flex;align-items:center;gap:10px;}
@@ -1382,7 +1384,7 @@ function _analWizard() {
               <option value="">${ANAL.clientId ? '— wybierz obiekt —' : 'najpierw klient'}</option>
               ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>K${ClientsModule.getNumber(o.clientId)}-${ObjectsModule.getNumber(o.id)} · ${_escA(o.name)}</option>`).join('')}
             </select></div>
-          <div class="anw-f"><label>${isReg ? 'Okres bazowy (regresja, PRZED)' : 'Okres bazowy (PRZED instalacją)'}</label>
+          <div class="anw-f${(ANAL.objectId && ANAL.basePeriod) ? ' sel' : ''}"><label style="display:flex;align-items:center;gap:6px;">${isReg ? 'Okres bazowy (regresja, PRZED)' : 'Okres bazowy (PRZED instalacją)'}${(ANAL.objectId && ANAL.basePeriod) ? '<span class="anw-chk-inline">✓</span>' : ''}</label>
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
               ${isReg
                 ? `<option value="">${ANAL.objectId ? (regBasePeriods.length ? '— wybierz okres bazowy regresji —' : 'brak okresów bazowych regresji (utwórz w arkuszu regresji)') : 'najpierw obiekt'}</option>
