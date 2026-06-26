@@ -1446,7 +1446,7 @@ function _analCtx() {
     <span>Klient: <b>K${cn} · ${_escA(c ? c.name : '')}</b></span>
     <span>Obiekt: <b>K${cn}-${on} · ${_escA(o.name)}</b></span>
     <span>Stacja meteo: <b>${_escA(o.weatherStation || '—')}</b></span>
-    <span>Tᵢ bazowa: <b>${_analBaseTi()} °C</b></span>
+    ${(ANAL && ANAL.type === 'REGRESSION') ? '' : `<span>Tᵢ bazowa: <b>${_analBaseTi()} °C</b></span>`}
   </div>`;
 }
 
@@ -1744,8 +1744,16 @@ function analRegImport(input) {
     const res = _analRegParseCsvText(e.target.result);
     if (res.err) { alert(res.err); input.value = ''; return; }
     if (!res.rows.length) { alert('Nie znaleziono wierszy danych w pliku.'); input.value = ''; return; }
-    const times = res.rows.map(r => r.readTime).filter(Boolean).sort();
-    ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: times[0] || '', to: times[times.length - 1] || '' };
+    const valid = res.rows.map(r => r.readTime).filter(Boolean);
+    let from = '', to = '', minMs = Infinity, maxMs = -Infinity;
+    valid.forEach(rt => {
+      const ms = (typeof _regTs === 'function') ? _regTs(rt) : null;
+      if (ms == null) return;
+      if (ms < minMs) { minMs = ms; from = rt; }
+      if (ms > maxMs) { maxMs = ms; to = rt; }
+    });
+    if (from === '' && valid.length) { const s = valid.slice().sort(); from = s[0]; to = s[s.length - 1]; }   // awaryjnie, gdy dat nie da się sparsować
+    ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: from, to: to };
     renderAnalysesModule();
     alert('Zaimportowano ' + res.rows.length + ' wierszy okresu analizowanego.');
   };
