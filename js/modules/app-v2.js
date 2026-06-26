@@ -1765,6 +1765,126 @@ function analRegSetBilling(which, v) {
   else if (which === 'to') ANAL.reg.billing.to = v || '';
 }
 
+// ── Model PRZED/PO wg arkusza referencyjnego (Regresja liniowa PREMIUM) ──
+// B „Tryb pogodowy" = regresja okresu bazowego; C „WaterAI" = regresja okresu analizowanego.
+// Dla T zewn. −15…+10°C: D = ((B−C)/B)·100 [%], E = B−C, plus średnie. Osobno: zużycie i temp. zasilania.
+function _analRegFitLine(rows, metric, method) {
+  let pts;
+  if (metric === 'sup') {
+    pts = (rows || []).filter(r => r && r.tOutdoor != null && r.tSupply != null).map(r => ({ x: +r.tOutdoor, y: +r.tSupply }));
+  } else {
+    const chrono = (rows || []).filter(r => r && r.tOutdoor != null && r.heatConsumption != null && r.readTime)
+      .map((r, i) => ({ r, i }))
+      .sort((A, B) => { const am = _regTs(A.r.readTime), bm = _regTs(B.r.readTime); return (am == null ? 0 : am) - (bm == null ? 0 : bm); });
+    const dl = (typeof _consDeltas === 'function') ? _consDeltas(chrono.map(o => Object.assign({}, o.r, { _idx: o.i }))) : [];
+    pts = dl.map(p => ({ x: p.x, y: p.y }));
+  }
+  if (pts.length < 2) return null;
+  if (method === 'binned' && typeof _binnedFit === 'function') {
+    const b = _binnedFit(pts); if (b && b.fit && b.fit.a != null) return { a: b.fit.a, b: b.fit.b, n: pts.length };
+  }
+  const f = (typeof _olsFit === 'function') ? _olsFit(pts) : null;
+  return (f && f.a != null) ? { a: f.a, b: f.b, n: pts.length } : null;
+}
+
+function _analRegModel(reg) {
+  if (!reg || !reg.baseLines) return null;
+  const method = reg.method === 'binned' ? 'binned' : 'raw';
+  const rows = (reg.analyzed && reg.analyzed.rows) || [];
+  const waterai = { cons: _analRegFitLine(rows, 'cons', method), sup: _analRegFitLine(rows, 'sup', method) };
+  const T0 = -15, T1 = 10;
+  const build = (base, wai) => {
+    if (!base || !wai || base.a == null || wai.a == null) return null;
+    const tab = []; let sumD = 0, sumE = 0, nD = 0;
+    for (let t = T0; t <= T1; t++) {
+      const B = base.a * t + base.b, C = wai.a * t + wai.b;
+      const D = (B !== 0) ? ((B - C) / B) * 100 : null, E = B - C;
+      tab.push({ t, B, C, D, E });
+      if (D != null && isFinite(D)) { sumD += D; nD++; }
+      sumE += E;
+    }
+    return { base, waterai: wai, rows: tab, avgPct: nD ? sumD / nD : null, avgDiff: tab.length ? sumE / tab.length : null };
+  };
+  return { method, cons: build(reg.baseLines.cons, waterai.cons), sup: build(reg.baseLines.sup, waterai.sup), waterai };
+}
+
+function _analRegChartSvg(title, m) {
+  const rows = m.rows, xs = rows.map(r => r.t), ys = rows.flatMap(r => [r.B, r.C]);
+  const xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs);
+  let ymin = Math.min.apply(null, ys), ymax = Math.max.apply(null, ys);
+  if (ymin === ymax) { ymin -= 1; ymax += 1; }
+  const padY = (ymax - ymin) * 0.08; ymin -= padY; ymax += padY;
+  const W = 560, H = 270, L = 54, R = 18, T = 30, Bm = 38;
+  const px = t => L + (t - xmin) / (xmax - xmin) * (W - L - R);
+  const py = v => T + (1 - (v - ymin) / (ymax - ymin)) * (H - T - Bm);
+  const poly = key => rows.map(r => `${px(r.t).toFixed(1)},${py(r[key]).toFixed(1)}`).join(' ');
+  let grid = '';
+  for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4, y = py(v);
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef" stroke-width="1"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${v.toFixed(1)}</text>`; }
+  let xlab = '';
+  for (let t = Math.ceil(xmin / 5) * 5; t <= xmax; t += 5) { const x = px(t);
+    xlab += `<line x1="${x.toFixed(1)}" y1="${H - Bm}" x2="${x.toFixed(1)}" y2="${H - Bm + 4}" stroke="#9aa5b1"/><text x="${x.toFixed(1)}" y="${H - Bm + 16}" text-anchor="middle" font-size="9" fill="#7a8794">${t}</text>`; }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;background:#fff;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <text x="${L}" y="18" font-size="12" font-weight="600" fill="#0C447C">${title}</text>
+    ${grid}${xlab}
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <line x1="${L}" y1="${H - Bm}" x2="${W - R}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <polyline points="${poly('B')}" fill="none" stroke="#9aa5b1" stroke-width="2.5"/>
+    <polyline points="${poly('C')}" fill="none" stroke="#1E7B34" stroke-width="2.5"/>
+    <text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="9" fill="#7a8794">T zewn. [°C]</text>
+    <g font-size="10"><rect x="${L + 4}" y="${T + 2}" width="12" height="3" fill="#9aa5b1"/><text x="${L + 20}" y="${T + 6}" fill="#5b6670">Tryb pogodowy (baza)</text>
+      <rect x="${L + 150}" y="${T + 2}" width="12" height="3" fill="#1E7B34"/><text x="${L + 166}" y="${T + 6}" fill="#5b6670">WaterAI (po)</text></g>
+  </svg>`;
+}
+
+function _analRegTableHtml(unit, m) {
+  const td = 'padding:3px 8px;font-size:11px;border-bottom:0.5px solid var(--color-border-tertiary);text-align:right;';
+  const th = 'padding:5px 8px;font-size:11px;font-weight:600;color:#0C447C;text-align:right;border-bottom:1px solid var(--color-border-tertiary);';
+  const body = m.rows.map(r => `<tr>
+      <td style="${td}text-align:center;">${r.t}</td>
+      <td style="${td}">${r.B.toFixed(2)}</td>
+      <td style="${td}">${r.C.toFixed(2)}</td>
+      <td style="${td}color:#1E7B34;font-weight:600;">${r.D != null && isFinite(r.D) ? r.D.toFixed(1) + '%' : '—'}</td>
+      <td style="${td}">${r.E.toFixed(2)}</td></tr>`).join('');
+  return `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;color:#0C447C;font-weight:600;">Tabela zbiorcza (−15…+10°C)</summary>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+      <thead><tr><th style="${th}text-align:center;">T zewn. [°C]</th><th style="${th}">Tryb pogodowy</th><th style="${th}">WaterAI</th><th style="${th}">Obniżenie</th><th style="${th}">Różnica [${unit}]</th></tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr style="background:var(--color-background-secondary);font-weight:700;">
+        <td style="${td}text-align:center;">Średnia</td><td style="${td}">—</td><td style="${td}">—</td>
+        <td style="${td}color:#1E7B34;">${m.avgPct != null ? m.avgPct.toFixed(1) + '%' : '—'}</td>
+        <td style="${td}">${m.avgDiff != null ? m.avgDiff.toFixed(2) : '—'}</td></tr></tfoot>
+    </table></details>`;
+}
+
+function _analRegResultsHtml(reg, model, opts) {
+  opts = opts || {};
+  if (!model || !model.cons || !model.sup) {
+    return `<div class="reminder-card" style="border-left:4px solid #c0392b;"><strong>Nie udało się policzyć analizy</strong>
+      <div class="reminder-meta">Upewnij się, że okres bazowy ma policzone linie (przycisk „Kopiuj dane", Metoda 1/2) i że zaimportowany okres analizowany ma kolumny temperatury zewnętrznej, zasilania oraz zużycia.</div></div>`;
+  }
+  const c = model.cons, s = model.sup;
+  const card = (val, unit, label, color) => `<div style="flex:1;min-width:150px;background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;">
+      <div style="font-size:24px;font-weight:700;color:${color};">${val}${unit}</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${label}</div></div>`;
+  const headline = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+      ${card(c.avgPct != null ? c.avgPct.toFixed(1) : '—', '%', 'średnie obniżenie zużycia ciepła', '#1E7B34')}
+      ${card(s.avgPct != null ? s.avgPct.toFixed(1) : '—', '%', 'średnie obniżenie temp. zasilania', '#185FA5')}
+      ${card(s.avgDiff != null ? s.avgDiff.toFixed(2) : '—', ' °C', 'średnia różnica temp. zasilania', '#B9770E')}
+    </div>`;
+  const saveBtn = opts.withSave ? `<div class="anw-act" style="margin-top:18px;"><button class="anw-run" onclick="analRegSave()">💾 Zapisz analizę</button></div>` : '';
+  return `<div class="anw-sec" style="margin-top:16px;">
+      <div class="anw-head anw-gold"><span class="ico">📈</span><h3>Wynik analizy regresji (PRZED / PO)</h3></div>
+      <div class="anw-body">
+        ${headline}
+        <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c)}${_analRegTableHtml('MJ', c)}</div>
+        <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s)}${_analRegTableHtml('°C', s)}</div>
+        <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. „Tryb pogodowy" = regresja okresu bazowego, „WaterAI" = regresja okresu analizowanego. Obniżenie liczone w zakresie −15…+10°C (jak w arkuszu referencyjnym).</div>
+        ${saveBtn}
+      </div>
+    </div>`;
+}
+
 function _analRegRun() {
   const reg = ANAL.reg || {};
   const problems = [];
@@ -1772,53 +1892,47 @@ function _analRegRun() {
   if (!(reg.analyzed && reg.analyzed.rows && reg.analyzed.rows.length)) problems.push('zaimportuj okres analizowany (CSV)');
   if (!(reg.billing && reg.billing.from && reg.billing.to)) problems.push('podaj zakres okresu rozliczeniowego (od–do)');
   if (problems.length) { alert('Uzupełnij: ' + problems.join('; ') + '.'); return; }
-  ANAL.results = { reg: true, draft: true, at: new Date().toISOString() };
+  const model = _analRegModel(reg);
+  if (!model || !model.cons || !model.sup) { alert('Nie udało się policzyć regresji okresu analizowanego — sprawdź, czy CSV ma kolumny tOutdoor, tSupply i heatConsumption oraz min. 2 punkty.'); return; }
+  ANAL.results = { reg: true, model: model, at: new Date().toISOString() };
   const slot = document.getElementById('anw-results');
-  if (slot) { slot.innerHTML = _analRegResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  if (slot) { slot.innerHTML = _analRegResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
 function _analRegResults() {
-  const reg = ANAL.reg || {};
-  const L = reg.baseLines || {};
-  const an = reg.analyzed || {};
-  return `
-    <div class="anw-sec" style="margin-top:16px;">
-      <div class="anw-head anw-gold"><span class="ico">🚧</span><h3>Wynik — metoda obliczeniowa w przygotowaniu</h3></div>
-      <div class="anw-body">
-        <div class="anw-muted" style="margin-bottom:10px;">Wejścia są kompletne i mogą zostać zapisane. Sposób liczenia PRZED/PO opiszemy w kolejnym kroku — dlatego ta analiza nie generuje jeszcze kwot ESCO i jest oznaczona jako <b>SZKIC</b>.</div>
-        <div class="anw-ctx">
-          <span>Linia bazowa zużycia: <b>${_analRegLineTxt(L.cons)}</b></span>
-          <span>Linia bazowa T zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
-          <span>Metoda: <b>${L.method === 'binned' ? '2' : '1'}</b></span>
-          <span>Okres analizowany: <b>${(an.rows || []).length} wierszy</b> (${_escA((an.from || '?') + ' … ' + (an.to || '?'))})</span>
-          <span>Okres rozliczeniowy: <b>${_escA((reg.billing.from || '?') + ' → ' + (reg.billing.to || '?'))}</b></span>
-        </div>
-        <div class="anw-act" style="margin-top:14px;">
-          <button class="small-button" style="font-size:13px;" onclick="analRegSaveDraft()">💾 Zapisz szkic analizy</button>
-        </div>
-      </div>
-    </div>`;
+  return _analRegResultsHtml(ANAL.reg, (ANAL.results && ANAL.results.model) || _analRegModel(ANAL.reg), { withSave: true });
 }
 
-function analRegSaveDraft() {
-  if (!ANAL.results || !ANAL.results.reg) return;
-  const o = ObjectsModule.find(ANAL.objectId);
+function analRegSave() {
   const reg = ANAL.reg || {};
+  const model = (ANAL.results && ANAL.results.model) || _analRegModel(reg);
+  if (!model || !model.cons || !model.sup) { alert('Najpierw wykonaj analizę („⚡ Wykonaj analizę").'); return; }
+  const o = ObjectsModule.find(ANAL.objectId);
   const payload = {
-    clientId: ANAL.clientId,
-    objectId: ANAL.objectId,
+    clientId: ANAL.clientId, objectId: ANAL.objectId,
     name: `${AnalysesModule.TYPES.REGRESSION.label} — ${o ? o.name : ''}`,
     analysisType: 'REGRESSION',
     executedAt: new Date().toISOString().slice(0, 10),
     author: String(ANAL.author || '').trim(),
-    status: 'DRAFT',
+    status: 'COMPLETE',
     inputParams: { basePeriod: ANAL.basePeriod, reg: JSON.parse(JSON.stringify(reg)) },
-    results: { draft: true }
+    results: {
+      regType: true, method: model.method,
+      savedEnergyPct: model.cons ? model.cons.avgPct : null,
+      supplyPct: model.sup ? model.sup.avgPct : null,
+      supplyAvgDiff: model.sup ? model.sup.avgDiff : null
+    }
   };
-  if (ANAL.editingId) { AnalysesModule.update(ANAL.editingId, payload); alert('Szkic analizy zaktualizowany.'); }
-  else { AnalysesModule.add(payload); alert('Szkic analizy zapisany. Dane okresu analizowanego są zapisane i zostaną wczytane po ponownym otwarciu.'); }
+  let id = ANAL.editingId;
+  if (id) { AnalysesModule.update(id, payload); }
+  else {
+    const rec = AnalysesModule.add(payload);
+    id = (rec && rec.id != null) ? rec.id : null;
+    if (id == null && AnalysesModule.getAll) { const all = AnalysesModule.getAll(); if (all.length) id = all[all.length - 1].id; }
+  }
   _analResetState();
-  renderAnalysesModule();
+  if (id != null && typeof analView === 'function') analView(id);   // pokaż zapisaną analizę zamiast wracać do pustej listy
+  else renderAnalysesModule();
 }
 
 // ── handlery wyboru / dat ───────────────────────────────────────────────────────
@@ -2474,6 +2588,22 @@ function analPrintPDF() { window.print(); }
 function analView(id) {
   const a = AnalysesModule.find(id); if (!a) return;
   const container = document.getElementById('module-content'); if (!container) return;
+  if (a.analysisType === 'REGRESSION') {
+    const reg = (a.inputParams && a.inputParams.reg) ? a.inputParams.reg : null;
+    const model = reg ? _analRegModel(reg) : null;
+    const o = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.find(a.objectId) : null;
+    container.innerHTML = ANAL_STYLE + `
+      <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
+        <button class="small-button" onclick="renderAnalysesModule()">← Lista analiz</button>
+        <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="window.print()">🖨 Drukuj</button>
+      </div>
+      <div class="anw-report">
+        <h2 style="margin:0 0 4px;font-size:18px;color:#0C447C;">${_escA(a.name || 'Analiza regresji')}</h2>
+        <div class="anw-muted" style="margin-bottom:10px;font-size:12px;">Obiekt: ${_escA(o ? o.name : '—')} · Wykonał: ${_escA(a.author || '—')} · Data: ${_escA(a.executedAt || '—')} · Okres rozliczeniowy: ${_escA(reg && reg.billing ? ((reg.billing.from || '?') + ' → ' + (reg.billing.to || '?')) : '—')}</div>
+        ${(reg && model) ? _analRegResultsHtml(reg, model, { withSave: false }) : '<div class="reminder-card">Brak zapisanych danych wejściowych tej analizy.</div>'}
+      </div>`;
+    return;
+  }
   const data = _analReportData({ saved: a });
   container.innerHTML = ANAL_STYLE + `
     <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
