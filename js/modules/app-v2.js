@@ -1435,7 +1435,6 @@ function _analWizard() {
       <button class="small-button" onclick="analBackToTypes()">← Typ analizy</button>
       <h2 style="font-size:16px;color:#0C447C;margin:0;">${t.icon} ${_escA(t.label)}</h2>
     </div>
-    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 18px;">2 · Uzupełnij klienta, obiekt i okres bazowy, wprowadź dane, a następnie kliknij „Wykonaj analizę" na dole.</p>
     ${selector}${body}${footer}`;
 }
 
