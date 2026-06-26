@@ -2833,6 +2833,7 @@ function renderMeasurementsModule() {
     .mtc .badge{position:absolute;top:11px;right:11px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
     .mtc .badge.ready{background:#EAF3DE;color:#27500A;}
     .mtc .badge.soon{background:#FFF1E0;color:#9A5B00;}
+    .mtc .chk{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#0C447C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;z-index:2;}
   </style>
   <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 14px;">Wybierz typ okresu bazowego. Typy i opisy są spójne z modułem Analizy.</p>
   <div class="mtc-grid">
@@ -2850,6 +2851,7 @@ function renderMeasurementsModule() {
         const sel = activeMeasurementsTab===x[0] ? 'sel' : '';
         return '<div class="mtc '+sel+'" onclick="activeMeasurementsTab=\''+x[0]+'\'; showMeasurementForm=false; renderMeasurementsModule();">'
           +'<span class="badge '+(x[4]?'ready':'soon')+'">'+(x[4]?'GOTOWE':'WKRÓTCE')+'</span>'
+          +(sel?'<span class="chk">✓</span>':'')
           +'<span class="ico">'+x[1]+'</span>'
           +'<span class="t">'+x[2]+'</span>'
           +'<span class="d">'+x[3]+'</span></div>';
