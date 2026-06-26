@@ -4099,8 +4099,8 @@ function _regViews(pid) {
   const consDetectFit = consBinAll.fit && consBinAll.fit.n >= 2 ? consBinAll.fit : _olsFit(consPtsAll.map(p => ({ x: p.x, y: p.y })));
   const supDetectFit  = supBinAll.fit  && supBinAll.fit.n  >= 2 ? supBinAll.fit  : _olsFit(supplyPtsAll.map(p => ({ x: p.x, y: p.y })));
   const out = {
-    cons_raw:    build('cons', 'raw',    consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]' }),
-    cons_binned: build('cons', 'binned', consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Δ zużycie [MJ]' }),
+    cons_raw:    build('cons', 'raw',    consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '📉', accent: '#185FA5', yLabel: 'Zużycie [MJ/h]' }),
+    cons_binned: build('cons', 'binned', consPtsWork, consBin, { title: 'Zużycie ciepła vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '📉', accent: '#2E86C1', yLabel: 'Zużycie [MJ/h]' }),
     sup_raw:     build('sup',  'raw',    supplyPtsWork, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 1 — wszystkie punkty', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]' }),
     sup_binned:  build('sup',  'binned', supplyPtsWork, supBin, { title: 'Temperatura zasilania vs T zewnętrzna', sub: 'Metoda 2 — średnie per °C', icon: '🌡️', accent: '#E59866', yLabel: 'T zasilania [°C]' }),
     metricOutliers: {
@@ -4108,7 +4108,7 @@ function _regViews(pid) {
       sup:  _madOutliers(supplyPtsAll, supDetectFit, rows)
     },
     metricMeta: {
-      cons: { title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', accent: '#185FA5', yLabel: 'Δ zużycie [MJ]', n: consPtsWork.length },
+      cons: { title: 'Zużycie ciepła vs T zewnętrzna', icon: '📉', accent: '#185FA5', yLabel: 'Zużycie [MJ/h]', n: consPtsWork.length },
       sup:  { title: 'Temperatura zasilania vs T zewnętrzna', icon: '🌡️', accent: '#B9770E', yLabel: 'T zasilania [°C]', n: supplyPtsWork.length }
     }
   };
@@ -4307,7 +4307,7 @@ function _regBaseSweep(pid) {
       <td style="${td}">${f2(r.cz)}</td>
       <td style="${td}">${f1(r.ts)}</td></tr>`).join('');
   const charts = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;">
-      ${hasCons ? `<div style="flex:1;min-width:300px;">${_regSweepChartSvg('📉 Zużycie ciepła — okres bazowy', rows, 'cz', 'Zużycie ciepła [MJ]', '#9aa5b1')}</div>` : ''}
+      ${hasCons ? `<div style="flex:1;min-width:300px;">${_regSweepChartSvg('📉 Zużycie ciepła — okres bazowy', rows, 'cz', 'Zużycie ciepła [MJ/h]', '#9aa5b1')}</div>` : ''}
       ${hasSup ? `<div style="flex:1;min-width:300px;">${_regSweepChartSvg('🌡️ Temp. zasilania — okres bazowy', rows, 'ts', 'T zasilania [°C]', '#9aa5b1')}</div>` : ''}
     </div>`;
   return `<div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px 16px;margin-top:18px;background:var(--color-background-primary);">
@@ -4324,7 +4324,7 @@ function _regBaseSweep(pid) {
         <table style="width:100%;border-collapse:collapse;margin-top:6px;">
           <thead><tr>
             <th style="${th}text-align:center;">T zewn. [°C]</th>
-            <th style="${th}">Zużycie ciepła [MJ]</th>
+            <th style="${th}">Zużycie ciepła [MJ/h]</th>
             <th style="${th}">T zasilania [°C]</th></tr></thead>
           <tbody>${body}</tbody>
           <tfoot><tr style="background:var(--color-background-secondary);font-weight:700;">
@@ -4574,15 +4574,21 @@ function _binnedFit(pts) {
 // rows: wiersze w kolejności chronologicznej. Zwraca [{x:tOutdoor, y:Δ, readTime, idx}].
 function _consDeltas(rows) {
   const out = [];
-  let lastHc = null;
+  let lastHc = null, lastMs = null;
   for (const r of rows) {
     if (r.heatConsumption == null || r.tOutdoor == null) continue;
     const hc = Number(r.heatConsumption);
     if (!isFinite(hc) || hc <= 0) continue;          // pusty/zerowy odczyt licznika — pomijamy
-    if (lastHc == null) { lastHc = hc; continue; }
+    const ms = (typeof _regTs === 'function') ? _regTs(r.readTime) : null;
+    if (lastHc == null) { lastHc = hc; lastMs = ms; continue; }
     const d = hc - lastHc;
-    if (d > 0) { out.push({ x: Number(r.tOutdoor), y: d, readTime: r.readTime, idx: r._idx }); lastHc = hc; }
-    else { lastHc = hc; }                             // spadek (reset / po skoku) — resync bez emisji, nie psuje reszty
+    const dtH = (ms != null && lastMs != null) ? (ms - lastMs) / 3600000 : null;   // Δczas w godzinach
+    // Emitujemy STRUMIEŃ zużycia [MJ/h] = Δlicznika ÷ Δczas — niezależny od częstotliwości odczytów.
+    // Pomijamy luki > 48 h i Δt ≤ 0 (resync bez emisji), żeby pojedyncza luka nie zawyżała zużycia.
+    if (d > 0 && dtH != null && dtH > 0 && dtH <= 48) {
+      out.push({ x: Number(r.tOutdoor), y: d / dtH, readTime: r.readTime, idx: r._idx });
+      lastHc = hc; lastMs = ms;
+    } else { lastHc = hc; lastMs = ms; }            // spadek/reset/luka — resync bez emisji
   }
   return out;
 }
