@@ -1187,6 +1187,7 @@ function renderAnalysesModule() {
   if (ANAL.step === 2 && ANAL.type === 'TYM' && ANAL.objectId) _analRecalcLive();
   if (ANAL.step === 2 && ANAL.results && ANAL.type !== 'REGRESSION') setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
   if (ANAL.step === 2 && ANAL.results && ANAL.results.reg && ANAL.type === 'REGRESSION' && ANAL._regData) setTimeout(() => _analRegDrawCharts(ANAL._regData), 60);
+  if (ANAL.step === 2 && ANAL.type === 'REGRESSION' && ANAL.reg && ANAL.reg.baseLines) setTimeout(() => _analRegDrawBaseCharts(), 60);
 }
 
 function _analStepsBar() {
@@ -1648,7 +1649,11 @@ function _analRegSheet() {
           <span>📉 Zużycie ciepła: <b>${_analRegLineTxt(L.cons)}</b></span>
           <span>🌡️ Temp. zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
           <span>Metoda: <b>${L.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}</b></span>
-        </div>` : `<div class="anw-muted" style="margin-top:8px;">Wybierz metodę i kliknij „Kopiuj dane", aby wczytać linie bazowe y = ax + b.</div>`}
+        </div>
+        <div class="anw-chart-wrap" style="margin-top:12px;">
+          <canvas id="anw-regbase-cons"></canvas>
+          <canvas id="anw-regbase-sup"></canvas>
+        </div>` : `<div class="anw-muted" style="margin-top:8px;">Wybierz metodę i kliknij „Kopiuj dane", aby wczytać linie bazowe y = ax + b i wykresy.</div>`}
       </div>
     </div>`;
 
@@ -2034,11 +2039,11 @@ function _anwScatterLines(cv, opts) {
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   const pad = { l: 56, r: 16, t: 30, b: 46 };
-  const pts = opts.points || [], lines = opts.lines || [];
+  const pts = opts.points || [], lines = opts.lines || [], pts2 = opts.points2 || [];
   let xMin = opts.xMin, xMax = opts.xMax;
-  if (xMin == null || xMax == null) { const xs = pts.map(p => p.x); xMin = Math.min.apply(null, xs); xMax = Math.max.apply(null, xs); }
+  if (xMin == null || xMax == null) { const xs = pts.map(p => p.x).concat(pts2.map(p => p.x)); xMin = Math.min.apply(null, xs); xMax = Math.max.apply(null, xs); }
   if (!isFinite(xMin) || !isFinite(xMax) || xMin === xMax) { xMin = (xMin || 0) - 1; xMax = (xMax || 0) + 1; }
-  const ys = pts.map(p => p.y).slice();
+  const ys = pts.map(p => p.y).slice(); pts2.forEach(p => ys.push(p.y));
   lines.forEach(L => { ys.push(L.a * xMin + L.b); ys.push(L.a * xMax + L.b); });
   let yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
   if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 1; }
@@ -2061,6 +2066,10 @@ function _anwScatterLines(cv, opts) {
   ctx.fillStyle = opts.pointColor || 'rgba(120,120,120,.32)';
   pts.forEach(p => { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2, 0, 6.29); ctx.fill(); });
   lines.forEach(L => { ctx.strokeStyle = L.c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(X(xMin), Y(L.a * xMin + L.b)); ctx.lineTo(X(xMax), Y(L.a * xMax + L.b)); ctx.stroke(); });
+  if (pts2.length) {
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    pts2.forEach(p => { ctx.fillStyle = opts.point2Color || '#0C447C'; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 3.2, 0, 6.29); ctx.fill(); ctx.stroke(); });
+  }
   let ly = pad.t - 2; ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
   lines.forEach((L, i) => { const lx = pad.l + 4 + i * 0; ctx.fillStyle = L.c; ctx.fillRect(W - pad.r - 150, ly + i * 14 - 8, 10, 10); ctx.fillStyle = '#555'; ctx.fillText(L.n || '', W - pad.r - 136, ly + i * 14); });
 }
@@ -2132,6 +2141,42 @@ function _analRegDrawCharts(data) {
     { label: 'Redukcja zużycia', bars: [{ v: data.savedPctCons, c: '#27500A', n: 'średnia [%]' }] },
     { label: 'Obniżenie T zasilania', bars: [{ v: data.savedPctSup, c: '#B9770E', n: 'średnia [%]' }] }
   ], { title: 'Średnia redukcja (regresja)', unit: '%' });
+}
+
+// Widoki okresu bazowego (PRZED) dla wybranej metody — punkty + linia y=ax+b.
+// Liczone na PEŁNYM okresie bazowym (neutralizujemy filtr zakresu z arkusza regresji).
+function _analRegBaseViews(pid, method) {
+  if (!pid || typeof _regViews !== 'function') return null;
+  const _sf = window._regBaseFrom, _st = window._regBaseTo;
+  window._regBaseFrom = ''; window._regBaseTo = '';
+  let v = null; try { v = _regViews(pid); } catch (e) { v = null; }
+  window._regBaseFrom = _sf; window._regBaseTo = _st;
+  if (!v) return null;
+  const m = method === 'binned' ? 'binned' : 'raw';
+  return { cons: v['cons_' + m], sup: v['sup_' + m], method: m };
+}
+
+// Rysuje 2 wykresy okresu bazowego (zużycie + temp. zasilania) dla wybranej metody.
+function _analRegDrawBaseCharts() {
+  const reg = ANAL.reg || {}; const L = reg.baseLines; if (!L) return;
+  const vv = _analRegBaseViews(ANAL.basePeriod, L.method); if (!vv) return;
+  const sub = arr => (arr && arr.length > 1200) ? arr.filter((_, i) => i % Math.ceil(arr.length / 1200) === 0) : (arr || []);
+  const binned = vv.method === 'binned';
+  const mLbl = binned ? 'Metoda 2 — średnie per °C' : 'Metoda 1 — wszystkie punkty';
+  const drawOne = (cvId, view, accent, yLabel, titlePrefix) => {
+    const cv = document.getElementById(cvId);
+    if (!cv || !view || !view.fit || view.fit.a == null) return;
+    _anwScatterLines(cv, {
+      title: titlePrefix + ' · ' + mLbl,
+      xLabel: 'Temperatura zewnętrzna [°C]', yLabel,
+      points: sub(view.pts || []), pointColor: 'rgba(120,120,120,.22)',
+      points2: binned ? (view.binPts || []).map(b => ({ x: b.x, y: b.y })) : null,
+      point2Color: accent,
+      lines: [{ a: view.fit.a, b: view.fit.b, c: accent, n: 'Linia bazowa (PRZED)' }]
+    });
+  };
+  drawOne('anw-regbase-cons', vv.cons, '#185FA5', 'Δ zużycie [MJ]', '📉 Zużycie ciepła');
+  drawOne('anw-regbase-sup', vv.sup, '#B9770E', 'T zasilania [°C]', '🌡️ Temp. zasilania');
 }
 
 function _analRegResults() {
