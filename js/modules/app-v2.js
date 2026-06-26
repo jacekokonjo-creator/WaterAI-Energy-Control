@@ -1657,18 +1657,112 @@ function _analRegSheet() {
       </div>
     </div>`;
 
+  // ── Okres analizowany (PO): tabela + Δ zużycia (jak w okresie bazowym) ──────────
+  const poRows = an.rows || [];
+  const _rt = (typeof _regTs === 'function') ? _regTs : (() => null);
+  const poChrono = poRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+    const am = _rt(A.r.readTime), bm = _rt(B.r.readTime);
+    if (am != null && bm != null) return am - bm;
+    if (am != null) return -1; if (bm != null) return 1; return A.idx - B.idx;
+  });
+  const poDelta = {};
+  if (typeof _consDeltas === 'function') _consDeltas(poChrono.map(o => Object.assign({}, o.r, { _idx: o.idx }))).forEach(d => { poDelta[d.idx] = d.y; });
+  window._aregPageSize = window._aregPageSize || 50;
+  const aps = window._aregPageSize;
+  const aTotalPages = Math.max(1, Math.ceil(poChrono.length / aps));
+  window._aregPage = window._aregPage || 0;
+  if (window._aregPage >= aTotalPages) window._aregPage = aTotalPages - 1;
+  if (window._aregPage < 0) window._aregPage = 0;
+  const aPage = window._aregPage;
+  const aPageRows = poChrono.slice(aPage * aps, (aPage + 1) * aps);
+  const fmtV = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+  const fmtT1 = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const fld = (id, ph, step) => `<div><label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">${ph.lbl}</label><input id="${id}" type="${ph.type || 'number'}" ${ph.type ? '' : `step="${step || '0.01'}"`} placeholder="${ph.ph || ''}" style="width:100%;font-size:12px;box-sizing:border-box;" /></div>`;
+  const poTableRows = aPageRows.map(({ r, idx }) => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
+        <td style="padding:4px 8px;font-size:11px;color:var(--color-text-tertiary);">${_escA(r.readTime || '—')}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tOutdoor)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tSupply)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tReturn)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.vFlow)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.heatPower)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.heatConsumption)}</td>
+        <td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:600;color:#B9770E;">${poDelta[idx] == null ? '—' : fmtV(poDelta[idx])}</td>
+        <td style="padding:4px 8px;"><button class="small-button" onclick="analRegDeleteRow(${idx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button></td>
+      </tr>`).join('');
+  const aNav = (label, target, disabled) => `<button class="small-button" onclick="window._aregPage=${target};renderAnalysesModule();" ${disabled ? 'disabled' : ''} style="font-size:11px;">${label}</button>`;
+  const poPagination = poChrono.length === 0 ? '' : `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;flex-wrap:wrap;">
+          ${aNav('« Pierwsza', 0, aPage === 0)}
+          ${aNav('‹ Poprzednia', Math.max(0, aPage - 1), aPage === 0)}
+          <span style="color:var(--color-text-secondary);">Strona ${aPage + 1} / ${aTotalPages}</span>
+          ${aNav('Następna ›', Math.min(aTotalPages - 1, aPage + 1), aPage === aTotalPages - 1)}
+          ${aNav('Ostatnia »', aTotalPages - 1, aPage === aTotalPages - 1)}
+          <span style="color:var(--color-text-tertiary);">· ${poChrono.length} wierszy${an.fileName ? ` · plik: ${_escA(an.fileName)}` : ''}</span>
+          <span style="margin-left:auto;"><select onchange="window._aregPageSize=Number(this.value);window._aregPage=0;renderAnalysesModule();" style="font-size:12px;padding:3px 6px;border:1px solid var(--color-border-tertiary);border-radius:6px;">
+            <option value="50" ${aps === 50 ? 'selected' : ''}>50 / stronę</option>
+            <option value="100" ${aps === 100 ? 'selected' : ''}>100 / stronę</option>
+          </select></span>
+        </div>`;
+
   const anBlock = `
-    <div class="anw-sec">
-      <div class="anw-head anw-gold"><span class="ico">📥</span><h3>Okres analizowany (PO) — dane z czujników</h3></div>
-      <div class="anw-body">
-        <div class="anw-muted" style="margin-bottom:8px;">Import danych czasowych (CSV). Kolejność kolumn jak w arkuszu regresji: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>. Dane zapisują się w analizie.</div>
-        <input type="file" accept=".csv,text/csv" onchange="analRegImport(this)" style="font-size:13px;">
-        ${anN ? `<div class="anw-ctx" style="margin-top:12px;">
-          <span>Plik: <b>${_escA(an.fileName || '—')}</b></span>
-          <span>Wierszy: <b>${anN}</b></span>
-          <span>Zakres danych: <b>${_escA((an.from || '?') + ' … ' + (an.to || '?'))}</b></span>
-          <span><button class="small-button" onclick="analRegClearImport()" style="font-size:12px;color:#c00;border-color:#c00;">✕ Wyczyść</button></span>
-        </div>` : `<div class="anw-muted" style="margin-top:8px;">Brak zaimportowanych danych okresu analizowanego.</div>`}
+    <div style="border:1px solid #E6C68A;border-radius:10px;overflow:hidden;margin-top:26px;">
+      <div style="background:#FBF3E2;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">📥</span>
+          <h3 style="margin:0;font-size:14px;font-weight:600;color:#8A5A00;">Okres analizowany (PO) — dane z czujników</h3>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label style="font-size:12px;color:#8A5A00;background:#fff;border:1px solid #E6C68A;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:500;">
+            📂 Importuj CSV/Excel
+            <input type="file" accept=".csv,.xlsx,.xls,text/csv" style="display:none;" onchange="analRegImport(this)" />
+          </label>
+          <button class="small-button" onclick="analRegClearImport()" style="font-size:11px;color:#c00;border-color:#c00;" ${poChrono.length === 0 ? 'disabled' : ''}>🗑 Wyczyść wszystko</button>
+        </div>
+      </div>
+
+      <!-- Formularz dodawania wiersza -->
+      <div style="padding:14px 16px;background:#FDFAF3;border-bottom:1px solid #E6C68A;">
+        <div style="font-size:11px;font-weight:600;color:#8A5A00;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Dodaj wiersz ręcznie</div>
+        <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr 1.2fr 1.4fr auto;gap:6px;align-items:end;">
+          ${fld('areg-readTime', { lbl: 'Data i czas odczytu', type: 'datetime-local' })}
+          ${fld('areg-tOutdoor', { lbl: 'T zewn. [°C]', ph: 'np. 0.4' })}
+          ${fld('areg-tSupply', { lbl: 'T zasilania [°C]', ph: 'np. 54.2' })}
+          ${fld('areg-tReturn', { lbl: 'T powrotu [°C]', ph: 'np. 43.7' })}
+          ${fld('areg-vFlow', { lbl: 'Przepływ [dm³/h]', ph: 'np. 3827' }, '1')}
+          ${fld('areg-heatPower', { lbl: 'Moc dostarczona [W]', ph: 'np. 46012' })}
+          ${fld('areg-heatConsumption', { lbl: 'Zużycie ciepła [MJ]', ph: 'np. 28263' })}
+          <div style="display:flex;align-items:flex-end;">
+            <button class="primary-button" onclick="analRegAddRow()" style="font-size:12px;padding:6px 14px;white-space:nowrap;">+ Dodaj</button>
+          </div>
+        </div>
+        <div class="anw-muted" style="margin-top:8px;font-size:11px;">Import danych czasowych z pliku. Kolejność kolumn: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>. Dane zapisują się w analizie.</div>
+      </div>
+
+      <!-- Tabela danych -->
+      <div style="padding:12px 16px;background:var(--color-background-primary);">
+        ${poChrono.length === 0 ? `
+          <div style="text-align:center;padding:28px;color:var(--color-text-secondary);font-size:13px;">
+            <div style="font-size:32px;margin-bottom:8px;">📊</div>
+            Brak danych okresu analizowanego. Dodaj wiersze ręcznie lub zaimportuj plik CSV/Excel.
+          </div>` : `
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px;">
+              <thead><tr style="background:var(--color-background-secondary);">
+                <th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Data odczytu</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T zewn. [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T zasil. [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T powrotu [°C]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Przepływ [dm³/h]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Moc dostarczona [W]</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Zużycie ciepła [MJ]</th>
+                <th title="Δ = różnica wskazań licznika między kolejnymi odczytami" style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:#B9770E;white-space:nowrap;">Δ [MJ]</th>
+                <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
+              </tr></thead>
+              <tbody>${poTableRows}</tbody>
+            </table>
+          </div>
+          ${poPagination}
+        `}
       </div>
     </div>`;
 
@@ -1743,14 +1837,18 @@ function analRegImport(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if (ext !== 'csv') { alert('Na teraz wspierany jest import CSV (jak w „Dane z czujników"). Zapisz Excel jako CSV i spróbuj ponownie.'); input.value = ''; return; }
+  if (ext !== 'csv') { alert('Import plików Excel (.xlsx) wymaga zapisu jako CSV — aktualnie wspierany format to CSV (jak w „Dane z czujników"). Zapisz Excel jako CSV i spróbuj ponownie.'); input.value = ''; return; }
   const reader = new FileReader();
   reader.onload = function (e) {
     const res = _analRegParseCsvText(e.target.result);
     if (res.err) { alert(res.err); input.value = ''; return; }
     if (!res.rows.length) { alert('Nie znaleziono wierszy danych w pliku.'); input.value = ''; return; }
-    const times = res.rows.map(r => r.readTime).filter(Boolean).sort();
-    ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: times[0] || '', to: times[times.length - 1] || '' };
+    if (!ANAL.reg.analyzed) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
+    ANAL.reg.analyzed.rows = (ANAL.reg.analyzed.rows || []).concat(res.rows);
+    ANAL.reg.analyzed.fileName = file.name;
+    _analRegRecalcRange();
+    ANAL.results = null; ANAL._regData = null;
+    window._aregPage = Math.floor((ANAL.reg.analyzed.rows.length - 1) / (window._aregPageSize || 50));
     renderAnalysesModule();
     alert('Zaimportowano ' + res.rows.length + ' wierszy okresu analizowanego.');
   };
@@ -1760,7 +1858,43 @@ function analRegImport(input) {
 }
 
 function analRegClearImport() {
+  if (!confirm('Usunąć wszystkie wiersze okresu analizowanego (import + dodane ręcznie)?')) return;
   if (ANAL.reg) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
+  ANAL.results = null; ANAL._regData = null;
+  window._aregPage = 0;
+  renderAnalysesModule();
+}
+
+function _analRegRecalcRange() {
+  const an = ANAL.reg && ANAL.reg.analyzed; if (!an) return;
+  const times = (an.rows || []).map(r => r.readTime).filter(Boolean).sort();
+  an.from = times[0] || ''; an.to = times[times.length - 1] || '';
+}
+
+function analRegAddRow() {
+  if (!ANAL.reg) ANAL.reg = { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } };
+  if (!ANAL.reg.analyzed) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const readTime = g('areg-readTime');
+  const tOutdoor = g('areg-tOutdoor'), tSupply = g('areg-tSupply'), tReturn = g('areg-tReturn');
+  const vFlow = g('areg-vFlow'), heatPower = g('areg-heatPower'), heatConsumption = g('areg-heatConsumption');
+  if (!readTime && tOutdoor === '' && tSupply === '') { alert('Podaj przynajmniej datę odczytu i temperaturę zewnętrzną.'); return; }
+  const num = v => (v !== '' && v != null && !isNaN(Number(v))) ? Number(v) : null;
+  ANAL.reg.analyzed.rows.push({
+    readTime: readTime || null, tOutdoor: num(tOutdoor), tSupply: num(tSupply), tReturn: num(tReturn),
+    vFlow: num(vFlow), heatPower: num(heatPower), heatConsumption: num(heatConsumption)
+  });
+  _analRegRecalcRange();
+  ANAL.results = null; ANAL._regData = null;
+  window._aregPage = Math.floor((ANAL.reg.analyzed.rows.length - 1) / (window._aregPageSize || 50));
+  renderAnalysesModule();
+}
+
+function analRegDeleteRow(idx) {
+  const an = ANAL.reg && ANAL.reg.analyzed; if (!an || !an.rows) return;
+  an.rows.splice(idx, 1);
+  _analRegRecalcRange();
+  ANAL.results = null; ANAL._regData = null;
   renderAnalysesModule();
 }
 
