@@ -3402,18 +3402,22 @@ function regProtoSave() {
   renderMeasurementsModule();
 }
 
-function regProtoOpen(pid) {
+function _regProtoActivate(pid, mode) {
   window._regActiveProtocolId = Number(pid);
-  window._regProtoForm = null; window._regPage = 0; window._regSelectionOpen = false;
+  window._regViewMode = (mode === 'edit') ? 'edit' : 'preview';
+  window._regProtoForm = null; window._regPage = 0;
+  window._regSelectionOpen = (mode === 'edit');   // w edycji od razu pokaż narzędzia selekcji
   // Wczytaj zapisany zakres okresu bazowego do filtra roboczego (żeby nie ustawiać go od nowa).
   const _p = (typeof selectedMeasurementObjectId !== 'undefined' && window.RegressionBaseModule)
     ? RegressionBaseModule.find(selectedMeasurementObjectId, Number(pid)) : null;
   window._regBaseFrom = (_p && _p.periodFrom) ? _p.periodFrom : '';
   window._regBaseTo   = (_p && _p.periodTo)   ? _p.periodTo   : '';
-  window._regResultsOpen = !!(_p && _p.regressionSaved);   // zapisana regresja → od razu pokaż 4 wykresy
+  window._regResultsOpen = !!(_p && _p.regressionSaved);   // zapisana regresja → pokaż 4 wykresy
   window._regOutPage = {};
   renderMeasurementsModule();
 }
+function regProtoPreview(pid) { _regProtoActivate(pid, 'preview'); }   // 👁 podgląd (read-only)
+function regProtoOpen(pid)    { _regProtoActivate(pid, 'edit'); }      // ✏️ edycja (selekcja + wykresy + zapis)
 function regProtoBack() { window._regActiveProtocolId = null; window._regProtoForm = null; renderMeasurementsModule(); }
 function regProtoDelete(pid) {
   // Dwustopniowo, bez confirm() (działa przy zablokowanych oknach dialogowych).
@@ -3442,8 +3446,8 @@ function _regProtocolListHtml(objId) {
       <td style="padding:8px 10px;font-size:12px;">${escapeHtml(p.climateSource || '—')}</td>
       <td style="padding:8px 10px;font-size:12px;text-align:right;">${n}</td>
       <td style="padding:8px 10px;text-align:right;white-space:nowrap;">
-        <button class="small-button" onclick="regProtoOpen(${p.id})" style="font-size:11px;">Otwórz</button>
-        <button class="small-button" onclick="regProtoEdit(${p.id})" style="font-size:11px;">✏️</button>
+        <button class="small-button" onclick="regProtoPreview(${p.id})" class="icon-btn" style="font-size:11px;" title="Podgląd">👁</button>
+        <button class="small-button" onclick="regProtoEdit(${p.id})" style="font-size:11px;" title="Edytuj protokół">✏️</button>
         <button class="small-button" onclick="regProtoDelete(${p.id})" style="font-size:11px;${window._regProtoDelArm == p.id ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}">${window._regProtoDelArm == p.id ? '⚠️ usuń?' : '🗑'}</button>
       </td>
     </tr>`;
@@ -3507,22 +3511,76 @@ function _regProtocolFormHtml(objId) {
 function _regProtocolActiveHtml(objId, pid) {
   const p = RegressionBaseModule.find(objId, pid);
   if (!p) { window._regActiveProtocolId = null; return _regProtocolListHtml(objId); }
+  const mode = (window._regViewMode === 'edit') ? 'edit' : 'preview';
   const per = (p.periodFrom || p.periodTo) ? `${(p.periodFrom || '—').replace('T', ' ')} → ${(p.periodTo || '—').replace('T', ' ')}` : '—';
   const meta = `<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--color-text-secondary);">
       <span>📅 Okres: <strong style="color:var(--color-text-primary);">${escapeHtml(per)}</strong></span>
       <span>🌍 Źródło klimatu: <strong style="color:var(--color-text-primary);">${escapeHtml(p.climateSource || '—')}</strong></span>
       <span>⬇ Pobrano: <strong style="color:var(--color-text-primary);">${p.climateFetchDate || '—'}</strong></span>
     </div>`;
+  const metaBox = `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:8px;">${meta}</div>`;
+  const obj = (typeof ObjectsModule !== 'undefined') ? ObjectsModule.find(objId) : null;
+
+  // ── TRYB EDYCJI: dane + selekcja + zakres + 4 wykresy + „Zapisz regresję" (na dole) ──
+  if (mode === 'edit') {
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 12px;gap:10px;flex-wrap:wrap;">
+        <div>
+          <button class="small-button" onclick="regProtoPreview(${pid})" style="font-size:12px;margin-bottom:8px;">← Podgląd</button>
+          <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">✏️ Edycja: ${escapeHtml(p.number || 'Okres bazowy')}</h3>
+        </div>
+        <button class="small-button" onclick="regProtoEdit(${pid})" style="font-size:12px;white-space:nowrap;">✏️ Edytuj nagłówek / dane klimatyczne</button>
+      </div>
+      ${metaBox}
+      ${renderRegressionSensorData(pid)}
+      ${_regWorkflowHtml(pid)}`;
+  }
+
+  // ── TRYB PODGLĄDU (read-only) ──
+  const lineTxt = key => {
+    const L = p.regressionLines && p.regressionLines[key];
+    if (!L || L.a == null || L.b == null) return '—';
+    const a = Number(L.a), b = Number(L.b);
+    return `y = ${a.toFixed(4)}·x ${b >= 0 ? '+ ' : '− '}${Math.abs(b).toFixed(2)}` + (L.n != null ? ` (n=${L.n})` : '');
+  };
+  const savedBlock = p.regressionSaved
+    ? `<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;color:#0C447C;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">📈 Zapisane wyniki regresji</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:12px;">
+          <span>📉 Zużycie — Metoda 1: <strong>${lineTxt('cons_raw')}</strong></span>
+          <span>📉 Zużycie — Metoda 2: <strong>${lineTxt('cons_binned')}</strong></span>
+          <span>🌡️ T zasilania — Metoda 1: <strong>${lineTxt('sup_raw')}</strong></span>
+          <span>🌡️ T zasilania — Metoda 2: <strong>${lineTxt('sup_binned')}</strong></span>
+        </div>
+        <div style="font-size:11px;color:#1E7B34;margin-top:8px;">✓ Zapisano: ${p.regressionSavedAt ? new Date(p.regressionSavedAt).toLocaleString('pl-PL') : '—'} · usuniętych punktów: ${p.regressionRemovedCount != null ? p.regressionRemovedCount : '—'}</div>
+      </div>
+      ${renderRegressionBaselineCurves(pid)}`
+    : `<div class="reminder-card" style="border-left:4px solid #FAC775;"><strong>Brak zapisanej regresji</strong><div class="reminder-meta">Kliknij „✏️ Edytuj", wykonaj 4 wykresy i na dole „💾 Zapisz regresję".</div></div>`;
+
+  const status = p.regressionSaved ? 'Zapisana' : 'Szkic';
+  const protocolDetails = `<div style="border-top:1px solid var(--color-border-tertiary);margin-top:14px;padding-top:12px;">
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">📋 Szczegóły protokołu</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 24px;font-size:12px;">
+        <span>Numer protokołu<br><strong style="color:var(--color-text-primary);">${escapeHtml(p.number || '—')}</strong></span>
+        <span>Data protokołu<br><strong style="color:var(--color-text-primary);">${p.protocolDate || '—'}</strong></span>
+        <span>Status<br><strong style="color:var(--color-text-primary);">${status}</strong></span>
+      </div>
+      ${p.notes ? `<div style="font-size:12px;margin-top:10px;">Notatki<br><strong style="color:var(--color-text-primary);">${escapeHtml(p.notes)}</strong></div>` : ''}
+    </div>`;
+
   return `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 12px;gap:10px;flex-wrap:wrap;">
       <div>
-        <button class="small-button" onclick="regProtoBack()" style="font-size:12px;margin-bottom:8px;">← Lista okresów bazowych</button>
+        <button class="small-button" onclick="regProtoBack()" style="font-size:12px;margin-bottom:8px;">← Wróć</button>
         <h3 style="margin:0;font-size:15px;font-weight:600;color:#0C447C;">📈 ${escapeHtml(p.number || 'Okres bazowy')}</h3>
       </div>
-      <button class="small-button" onclick="regProtoEdit(${pid})" style="font-size:12px;white-space:nowrap;">✏️ Edytuj nagłówek / dane klimatyczne</button>
+      <button class="primary-button" onclick="regProtoOpen(${pid})" style="font-size:13px;white-space:nowrap;">✏️ Edytuj</button>
     </div>
-    <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;margin-bottom:8px;">${meta}</div>
-    ${renderRegressionSensorData(pid)}
-    ${_regWorkflowHtml(pid)}`;
+    ${metaBox}
+    ${savedBlock}
+    ${protocolDetails}
+    <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="small-button" onclick="regProtoEdit(${pid})" style="font-size:13px;">✏️ Edytuj protokół</button>
+      ${obj ? `<button class="small-button" onclick="switchToView('objects',()=>viewObject(${objId}))" style="font-size:13px;">🏗️ Podgląd obiektu</button>` : ''}
+    </div>`;
 }
 
 // Odporny parser daty/godziny odczytu — toleruje dowolne separatory (., /, -, przecinek, spacje).
@@ -4161,13 +4219,16 @@ function renderRegressionSelection(pid) {
       </div>
     </div>`;
 
-  const runBlock = `<div style="margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+  const runBlock = `<div style="margin-bottom:8px;">
       <button class="primary-button" onclick="regRunRegression()" style="font-size:14px;padding:9px 20px;">▶ Wykonaj regresję (4 wykresy)</button>
-      <button class="small-button" onclick="regSaveRegression(${pid})" style="font-size:13px;padding:9px 18px;color:#1E7B34;border-color:#1E7B34;font-weight:600;">💾 Zapisz regresję</button>
+    </div>`;
+
+  const saveBlock = `<div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--color-border-tertiary);display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+      <button class="small-button" onclick="regSaveRegression(${pid})" style="font-size:14px;padding:10px 22px;color:#fff;background:#1E7B34;border-color:#1E7B34;font-weight:600;">💾 Zapisz regresję</button>
       ${savedHint}
     </div>`;
 
-  return headBar + allTables + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '');
+  return headBar + allTables + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '') + saveBlock;
 }
 
 function _regWorkflowHtml(pid) {
