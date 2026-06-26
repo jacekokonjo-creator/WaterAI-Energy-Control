@@ -1629,7 +1629,7 @@ function _analRegSheet() {
 
   const baseBlock = `
     <div class="anw-sec">
-      <div class="anw-head anw-blue"><span class="ico">📈</span><h3>Okres bazowy — regresja (PRZED)</h3></div>
+      <div class="anw-head anw-blue"><span class="ico">📈</span><h3>Okres bazowy — regresja (PRZED)</h3>${pid ? '<span class="anw-chk-inline" style="margin-left:auto;width:24px;height:24px;font-size:14px;">✓</span>' : ''}</div>
       <div class="anw-body">
         <div class="anw-ctx" style="margin-bottom:12px;">
           <span>Okres bazowy: <b>${bp ? _escA(bp.number || ('REG ' + pid)) : '—'}</b></span>
