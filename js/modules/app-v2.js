@@ -1733,9 +1733,12 @@ function analRegCopyBase(silent) {
   if (!pid || !window.RegressionBaseModule || typeof _regViews !== 'function') { if (!silent) alert('Brak okresu bazowego regresji.'); return; }
   if (!RegressionBaseModule.getRows(pid).length) { if (!silent) alert('Wybrany okres bazowy nie ma żadnych odczytów.'); return; }
   const method = ANAL.reg.method === 'binned' ? 'binned' : 'raw';
-  // Linie liczone na PEŁNYM okresie bazowym (neutralizujemy filtr zakresu z arkusza regresji).
+  // Linia bazowa liczona dla ZAKRESU okresu bazowego (periodFrom/periodTo protokołu) — to definiuje „okres wyliczeń" PRZED,
+  // a nie cały zaimportowany plik. Dzięki temu baza i okres analizowany mogą pochodzić z tego samego pliku, ale różnych zakresów dat.
   const _sf = window._regBaseFrom, _st = window._regBaseTo;
-  window._regBaseFrom = ''; window._regBaseTo = '';
+  const _bp = (window.RegressionBaseModule && typeof RegressionBaseModule.find === 'function') ? RegressionBaseModule.find(ANAL.objectId, pid) : null;
+  window._regBaseFrom = (_bp && _bp.periodFrom) ? _bp.periodFrom : '';
+  window._regBaseTo = (_bp && _bp.periodTo) ? _bp.periodTo : '';
   let v = null;
   try { v = _regViews(pid); } catch (e) { v = null; }
   window._regBaseFrom = _sf; window._regBaseTo = _st;
@@ -1841,8 +1844,19 @@ function _analRegFitLine(rows, metric, method) {
 function _analRegModel(reg) {
   if (!reg || !reg.baseLines) return null;
   const method = reg.method === 'binned' ? 'binned' : 'raw';
-  const rows = (reg.analyzed && reg.analyzed.rows) || [];
-  const waterai = { cons: _analRegFitLine(rows, 'cons', method), sup: _analRegFitLine(rows, 'sup', method) };
+  const allRows = (reg.analyzed && reg.analyzed.rows) || [];
+  // WaterAI liczone TYLKO dla okresu analizowanego (= 🗓️ Zakres okresu rozliczeniowego), a nie z całego pliku.
+  const _pms = s => { const ms = s ? Date.parse(s) : NaN; return isFinite(ms) ? ms : null; };
+  const bf = _pms(reg.billing && reg.billing.from);
+  const bt = _pms(reg.billing && reg.billing.to);
+  const rows = (bf == null && bt == null) ? allRows : allRows.filter(r => {
+    const ms = (r && r.readTime && typeof _regTs === 'function') ? _regTs(r.readTime) : null;
+    if (ms == null) return false;
+    if (bf != null && ms < bf) return false;
+    if (bt != null && ms > bt) return false;
+    return true;
+  });
+  const waterai = { cons: _analRegFitLine(rows, 'cons', method), sup: _analRegFitLine(rows, 'sup', method), nRows: rows.length, nAll: allRows.length };
   // Zakres temperatur do tabeli/wykresów — swobodnie wybierany (domyślnie −15…+10°C, krok 1).
   const tr = reg.tempRange || {};
   let T0 = Number(tr.from); if (!isFinite(T0)) T0 = -15;
@@ -1948,6 +1962,11 @@ function _analRegResultsHtml(reg, model, opts) {
       <span>🌡️ T zasilania — Tryb pogodowy: <b>${_analRegLineTxt(s.base)}</b> &nbsp;·&nbsp; WaterAI: <b>${_analRegLineTxt(s.waterai)}</b></span>
     </div>`;
   const rngTxt = model.range ? `${model.range.from}…${model.range.to}°C (krok ${model.range.step}°C)` : '−15…+10°C';
+  const wN = model.waterai || {};
+  const billTxt = (reg && reg.billing && (reg.billing.from || reg.billing.to))
+    ? `${(reg.billing.from || '?').replace('T', ' ')} → ${(reg.billing.to || '?').replace('T', ' ')}` : 'cały plik';
+  const subsetNote = (wN.nRows != null && wN.nAll != null)
+    ? ` WaterAI policzono z <b>${wN.nRows}</b> z ${wN.nAll} odczytów (okres analizowany: ${billTxt}).` : '';
   return `<div class="anw-sec" style="margin-top:16px;">
       <div class="anw-head anw-gold"><span class="ico">📈</span><h3>Wynik analizy regresji (PRZED / PO)</h3></div>
       <div class="anw-body">
@@ -1955,7 +1974,7 @@ function _analRegResultsHtml(reg, model, opts) {
         ${eqStrip}
         <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}${_analRegTableHtml(c, 'zużycie', 'MJ')}</div>
         <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}${_analRegTableHtml(s, 'T zasilania', '°C')}</div>
-        <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. <b>Tryb pogodowy</b> = regresja <b>okresu bazowego</b>; <b>WaterAI</b> = regresja <b>okresu analizowanego (PO) — dane z czujników</b>. Obniżenie liczone w zakresie ${rngTxt}.</div>
+        <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. <b>Tryb pogodowy</b> = regresja <b>okresu bazowego</b> (zakres okresu bazowego); <b>WaterAI</b> = regresja <b>okresu analizowanego (PO) — dane z czujników</b>.${subsetNote} Obniżenie liczone w zakresie ${rngTxt}.</div>
         ${saveBtn}
       </div>
     </div>`;
