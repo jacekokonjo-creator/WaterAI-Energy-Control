@@ -4228,7 +4228,111 @@ function renderRegressionSelection(pid) {
       ${savedHint}
     </div>`;
 
-  return headBar + allTables + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '') + saveBlock;
+  return headBar + allTables + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) + _regBaseSweep(pid) : '') + saveBlock;
+}
+
+// ── Zakres temperatur okresu bazowego: tabela + wykresy linii bazowej (PRZED) ──
+function _regSweepChartSvg(title, rows, key, yLabel, color) {
+  const xs = rows.map(r => r.t), ys = rows.map(r => r[key]).filter(v => v != null);
+  if (!ys.length) return '';
+  const xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs);
+  let ymin = Math.min.apply(null, ys), ymax = Math.max.apply(null, ys);
+  if (ymin === ymax) { ymin -= 1; ymax += 1; }
+  const padY = (ymax - ymin) * 0.08; ymin -= padY; ymax += padY;
+  const W = 560, H = 260, L = 66, R = 18, T = 28, Bm = 50;
+  const xspan = (xmax - xmin) || 1, yspan = (ymax - ymin) || 1;
+  const px = t => L + (t - xmin) / xspan * (W - L - R);
+  const py = val => T + (1 - (val - ymin) / yspan) * (H - T - Bm);
+  const poly = rows.filter(r => r[key] != null).map(r => `${px(r.t).toFixed(1)},${py(r[key]).toFixed(1)}`).join(' ');
+  let grid = '';
+  for (let i = 0; i <= 4; i++) { const val = ymin + yspan * i / 4, y = py(val);
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${val.toFixed(1)}</text>`; }
+  let xlab = ''; const xstep = xspan > 30 ? 10 : (xspan > 12 ? 5 : (xspan > 4 ? 2 : 1));
+  for (let t = Math.ceil(xmin / xstep) * xstep; t <= xmax + 1e-9; t += xstep) { const x = px(t);
+    xlab += `<line x1="${x.toFixed(1)}" y1="${H - Bm}" x2="${x.toFixed(1)}" y2="${H - Bm + 4}" stroke="#9aa5b1"/><text x="${x.toFixed(1)}" y="${H - Bm + 16}" text-anchor="middle" font-size="9" fill="#7a8794">${t}</text>`; }
+  const cx = (L + (W - R)) / 2, cy = (T + (H - Bm)) / 2;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;background:#fff;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <text x="${L}" y="16" font-size="12" font-weight="600" fill="#0C447C">${title}</text>
+    ${grid}${xlab}
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <line x1="${L}" y1="${H - Bm}" x2="${W - R}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="2.5"/>
+    <text x="${cx.toFixed(0)}" y="${H - 20}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670">Temperatura zewnętrzna [°C]</text>
+    <text x="16" y="${cy.toFixed(0)}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670" transform="rotate(-90 16 ${cy.toFixed(0)})">${yLabel}</text>
+  </svg>`;
+}
+
+function regSetSweep(field, val) {
+  if (field === 'method') { window._regSweepMethod = (val === 'binned') ? 'binned' : 'raw'; }
+  else {
+    const n = Number(String(val).replace(',', '.'));
+    if (field === 'step') window._regSweepStep = (isFinite(n) && n > 0) ? n : 1;
+    else if (field === 'from') window._regSweepFrom = isFinite(n) ? n : -15;
+    else if (field === 'to') window._regSweepTo = isFinite(n) ? n : 10;
+  }
+  renderMeasurementsModule();
+}
+
+function _regBaseSweep(pid) {
+  if (typeof _regViews !== 'function') return '';
+  let T0 = Number(window._regSweepFrom); if (!isFinite(T0)) T0 = -15;
+  let T1 = Number(window._regSweepTo);   if (!isFinite(T1)) T1 = 10;
+  let step = Number(window._regSweepStep); if (!isFinite(step) || step <= 0) step = 1;
+  const method = (window._regSweepMethod === 'binned') ? 'binned' : 'raw';
+  let v = null; try { v = _regViews(pid); } catch (e) { v = null; }
+  if (!v) return '';
+  const consFit = (v[method === 'binned' ? 'cons_binned' : 'cons_raw'] || {}).fit;
+  const supFit  = (v[method === 'binned' ? 'sup_binned' : 'sup_raw'] || {}).fit;
+  const hasCons = consFit && consFit.a != null, hasSup = supFit && supFit.a != null;
+  if (!hasCons && !hasSup) return '';
+  let lo = T0, hi = T1; if (hi < lo) { const t = lo; lo = hi; hi = t; }
+  if ((hi - lo) / step > 400) step = (hi - lo) / 400;
+  const rows = []; let sC = 0, sS = 0, n = 0;
+  for (let t = lo; t <= hi + 1e-9; t += step) {
+    const tt = Math.round(t * 100) / 100;
+    const cz = hasCons ? consFit.a * tt + consFit.b : null;
+    const ts = hasSup ? supFit.a * tt + supFit.b : null;
+    rows.push({ t: tt, cz, ts });
+    if (cz != null) sC += cz; if (ts != null) sS += ts; n++;
+  }
+  const avgC = n ? sC / n : 0, avgS = n ? sS / n : 0;
+  const m1 = method === 'raw', m2 = method === 'binned';
+  const tabBtn = (active, on, label) => `<button class="small-button" onclick="regSetSweep('method','${on}')" style="font-size:12px;${active ? 'background:#E6F1FB;border-color:#185FA5;font-weight:600;' : ''}">${label}</button>`;
+  const f2 = x => x == null ? '—' : Number(x).toFixed(2);
+  const f1 = x => x == null ? '—' : Number(x).toFixed(1);
+  const td = 'padding:3px 8px;font-size:11px;border-bottom:0.5px solid var(--color-border-tertiary);text-align:right;';
+  const th = 'padding:5px 8px;font-size:11px;font-weight:600;color:#0C447C;text-align:right;border-bottom:1px solid var(--color-border-tertiary);';
+  const body = rows.map(r => `<tr>
+      <td style="${td}text-align:center;">${r.t}</td>
+      <td style="${td}">${f2(r.cz)}</td>
+      <td style="${td}">${f1(r.ts)}</td></tr>`).join('');
+  const charts = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;">
+      ${hasCons ? `<div style="flex:1;min-width:300px;">${_regSweepChartSvg('📉 Zużycie ciepła — okres bazowy', rows, 'cz', 'Zużycie ciepła [MJ]', '#9aa5b1')}</div>` : ''}
+      ${hasSup ? `<div style="flex:1;min-width:300px;">${_regSweepChartSvg('🌡️ Temp. zasilania — okres bazowy', rows, 'ts', 'T zasilania [°C]', '#9aa5b1')}</div>` : ''}
+    </div>`;
+  return `<div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px 16px;margin-top:18px;background:var(--color-background-primary);">
+      <div style="font-size:13px;font-weight:700;color:#0C447C;margin-bottom:6px;">🌡️ Zakres temperatur — tabela i wykresy okresu bazowego</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:10px;">Tabela i wykresy budują się dla wybranego zakresu T zewnętrznej. Domyślnie −15…+10°C, krok 1°C — dostosuj wedle potrzeby. Wartości to przewidywania linii bazowej (PRZED) y = a·t + b oraz ich średnie.</div>
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Od [°C]</label><input type="number" step="1" value="${T0}" onchange="regSetSweep('from',this.value)" style="font-size:12px;width:90px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Do [°C]</label><input type="number" step="1" value="${T1}" onchange="regSetSweep('to',this.value)" style="font-size:12px;width:90px;"></div>
+        <div><label style="display:block;font-size:10px;color:var(--color-text-secondary);">Krok [°C]</label><input type="number" step="0.5" min="0.1" value="${step}" onchange="regSetSweep('step',this.value)" style="font-size:12px;width:90px;"></div>
+        <div style="display:flex;gap:6px;">${tabBtn(m1, 'raw', 'Metoda 1')}${tabBtn(m2, 'binned', 'Metoda 2')}</div>
+      </div>
+      ${charts}
+      <details open style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#0C447C;font-weight:600;">Tabela zbiorcza okresu bazowego (${lo}…${hi}°C)</summary>
+        <table style="width:100%;border-collapse:collapse;margin-top:6px;">
+          <thead><tr>
+            <th style="${th}text-align:center;">T zewn. [°C]</th>
+            <th style="${th}">Zużycie ciepła [MJ]</th>
+            <th style="${th}">T zasilania [°C]</th></tr></thead>
+          <tbody>${body}</tbody>
+          <tfoot><tr style="background:var(--color-background-secondary);font-weight:700;">
+            <td style="${td}text-align:center;">Średnia</td>
+            <td style="${td}">${hasCons ? avgC.toFixed(2) : '—'}</td>
+            <td style="${td}">${hasSup ? avgS.toFixed(1) : '—'}</td></tr></tfoot>
+        </table></details>
+    </div>`;
 }
 
 function _regWorkflowHtml(pid) {
