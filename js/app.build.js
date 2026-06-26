@@ -3402,7 +3402,18 @@ function regProtoSave() {
   renderMeasurementsModule();
 }
 
-function regProtoOpen(pid) { window._regActiveProtocolId = Number(pid); window._regProtoForm = null; window._regPage = 0; window._regSelectionOpen = false; window._regResultsOpen = false; renderMeasurementsModule(); }
+function regProtoOpen(pid) {
+  window._regActiveProtocolId = Number(pid);
+  window._regProtoForm = null; window._regPage = 0; window._regSelectionOpen = false;
+  // Wczytaj zapisany zakres okresu bazowego do filtra roboczego (żeby nie ustawiać go od nowa).
+  const _p = (typeof selectedMeasurementObjectId !== 'undefined' && window.RegressionBaseModule)
+    ? RegressionBaseModule.find(selectedMeasurementObjectId, Number(pid)) : null;
+  window._regBaseFrom = (_p && _p.periodFrom) ? _p.periodFrom : '';
+  window._regBaseTo   = (_p && _p.periodTo)   ? _p.periodTo   : '';
+  window._regResultsOpen = !!(_p && _p.regressionSaved);   // zapisana regresja → od razu pokaż 4 wykresy
+  window._regOutPage = {};
+  renderMeasurementsModule();
+}
 function regProtoBack() { window._regActiveProtocolId = null; window._regProtoForm = null; renderMeasurementsModule(); }
 function regProtoDelete(pid) {
   // Dwustopniowo, bez confirm() (działa przy zablokowanych oknach dialogowych).
@@ -3857,6 +3868,37 @@ function importRegressionSensorFile(input, objectId) {
 // ─── Selekcja danych (przegląd odchyłek) → Wykonaj regresję ───
 function regToggleSelection() { window._regSelectionOpen = !window._regSelectionOpen; renderMeasurementsModule(); }
 function regRunRegression() { window._regResultsOpen = true; renderMeasurementsModule(); }
+// Zapisuje stan regresji do protokołu: zakres okresu bazowego + snapshot wyników (a, b dla 4 wykresów).
+// Selekcja danych (flagi removed*) zapisuje się już na bieżąco w wierszach — tu utrwalamy ZAKRES i wyniki,
+// oraz oznaczamy okres jako gotowy (po ponownym otwarciu wczyta się zakres i od razu pokażą się wykresy).
+function regSaveRegression(pid) {
+  const oid = (typeof selectedMeasurementObjectId !== 'undefined') ? selectedMeasurementObjectId : null;
+  if (oid == null || !window.RegressionBaseModule) { alert('Brak aktywnego obiektu — otwórz okres bazowy z listy.'); return; }
+  // Pobierz zakres z pól (nawet jeśli użytkownik nie kliknął „Zastosuj").
+  const fromEl = document.getElementById('reg-base-from'), toEl = document.getElementById('reg-base-to');
+  const from = fromEl ? fromEl.value : (window._regBaseFrom || '');
+  const to   = toEl   ? toEl.value   : (window._regBaseTo   || '');
+  window._regBaseFrom = from; window._regBaseTo = to;
+  // Snapshot linii regresji (a, b, n) dla 4 wykresów — w bieżącym zakresie.
+  let lines = null;
+  try {
+    const v = _regViews(pid);
+    const line = view => (view && view.fit && view.fit.a != null) ? { a: view.fit.a, b: view.fit.b, n: view.pts ? view.pts.length : null } : null;
+    lines = { cons_raw: line(v.cons_raw), cons_binned: line(v.cons_binned), sup_raw: line(v.sup_raw), sup_binned: line(v.sup_binned) };
+  } catch (e) { lines = null; }
+  const rows = RegressionBaseModule.getRows(pid);
+  const removedCount = rows.filter(r => r.removed || r.removedCons || r.removedSup).length;
+  RegressionBaseModule.update(oid, Number(pid), {
+    periodFrom: from, periodTo: to,
+    regressionSaved: true, regressionSavedAt: new Date().toISOString(),
+    regressionLines: lines, regressionRemovedCount: removedCount, regressionRowCount: rows.length
+  });
+  window._regResultsOpen = true;
+  renderMeasurementsModule();
+  alert('Zapisano regresję.\n\n• Zakres okresu bazowego: ' + ((from || to) ? ((from || '—') + ' → ' + (to || '—')) : 'cały zakres') +
+        '\n• Selekcja danych: zapisana (usuniętych: ' + removedCount + ')' +
+        '\n• Wyniki a, b: zapisane\n\nPo ponownym otwarciu tego okresu wszystko wczyta się automatycznie.');
+}
 function regAcceptRow(pid, idx, metricKey) {
   const rows = RegressionBaseModule.getRows(pid);
   if (rows[idx]) { rows[idx][metricKey === 'sup' ? 'acceptedSup' : 'acceptedCons'] = true; RegressionBaseModule.saveRows(pid, rows); }
@@ -4024,6 +4066,10 @@ function renderRegressionSelection(pid) {
   const accCount = _selRows.filter(r => r.accepted || r.acceptedCons || r.acceptedSup).length;
   const removedCount = _selRows.filter(r => r.removed || r.removedCons || r.removedSup).length;
   const resOpen = !!window._regResultsOpen;
+  const _proto = (typeof selectedMeasurementObjectId !== 'undefined' && window.RegressionBaseModule) ? RegressionBaseModule.find(selectedMeasurementObjectId, pid) : null;
+  const savedHint = (_proto && _proto.regressionSavedAt)
+    ? `<span style="font-size:11px;color:#1E7B34;">✓ Zapisano: ${new Date(_proto.regressionSavedAt).toLocaleString('pl-PL')}</span>`
+    : `<span style="font-size:11px;color:#B9770E;">⚠ Niezapisane — kliknij „Zapisz regresję", aby zachować zakres i wyniki.</span>`;
   const from = window._regBaseFrom || '', to = window._regBaseTo || '';
   window._regOutSortKey = window._regOutSortKey || 'resid';
   window._regOutSortDir = window._regOutSortDir || 'desc';
@@ -4115,8 +4161,10 @@ function renderRegressionSelection(pid) {
       </div>
     </div>`;
 
-  const runBlock = `<div style="margin-bottom:8px;">
+  const runBlock = `<div style="margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
       <button class="primary-button" onclick="regRunRegression()" style="font-size:14px;padding:9px 20px;">▶ Wykonaj regresję (4 wykresy)</button>
+      <button class="small-button" onclick="regSaveRegression(${pid})" style="font-size:13px;padding:9px 18px;color:#1E7B34;border-color:#1E7B34;font-weight:600;">💾 Zapisz regresję</button>
+      ${savedHint}
     </div>`;
 
   return headBar + allTables + dateBlock + runBlock + (resOpen ? renderRegressionBaselineCurves(pid) : '');
