@@ -1050,8 +1050,6 @@ const ANAL_STYLE = `<style>
   .anw-type .badge.ready{background:#EAF3DE;color:#27500A;}
   .anw-type .badge.soon{background:#FFF1E0;color:#9A5B00;}
   .anw-type .chk{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#0C447C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
-  .anw-chk-inline{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#0C447C;color:#fff;font-size:11px;line-height:1;flex:none;}
-  .anw-f.sel select{border-color:#0C447C;box-shadow:0 0 0 2px rgba(12,68,124,.14);}
   .anw-act{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
   .anw-sec{border:1px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;margin-bottom:18px;}
   .anw-head{padding:12px 16px;display:flex;align-items:center;gap:10px;}
@@ -1188,8 +1186,6 @@ function renderAnalysesModule() {
 
   if (ANAL.step === 2 && ANAL.type === 'TYM' && ANAL.objectId) _analRecalcLive();
   if (ANAL.step === 2 && ANAL.results && ANAL.type !== 'REGRESSION') setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
-  if (ANAL.step === 2 && ANAL.results && ANAL.results.reg && ANAL.type === 'REGRESSION' && ANAL._regData) setTimeout(() => _analRegDrawCharts(ANAL._regData), 60);
-  if (ANAL.step === 2 && ANAL.type === 'REGRESSION' && ANAL.reg && ANAL.reg.baseLines) setTimeout(() => _analRegDrawBaseCharts(), 60);
 }
 
 function _analStepsBar() {
@@ -1384,7 +1380,7 @@ function _analWizard() {
               <option value="">${ANAL.clientId ? '— wybierz obiekt —' : 'najpierw klient'}</option>
               ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>K${ClientsModule.getNumber(o.clientId)}-${ObjectsModule.getNumber(o.id)} · ${_escA(o.name)}</option>`).join('')}
             </select></div>
-          <div class="anw-f${(ANAL.objectId && ANAL.basePeriod) ? ' sel' : ''}"><label style="display:flex;align-items:center;gap:6px;">${isReg ? 'Okres bazowy (regresja, PRZED)' : 'Okres bazowy (PRZED instalacją)'}${(ANAL.objectId && ANAL.basePeriod) ? '<span class="anw-chk-inline">✓</span>' : ''}</label>
+          <div class="anw-f"><label>${isReg ? 'Okres bazowy (regresja, PRZED)' : 'Okres bazowy (PRZED instalacją)'}</label>
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
               ${isReg
                 ? `<option value="">${ANAL.objectId ? (regBasePeriods.length ? '— wybierz okres bazowy regresji —' : 'brak okresów bazowych regresji (utwórz w arkuszu regresji)') : 'najpierw obiekt'}</option>
@@ -1438,6 +1434,7 @@ function _analWizard() {
       <button class="small-button" onclick="analBackToTypes()">← Typ analizy</button>
       <h2 style="font-size:16px;color:#0C447C;margin:0;">${t.icon} ${_escA(t.label)}</h2>
     </div>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 18px;">2 · Uzupełnij klienta, obiekt i okres bazowy, wprowadź dane, a następnie kliknij „Wykonaj analizę" na dole.</p>
     ${selector}${body}${footer}`;
 }
 
@@ -1629,7 +1626,7 @@ function _analRegSheet() {
 
   const baseBlock = `
     <div class="anw-sec">
-      <div class="anw-head anw-blue"><span class="ico">📈</span><h3>Okres bazowy — regresja (PRZED)</h3>${pid ? '<span class="anw-chk-inline" style="margin-left:auto;width:24px;height:24px;font-size:14px;">✓</span>' : ''}</div>
+      <div class="anw-head anw-blue"><span class="ico">📈</span><h3>Okres bazowy — regresja (PRZED)</h3></div>
       <div class="anw-body">
         <div class="anw-ctx" style="margin-bottom:12px;">
           <span>Okres bazowy: <b>${bp ? _escA(bp.number || ('REG ' + pid)) : '—'}</b></span>
@@ -1651,142 +1648,22 @@ function _analRegSheet() {
           <span>📉 Zużycie ciepła: <b>${_analRegLineTxt(L.cons)}</b></span>
           <span>🌡️ Temp. zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
           <span>Metoda: <b>${L.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}</b></span>
-        </div>
-        <div class="anw-chart-wrap" style="margin-top:12px;">
-          <canvas id="anw-regbase-cons"></canvas>
-          <canvas id="anw-regbase-sup"></canvas>
-        </div>` : `<div class="anw-muted" style="margin-top:8px;">Wybierz metodę i kliknij „Kopiuj dane", aby wczytać linie bazowe y = ax + b i wykresy.</div>`}
+        </div>` : `<div class="anw-muted" style="margin-top:8px;">Wybierz metodę i kliknij „Kopiuj dane", aby wczytać linie bazowe y = ax + b.</div>`}
       </div>
     </div>`;
 
-  // ── Okres analizowany (PO): tabela + Δ zużycia (jak w okresie bazowym) ──────────
-  const poRows = an.rows || [];
-  const _rt = (typeof _regTs === 'function') ? _regTs : (() => null);
-  const poChrono = poRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
-    const am = _rt(A.r.readTime), bm = _rt(B.r.readTime);
-    if (am != null && bm != null) return am - bm;
-    if (am != null) return -1; if (bm != null) return 1; return A.idx - B.idx;
-  });
-  const poDelta = {};
-  if (typeof _consDeltas === 'function') _consDeltas(poChrono.map(o => Object.assign({}, o.r, { _idx: o.idx }))).forEach(d => { poDelta[d.idx] = d.y; });
-  window._aregPageSize = window._aregPageSize || 50;
-  window._aregSortKey = window._aregSortKey || 'readTime';
-  window._aregSortDir = window._aregSortDir || 'asc';
-  const aps = window._aregPageSize;
-  const aSortKey = window._aregSortKey, aSortDir = window._aregSortDir === 'desc' ? -1 : 1;
-  // Sortowanie WYŚWIETLANIA (Δ liczona osobno, chronologicznie — niezależnie od sortu).
-  const poDisplay = poRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
-    let a, b;
-    if (aSortKey === 'readTime') {
-      a = _rt(A.r.readTime); b = _rt(B.r.readTime);
-      if (a == null && b == null) {
-        const as = String(A.r.readTime || ''), bs = String(B.r.readTime || '');
-        if (as < bs) return -1 * aSortDir; if (as > bs) return 1 * aSortDir; return A.idx - B.idx;
-      }
-    } else {
-      a = (A.r[aSortKey] == null || A.r[aSortKey] === '') ? null : Number(A.r[aSortKey]);
-      b = (B.r[aSortKey] == null || B.r[aSortKey] === '') ? null : Number(B.r[aSortKey]);
-    }
-    if (a == null && b == null) return A.idx - B.idx;
-    if (a == null) return 1; if (b == null) return -1;
-    if (a < b) return -1 * aSortDir; if (a > b) return 1 * aSortDir; return A.idx - B.idx;
-  });
-  const aTotalPages = Math.max(1, Math.ceil(poDisplay.length / aps));
-  window._aregPage = window._aregPage || 0;
-  if (window._aregPage >= aTotalPages) window._aregPage = aTotalPages - 1;
-  if (window._aregPage < 0) window._aregPage = 0;
-  const aPage = window._aregPage;
-  const aPageRows = poDisplay.slice(aPage * aps, (aPage + 1) * aps);
-  const aSortArrow = key => window._aregSortKey === key ? (window._aregSortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
-  const poTh = (key, label, align) => `<th onclick="analRegToggleSort('${key}')" title="Kliknij, aby sortować" style="padding:6px 8px;text-align:${align};font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);cursor:pointer;user-select:none;white-space:nowrap;">${label}<span style="opacity:.55;">${aSortArrow(key)}</span></th>`;
-  const fmtV = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
-  const fmtT1 = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const fld = (id, ph, step) => `<div><label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">${ph.lbl}</label><input id="${id}" type="${ph.type || 'number'}" ${ph.type ? '' : `step="${step || '0.01'}"`} placeholder="${ph.ph || ''}" style="width:100%;font-size:12px;box-sizing:border-box;" /></div>`;
-  const poTableRows = aPageRows.map(({ r, idx }) => `<tr style="border-bottom:0.5px solid var(--color-border-tertiary);">
-        <td style="padding:4px 8px;font-size:11px;color:var(--color-text-tertiary);">${_escA(r.readTime || '—')}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tOutdoor)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tSupply)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtT1(r.tReturn)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.vFlow)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.heatPower)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;">${fmtV(r.heatConsumption)}</td>
-        <td style="padding:4px 8px;font-size:12px;text-align:right;font-weight:600;color:#B9770E;">${poDelta[idx] == null ? '—' : fmtV(poDelta[idx])}</td>
-        <td style="padding:4px 8px;"><button class="small-button" onclick="analRegDeleteRow(${idx})" style="font-size:10px;padding:2px 7px;color:#c00;border-color:#c00;">✕</button></td>
-      </tr>`).join('');
-  const aNav = (label, target, disabled) => `<button class="small-button" onclick="window._aregPage=${target};renderAnalysesModule();" ${disabled ? 'disabled' : ''} style="font-size:11px;">${label}</button>`;
-  const poPagination = poChrono.length === 0 ? '' : `
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;flex-wrap:wrap;">
-          ${aNav('« Pierwsza', 0, aPage === 0)}
-          ${aNav('‹ Poprzednia', Math.max(0, aPage - 1), aPage === 0)}
-          <span style="color:var(--color-text-secondary);">Strona ${aPage + 1} / ${aTotalPages}</span>
-          ${aNav('Następna ›', Math.min(aTotalPages - 1, aPage + 1), aPage === aTotalPages - 1)}
-          ${aNav('Ostatnia »', aTotalPages - 1, aPage === aTotalPages - 1)}
-          <span style="color:var(--color-text-tertiary);">· ${poChrono.length} wierszy${an.fileName ? ` · plik: ${_escA(an.fileName)}` : ''}</span>
-          <span style="margin-left:auto;"><select onchange="window._aregPageSize=Number(this.value);window._aregPage=0;renderAnalysesModule();" style="font-size:12px;padding:3px 6px;border:1px solid var(--color-border-tertiary);border-radius:6px;">
-            <option value="50" ${aps === 50 ? 'selected' : ''}>50 / stronę</option>
-            <option value="100" ${aps === 100 ? 'selected' : ''}>100 / stronę</option>
-          </select></span>
-        </div>`;
-
   const anBlock = `
-    <div style="border:1px solid #E6C68A;border-radius:10px;overflow:hidden;margin-top:26px;">
-      <div style="background:#FBF3E2;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">📥</span>
-          <h3 style="margin:0;font-size:14px;font-weight:600;color:#8A5A00;">Okres analizowany (PO) — dane z czujników</h3>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <label style="font-size:12px;color:#8A5A00;background:#fff;border:1px solid #E6C68A;border-radius:6px;padding:5px 12px;cursor:pointer;font-weight:500;">
-            📂 Importuj CSV/Excel
-            <input type="file" accept=".csv,.xlsx,.xls,text/csv" style="display:none;" onchange="analRegImport(this)" />
-          </label>
-          <button class="small-button" onclick="analRegClearImport()" style="font-size:11px;color:#c00;border-color:#c00;" ${poChrono.length === 0 ? 'disabled' : ''}>🗑 Wyczyść wszystko</button>
-        </div>
-      </div>
-
-      <!-- Formularz dodawania wiersza -->
-      <div style="padding:14px 16px;background:#FDFAF3;border-bottom:1px solid #E6C68A;">
-        <div style="font-size:11px;font-weight:600;color:#8A5A00;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Dodaj wiersz ręcznie</div>
-        <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr 1.2fr 1.4fr auto;gap:6px;align-items:end;">
-          ${fld('areg-readTime', { lbl: 'Data i czas odczytu', type: 'datetime-local' })}
-          ${fld('areg-tOutdoor', { lbl: 'T zewn. [°C]', ph: 'np. 0.4' })}
-          ${fld('areg-tSupply', { lbl: 'T zasilania [°C]', ph: 'np. 54.2' })}
-          ${fld('areg-tReturn', { lbl: 'T powrotu [°C]', ph: 'np. 43.7' })}
-          ${fld('areg-vFlow', { lbl: 'Przepływ [dm³/h]', ph: 'np. 3827' }, '1')}
-          ${fld('areg-heatPower', { lbl: 'Moc dostarczona [W]', ph: 'np. 46012' })}
-          ${fld('areg-heatConsumption', { lbl: 'Zużycie ciepła [MJ]', ph: 'np. 28263' })}
-          <div style="display:flex;align-items:flex-end;">
-            <button class="primary-button" onclick="analRegAddRow()" style="font-size:12px;padding:6px 14px;white-space:nowrap;">+ Dodaj</button>
-          </div>
-        </div>
-        <div class="anw-muted" style="margin-top:8px;font-size:11px;">Import danych czasowych z pliku. Kolejność kolumn: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>. Dane zapisują się w analizie.</div>
-      </div>
-
-      <!-- Tabela danych -->
-      <div style="padding:12px 16px;background:var(--color-background-primary);">
-        ${poChrono.length === 0 ? `
-          <div style="text-align:center;padding:28px;color:var(--color-text-secondary);font-size:13px;">
-            <div style="font-size:32px;margin-bottom:8px;">📊</div>
-            Brak danych okresu analizowanego. Dodaj wiersze ręcznie lub zaimportuj plik CSV/Excel.
-          </div>` : `
-          <div style="overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px;">
-              <thead><tr style="background:var(--color-background-secondary);">
-                ${poTh('readTime', 'Data odczytu', 'left')}
-                ${poTh('tOutdoor', 'T zewn. [°C]', 'right')}
-                ${poTh('tSupply', 'T zasil. [°C]', 'right')}
-                ${poTh('tReturn', 'T powrotu [°C]', 'right')}
-                ${poTh('vFlow', 'Przepływ [dm³/h]', 'right')}
-                ${poTh('heatPower', 'Moc dostarczona [W]', 'right')}
-                ${poTh('heatConsumption', 'Zużycie ciepła [MJ]', 'right')}
-                <th title="Δ = różnica wskazań licznika między kolejnymi odczytami" style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:#B9770E;white-space:nowrap;">Δ [MJ]</th>
-                <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
-              </tr></thead>
-              <tbody>${poTableRows}</tbody>
-            </table>
-          </div>
-          ${poPagination}
-        `}
+    <div class="anw-sec">
+      <div class="anw-head anw-gold"><span class="ico">📥</span><h3>Okres analizowany (PO) — dane z czujników</h3></div>
+      <div class="anw-body">
+        <div class="anw-muted" style="margin-bottom:8px;">Import danych czasowych (CSV). Kolejność kolumn jak w arkuszu regresji: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>. Dane zapisują się w analizie.</div>
+        <input type="file" accept=".csv,text/csv" onchange="analRegImport(this)" style="font-size:13px;">
+        ${anN ? `<div class="anw-ctx" style="margin-top:12px;">
+          <span>Plik: <b>${_escA(an.fileName || '—')}</b></span>
+          <span>Wierszy: <b>${anN}</b></span>
+          <span>Zakres danych: <b>${_escA((an.from || '?') + ' … ' + (an.to || '?'))}</b></span>
+          <span><button class="small-button" onclick="analRegClearImport()" style="font-size:12px;color:#c00;border-color:#c00;">✕ Wyczyść</button></span>
+        </div>` : `<div class="anw-muted" style="margin-top:8px;">Brak zaimportowanych danych okresu analizowanego.</div>`}
       </div>
     </div>`;
 
@@ -1861,18 +1738,14 @@ function analRegImport(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if (ext !== 'csv') { alert('Import plików Excel (.xlsx) wymaga zapisu jako CSV — aktualnie wspierany format to CSV (jak w „Dane z czujników"). Zapisz Excel jako CSV i spróbuj ponownie.'); input.value = ''; return; }
+  if (ext !== 'csv') { alert('Na teraz wspierany jest import CSV (jak w „Dane z czujników"). Zapisz Excel jako CSV i spróbuj ponownie.'); input.value = ''; return; }
   const reader = new FileReader();
   reader.onload = function (e) {
     const res = _analRegParseCsvText(e.target.result);
     if (res.err) { alert(res.err); input.value = ''; return; }
     if (!res.rows.length) { alert('Nie znaleziono wierszy danych w pliku.'); input.value = ''; return; }
-    if (!ANAL.reg.analyzed) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
-    ANAL.reg.analyzed.rows = (ANAL.reg.analyzed.rows || []).concat(res.rows);
-    ANAL.reg.analyzed.fileName = file.name;
-    _analRegRecalcRange();
-    ANAL.results = null; ANAL._regData = null;
-    window._aregPage = Math.floor((ANAL.reg.analyzed.rows.length - 1) / (window._aregPageSize || 50));
+    const times = res.rows.map(r => r.readTime).filter(Boolean).sort();
+    ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: times[0] || '', to: times[times.length - 1] || '' };
     renderAnalysesModule();
     alert('Zaimportowano ' + res.rows.length + ' wierszy okresu analizowanego.');
   };
@@ -1882,52 +1755,7 @@ function analRegImport(input) {
 }
 
 function analRegClearImport() {
-  if (!confirm('Usunąć wszystkie wiersze okresu analizowanego (import + dodane ręcznie)?')) return;
   if (ANAL.reg) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
-  ANAL.results = null; ANAL._regData = null;
-  window._aregPage = 0;
-  renderAnalysesModule();
-}
-
-function _analRegRecalcRange() {
-  const an = ANAL.reg && ANAL.reg.analyzed; if (!an) return;
-  const times = (an.rows || []).map(r => r.readTime).filter(Boolean).sort();
-  an.from = times[0] || ''; an.to = times[times.length - 1] || '';
-}
-
-function analRegAddRow() {
-  if (!ANAL.reg) ANAL.reg = { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } };
-  if (!ANAL.reg.analyzed) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
-  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const readTime = g('areg-readTime');
-  const tOutdoor = g('areg-tOutdoor'), tSupply = g('areg-tSupply'), tReturn = g('areg-tReturn');
-  const vFlow = g('areg-vFlow'), heatPower = g('areg-heatPower'), heatConsumption = g('areg-heatConsumption');
-  if (!readTime && tOutdoor === '' && tSupply === '') { alert('Podaj przynajmniej datę odczytu i temperaturę zewnętrzną.'); return; }
-  const num = v => (v !== '' && v != null && !isNaN(Number(v))) ? Number(v) : null;
-  ANAL.reg.analyzed.rows.push({
-    readTime: readTime || null, tOutdoor: num(tOutdoor), tSupply: num(tSupply), tReturn: num(tReturn),
-    vFlow: num(vFlow), heatPower: num(heatPower), heatConsumption: num(heatConsumption)
-  });
-  _analRegRecalcRange();
-  ANAL.results = null; ANAL._regData = null;
-  window._aregPage = Math.floor((ANAL.reg.analyzed.rows.length - 1) / (window._aregPageSize || 50));
-  renderAnalysesModule();
-}
-
-function analRegDeleteRow(idx) {
-  const an = ANAL.reg && ANAL.reg.analyzed; if (!an || !an.rows) return;
-  an.rows.splice(idx, 1);
-  _analRegRecalcRange();
-  ANAL.results = null; ANAL._regData = null;
-  renderAnalysesModule();
-}
-
-function analRegToggleSort(key) {
-  if (window._aregSortKey === key) {
-    window._aregSortDir = (window._aregSortDir === 'asc') ? 'desc' : 'asc';
-  } else {
-    window._aregSortKey = key; window._aregSortDir = 'asc';
-  }
   renderAnalysesModule();
 }
 
@@ -1937,435 +1765,43 @@ function analRegSetBilling(which, v) {
   else if (which === 'to') ANAL.reg.billing.to = v || '';
 }
 
-// ── REGRESJA LINIOWA: pełna analiza PRZED/PO (analogicznie do TYM) ───────────────
-// PRZED = linie bazowe z okresu bazowego (reg.baseLines: y = a·x + b).
-// PO    = linie liczone z importu CSV okresu analizowanego (ten sam silnik:
-//         _olsFit / _binnedFit / _consDeltas z app.build.js).
-// Porównanie krzywych „Tryb pogodowy" (PRZED) vs „WaterAI" (PO) — jak w arkuszu
-// referencyjnym Regresja_liniowa__PREMIUM.xlsx (zakładki supply temp / heat consumption).
 function _analRegRun() {
   const reg = ANAL.reg || {};
   const problems = [];
-  if (!reg.baseLines || !reg.baseLines.cons || reg.baseLines.cons.a == null) problems.push('skopiuj dane z okresu bazowego (Metoda 1/2)');
+  if (!reg.baseLines) problems.push('skopiuj dane z okresu bazowego (Metoda 1/2)');
   if (!(reg.analyzed && reg.analyzed.rows && reg.analyzed.rows.length)) problems.push('zaimportuj okres analizowany (CSV)');
+  if (!(reg.billing && reg.billing.from && reg.billing.to)) problems.push('podaj zakres okresu rozliczeniowego (od–do)');
   if (problems.length) { alert('Uzupełnij: ' + problems.join('; ') + '.'); return; }
-  const data = _analRegReportData({ live: true });
-  if (!data || !data.ok) { alert('Nie udało się policzyć linii regresji okresu analizowanego (min. 2 punkty na każdą wielkość). Sprawdź dane CSV.'); return; }
-  ANAL._regData = data;
-  ANAL.results = {
-    reg: true, draft: false, at: new Date().toISOString(),
-    savedPctCons: data.savedPctCons, savedPctSup: data.savedPctSup, savedEnergy: data.savedEnergy
-  };
+  ANAL.results = { reg: true, draft: true, at: new Date().toISOString() };
   const slot = document.getElementById('anw-results');
   if (slot) { slot.innerHTML = _analRegResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-  setTimeout(() => _analRegDrawCharts(data), 60);
-}
-
-// Dopasuj linie regresji (zużycie + temp. zasilania) do wierszy CSV okresu PO.
-function _analRegFitFromRows(rows, method) {
-  rows = rows || [];
-  const supPts = [];
-  rows.forEach(r => { if (r.tOutdoor != null && r.tSupply != null) supPts.push({ x: +r.tOutdoor, y: +r.tSupply }); });
-  const chrono = rows.slice().sort((A, B) => {
-    const am = (typeof _regTs === 'function') ? _regTs(A.readTime) : 0;
-    const bm = (typeof _regTs === 'function') ? _regTs(B.readTime) : 0;
-    return (am == null ? 0 : am) - (bm == null ? 0 : bm);
-  });
-  const consPts = (typeof _consDeltas === 'function')
-    ? _consDeltas(chrono.map((r, i) => Object.assign({}, r, { _idx: i }))) : [];
-  const fit = pts => {
-    const xy = pts.map(p => ({ x: p.x, y: p.y }));
-    return (method === 'binned' && typeof _binnedFit === 'function') ? _binnedFit(xy).fit : _olsFit(xy);
-  };
-  return { sup: { pts: supPts, fit: fit(supPts) }, cons: { pts: consPts, fit: fit(consPts) } };
-}
-
-// Komplet danych raportu regresji (działa dla live ANAL.reg i dla zapisanej analizy).
-function _analRegReportData(source) {
-  source = source || {};
-  let reg, clientId, objectId, name, executedAt, number, author, saved, cid;
-  if (source.saved) {
-    const a = source.saved, ip = a.inputParams || {};
-    reg = ip.reg || {};
-    clientId = a.clientId; objectId = a.objectId;
-    name = a.name; executedAt = a.executedAt; author = a.author || '';
-    number = (AnalysesModule.getNumber ? AnalysesModule.getNumber(a.id) : null) || ('#' + a.id);
-    saved = true; cid = 'anwreg' + a.id;
-  } else {
-    reg = ANAL.reg || {};
-    clientId = ANAL.clientId; objectId = ANAL.objectId;
-    const o0 = ObjectsModule.find(objectId);
-    name = ((AnalysesModule.TYPES.REGRESSION || {}).label || 'Regresja liniowa') + ' — ' + (o0 ? o0.name : '');
-    executedAt = new Date().toISOString().slice(0, 10);
-    author = ANAL.author || '';
-    number = ANAL.editingId ? ((AnalysesModule.getNumber && AnalysesModule.getNumber(ANAL.editingId)) || ('#' + ANAL.editingId)) : '— (niezapisana)';
-    saved = false; cid = 'anwreglive';
-  }
-  const L = reg.baseLines || {};
-  const method = (L.method === 'binned') ? 'binned' : 'raw';
-  const an = reg.analyzed || {};
-  const po = _analRegFitFromRows(an.rows || [], method);
-  const consB = L.cons, supB = L.sup;
-  const consA = po.cons.fit, supA = po.sup.fit;
-  const okCons = !!(consB && consB.a != null && consA && consA.n >= 2);
-  const okSup = !!(supB && supB.a != null && supA && supA.n >= 2);
-  // Zakres T zewnętrznej z okresu analizowanego (tam, gdzie linia PO jest poparta danymi).
-  const xsAll = po.cons.pts.map(p => p.x).concat(po.sup.pts.map(p => p.x));
-  let xMin = Math.min.apply(null, xsAll), xMax = Math.max.apply(null, xsAll);
-  if (!isFinite(xMin) || !isFinite(xMax)) { xMin = -15; xMax = 10; }
-  let lo = Math.floor(xMin), hi = Math.ceil(xMax); if (hi - lo < 1) { lo -= 1; hi += 1; }
-  // Tabela porównawcza per °C (PRZED vs PO) — jak arkusz Excel.
-  const table = []; let sCR = 0, nCR = 0, sSR = 0, nSR = 0, sCD = 0, sSD = 0;
-  for (let t = lo; t <= hi; t++) {
-    const cB = okCons ? consB.a * t + consB.b : null, cA = okCons ? consA.a * t + consA.b : null;
-    const sB = okSup ? supB.a * t + supB.b : null, sA = okSup ? supA.a * t + supA.b : null;
-    const cDiff = (cB != null && cA != null) ? cB - cA : null;
-    const cRed = (cB != null && cB > 0 && cDiff != null) ? cDiff / cB * 100 : null;
-    const sDiff = (sB != null && sA != null) ? sB - sA : null;
-    const sRed = (sB != null && sB > 0 && sDiff != null) ? sDiff / sB * 100 : null;
-    if (cRed != null) { sCR += cRed; nCR++; sCD += cDiff; }
-    if (sRed != null) { sSR += sRed; nSR++; sSD += sDiff; }
-    table.push({ t, cB, cA, cDiff, cRed, sB, sA, sDiff, sRed });
-  }
-  const savedPctCons = nCR ? sCR / nCR : null;
-  const savedPctSup = nSR ? sSR / nSR : null;
-  const avgDiffCons = nCR ? sCD / nCR : null;
-  const avgDiffSup = nSR ? sSD / nSR : null;
-  // Energia zaoszczędzona [MJ]: Σ(linia bazowa − rzeczywiste) na punktach okresu PO.
-  let sBaseE = 0, sActE = 0, nE = 0;
-  if (okCons) po.cons.pts.forEach(p => { const qb = consB.a * p.x + consB.b; if (qb > 0) { sBaseE += qb; sActE += p.y; nE++; } });
-  const savedEnergy = nE ? (sBaseE - sActE) : null;
-  return {
-    ok: okCons || okSup, okCons, okSup, method, cid, saved,
-    client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
-    name, executedAt, number, author,
-    base: { cons: consB, sup: supB }, an: { cons: consA, sup: supA },
-    poPts: { cons: po.cons.pts, sup: po.sup.pts },
-    anMeta: { from: an.from, to: an.to, n: (an.rows || []).length, fileName: an.fileName },
-    bill: reg.billing || {},
-    table, xMin: lo, xMax: hi,
-    savedPctCons, savedPctSup, avgDiffCons, avgDiffSup, savedEnergy,
-    baseN: { cons: (consB && consB.n != null) ? consB.n : null, sup: (supB && supB.n != null) ? supB.n : null },
-    consR2: (consA && consA.r2 != null) ? consA.r2 : null,
-    supR2: (supA && supA.r2 != null) ? supA.r2 : null
-  };
-}
-
-function _regEqTxt(f) { return (f && f.a != null) ? `y = ${_fmtA(f.a, 4)}·x ${f.b >= 0 ? '+' : '−'} ${_fmtA(Math.abs(f.b), 2)}` : '—'; }
-
-function _regCompTable(rows, kind, unit) {
-  const body = rows.map(r => {
-    const B = kind === 'cons' ? r.cB : r.sB, A = kind === 'cons' ? r.cA : r.sA;
-    const D = kind === 'cons' ? r.cDiff : r.sDiff, R = kind === 'cons' ? r.cRed : r.sRed;
-    if (B == null) return '';
-    return `<tr><td class="calc">${_fmtA(r.t, 0)}</td><td class="calc">${_fmtA(B, 2)}</td><td class="calc">${_fmtA(A, 2)}</td><td class="calc">${R != null ? _fmtA(R, 1) + '%' : '—'}</td><td class="calc">${_fmtA(D, 2)}</td></tr>`;
-  }).join('');
-  return `<table class="anw-t"><thead><tr><th>T zewn. [°C]</th><th>Tryb pogodowy (PRZED)</th><th>WaterAI (PO)</th><th>Obniżenie</th><th>Różnica [${unit}]</th></tr></thead><tbody>${body || '<tr><td colspan="5" class="anw-muted">Brak danych</td></tr>'}</tbody></table>`;
-}
-
-function _analRegReportBody(data) {
-  const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
-  const posC = (data.savedPctCons || 0) >= 0;
-  const r2lab = r2 => r2 == null ? '—' : (_fmtA(r2, 3) + ' ' + (r2 >= 0.9 ? '✅' : r2 >= 0.6 ? '🟡' : '🔴'));
-  const methodLbl = data.method === 'binned' ? 'Metoda 2 — średnie per °C' : 'Metoda 1 — wszystkie punkty (OLS)';
-  return `
-  <div class="anw-cover">
-    <div class="anw-cover-top">
-      <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
-      <div class="anw-cover-num">
-        <div class="anw-cover-num-lbl">Nr analizy</div>
-        <div class="anw-cover-num-val">${_escA(data.number)}</div>
-      </div>
-    </div>
-
-    <div class="anw-cover-title">
-      <div class="anw-cover-kicker">Raport techniczny · Regresja liniowa</div>
-      <h1>Analiza oszczędności energii</h1>
-      <div class="anw-cover-method">Metoda regresji liniowej — zużycie ciepła i temperatura zasilania względem temperatury zewnętrznej</div>
-    </div>
-
-    <div class="anw-cover-meta">
-      <div class="anw-cover-meta-card">
-        <div class="anw-cm-lbl">Dla kogo</div>
-        <div class="anw-cm-val">${_escA((data.client && data.client.name) || '—')}</div>
-        <div class="anw-cm-sub">Obiekt: ${_escA((data.object && data.object.name) || '—')}</div>
-      </div>
-      <div class="anw-cover-meta-card">
-        <div class="anw-cm-lbl">Wykonał — Energy Analyst</div>
-        <div class="anw-cm-val">${_escA(data.author || '—')}</div>
-        <div class="anw-cm-sub">Data wykonania: ${_fmtDateA(data.executedAt)}</div>
-      </div>
-      <div class="anw-cover-meta-card">
-        <div class="anw-cm-lbl">Okres bazowy (PRZED)</div>
-        <div class="anw-cm-val anw-cm-period">linie y = a·x + b z okresu bazowego</div>
-      </div>
-      <div class="anw-cover-meta-card">
-        <div class="anw-cm-lbl">Okres analizowany (PO)</div>
-        <div class="anw-cm-val anw-cm-period">${_fmtDateA(data.anMeta.from)} → ${_fmtDateA(data.anMeta.to)}</div>
-      </div>
-    </div>
-
-    <div class="anw-cover-result">
-      <div class="anw-cover-result-head">Wynik końcowy</div>
-      <div class="anw-cover-osz ${posC ? 'pos' : 'neg'}">
-        <div class="anw-cover-osz-lbl">Redukcja<br>zużycia</div>
-        <div class="anw-cover-osz-val">${posC ? '' : '−'}${_fmtA(Math.abs(data.savedPctCons || 0), 1)}<span>%</span></div>
-      </div>
-      <div class="anw-cover-kpis">
-        <div class="anw-cover-kpi">
-          <div class="v">${data.savedEnergy != null ? _fmtA(data.savedEnergy, 2) : '—'} <span>MJ</span></div>
-          <div class="k">Energia zaoszczędzona (okres PO)</div>
-        </div>
-        <div class="anw-cover-kpi">
-          <div class="v">${data.savedPctSup != null ? _fmtA(data.savedPctSup, 1) : '—'} <span>%</span></div>
-          <div class="k">Obniżenie temp. zasilania (śr.)</div>
-        </div>
-        <div class="anw-cover-kpi">
-          <div class="v">${r2lab(data.consR2)}</div>
-          <div class="k">Dopasowanie R² (zużycie, PO)</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="anw-cover-foot">
-      <span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span>
-      <span>control.waterai.cloud</span>
-    </div>
-  </div>
-
-  <div class="anw-step-card">
-    <h4><span class="anw-step-num">1</span> Linie regresji — okres bazowy (PRZED) vs analizowany (PO)</h4>
-    <div class="anw-desc">
-      <p style="margin:0 0 8px;">W metodzie regresji liniowej charakterystykę cieplną obiektu opisuje się prostą zależnością badanej wielkości od temperatury zewnętrznej. Dla okresu bazowego (PRZED wdrożeniem — „tryb pogodowy") oraz okresu analizowanego (PO wdrożeniu — „WaterAI") wyznacza się osobne równania regresji postaci:</p>
-    </div>
-    <div class="anw-formula">y = a · x + b</div>
-    <div class="anw-desc">
-      <p style="margin:0 0 4px;">gdzie <b>x</b> — średnia temperatura zewnętrzna [°C], <b>y</b> — zużycie ciepła [MJ] lub temperatura zasilania [°C], <b>a</b> — nachylenie (wrażliwość na pogodę), <b>b</b> — wyraz wolny. Współczynniki wyznaczono metodą najmniejszych kwadratów (${_escA(methodLbl)}). Im niżej leży krzywa „WaterAI" względem „trybu pogodowego", tym większa oszczędność uzyskana dzięki sterowaniu.</p>
-    </div>
-    <div class="anw-g2">
-      <div class="anw-formula" style="border-color:#185FA5;">📉 Zużycie ciepła<br>PRZED: <b>${_regEqTxt(data.base.cons)}</b>${data.baseN.cons != null ? ` <span class="anw-muted">(n=${data.baseN.cons})</span>` : ''}<br>PO: <b>${_regEqTxt(data.an.cons)}</b> <span class="anw-muted">(R²=${_fmtA(data.consR2 || 0, 3)}, n=${data.an.cons && data.an.cons.n != null ? data.an.cons.n : '—'})</span></div>
-      <div class="anw-formula" style="border-color:#B9770E;">🌡️ Temp. zasilania<br>PRZED: <b>${_regEqTxt(data.base.sup)}</b>${data.baseN.sup != null ? ` <span class="anw-muted">(n=${data.baseN.sup})</span>` : ''}<br>PO: <b>${_regEqTxt(data.an.sup)}</b> <span class="anw-muted">(R²=${_fmtA(data.supR2 || 0, 3)}, n=${data.an.sup && data.an.sup.n != null ? data.an.sup.n : '—'})</span></div>
-    </div>
-  </div>
-
-  <div class="anw-step-card">
-    <h4><span class="anw-step-num">2</span> Porównanie krzywych „Tryb pogodowy" (PRZED) vs „WaterAI" (PO)</h4>
-    <div class="anw-desc">
-      <p style="margin:0 0 8px;">Dla każdej temperatury zewnętrznej z analizowanego zakresu (${_fmtA(data.xMin, 0)} … ${_fmtA(data.xMax, 0)} °C) podstawia się x do obu równań i porównuje wynik. Obniżenie wyraża się procentowo względem wartości bazowej, a różnica — w jednostkach danej wielkości:</p>
-    </div>
-    <div class="anw-formula">Obniżenie [%] = (y<sub>PRZED</sub> − y<sub>PO</sub>) / y<sub>PRZED</sub> · 100%&nbsp;&nbsp;·&nbsp;&nbsp;Różnica = y<sub>PRZED</sub> − y<sub>PO</sub></div>
-    <div class="anw-pair" style="margin-top:10px;">
-      <div class="anw-pair-col anw-pair-before"><div class="anw-muted" style="margin-bottom:6px;color:#185FA5;font-weight:600;">📉 Zużycie ciepła [MJ]</div>${_regCompTable(data.table, 'cons', 'MJ')}</div>
-      <div class="anw-pair-col anw-pair-after"><div class="anw-muted" style="margin-bottom:6px;color:#B9770E;font-weight:600;">🌡️ Temperatura zasilania [°C]</div>${_regCompTable(data.table, 'sup', '°C')}</div>
-    </div>
-  </div>
-
-  <div class="anw-step-card">
-    <h4><span class="anw-step-num">3</span> Średnia redukcja i zaoszczędzona energia</h4>
-    <div class="anw-desc">
-      <p style="margin:0 0 8px;">Średnia redukcja to średnia z obniżeń procentowych w całym analizowanym zakresie temperatur. Energię zaoszczędzoną szacuje się jako sumę różnic między zużyciem przewidywanym przez linię bazową (PRZED) a zużyciem rzeczywistym, dla wszystkich odczytów okresu analizowanego.</p>
-    </div>
-    <div class="anw-formula">Energia zaoszczędzona = ∑ ( y<sub>bazowa</sub>(x<sub>i</sub>) − y<sub>rzecz,i</sub> )&nbsp;&nbsp;[MJ]</div>
-    <div class="anw-rgrid" style="margin-top:10px;">
-      <div class="anw-tile"><div class="v">${_fmtA(data.savedPctCons || 0, 1)} %</div><div class="k">Średnia redukcja zużycia ciepła</div></div>
-      <div class="anw-tile"><div class="v">${_fmtA(data.savedPctSup || 0, 1)} %</div><div class="k">Średnie obniżenie temp. zasilania</div></div>
-      <div class="anw-tile"><div class="v">${data.savedEnergy != null ? _fmtA(data.savedEnergy, 2) : '—'} MJ</div><div class="k">Energia zaoszczędzona (okres PO)</div></div>
-    </div>
-    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Regresja jest <b>technicznym dowodem działania systemu</b> — izoluje wpływ sterowania od warunków pogodowych. W rozliczeniach ESCO pełni rolę pomocniczą; podstawą rozliczenia oszczędności pozostaje metoda korekty stopniodni (TYM).</p></div>
-  </div>
-
-  <div class="anw-step-card">
-    <h4><span class="anw-step-num">4</span> Wizualizacja</h4>
-    <div class="anw-chart-wrap">
-      <canvas id="${data.cid}-rcons"></canvas>
-      <canvas id="${data.cid}-rsup"></canvas>
-      <canvas id="${data.cid}-rred"></canvas>
-      <canvas id="${data.cid}-rsum"></canvas>
-    </div>
-  </div>
-
-  <div class="anw-sign">
-    <div class="anw-sign-box">
-      <div class="anw-sign-line"></div>
-      <div class="anw-sign-cap">Klient — podpis i data</div>
-    </div>
-    <div class="anw-sign-box anw-sign-wateria">
-      <div class="anw-stamp">WaterAI Energy</div>
-      <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
-      <div class="anw-sign-cap">Analizy energetyczne WaterAI Energy.</div>
-    </div>
-  </div>`;
-}
-
-// Wykres punktowy + linie regresji (PRZED/PO) — ostry przy druku (DPR).
-function _anwScatterLines(cv, opts) {
-  if (!cv) return; opts = opts || {};
-  const dpr = window.devicePixelRatio || 1;
-  const W = cv.clientWidth || 480, H = 300;
-  cv.width = W * dpr; cv.height = H * dpr;
-  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  const pad = { l: 56, r: 16, t: 30, b: 46 };
-  const pts = opts.points || [], lines = opts.lines || [], pts2 = opts.points2 || [];
-  let xMin = opts.xMin, xMax = opts.xMax;
-  if (xMin == null || xMax == null) { const xs = pts.map(p => p.x).concat(pts2.map(p => p.x)); xMin = Math.min.apply(null, xs); xMax = Math.max.apply(null, xs); }
-  if (!isFinite(xMin) || !isFinite(xMax) || xMin === xMax) { xMin = (xMin || 0) - 1; xMax = (xMax || 0) + 1; }
-  const ys = pts.map(p => p.y).slice(); pts2.forEach(p => ys.push(p.y));
-  lines.forEach(L => { ys.push(L.a * xMin + L.b); ys.push(L.a * xMax + L.b); });
-  let yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
-  if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 1; }
-  if (yMin === yMax) { yMin -= 1; yMax += 1; }
-  const padY = (yMax - yMin) * 0.1; yMin -= padY; yMax += padY;
-  const X = x => pad.l + (x - xMin) / (xMax - xMin) * (W - pad.l - pad.r);
-  const Y = y => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
-  ctx.fillStyle = '#222'; ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left';
-  if (opts.title) ctx.fillText(opts.title, 8, 16);
-  ctx.textAlign = 'right'; ctx.font = '10px sans-serif';
-  const yDec = Math.abs(yMax - yMin) < 10 ? 1 : 0;
-  for (let i = 0; i <= 4; i++) {
-    const v = yMin + (yMax - yMin) * i / 4, y = Y(v);
-    ctx.strokeStyle = '#ececec'; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-    ctx.fillStyle = '#999'; ctx.fillText(_fmtA(v, yDec), pad.l - 6, y + 3);
-  }
-  ctx.textAlign = 'center'; ctx.fillStyle = '#999';
-  for (let i = 0; i <= 5; i++) { const v = xMin + (xMax - xMin) * i / 5; ctx.fillText(_fmtA(v, 0), X(v), H - pad.b + 16); }
-  ctx.fillStyle = '#777'; ctx.fillText(opts.xLabel || 'Temperatura zewnętrzna [°C]', (pad.l + W - pad.r) / 2, H - 6);
-  ctx.fillStyle = opts.pointColor || 'rgba(120,120,120,.32)';
-  pts.forEach(p => { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2, 0, 6.29); ctx.fill(); });
-  lines.forEach(L => { ctx.strokeStyle = L.c; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(X(xMin), Y(L.a * xMin + L.b)); ctx.lineTo(X(xMax), Y(L.a * xMax + L.b)); ctx.stroke(); });
-  if (pts2.length) {
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
-    pts2.forEach(p => { ctx.fillStyle = opts.point2Color || '#0C447C'; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 3.2, 0, 6.29); ctx.fill(); ctx.stroke(); });
-  }
-  let ly = pad.t - 2; ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
-  lines.forEach((L, i) => { const lx = pad.l + 4 + i * 0; ctx.fillStyle = L.c; ctx.fillRect(W - pad.r - 150, ly + i * 14 - 8, 10, 10); ctx.fillStyle = '#555'; ctx.fillText(L.n || '', W - pad.r - 136, ly + i * 14); });
-}
-
-// Wykres wieloseryjny (łamana) — np. obniżenie % per °C.
-function _anwMultiLine(cv, opts) {
-  if (!cv) return; opts = opts || {};
-  const dpr = window.devicePixelRatio || 1;
-  const W = cv.clientWidth || 480, H = 300;
-  cv.width = W * dpr; cv.height = H * dpr;
-  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, W, H);
-  const pad = { l: 56, r: 16, t: 30, b: 46 };
-  const xs = opts.xs || [], series = opts.series || [];
-  let xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
-  if (!isFinite(xMin) || !isFinite(xMax) || xMin === xMax) { xMin = (xMin || 0) - 1; xMax = (xMax || 0) + 1; }
-  const allY = []; series.forEach(s => s.ys.forEach(v => { if (v != null && isFinite(v)) allY.push(v); }));
-  let yMin = Math.min.apply(null, allY), yMax = Math.max.apply(null, allY);
-  if (!isFinite(yMin) || !isFinite(yMax)) { yMin = 0; yMax = 1; }
-  if (yMin === yMax) { yMin -= 1; yMax += 1; }
-  if (yMin > 0) yMin = 0;
-  const padY = (yMax - yMin) * 0.12; yMax += padY;
-  const X = x => pad.l + (x - xMin) / (xMax - xMin) * (W - pad.l - pad.r);
-  const Y = y => pad.t + (1 - (y - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
-  ctx.fillStyle = '#222'; ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left';
-  if (opts.title) ctx.fillText(opts.title, 8, 16);
-  if (opts.unit) { ctx.fillStyle = '#999'; ctx.textAlign = 'right'; ctx.font = '10px sans-serif'; ctx.fillText('[' + opts.unit + ']', W - 12, 16); }
-  ctx.textAlign = 'right'; ctx.font = '10px sans-serif';
-  for (let i = 0; i <= 4; i++) {
-    const v = yMin + (yMax - yMin) * i / 4, y = Y(v);
-    ctx.strokeStyle = '#ececec'; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
-    ctx.fillStyle = '#999'; ctx.fillText(_fmtA(v, 1), pad.l - 6, y + 3);
-  }
-  ctx.textAlign = 'center'; ctx.fillStyle = '#999';
-  for (let i = 0; i <= 5; i++) { const v = xMin + (xMax - xMin) * i / 5; ctx.fillText(_fmtA(v, 0), X(v), H - pad.b + 16); }
-  ctx.fillStyle = '#777'; ctx.fillText(opts.xLabel || 'Temperatura zewnętrzna [°C]', (pad.l + W - pad.r) / 2, H - 6);
-  series.forEach(s => {
-    ctx.strokeStyle = s.c; ctx.lineWidth = 2.2; ctx.beginPath(); let started = false;
-    xs.forEach((x, i) => { const v = s.ys[i]; if (v == null || !isFinite(v)) { started = false; return; } const px = X(x), py = Y(v); if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py); });
-    ctx.stroke();
-  });
-  let lx = pad.l, ly = H - 12; ctx.textAlign = 'left';
-  series.forEach(s => { ctx.fillStyle = s.c; ctx.fillRect(lx, ly - 8, 10, 10); ctx.fillStyle = '#555'; ctx.font = '10px sans-serif'; ctx.fillText(s.name, lx + 14, ly); lx += ctx.measureText(s.name).width + 32; });
-}
-
-function _analRegDrawCharts(data) {
-  if (!data) return;
-  const sub = arr => (arr.length > 1200) ? arr.filter((_, i) => i % Math.ceil(arr.length / 1200) === 0) : arr;
-  if (data.okCons) _anwScatterLines(document.getElementById(data.cid + '-rcons'), {
-    title: 'Zużycie ciepła vs T zewn. — PRZED vs PO', xLabel: 'Temperatura zewnętrzna [°C]',
-    points: sub(data.poPts.cons), pointColor: 'rgba(39,80,10,.28)', xMin: data.xMin, xMax: data.xMax,
-    lines: [{ a: data.base.cons.a, b: data.base.cons.b, c: '#185FA5', n: 'PRZED (tryb pogodowy)' },
-            { a: data.an.cons.a, b: data.an.cons.b, c: '#27500A', n: 'PO (WaterAI)' }]
-  });
-  if (data.okSup) _anwScatterLines(document.getElementById(data.cid + '-rsup'), {
-    title: 'Temp. zasilania vs T zewn. — PRZED vs PO', xLabel: 'Temperatura zewnętrzna [°C]',
-    points: sub(data.poPts.sup), pointColor: 'rgba(185,119,14,.28)', xMin: data.xMin, xMax: data.xMax,
-    lines: [{ a: data.base.sup.a, b: data.base.sup.b, c: '#185FA5', n: 'PRZED (tryb pogodowy)' },
-            { a: data.an.sup.a, b: data.an.sup.b, c: '#27500A', n: 'PO (WaterAI)' }]
-  });
-  _anwMultiLine(document.getElementById(data.cid + '-rred'), {
-    title: 'Obniżenie per stopień T zewnętrznej', unit: '%', xs: data.table.map(r => r.t),
-    series: [
-      { name: 'Zużycie ciepła', c: '#185FA5', ys: data.table.map(r => r.cRed) },
-      { name: 'Temp. zasilania', c: '#B9770E', ys: data.table.map(r => r.sRed) }
-    ]
-  });
-  _anwBar(document.getElementById(data.cid + '-rsum'), [
-    { label: 'Redukcja zużycia', bars: [{ v: data.savedPctCons, c: '#27500A', n: 'średnia [%]' }] },
-    { label: 'Obniżenie T zasilania', bars: [{ v: data.savedPctSup, c: '#B9770E', n: 'średnia [%]' }] }
-  ], { title: 'Średnia redukcja (regresja)', unit: '%' });
-}
-
-// Widoki okresu bazowego (PRZED) dla wybranej metody — punkty + linia y=ax+b.
-// Liczone na PEŁNYM okresie bazowym (neutralizujemy filtr zakresu z arkusza regresji).
-function _analRegBaseViews(pid, method) {
-  if (!pid || typeof _regViews !== 'function') return null;
-  const _sf = window._regBaseFrom, _st = window._regBaseTo;
-  window._regBaseFrom = ''; window._regBaseTo = '';
-  let v = null; try { v = _regViews(pid); } catch (e) { v = null; }
-  window._regBaseFrom = _sf; window._regBaseTo = _st;
-  if (!v) return null;
-  const m = method === 'binned' ? 'binned' : 'raw';
-  return { cons: v['cons_' + m], sup: v['sup_' + m], method: m };
-}
-
-// Rysuje 2 wykresy okresu bazowego (zużycie + temp. zasilania) dla wybranej metody.
-function _analRegDrawBaseCharts() {
-  const reg = ANAL.reg || {}; const L = reg.baseLines; if (!L) return;
-  const vv = _analRegBaseViews(ANAL.basePeriod, L.method); if (!vv) return;
-  const sub = arr => (arr && arr.length > 1200) ? arr.filter((_, i) => i % Math.ceil(arr.length / 1200) === 0) : (arr || []);
-  const binned = vv.method === 'binned';
-  const mLbl = binned ? 'Metoda 2 — średnie per °C' : 'Metoda 1 — wszystkie punkty';
-  const drawOne = (cvId, view, accent, yLabel, titlePrefix) => {
-    const cv = document.getElementById(cvId);
-    if (!cv || !view || !view.fit || view.fit.a == null) return;
-    _anwScatterLines(cv, {
-      title: titlePrefix + ' · ' + mLbl,
-      xLabel: 'Temperatura zewnętrzna [°C]', yLabel,
-      points: sub(view.pts || []), pointColor: 'rgba(120,120,120,.22)',
-      points2: binned ? (view.binPts || []).map(b => ({ x: b.x, y: b.y })) : null,
-      point2Color: accent,
-      lines: [{ a: view.fit.a, b: view.fit.b, c: accent, n: 'Linia bazowa (PRZED)' }]
-    });
-  };
-  drawOne('anw-regbase-cons', vv.cons, '#185FA5', 'Δ zużycie [MJ]', '📉 Zużycie ciepła');
-  drawOne('anw-regbase-sup', vv.sup, '#B9770E', 'T zasilania [°C]', '🌡️ Temp. zasilania');
 }
 
 function _analRegResults() {
-  if (!ANAL.results || !ANAL.results.reg) return '';
-  const data = ANAL._regData || _analRegReportData({ live: true });
-  ANAL._regData = data;
-  if (!data.ok) {
-    return `<div class="anw-sec" style="margin-top:16px;"><div class="anw-head anw-gold"><span class="ico">⚠️</span><h3>Za mało danych</h3></div>
-      <div class="anw-body"><div class="anw-muted">Nie udało się policzyć linii regresji okresu analizowanego (min. 2 punkty na każdą wielkość). Sprawdź import CSV i okres bazowy.</div></div></div>`;
-  }
+  const reg = ANAL.reg || {};
+  const L = reg.baseLines || {};
+  const an = reg.analyzed || {};
   return `
-  <div id="anw-report" class="anw-report">${_analRegReportBody(data)}</div>
-  <div class="anw-act anw-noprint" style="justify-content:center;margin:22px 0 6px;gap:12px;">
-    <button class="anw-run" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);font-size:14px;padding:13px 26px;box-shadow:0 6px 18px rgba(12,68,124,.25);" onclick="analRegSave()">💾 Zapisz analizę</button>
-    <button class="small-button" style="font-size:14px;padding:13px 22px;" onclick="analPrintPDF()">🖨 Drukuj</button>
-  </div>`;
+    <div class="anw-sec" style="margin-top:16px;">
+      <div class="anw-head anw-gold"><span class="ico">🚧</span><h3>Wynik — metoda obliczeniowa w przygotowaniu</h3></div>
+      <div class="anw-body">
+        <div class="anw-muted" style="margin-bottom:10px;">Wejścia są kompletne i mogą zostać zapisane. Sposób liczenia PRZED/PO opiszemy w kolejnym kroku — dlatego ta analiza nie generuje jeszcze kwot ESCO i jest oznaczona jako <b>SZKIC</b>.</div>
+        <div class="anw-ctx">
+          <span>Linia bazowa zużycia: <b>${_analRegLineTxt(L.cons)}</b></span>
+          <span>Linia bazowa T zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
+          <span>Metoda: <b>${L.method === 'binned' ? '2' : '1'}</b></span>
+          <span>Okres analizowany: <b>${(an.rows || []).length} wierszy</b> (${_escA((an.from || '?') + ' … ' + (an.to || '?'))})</span>
+          <span>Okres rozliczeniowy: <b>${_escA((reg.billing.from || '?') + ' → ' + (reg.billing.to || '?'))}</b></span>
+        </div>
+        <div class="anw-act" style="margin-top:14px;">
+          <button class="small-button" style="font-size:13px;" onclick="analRegSaveDraft()">💾 Zapisz szkic analizy</button>
+        </div>
+      </div>
+    </div>`;
 }
 
-function analRegSave() {
+function analRegSaveDraft() {
   if (!ANAL.results || !ANAL.results.reg) return;
-  const data = ANAL._regData || _analRegReportData({ live: true });
-  if (!data || !data.ok) { alert('Brak policzonego wyniku regresji.'); return; }
   const o = ObjectsModule.find(ANAL.objectId);
   const reg = ANAL.reg || {};
   const payload = {
@@ -2375,22 +1811,12 @@ function analRegSave() {
     analysisType: 'REGRESSION',
     executedAt: new Date().toISOString().slice(0, 10),
     author: String(ANAL.author || '').trim(),
-    status: 'COMPLETE',
-    inputParams: {
-      basePeriod: ANAL.basePeriod, reg: JSON.parse(JSON.stringify(reg)),
-      billingFrom: (reg.billing || {}).from || '', billingTo: (reg.billing || {}).to || ''
-    },
-    results: {
-      savedEnergy: data.savedEnergy,
-      savedEnergyPct: data.savedPctCons,        // % redukcji zużycia (dla listy/ESCO)
-      avgReductionHeat: data.savedPctCons,      // procent redukcji widziany przez raport ESCO
-      avgReductionSupply: data.savedPctSup,
-      baseLines: data.base, analyzedLines: data.an,
-      consR2: data.consR2, supR2: data.supR2
-    }
+    status: 'DRAFT',
+    inputParams: { basePeriod: ANAL.basePeriod, reg: JSON.parse(JSON.stringify(reg)) },
+    results: { draft: true }
   };
-  if (ANAL.editingId) { AnalysesModule.update(ANAL.editingId, payload); alert('Analiza regresji zaktualizowana.'); }
-  else { AnalysesModule.add(payload); alert('Analiza regresji zapisana.'); }
+  if (ANAL.editingId) { AnalysesModule.update(ANAL.editingId, payload); alert('Szkic analizy zaktualizowany.'); }
+  else { AnalysesModule.add(payload); alert('Szkic analizy zapisany. Dane okresu analizowanego są zapisane i zostaną wczytane po ponownym otwarciu.'); }
   _analResetState();
   renderAnalysesModule();
 }
@@ -3048,17 +2474,6 @@ function analPrintPDF() { window.print(); }
 function analView(id) {
   const a = AnalysesModule.find(id); if (!a) return;
   const container = document.getElementById('module-content'); if (!container) return;
-  if (a.analysisType === 'REGRESSION') {
-    const rdata = _analRegReportData({ saved: a });
-    container.innerHTML = ANAL_STYLE + `
-      <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
-        <button class="small-button" onclick="renderAnalysesModule()">← Lista analiz</button>
-        <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj</button>
-      </div>
-      <div id="anw-report" class="anw-report">${rdata.ok ? _analRegReportBody(rdata) : '<div class="reminder-card"><strong>Brak danych do odtworzenia raportu regresji</strong><div class="reminder-meta">Analiza nie zawiera kompletnych danych okresu analizowanego / linii bazowych.</div></div>'}</div>`;
-    if (rdata.ok) setTimeout(() => _analRegDrawCharts(rdata), 60);
-    return;
-  }
   const data = _analReportData({ saved: a });
   container.innerHTML = ANAL_STYLE + `
     <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
