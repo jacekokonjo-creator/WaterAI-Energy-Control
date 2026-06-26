@@ -1009,6 +1009,7 @@ function _analResetState() {
     after:  { from: '', to: '', consumption: '', months: [], baseTi: 20 },
     energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50, priceMode: 'FIXED', priceDescription: '' },
     author: '',
+    reg: { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } },
     results: null,
     editingId: null
   };
@@ -1184,7 +1185,7 @@ function renderAnalysesModule() {
   container.innerHTML = ANAL_STYLE + _analStepsBar() + (ANAL.step === 1 ? _analTypeSelect() : _analWizard());
 
   if (ANAL.step === 2 && ANAL.type === 'TYM' && ANAL.objectId) _analRecalcLive();
-  if (ANAL.step === 2 && ANAL.results) setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
+  if (ANAL.step === 2 && ANAL.results && ANAL.type !== 'REGRESSION') setTimeout(() => _analDrawCharts(_analReportData({ live: true })), 60);
 }
 
 function _analStepsBar() {
@@ -1323,6 +1324,12 @@ function analEdit(id) {
     priceDescription: ip.priceDescription || ''
   };
   ANAL.author = a.author || '';
+  if (ANAL.type === 'REGRESSION') {
+    ANAL.reg = Object.assign(
+      { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } },
+      (ip.reg ? JSON.parse(JSON.stringify(ip.reg)) : {})
+    );
+  }
   // ── Synchronizacja okresu bazowego 1:1 z protokołem ───────────────────────
   // Jeśli analiza jest powiązana z protokołem okresu bazowego (a nie „Ręczne
   // wprowadzenie"), NIE ufamy zapisanej migawce miesięcy — pobieramy okres
@@ -1333,7 +1340,7 @@ function analEdit(id) {
   // oraz parametry energii pozostają nietknięte.
   const _bpId = ANAL.basePeriod;
   const _isProtocolBacked = _bpId != null && _bpId !== 'manual'
-    && !String(_bpId).startsWith('int:') && ANAL.type !== 'VOLUME';
+    && !String(_bpId).startsWith('int:') && ANAL.type !== 'VOLUME' && ANAL.type !== 'REGRESSION';
   if (_isProtocolBacked && window.MeasurementsModule) {
     const _p = MeasurementsModule.find(Number(_bpId));
     if (_p) {
@@ -1355,6 +1362,8 @@ function _analWizard() {
   const clients = ClientsModule.getAll();
   const objsForClient = ANAL.clientId ? ObjectsModule.findByClient(ANAL.clientId) : [];
   const baseProtocols = (ANAL.objectId && window.MeasurementsModule) ? (MeasurementsModule.findByObject(ANAL.objectId) || []) : [];
+  const isReg = ANAL.type === 'REGRESSION';
+  const regBasePeriods = (isReg && ANAL.objectId && window.RegressionBaseModule) ? RegressionBaseModule.listByObject(ANAL.objectId) : [];
 
   const selector = `
     <div class="anw-sec">
@@ -1371,12 +1380,15 @@ function _analWizard() {
               <option value="">${ANAL.clientId ? '— wybierz obiekt —' : 'najpierw klient'}</option>
               ${objsForClient.map(o => `<option value="${o.id}" ${Number(o.id) === Number(ANAL.objectId) ? 'selected' : ''}>K${ClientsModule.getNumber(o.clientId)}-${ObjectsModule.getNumber(o.id)} · ${_escA(o.name)}</option>`).join('')}
             </select></div>
-          <div class="anw-f"><label>Okres bazowy (PRZED instalacją)</label>
+          <div class="anw-f"><label>${isReg ? 'Okres bazowy (regresja, PRZED)' : 'Okres bazowy (PRZED instalacją)'}</label>
             <select onchange="analOnBasePeriod(this.value)" ${ANAL.objectId ? '' : 'disabled'}>
-              <option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
-              ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
-              ${(ANAL.type === 'VOLUME' && window.BasePeriodModule && ANAL.objectId) ? BasePeriodModule.findByObjectType(ANAL.objectId, 'volume').map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ ${_escA(it.protocolNumber || 'Okres bazowy intensywności')} · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
-              <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>
+              ${isReg
+                ? `<option value="">${ANAL.objectId ? (regBasePeriods.length ? '— wybierz okres bazowy regresji —' : 'brak okresów bazowych regresji (utwórz w arkuszu regresji)') : 'najpierw obiekt'}</option>
+                   ${regBasePeriods.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.number || ('REG ' + p.id))}${(p.periodFrom || p.periodTo) ? ' · ' + _escA((p.periodFrom || '?') + '–' + (p.periodTo || '?')) : ''}</option>`).join('')}`
+                : `<option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
+                   ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
+                   ${(ANAL.type === 'VOLUME' && window.BasePeriodModule && ANAL.objectId) ? BasePeriodModule.findByObjectType(ANAL.objectId, 'volume').map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ ${_escA(it.protocolNumber || 'Okres bazowy intensywności')} · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
+                   <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>`}
             </select></div>
         </div>
         ${ANAL.objectId ? _analCtx() : ''}
@@ -1395,7 +1407,9 @@ function _analWizard() {
       ? _analVOLUMESheet()
       : `<div class="reminder-card"><strong>Wybierz okres bazowy</strong><div class="reminder-meta">Dla korekty intensywności okres PRZED instalacją oraz zakres dat zostaną wczytane z wybranego protokołu bazowego. Możesz też wybrać „✏️ Ręczne wprowadzenie".</div></div>`;
   } else if (ANAL.type === 'REGRESSION') {
-    body = _analRegInfo();
+    body = ANAL.basePeriod
+      ? _analRegSheet()
+      : `<div class="reminder-card"><strong>Wybierz okres bazowy regresji</strong><div class="reminder-meta">Wskaż zapisany okres bazowy z arkusza regresji. Następnie wybierzesz metodę (1/2), skopiujesz dane bazowe, zaimportujesz okres analizowany (CSV) i podasz zakres rozliczeniowy.</div></div>`;
   } else {
     body = `<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">${t.icon}</span><h3>${_escA(t.label)}</h3></div>
       <div class="anw-body" style="text-align:center;padding:40px 20px;color:var(--color-text-secondary);">
@@ -1403,7 +1417,7 @@ function _analWizard() {
         <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
   }
 
-  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'VOLUME')) ? `
+  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'VOLUME' || ANAL.type === 'REGRESSION')) ? `
     ${ANAL.type === 'VOLUME' ? `<div class="anw-muted" style="margin:14px 0 6px;">Wsk = I·z₀ · φ = ΣWsk_ref / ΣWsk_rzecz · Qs = Q·φ (zużycie sprowadzone do referencyjnej intensywności)</div>` : ''}
     <div class="anw-act" style="justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
       <div class="anw-f" style="min-width:240px;max-width:360px;flex:1;">
@@ -1413,7 +1427,7 @@ function _analWizard() {
       </div>
       <button class="anw-run" onclick="analRun()">⚡ Wykonaj analizę</button>
     </div>
-    <div id="anw-results">${ANAL.results ? _analResults() : ''}</div>` : '';
+    <div id="anw-results">${ANAL.results ? (ANAL.type === 'REGRESSION' ? _analRegResults() : _analResults()) : ''}</div>` : '';
 
   return `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
@@ -1586,6 +1600,227 @@ function _analRegInfo() {
     </div></div>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ARKUSZ: Regresja liniowa (PRZED/PO) — szkielet wejść. Sama metoda obliczeniowa:
+// do opisania (analiza zapisuje się jako SZKIC, bez kwot ESCO). Okres bazowy z
+// arkusza regresji (RegressionBaseModule). Metoda 1 = wszystkie punkty (OLS),
+// Metoda 2 = średnie per °C — dla OBU wielkości (zużycie + temp. zasilania).
+// Okres analizowany: import CSV zapisywany w rekordzie analizy.
+// ═══════════════════════════════════════════════════════════════════════════════
+function _analRegLineTxt(L) {
+  if (!L || L.a == null || L.b == null) return '—';
+  const a = Number(L.a), b = Number(L.b);
+  return `y = ${a.toFixed(4)}·x ${b >= 0 ? '+ ' : '− '}${Math.abs(b).toFixed(2)}` + (L.n != null ? ` <span class="anw-muted">(n=${L.n})</span>` : '');
+}
+
+function _analRegSheet() {
+  const reg = ANAL.reg || (ANAL.reg = { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } });
+  const pid = ANAL.basePeriod;
+  const bp = (window.RegressionBaseModule && pid) ? RegressionBaseModule.find(ANAL.objectId, pid) : null;
+  const rowsCount = (window.RegressionBaseModule && pid) ? RegressionBaseModule.getRows(pid).length : 0;
+  const m1 = reg.method === 'raw', m2 = reg.method === 'binned';
+  const L = reg.baseLines;
+  const an = reg.analyzed || {};
+  const anN = (an.rows || []).length;
+  const radio = (active, on, label) => `<label onclick="analRegSetMethod('${on}')" style="cursor:pointer;padding:8px 12px;border-radius:8px;border:1px solid ${active ? '#185FA5' : 'var(--color-border-tertiary)'};background:${active ? '#E6F1FB' : 'transparent'};font-size:13px;font-weight:${active ? '600' : '400'};">${label}</label>`;
+
+  const baseBlock = `
+    <div class="anw-sec">
+      <div class="anw-head anw-blue"><span class="ico">📈</span><h3>Okres bazowy — regresja (PRZED)</h3></div>
+      <div class="anw-body">
+        <div class="anw-ctx" style="margin-bottom:12px;">
+          <span>Okres bazowy: <b>${bp ? _escA(bp.number || ('REG ' + pid)) : '—'}</b></span>
+          <span>Zakres: <b>${bp && (bp.periodFrom || bp.periodTo) ? _escA((bp.periodFrom || '?') + '–' + (bp.periodTo || '?')) : '—'}</b></span>
+          <span>Odczytów (po selekcji): <b>${rowsCount}</b></span>
+        </div>
+        <div class="anw-f" style="max-width:560px;">
+          <label>Metoda regresji (dotyczy obu wielkości: zużycie + temp. zasilania)</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;">
+            ${radio(m1, 'raw', 'Metoda 1 — wszystkie punkty')}
+            ${radio(m2, 'binned', 'Metoda 2 — średnie per °C')}
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="small-button" style="font-size:13px;" ${rowsCount ? '' : 'disabled'} onclick="analRegCopyBase()">📥 Kopiuj dane z okresu bazowego</button>
+        </div>
+        ${L ? `
+        <div class="anw-ctx" style="margin-top:12px;">
+          <span>📉 Zużycie ciepła: <b>${_analRegLineTxt(L.cons)}</b></span>
+          <span>🌡️ Temp. zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
+          <span>Metoda: <b>${L.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}</b></span>
+        </div>` : `<div class="anw-muted" style="margin-top:8px;">Wybierz metodę i kliknij „Kopiuj dane", aby wczytać linie bazowe y = ax + b.</div>`}
+      </div>
+    </div>`;
+
+  const anBlock = `
+    <div class="anw-sec">
+      <div class="anw-head anw-gold"><span class="ico">📥</span><h3>Okres analizowany (PO) — dane z czujników</h3></div>
+      <div class="anw-body">
+        <div class="anw-muted" style="margin-bottom:8px;">Import danych czasowych (CSV). Kolejność kolumn jak w arkuszu regresji: <code>readTime, tOutdoor, tSupply, tReturn, vFlow, heatPower, heatConsumption</code>. Dane zapisują się w analizie.</div>
+        <input type="file" accept=".csv,text/csv" onchange="analRegImport(this)" style="font-size:13px;">
+        ${anN ? `<div class="anw-ctx" style="margin-top:12px;">
+          <span>Plik: <b>${_escA(an.fileName || '—')}</b></span>
+          <span>Wierszy: <b>${anN}</b></span>
+          <span>Zakres danych: <b>${_escA((an.from || '?') + ' … ' + (an.to || '?'))}</b></span>
+          <span><button class="small-button" onclick="analRegClearImport()" style="font-size:12px;color:#c00;border-color:#c00;">✕ Wyczyść</button></span>
+        </div>` : `<div class="anw-muted" style="margin-top:8px;">Brak zaimportowanych danych okresu analizowanego.</div>`}
+      </div>
+    </div>`;
+
+  const billBlock = `
+    <div class="anw-sec">
+      <div class="anw-head anw-blue"><span class="ico">🗓️</span><h3>Zakres okresu rozliczeniowego</h3></div>
+      <div class="anw-body">
+        <div class="anw-g3">
+          <div class="anw-f"><label>Od (data i godzina)</label>
+            <input type="datetime-local" value="${_escA(reg.billing.from || '')}" onchange="analRegSetBilling('from', this.value)"></div>
+          <div class="anw-f"><label>Do (data i godzina)</label>
+            <input type="datetime-local" value="${_escA(reg.billing.to || '')}" onchange="analRegSetBilling('to', this.value)"></div>
+          <div class="anw-f"><label>&nbsp;</label>
+            <div class="anw-muted">Zakres rozliczenia, dla którego liczona będzie analiza PRZED/PO.</div></div>
+        </div>
+      </div>
+    </div>`;
+
+  return baseBlock + anBlock + billBlock;
+}
+
+function analRegSetMethod(m) {
+  if (!ANAL.reg) return;
+  ANAL.reg.method = (m === 'binned') ? 'binned' : 'raw';
+  if (ANAL.reg.baseLines) analRegCopyBase(true);   // przelicz linie pod nową metodę
+  else renderAnalysesModule();
+}
+
+function analRegCopyBase(silent) {
+  const pid = ANAL.basePeriod;
+  if (!pid || !window.RegressionBaseModule || typeof _regViews !== 'function') { if (!silent) alert('Brak okresu bazowego regresji.'); return; }
+  if (!RegressionBaseModule.getRows(pid).length) { if (!silent) alert('Wybrany okres bazowy nie ma żadnych odczytów.'); return; }
+  const method = ANAL.reg.method === 'binned' ? 'binned' : 'raw';
+  // Linie liczone na PEŁNYM okresie bazowym (neutralizujemy filtr zakresu z arkusza regresji).
+  const _sf = window._regBaseFrom, _st = window._regBaseTo;
+  window._regBaseFrom = ''; window._regBaseTo = '';
+  let v = null;
+  try { v = _regViews(pid); } catch (e) { v = null; }
+  window._regBaseFrom = _sf; window._regBaseTo = _st;
+  if (!v) { if (!silent) alert('Nie udało się policzyć regresji dla okresu bazowego.'); return; }
+  const line = view => (view && view.fit && view.fit.a != null) ? { a: view.fit.a, b: view.fit.b, n: (view.pts ? view.pts.length : (view.fit.n != null ? view.fit.n : null)) } : null;
+  ANAL.reg.baseLines = {
+    method, periodId: pid,
+    cons: line(v[method === 'binned' ? 'cons_binned' : 'cons_raw']),
+    sup: line(v[method === 'binned' ? 'sup_binned' : 'sup_raw'])
+  };
+  renderAnalysesModule();
+}
+
+function _analRegParseCsvText(text) {
+  const lines = String(text || '').trim().split(/\r?\n/);
+  if (lines.length < 2) return { rows: [], err: 'Plik CSV jest pusty lub nie zawiera nagłówka.' };
+  const delim = lines[0].indexOf(';') >= 0 ? ';' : (lines[0].indexOf('\t') >= 0 ? '\t' : ',');
+  const num = s => { s = (s || '').trim().replace(/\s/g, '').replace(',', '.'); return (s !== '' && !isNaN(Number(s))) ? Number(s) : null; };
+  const firstCells = lines[0].split(delim);
+  const hasHeader = firstCells.length > 1 && num(firstCells[1]) === null;
+  const startIdx = hasHeader ? 1 : 0;
+  const rows = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const cells = lines[i].split(delim);
+    if (cells.length < 2) continue;
+    rows.push({
+      readTime: (cells[0] || '').trim() || null,
+      tOutdoor: num(cells[1]), tSupply: num(cells[2]), tReturn: num(cells[3]),
+      vFlow: num(cells[4]), heatPower: num(cells[5]), heatConsumption: num(cells[6])
+    });
+  }
+  return { rows };
+}
+
+function analRegImport(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext !== 'csv') { alert('Na teraz wspierany jest import CSV (jak w „Dane z czujników"). Zapisz Excel jako CSV i spróbuj ponownie.'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const res = _analRegParseCsvText(e.target.result);
+    if (res.err) { alert(res.err); input.value = ''; return; }
+    if (!res.rows.length) { alert('Nie znaleziono wierszy danych w pliku.'); input.value = ''; return; }
+    const times = res.rows.map(r => r.readTime).filter(Boolean).sort();
+    ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: times[0] || '', to: times[times.length - 1] || '' };
+    renderAnalysesModule();
+    alert('Zaimportowano ' + res.rows.length + ' wierszy okresu analizowanego.');
+  };
+  reader.onerror = function () { alert('Nie udało się odczytać pliku.'); };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function analRegClearImport() {
+  if (ANAL.reg) ANAL.reg.analyzed = { rows: [], fileName: '', from: '', to: '' };
+  renderAnalysesModule();
+}
+
+function analRegSetBilling(which, v) {
+  if (!ANAL.reg) return;
+  if (which === 'from') ANAL.reg.billing.from = v || '';
+  else if (which === 'to') ANAL.reg.billing.to = v || '';
+}
+
+function _analRegRun() {
+  const reg = ANAL.reg || {};
+  const problems = [];
+  if (!reg.baseLines) problems.push('skopiuj dane z okresu bazowego (Metoda 1/2)');
+  if (!(reg.analyzed && reg.analyzed.rows && reg.analyzed.rows.length)) problems.push('zaimportuj okres analizowany (CSV)');
+  if (!(reg.billing && reg.billing.from && reg.billing.to)) problems.push('podaj zakres okresu rozliczeniowego (od–do)');
+  if (problems.length) { alert('Uzupełnij: ' + problems.join('; ') + '.'); return; }
+  ANAL.results = { reg: true, draft: true, at: new Date().toISOString() };
+  const slot = document.getElementById('anw-results');
+  if (slot) { slot.innerHTML = _analRegResults(); slot.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+
+function _analRegResults() {
+  const reg = ANAL.reg || {};
+  const L = reg.baseLines || {};
+  const an = reg.analyzed || {};
+  return `
+    <div class="anw-sec" style="margin-top:16px;">
+      <div class="anw-head anw-gold"><span class="ico">🚧</span><h3>Wynik — metoda obliczeniowa w przygotowaniu</h3></div>
+      <div class="anw-body">
+        <div class="anw-muted" style="margin-bottom:10px;">Wejścia są kompletne i mogą zostać zapisane. Sposób liczenia PRZED/PO opiszemy w kolejnym kroku — dlatego ta analiza nie generuje jeszcze kwot ESCO i jest oznaczona jako <b>SZKIC</b>.</div>
+        <div class="anw-ctx">
+          <span>Linia bazowa zużycia: <b>${_analRegLineTxt(L.cons)}</b></span>
+          <span>Linia bazowa T zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
+          <span>Metoda: <b>${L.method === 'binned' ? '2' : '1'}</b></span>
+          <span>Okres analizowany: <b>${(an.rows || []).length} wierszy</b> (${_escA((an.from || '?') + ' … ' + (an.to || '?'))})</span>
+          <span>Okres rozliczeniowy: <b>${_escA((reg.billing.from || '?') + ' → ' + (reg.billing.to || '?'))}</b></span>
+        </div>
+        <div class="anw-act" style="margin-top:14px;">
+          <button class="small-button" style="font-size:13px;" onclick="analRegSaveDraft()">💾 Zapisz szkic analizy</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function analRegSaveDraft() {
+  if (!ANAL.results || !ANAL.results.reg) return;
+  const o = ObjectsModule.find(ANAL.objectId);
+  const reg = ANAL.reg || {};
+  const payload = {
+    clientId: ANAL.clientId,
+    objectId: ANAL.objectId,
+    name: `${AnalysesModule.TYPES.REGRESSION.label} — ${o ? o.name : ''}`,
+    analysisType: 'REGRESSION',
+    executedAt: new Date().toISOString().slice(0, 10),
+    author: String(ANAL.author || '').trim(),
+    status: 'DRAFT',
+    inputParams: { basePeriod: ANAL.basePeriod, reg: JSON.parse(JSON.stringify(reg)) },
+    results: { draft: true }
+  };
+  if (ANAL.editingId) { AnalysesModule.update(ANAL.editingId, payload); alert('Szkic analizy zaktualizowany.'); }
+  else { AnalysesModule.add(payload); alert('Szkic analizy zapisany. Dane okresu analizowanego są zapisane i zostaną wczytane po ponownym otwarciu.'); }
+  _analResetState();
+  renderAnalysesModule();
+}
+
 // ── handlery wyboru / dat ───────────────────────────────────────────────────────
 function analOnClient(v) { ANAL.clientId = v ? Number(v) : null; ANAL.objectId = null; ANAL.results = null; renderAnalysesModule(); }
 function analOnObject(v) {
@@ -1601,13 +1836,24 @@ function analOnObject(v) {
     ANAL.energy.escoShare = o.escoShare != null ? o.escoShare : ANAL.energy.escoShare;
   }
   // jeśli obiekt ma dokładnie jeden okres bazowy — wczytaj go od razu z protokołu
-  const bp = (ANAL.objectId && window.MeasurementsModule)
-    ? (MeasurementsModule.findByObject(ANAL.objectId) || []) : [];
-  if (bp.length === 1) { ANAL.basePeriod = bp[0].id; _analApplyBaseProtocol(bp[0]); }
+  if (ANAL.type === 'REGRESSION') {
+    if (ANAL.reg) ANAL.reg.baseLines = null;
+    const rbp = (ANAL.objectId && window.RegressionBaseModule) ? RegressionBaseModule.listByObject(ANAL.objectId) : [];
+    if (rbp.length === 1) ANAL.basePeriod = rbp[0].id;
+  } else {
+    const bp = (ANAL.objectId && window.MeasurementsModule)
+      ? (MeasurementsModule.findByObject(ANAL.objectId) || []) : [];
+    if (bp.length === 1) { ANAL.basePeriod = bp[0].id; _analApplyBaseProtocol(bp[0]); }
+  }
   renderAnalysesModule();
 }
 function analOnBasePeriod(v) {
   ANAL.basePeriod = v || null;
+  if (ANAL.type === 'REGRESSION') {
+    if (ANAL.reg) ANAL.reg.baseLines = null;   // nowy okres → wymuś ponowne „Kopiuj dane"
+    renderAnalysesModule();
+    return;
+  }
   if (v && v !== 'manual') {
     const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
     if (p) _analApplyBaseProtocol(p);
@@ -1740,6 +1986,7 @@ function analRun() {
     alert('Wskaż osobę wykonującą analizę w polu „Wykonał — Energy Analyst". Analizę może wykonać wyłącznie użytkownik z rolą Energy Analyst (dodaj go w module Użytkownicy, jeśli lista jest pusta).');
     return;
   }
+  if (ANAL.type === 'REGRESSION') { _analRegRun(); return; }
   const before = _analComputePeriod('before');
   const after = _analComputePeriod('after');
   if (before.qs == null || after.qs == null) {
