@@ -1916,7 +1916,7 @@ function _analRegChartSvg(title, m, yLabel) {
 function _analRegTableHtml(m, valueLabel, unit) {
   const td = 'padding:3px 8px;font-size:11px;border-bottom:0.5px solid var(--color-border-tertiary);text-align:right;';
   const th = 'padding:5px 8px;font-size:11px;font-weight:600;color:#0C447C;text-align:right;border-bottom:1px solid var(--color-border-tertiary);';
-  const dec = unit === 'MJ' ? 2 : 1;
+  const dec = (String(unit).indexOf('MJ') >= 0) ? 2 : 1;
   const body = m.rows.map(r => `<tr>
       <td style="${td}text-align:center;">${r.t}</td>
       <td style="${td}">${r.B.toFixed(dec)}</td>
@@ -1972,7 +1972,7 @@ function _analRegResultsHtml(reg, model, opts) {
       <div class="anw-body">
         ${headline}
         ${eqStrip}
-        <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}${_analRegTableHtml(c, 'zużycie', 'MJ')}</div>
+        <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ/h]')}${_analRegTableHtml(c, 'zużycie', 'MJ/h')}</div>
         <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}${_analRegTableHtml(s, 'T zasilania', '°C')}</div>
         <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. <b>Tryb pogodowy</b> = regresja <b>okresu bazowego</b> (zakres okresu bazowego); <b>WaterAI</b> = regresja <b>okresu analizowanego (PO) — dane z czujników</b>.${subsetNote} Obniżenie liczone w zakresie ${rngTxt}.</div>
         ${saveBtn}
