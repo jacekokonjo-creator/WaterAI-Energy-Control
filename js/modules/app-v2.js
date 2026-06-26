@@ -1670,13 +1670,35 @@ function _analRegSheet() {
   const poDelta = {};
   if (typeof _consDeltas === 'function') _consDeltas(poChrono.map(o => Object.assign({}, o.r, { _idx: o.idx }))).forEach(d => { poDelta[d.idx] = d.y; });
   window._aregPageSize = window._aregPageSize || 50;
+  window._aregSortKey = window._aregSortKey || 'readTime';
+  window._aregSortDir = window._aregSortDir || 'asc';
   const aps = window._aregPageSize;
-  const aTotalPages = Math.max(1, Math.ceil(poChrono.length / aps));
+  const aSortKey = window._aregSortKey, aSortDir = window._aregSortDir === 'desc' ? -1 : 1;
+  // Sortowanie WYŚWIETLANIA (Δ liczona osobno, chronologicznie — niezależnie od sortu).
+  const poDisplay = poRows.map((r, idx) => ({ r, idx })).sort((A, B) => {
+    let a, b;
+    if (aSortKey === 'readTime') {
+      a = _rt(A.r.readTime); b = _rt(B.r.readTime);
+      if (a == null && b == null) {
+        const as = String(A.r.readTime || ''), bs = String(B.r.readTime || '');
+        if (as < bs) return -1 * aSortDir; if (as > bs) return 1 * aSortDir; return A.idx - B.idx;
+      }
+    } else {
+      a = (A.r[aSortKey] == null || A.r[aSortKey] === '') ? null : Number(A.r[aSortKey]);
+      b = (B.r[aSortKey] == null || B.r[aSortKey] === '') ? null : Number(B.r[aSortKey]);
+    }
+    if (a == null && b == null) return A.idx - B.idx;
+    if (a == null) return 1; if (b == null) return -1;
+    if (a < b) return -1 * aSortDir; if (a > b) return 1 * aSortDir; return A.idx - B.idx;
+  });
+  const aTotalPages = Math.max(1, Math.ceil(poDisplay.length / aps));
   window._aregPage = window._aregPage || 0;
   if (window._aregPage >= aTotalPages) window._aregPage = aTotalPages - 1;
   if (window._aregPage < 0) window._aregPage = 0;
   const aPage = window._aregPage;
-  const aPageRows = poChrono.slice(aPage * aps, (aPage + 1) * aps);
+  const aPageRows = poDisplay.slice(aPage * aps, (aPage + 1) * aps);
+  const aSortArrow = key => window._aregSortKey === key ? (window._aregSortDir === 'desc' ? ' ▼' : ' ▲') : ' ⇅';
+  const poTh = (key, label, align) => `<th onclick="analRegToggleSort('${key}')" title="Kliknij, aby sortować" style="padding:6px 8px;text-align:${align};font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);cursor:pointer;user-select:none;white-space:nowrap;">${label}<span style="opacity:.55;">${aSortArrow(key)}</span></th>`;
   const fmtV = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { maximumFractionDigits: 2 });
   const fmtT1 = v => (v == null || v === '') ? '—' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const fld = (id, ph, step) => `<div><label style="font-size:10px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">${ph.lbl}</label><input id="${id}" type="${ph.type || 'number'}" ${ph.type ? '' : `step="${step || '0.01'}"`} placeholder="${ph.ph || ''}" style="width:100%;font-size:12px;box-sizing:border-box;" /></div>`;
@@ -1750,13 +1772,13 @@ function _analRegSheet() {
           <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:780px;">
               <thead><tr style="background:var(--color-background-secondary);">
-                <th style="padding:6px 8px;text-align:left;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Data odczytu</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T zewn. [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T zasil. [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">T powrotu [°C]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Przepływ [dm³/h]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Moc dostarczona [W]</th>
-                <th style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:var(--color-text-secondary);white-space:nowrap;">Zużycie ciepła [MJ]</th>
+                ${poTh('readTime', 'Data odczytu', 'left')}
+                ${poTh('tOutdoor', 'T zewn. [°C]', 'right')}
+                ${poTh('tSupply', 'T zasil. [°C]', 'right')}
+                ${poTh('tReturn', 'T powrotu [°C]', 'right')}
+                ${poTh('vFlow', 'Przepływ [dm³/h]', 'right')}
+                ${poTh('heatPower', 'Moc dostarczona [W]', 'right')}
+                ${poTh('heatConsumption', 'Zużycie ciepła [MJ]', 'right')}
                 <th title="Δ = różnica wskazań licznika między kolejnymi odczytami" style="padding:6px 8px;text-align:right;font-size:10px;font-weight:600;border-bottom:1px solid var(--color-border-tertiary);color:#B9770E;white-space:nowrap;">Δ [MJ]</th>
                 <th style="padding:6px 8px;border-bottom:1px solid var(--color-border-tertiary);"></th>
               </tr></thead>
@@ -1897,6 +1919,15 @@ function analRegDeleteRow(idx) {
   an.rows.splice(idx, 1);
   _analRegRecalcRange();
   ANAL.results = null; ANAL._regData = null;
+  renderAnalysesModule();
+}
+
+function analRegToggleSort(key) {
+  if (window._aregSortKey === key) {
+    window._aregSortDir = (window._aregSortDir === 'asc') ? 'desc' : 'asc';
+  } else {
+    window._aregSortKey = key; window._aregSortDir = 'asc';
+  }
   renderAnalysesModule();
 }
 
