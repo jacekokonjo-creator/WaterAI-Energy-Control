@@ -1943,11 +1943,16 @@ function _analRegResultsHtml(reg, model, opts) {
       ${card(s.avgDiff != null ? s.avgDiff.toFixed(2) : '—', ' °C', 'średnia różnica temp. zasilania', '#B9770E')}
     </div>`;
   const saveBtn = opts.withSave ? `<div class="anw-act" style="margin-top:18px;"><button class="anw-run" onclick="analRegSave()">💾 Zapisz analizę</button></div>` : '';
+  const eqStrip = `<div class="anw-ctx" style="margin:10px 0 4px;">
+      <span>📉 Zużycie — Tryb pogodowy: <b>${_analRegLineTxt(c.base)}</b> &nbsp;·&nbsp; WaterAI: <b>${_analRegLineTxt(c.waterai)}</b></span>
+      <span>🌡️ T zasilania — Tryb pogodowy: <b>${_analRegLineTxt(s.base)}</b> &nbsp;·&nbsp; WaterAI: <b>${_analRegLineTxt(s.waterai)}</b></span>
+    </div>`;
   const rngTxt = model.range ? `${model.range.from}…${model.range.to}°C (krok ${model.range.step}°C)` : '−15…+10°C';
   return `<div class="anw-sec" style="margin-top:16px;">
       <div class="anw-head anw-gold"><span class="ico">📈</span><h3>Wynik analizy regresji (PRZED / PO)</h3></div>
       <div class="anw-body">
         ${headline}
+        ${eqStrip}
         <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}${_analRegTableHtml(c, 'zużycie', 'MJ')}</div>
         <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}${_analRegTableHtml(s, 'T zasilania', '°C')}</div>
         <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. <b>Tryb pogodowy</b> = regresja <b>okresu bazowego</b>; <b>WaterAI</b> = regresja <b>okresu analizowanego (PO) — dane z czujników</b>. Obniżenie liczone w zakresie ${rngTxt}.</div>
