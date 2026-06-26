@@ -1009,7 +1009,7 @@ function _analResetState() {
     after:  { from: '', to: '', consumption: '', months: [], baseTi: 20 },
     energy: { unit: 'GJ', currency: 'PLN', price: '', escoShare: 50, priceMode: 'FIXED', priceDescription: '' },
     author: '',
-    reg: { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } },
+    reg: { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' }, tempRange: { from: -15, to: 10, step: 1 } },
     results: null,
     editingId: null
   };
@@ -1326,9 +1326,10 @@ function analEdit(id) {
   ANAL.author = a.author || '';
   if (ANAL.type === 'REGRESSION') {
     ANAL.reg = Object.assign(
-      { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' } },
+      { method: 'raw', baseLines: null, analyzed: { rows: [], fileName: '', from: '', to: '' }, billing: { from: '', to: '' }, tempRange: { from: -15, to: 10, step: 1 } },
       (ip.reg ? JSON.parse(JSON.stringify(ip.reg)) : {})
     );
+    if (!ANAL.reg.tempRange) ANAL.reg.tempRange = { from: -15, to: 10, step: 1 };
   }
   // ── Synchronizacja okresu bazowego 1:1 z protokołem ───────────────────────
   // Jeśli analiza jest powiązana z protokołem okresu bazowego (a nie „Ręczne
@@ -1682,7 +1683,35 @@ function _analRegSheet() {
       </div>
     </div>`;
 
-  return baseBlock + anBlock + billBlock;
+  const tr = reg.tempRange || { from: -15, to: 10, step: 1 };
+  const rangeBlock = `
+    <div class="anw-sec">
+      <div class="anw-head anw-blue"><span class="ico">🌡️</span><h3>Zakres temperatur — tabela zbiorcza i wykresy</h3></div>
+      <div class="anw-body">
+        <div class="anw-muted" style="margin-bottom:8px;">Tabela i wykresy budują się dla wybranego zakresu T zewnętrznej. Domyślnie −15…+10°C, krok 1°C — dostosuj wedle potrzeby.</div>
+        <div class="anw-g3">
+          <div class="anw-f"><label>Od [°C]</label>
+            <input type="number" step="1" value="${tr.from != null ? tr.from : -15}" onchange="analRegSetTempRange('from', this.value)"></div>
+          <div class="anw-f"><label>Do [°C]</label>
+            <input type="number" step="1" value="${tr.to != null ? tr.to : 10}" onchange="analRegSetTempRange('to', this.value)"></div>
+          <div class="anw-f"><label>Krok [°C]</label>
+            <input type="number" step="0.5" min="0.1" value="${tr.step != null ? tr.step : 1}" onchange="analRegSetTempRange('step', this.value)"></div>
+        </div>
+      </div>
+    </div>`;
+
+  return baseBlock + anBlock + billBlock + rangeBlock;
+}
+
+function analRegSetTempRange(field, v) {
+  if (!ANAL.reg) return;
+  if (!ANAL.reg.tempRange) ANAL.reg.tempRange = { from: -15, to: 10, step: 1 };
+  const n = Number(String(v).replace(',', '.'));
+  if (field === 'step') { ANAL.reg.tempRange.step = (isFinite(n) && n > 0) ? n : 1; }
+  else if (field === 'from' || field === 'to') { ANAL.reg.tempRange[field] = isFinite(n) ? n : (field === 'from' ? -15 : 10); }
+  // jeśli wynik już policzony — przelicz pod nowy zakres
+  if (ANAL.results && ANAL.results.model) { ANAL.results.model = _analRegModel(ANAL.reg);
+    const slot = document.getElementById('anw-results'); if (slot) slot.innerHTML = _analRegResults(); }
 }
 
 function analRegSetMethod(m) {
@@ -1800,38 +1829,48 @@ function _analRegModel(reg) {
   const method = reg.method === 'binned' ? 'binned' : 'raw';
   const rows = (reg.analyzed && reg.analyzed.rows) || [];
   const waterai = { cons: _analRegFitLine(rows, 'cons', method), sup: _analRegFitLine(rows, 'sup', method) };
-  const T0 = -15, T1 = 10;
+  // Zakres temperatur do tabeli/wykresów — swobodnie wybierany (domyślnie −15…+10°C, krok 1).
+  const tr = reg.tempRange || {};
+  let T0 = Number(tr.from); if (!isFinite(T0)) T0 = -15;
+  let T1 = Number(tr.to);   if (!isFinite(T1)) T1 = 10;
+  let step = Number(tr.step); if (!isFinite(step) || step <= 0) step = 1;
+  if (T1 < T0) { const t = T0; T0 = T1; T1 = t; }
+  if ((T1 - T0) / step > 400) step = (T1 - T0) / 400;   // limit liczby wierszy tabeli
   const build = (base, wai) => {
     if (!base || !wai || base.a == null || wai.a == null) return null;
     const tab = []; let sumD = 0, sumE = 0, nD = 0;
-    for (let t = T0; t <= T1; t++) {
-      const B = base.a * t + base.b, C = wai.a * t + wai.b;
+    for (let t = T0; t <= T1 + 1e-9; t += step) {
+      const tt = Math.round(t * 100) / 100;
+      const B = base.a * tt + base.b, C = wai.a * tt + wai.b;
       const D = (B !== 0) ? ((B - C) / B) * 100 : null, E = B - C;
-      tab.push({ t, B, C, D, E });
+      tab.push({ t: tt, B, C, D, E });
       if (D != null && isFinite(D)) { sumD += D; nD++; }
       sumE += E;
     }
     return { base, waterai: wai, rows: tab, avgPct: nD ? sumD / nD : null, avgDiff: tab.length ? sumE / tab.length : null };
   };
-  return { method, cons: build(reg.baseLines.cons, waterai.cons), sup: build(reg.baseLines.sup, waterai.sup), waterai };
+  return { method, range: { from: T0, to: T1, step: step }, cons: build(reg.baseLines.cons, waterai.cons), sup: build(reg.baseLines.sup, waterai.sup), waterai };
 }
 
-function _analRegChartSvg(title, m) {
+function _analRegChartSvg(title, m, yLabel) {
   const rows = m.rows, xs = rows.map(r => r.t), ys = rows.flatMap(r => [r.B, r.C]);
   const xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs);
   let ymin = Math.min.apply(null, ys), ymax = Math.max.apply(null, ys);
   if (ymin === ymax) { ymin -= 1; ymax += 1; }
   const padY = (ymax - ymin) * 0.08; ymin -= padY; ymax += padY;
-  const W = 560, H = 270, L = 54, R = 18, T = 30, Bm = 38;
-  const px = t => L + (t - xmin) / (xmax - xmin) * (W - L - R);
-  const py = v => T + (1 - (v - ymin) / (ymax - ymin)) * (H - T - Bm);
+  const W = 580, H = 300, L = 66, R = 18, T = 30, Bm = 52;
+  const xspan = (xmax - xmin) || 1, yspan = (ymax - ymin) || 1;
+  const px = t => L + (t - xmin) / xspan * (W - L - R);
+  const py = v => T + (1 - (v - ymin) / yspan) * (H - T - Bm);
   const poly = key => rows.map(r => `${px(r.t).toFixed(1)},${py(r[key]).toFixed(1)}`).join(' ');
   let grid = '';
-  for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4, y = py(v);
+  for (let i = 0; i <= 4; i++) { const v = ymin + yspan * i / 4, y = py(v);
     grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef" stroke-width="1"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${v.toFixed(1)}</text>`; }
   let xlab = '';
-  for (let t = Math.ceil(xmin / 5) * 5; t <= xmax; t += 5) { const x = px(t);
+  const xstep = xspan > 30 ? 10 : (xspan > 12 ? 5 : (xspan > 4 ? 2 : 1));
+  for (let t = Math.ceil(xmin / xstep) * xstep; t <= xmax + 1e-9; t += xstep) { const x = px(t);
     xlab += `<line x1="${x.toFixed(1)}" y1="${H - Bm}" x2="${x.toFixed(1)}" y2="${H - Bm + 4}" stroke="#9aa5b1"/><text x="${x.toFixed(1)}" y="${H - Bm + 16}" text-anchor="middle" font-size="9" fill="#7a8794">${t}</text>`; }
+  const cx = (L + (W - R)) / 2, cy = (T + (H - Bm)) / 2;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;background:#fff;border:1px solid var(--color-border-tertiary);border-radius:8px;">
     <text x="${L}" y="18" font-size="12" font-weight="600" fill="#0C447C">${title}</text>
     ${grid}${xlab}
@@ -1839,29 +1878,37 @@ function _analRegChartSvg(title, m) {
     <line x1="${L}" y1="${H - Bm}" x2="${W - R}" y2="${H - Bm}" stroke="#9aa5b1"/>
     <polyline points="${poly('B')}" fill="none" stroke="#9aa5b1" stroke-width="2.5"/>
     <polyline points="${poly('C')}" fill="none" stroke="#1E7B34" stroke-width="2.5"/>
-    <text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="9" fill="#7a8794">T zewn. [°C]</text>
+    <text x="${cx.toFixed(0)}" y="${H - 22}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670">Temperatura zewnętrzna [°C]</text>
+    <text x="16" y="${cy.toFixed(0)}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670" transform="rotate(-90 16 ${cy.toFixed(0)})">${yLabel || ''}</text>
     <g font-size="10"><rect x="${L + 4}" y="${T + 2}" width="12" height="3" fill="#9aa5b1"/><text x="${L + 20}" y="${T + 6}" fill="#5b6670">Tryb pogodowy (baza)</text>
-      <rect x="${L + 150}" y="${T + 2}" width="12" height="3" fill="#1E7B34"/><text x="${L + 166}" y="${T + 6}" fill="#5b6670">WaterAI (po)</text></g>
+      <rect x="${L + 160}" y="${T + 2}" width="12" height="3" fill="#1E7B34"/><text x="${L + 176}" y="${T + 6}" fill="#5b6670">WaterAI (po)</text></g>
   </svg>`;
 }
 
-function _analRegTableHtml(unit, m) {
+function _analRegTableHtml(m, valueLabel, unit) {
   const td = 'padding:3px 8px;font-size:11px;border-bottom:0.5px solid var(--color-border-tertiary);text-align:right;';
   const th = 'padding:5px 8px;font-size:11px;font-weight:600;color:#0C447C;text-align:right;border-bottom:1px solid var(--color-border-tertiary);';
+  const dec = unit === 'MJ' ? 2 : 1;
   const body = m.rows.map(r => `<tr>
       <td style="${td}text-align:center;">${r.t}</td>
-      <td style="${td}">${r.B.toFixed(2)}</td>
-      <td style="${td}">${r.C.toFixed(2)}</td>
+      <td style="${td}">${r.B.toFixed(dec)}</td>
+      <td style="${td}">${r.C.toFixed(dec)}</td>
       <td style="${td}color:#1E7B34;font-weight:600;">${r.D != null && isFinite(r.D) ? r.D.toFixed(1) + '%' : '—'}</td>
-      <td style="${td}">${r.E.toFixed(2)}</td></tr>`).join('');
-  return `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;color:#0C447C;font-weight:600;">Tabela zbiorcza (−15…+10°C)</summary>
+      <td style="${td}">${r.E.toFixed(dec)}</td></tr>`).join('');
+  const rng = m.range ? `${m.range.from}…${m.range.to}°C` : '';
+  return `<details open style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;color:#0C447C;font-weight:600;">Tabela zbiorcza (${rng})</summary>
     <table style="width:100%;border-collapse:collapse;margin-top:6px;">
-      <thead><tr><th style="${th}text-align:center;">T zewn. [°C]</th><th style="${th}">Tryb pogodowy</th><th style="${th}">WaterAI</th><th style="${th}">Obniżenie</th><th style="${th}">Różnica [${unit}]</th></tr></thead>
+      <thead><tr>
+        <th style="${th}text-align:center;">T zewn. [°C]</th>
+        <th style="${th}">Tryb pogodowy — ${valueLabel} [${unit}]</th>
+        <th style="${th}">WaterAI — ${valueLabel} [${unit}]</th>
+        <th style="${th}">Obniżenie [%]</th>
+        <th style="${th}">Różnica [${unit}]</th></tr></thead>
       <tbody>${body}</tbody>
       <tfoot><tr style="background:var(--color-background-secondary);font-weight:700;">
         <td style="${td}text-align:center;">Średnia</td><td style="${td}">—</td><td style="${td}">—</td>
         <td style="${td}color:#1E7B34;">${m.avgPct != null ? m.avgPct.toFixed(1) + '%' : '—'}</td>
-        <td style="${td}">${m.avgDiff != null ? m.avgDiff.toFixed(2) : '—'}</td></tr></tfoot>
+        <td style="${td}">${m.avgDiff != null ? m.avgDiff.toFixed(dec) : '—'}</td></tr></tfoot>
     </table></details>`;
 }
 
@@ -1872,6 +1919,7 @@ function _analRegResultsHtml(reg, model, opts) {
       <div class="reminder-meta">Upewnij się, że okres bazowy ma policzone linie (przycisk „Kopiuj dane", Metoda 1/2) i że zaimportowany okres analizowany ma kolumny temperatury zewnętrznej, zasilania oraz zużycia.</div></div>`;
   }
   const c = model.cons, s = model.sup;
+  if (model.range) { c.range = model.range; s.range = model.range; }
   const card = (val, unit, label, color) => `<div style="flex:1;min-width:150px;background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 16px;">
       <div style="font-size:24px;font-weight:700;color:${color};">${val}${unit}</div>
       <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${label}</div></div>`;
@@ -1881,13 +1929,14 @@ function _analRegResultsHtml(reg, model, opts) {
       ${card(s.avgDiff != null ? s.avgDiff.toFixed(2) : '—', ' °C', 'średnia różnica temp. zasilania', '#B9770E')}
     </div>`;
   const saveBtn = opts.withSave ? `<div class="anw-act" style="margin-top:18px;"><button class="anw-run" onclick="analRegSave()">💾 Zapisz analizę</button></div>` : '';
+  const rngTxt = model.range ? `${model.range.from}…${model.range.to}°C (krok ${model.range.step}°C)` : '−15…+10°C';
   return `<div class="anw-sec" style="margin-top:16px;">
       <div class="anw-head anw-gold"><span class="ico">📈</span><h3>Wynik analizy regresji (PRZED / PO)</h3></div>
       <div class="anw-body">
         ${headline}
-        <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c)}${_analRegTableHtml('MJ', c)}</div>
-        <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s)}${_analRegTableHtml('°C', s)}</div>
-        <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. „Tryb pogodowy" = regresja okresu bazowego, „WaterAI" = regresja okresu analizowanego. Obniżenie liczone w zakresie −15…+10°C (jak w arkuszu referencyjnym).</div>
+        <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}${_analRegTableHtml(c, 'zużycie', 'MJ')}</div>
+        <div style="margin-top:18px;">${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}${_analRegTableHtml(s, 'T zasilania', '°C')}</div>
+        <div class="anw-muted" style="margin-top:10px;font-size:11px;">Metoda ${model.method === 'binned' ? '2 (średnie per °C)' : '1 (wszystkie punkty)'}. <b>Tryb pogodowy</b> = regresja <b>okresu bazowego</b>; <b>WaterAI</b> = regresja <b>okresu analizowanego (PO) — dane z czujników</b>. Obniżenie liczone w zakresie ${rngTxt}.</div>
         ${saveBtn}
       </div>
     </div>`;
