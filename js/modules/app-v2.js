@@ -1623,6 +1623,13 @@ function _analRegSheet() {
   const L = reg.baseLines;
   const an = reg.analyzed || {};
   const anN = (an.rows || []).length;
+  // Zakres danych liczony odpornie z wierszy (naprawia stare zapisy z błędnym from/to z sortu tekstowego)
+  let anFrom = an.from || '', anTo = an.to || '';
+  if (anN && typeof _regTs === 'function') {
+    let mn = Infinity, mx = -Infinity, f = '', t = '';
+    (an.rows || []).forEach(r => { if (!r || !r.readTime) return; const ms = _regTs(r.readTime); if (ms == null) return; if (ms < mn) { mn = ms; f = r.readTime; } if (ms > mx) { mx = ms; t = r.readTime; } });
+    if (f) { anFrom = f; anTo = t; }
+  }
   const radio = (active, on, label) => `<label onclick="analRegSetMethod('${on}')" style="cursor:pointer;padding:8px 12px;border-radius:8px;border:1px solid ${active ? '#185FA5' : 'var(--color-border-tertiary)'};background:${active ? '#E6F1FB' : 'transparent'};font-size:13px;font-weight:${active ? '600' : '400'};">${label}</label>`;
 
   const baseBlock = `
@@ -1662,7 +1669,7 @@ function _analRegSheet() {
         ${anN ? `<div class="anw-ctx" style="margin-top:12px;">
           <span>Plik: <b>${_escA(an.fileName || '—')}</b></span>
           <span>Wierszy: <b>${anN}</b></span>
-          <span>Zakres danych: <b>${_escA((an.from || '?') + ' … ' + (an.to || '?'))}</b></span>
+          <span>Zakres danych: <b>${_escA((anFrom || '?') + ' … ' + (anTo || '?'))}</b></span>
           <span><button class="small-button" onclick="analRegClearImport()" style="font-size:12px;color:#c00;border-color:#c00;">✕ Wyczyść</button></span>
         </div>` : `<div class="anw-muted" style="margin-top:8px;">Brak zaimportowanych danych okresu analizowanego.</div>`}
       </div>
@@ -1783,6 +1790,13 @@ function analRegImport(input) {
     });
     if (from === '' && valid.length) { const s = valid.slice().sort(); from = s[0]; to = s[s.length - 1]; }   // awaryjnie, gdy dat nie da się sparsować
     ANAL.reg.analyzed = { rows: res.rows, fileName: file.name, from: from, to: to };
+    // #3 — okres rozliczeniowy bierzemy wprost z zakresu danych pliku (PO — dane z czujników)
+    if (isFinite(minMs) && isFinite(maxMs)) {
+      const toLocal = ms => { const d = new Date(ms), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+      if (!ANAL.reg.billing) ANAL.reg.billing = { from: '', to: '' };
+      ANAL.reg.billing.from = toLocal(minMs);
+      ANAL.reg.billing.to = toLocal(maxMs);
+    }
     renderAnalysesModule();
     alert('Zaimportowano ' + res.rows.length + ' wierszy okresu analizowanego.');
   };
