@@ -3047,7 +3047,8 @@ function escoAnalysesTableHTML(objectId, preselectIds){
     const p=_escoAnalPct(a);
     const pct=p!=null?p.toFixed(1)+'%':'—';
     const energy=r.savedEnergy!=null?Number(r.savedEnergy).toFixed(2)+' '+(ip.energyUnit||''):'—';
-    const period=(ip.billingFrom||ip.billingTo)?`${fmtDate(ip.billingFrom)} → ${fmtDate(ip.billingTo)}`:fmtDate(a.executedAt);
+    const _per=_escoAnalPeriod(a);
+    const period=(_per.from||_per.to)?`${fmtDate(_per.from)} → ${fmtDate(_per.to)}`:fmtDate(a.executedAt);
     const checked=pre.includes(Number(a.id));
     return `<tr style="border-bottom:.5px solid var(--color-border-tertiary);">
       <td style="padding:6px 10px;text-align:center;"><input type="checkbox" name="esco_anal" value="${a.id}" ${checked?'checked':''} onchange="updateESCOSummary()"/></td>
@@ -3135,7 +3136,7 @@ function renderESCOReports() {
       <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(rep.reportNumber||'—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((client&&client.name)||'—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((obj&&obj.name)||'—')}</td>
-      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(rep.periodFrom)} → ${fmtDate(rep.periodTo)}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${(function(){const p=_escoRepPeriod(rep);return fmtDate(p.from)+' → '+fmtDate(p.to);})()}</td>
       <td style="padding:9px 12px;">${statusCell}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;align-items:center;">
@@ -3262,6 +3263,29 @@ function _escoAnalPct(a){
   return null;
 }
 
+// Okres liczenia oszczędności (PO) analizy. TYM/obj: inputParams.after.{from,to}.
+// Fallback: before, top-level periodFrom/To, data wykonania.
+function _escoAnalPeriod(a){
+  const ip=(a&&a.inputParams)||{};
+  const af=ip.after||{}, bf=ip.before||{};
+  const from=af.from||bf.from||a.periodFrom||a.executedAt||'';
+  const to  =af.to  ||bf.to  ||a.periodTo  ||a.executedAt||'';
+  return {from,to};
+}
+
+// Okres raportu: z rep.periodFrom/To, a gdy puste (stare raporty) — policzony z analiz (preferuj TYM).
+function _escoRepPeriod(rep){
+  let from=rep.periodFrom, to=rep.periodTo;
+  if(!from||!to){
+    const ids=(rep.analysisIdsTYM&&rep.analysisIdsTYM.length)?rep.analysisIdsTYM:(rep.analysisIds||[]);
+    const an=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
+    const fs=an.map(a=>_escoAnalPeriod(a).from).filter(Boolean).sort();
+    const ts=an.map(a=>_escoAnalPeriod(a).to).filter(Boolean).sort();
+    from=from||fs[0]||''; to=to||ts[ts.length-1]||'';
+  }
+  return {from,to};
+}
+
 function updateESCOSummary() {
   const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
   const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
@@ -3321,11 +3345,15 @@ function escoBuildReportFromForm(form){
   const firstTym=anals.find(a=>a.analysisType==='TYM')||anals[0]||{};
   const ftIp=firstTym.inputParams||{}, ftR=firstTym.results||{};
 
-  // okres = od najwcześniejszego do najpóźniejszego okresu rozliczeniowego wybranych analiz
-  const froms=anals.map(a=>(a.inputParams||{}).billingFrom).filter(Boolean).sort();
-  const tos  =anals.map(a=>(a.inputParams||{}).billingTo).filter(Boolean).sort();
+  // okres rozliczeniowy = okres PO (liczenia oszczędności): TYM trzyma go w inputParams.after.{from,to}.
+  // Preferuj analizy TYM; jeśli brak — dowolne wybrane. Min from / max to.
+  const periodAnals=tymIds.length?anals.filter(a=>a.analysisType==='TYM'):anals;
+  const froms=periodAnals.map(a=>_escoAnalPeriod(a).from).filter(Boolean).sort();
+  const tos  =periodAnals.map(a=>_escoAnalPeriod(a).to).filter(Boolean).sort();
   const regAnals=anals.filter(a=>a.analysisType==='REGRESSION');
-  const avgReg=regAnals.length?regAnals.reduce((s,a)=>s+(a.results?.avgReductionHeat||0),0)/regAnals.length:null;
+  // średnia redukcja zużycia z regresji (savedEnergyPct = cons.avgPct, w %)
+  const regPcts=regAnals.map(a=>(a.results||{}).savedEnergyPct).filter(v=>v!=null).map(Number);
+  const avgReg=regPcts.length?regPcts.reduce((s,v)=>s+v,0)/regPcts.length:null;
 
   // przy edycji zachowaj id i createdAt
   const editId=window._escoEditId;
@@ -3341,8 +3369,8 @@ function escoBuildReportFromForm(form){
     preparedBy: form.preparedBy.value.trim(),
     clientId: Number(clientId),
     objectId: Number(objectId),
-    periodFrom: froms[0]||ftIp.billingFrom||'',
-    periodTo: tos[tos.length-1]||ftIp.billingTo||'',
+    periodFrom: froms[0]||'',
+    periodTo: tos[tos.length-1]||'',
     analysisIds: ids,
     analysisIdsTYM: tymIds,
     analysisIdsREG: regIds,
@@ -3353,9 +3381,7 @@ function escoBuildReportFromForm(form){
       savedEnergyPct: ftR.savedEnergyPct||0,
       energyUnit: r.unit||ftIp.energyUnit||'',
       currency: r.currency||ftIp.currency||'',
-      avgReductionReg: avgReg!=null?avgReg/100:null,
-      eBill: ftR.eBill,
-      eComp: ftR.eComp
+      avgReductionReg: avgReg!=null?avgReg/100:null
     }
   };
 }
@@ -3450,13 +3476,19 @@ function escoRenderReportView(rep, isPreview){
          <button class="small-button" onclick="escoBackToEdit()">← Wróć do edycji</button>
        </div>`
     : `<div class="anw-noprint" style="margin-top:16px;font-size:11px;color:var(--color-text-secondary);padding:6px 10px;background:var(--color-background-secondary);border-radius:6px;display:inline-block;">🔒 Poufne — przeznaczone dla klienta</div>`;
+  const parts=escoBuildReportParts(rep);
   container.innerHTML = ANAL_STYLE + toolbar +
-    `<div id="anw-report" class="anw-report">${escoReportBodyHTML(rep)}</div>` + footer;
+    `<div id="anw-report" class="anw-report">${parts.html}</div>` + footer;
+  // wykresy wstawionych raportów metod (TYM/VOLUME); regresja rysuje wykresy SVG inline
+  setTimeout(()=>{ (parts.drawDatas||[]).forEach(d=>{ try{ _analDrawCharts(d); }catch(e){} }); }, 80);
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// Treść raportu ESCO — okładka + numerowane sekcje + podpisy (układ jak w raportach analiz).
-function escoReportBodyHTML(rep){
+// Składa OBSZERNY raport ESCO: okładka + metodyka + przegląd analiz + rozliczenie +
+// porównanie metod + PEŁNE raporty obu metod (TYM: _analReportBody z wykresami; regresja:
+// _analRegReportBody z wykresami SVG) jako dowody + podpisy.
+// Zwraca {html, drawDatas} — drawDatas to dane TYM/VOLUME do narysowania po wstawieniu do DOM.
+function escoBuildReportParts(rep){
   const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
   const r=rep.results||{};
   const u=r.energyUnit||'kWh', cur=r.currency||'EUR';
@@ -3465,6 +3497,16 @@ function escoReportBodyHTML(rep){
   const regAnals=(rep.analysisIdsREG||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
   const trSet=new Set([...(rep.analysisIdsTYM||[]),...(rep.analysisIdsREG||[])].map(Number));
   const otherAnals=all.filter(a=>!trSet.has(Number(a.id)));
+
+  // okres — z raportu; gdy pusty (stare raporty) policz na żywo z analiz (preferuj TYM)
+  let pFrom=rep.periodFrom, pTo=rep.periodTo;
+  if(!pFrom||!pTo){
+    const src=tymAnals.length?tymAnals:all;
+    const fs=src.map(a=>_escoAnalPeriod(a).from).filter(Boolean).sort();
+    const ts=src.map(a=>_escoAnalPeriod(a).to).filter(Boolean).sort();
+    pFrom=pFrom||fs[0]||''; pTo=pTo||ts[ts.length-1]||'';
+  }
+
   const pctNum=r.savedEnergyPct!=null?(r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct):null;
   const pos=(pctNum||0)>=0;
   const escoSum=all.reduce((s,a)=>s+((a.results&&a.results.escoAmount!=null)?Number(a.results.escoAmount):0),0);
@@ -3472,82 +3514,28 @@ function escoReportBodyHTML(rep){
   const genDate=fmtDate(new Date().toISOString().slice(0,10));
   const stMeta=escoStatusMeta(rep.status);
 
-  const tymRows=tymAnals.map(a=>{
-    const ar=a.results||{}, ai=a.inputParams||{}, p=_escoAnalPct(a);
-    return `<tr>
-      <td>${escapeHtml(a.name)}</td>
-      <td class="calc" style="color:#27500A;font-weight:600;">${p!=null?_fmtA(p,1)+'%':'—'}</td>
-      <td class="calc">${ar.savedEnergy!=null?_fmtA(ar.savedEnergy,2)+' '+(ai.energyUnit||u):'—'}</td>
-      <td class="calc">${ar.savedMoney!=null?_fmtA(ar.savedMoney,2)+' '+(ai.currency||cur):'—'}</td>
-      <td class="calc">${ar.escoAmount!=null?_fmtA(ar.escoAmount,2)+' '+(ai.currency||cur):'—'}</td>
-    </tr>`;
+  const typeMeta=a=>((AnalysesModule.TYPES&&AnalysesModule.TYPES[a.analysisType])||{label:a.analysisType,icon:'📊'});
+  const headline=a=>{
+    const ar=a.results||{}, ai=a.inputParams||{};
+    if(a.analysisType==='REGRESSION'){
+      const c=ar.savedEnergyPct!=null?_fmtA(ar.savedEnergyPct,1)+'% zużycia ciepła':'';
+      const s=ar.supplyPct!=null?_fmtA(ar.supplyPct,1)+'% temp. zasilania':'';
+      return [c,s].filter(Boolean).join(' · ')||'—';
+    }
+    const p=_escoAnalPct(a);
+    const e=ar.savedEnergy!=null?_fmtA(ar.savedEnergy,2)+' '+(ai.energyUnit||u):'';
+    const m=ar.savedMoney!=null?_fmtA(ar.savedMoney,2)+' '+(ai.currency||cur):'';
+    return [p!=null?_fmtA(p,1)+'% redukcji':'',e,m].filter(Boolean).join(' · ')||'—';
+  };
+  const overviewRows=all.map(a=>{
+    const t=typeMeta(a), per=_escoAnalPeriod(a);
+    return `<tr><td>${t.icon} ${escapeHtml(t.label)}</td><td>${escapeHtml(a.name)}</td><td class="calc">${fmtDate(per.from)} → ${fmtDate(per.to)}</td><td class="calc">${headline(a)}</td></tr>`;
   }).join('');
 
-  const regRows=regAnals.map(a=>{
-    const ar=a.results||{};
-    return `<tr>
-      <td>${escapeHtml(a.name)}</td>
-      <td class="calc">${ar.avgReductionSupply!=null?_fmtA(ar.avgReductionSupply,1)+'%':'—'}</td>
-      <td class="calc">${ar.avgReductionHeat!=null?_fmtA(ar.avgReductionHeat,1)+'%':'—'}</td>
-    </tr>`;
-  }).join('');
+  let n=0; const sec=(title,inner)=>{ n++; return `<div class="anw-step-card"><h4><span class="anw-step-num">${n}</span> ${title}</h4>${inner}</div>`; };
 
-  const otherRows=otherAnals.map(a=>{
-    const ar=a.results||{}, ai=a.inputParams||{}, p=_escoAnalPct(a);
-    const t=(AnalysesModule.TYPES&&AnalysesModule.TYPES[a.analysisType])||{label:a.analysisType,icon:'📊'};
-    return `<tr>
-      <td>${t.icon} ${escapeHtml(t.label)}</td>
-      <td>${escapeHtml(a.name)}</td>
-      <td class="calc" style="color:#27500A;font-weight:600;">${p!=null?_fmtA(p,1)+'%':'—'}</td>
-      <td class="calc">${ar.savedEnergy!=null?_fmtA(ar.savedEnergy,2)+' '+(ai.energyUnit||u):'—'}</td>
-      <td class="calc">${ar.savedMoney!=null?_fmtA(ar.savedMoney,2)+' '+(ai.currency||cur):'—'}</td>
-    </tr>`;
-  }).join('');
-
-  // numerowanie sekcji (pomija nieobecne)
-  let n=0;
-  const sec=(title,inner)=>{ n++; return `<div class="anw-step-card"><h4><span class="anw-step-num">${n}</span> ${title}</h4>${inner}</div>`; };
-
-  const secPodstawa=sec('Podstawa rozliczenia ESCO',`
-    <div class="anw-desc">
-      <p style="margin:0 0 8px;">Niniejszy raport zbiorczo rozlicza oszczędności energii uzyskane na obiekcie w okresie rozliczeniowym. Podstawą rozliczenia jest <b>metoda korekty do Typowego Roku Meteorologicznego (TYM)</b> — sprowadza zużycie okresu bazowego (PRZED) i okresu po wdrożeniu (PO) do wspólnych warunków pogodowych, dzięki czemu oszczędność nie zależy od tego, czy sezon był cieplejszy, czy chłodniejszy od normy.</p>
-      <p style="margin:0;">Wynik TYM jest weryfikowany pomocniczo <b>regresją liniową</b> zużycia względem temperatury (intensywność grzewcza). Obie metody mierzą inny aspekt tej samej oszczędności i wzajemnie się potwierdzają.</p>
-    </div>
-    ${(r.eBill!=null||r.eComp!=null)?`<div class="anw-rgrid" style="margin-top:12px;">
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(r.eBill||0,3)}</div><div class="k">E rozliczeniowe [${u}/HDD] — z WaterAI</div></div>
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(r.eComp||0,3)}</div><div class="k">E porównawcze [${u}/HDD] — bez WaterAI</div></div>
-    </div>`:''}`);
-
-  const secTym=sec('Metoda główna — korekta do TYM (podstawa faktur)',
-    tymAnals.length
-      ? `<table class="anw-t"><thead><tr><th>Analiza (TYM)</th><th style="text-align:right;">Redukcja</th><th style="text-align:right;">Oszczędność</th><th style="text-align:right;">Wartość</th><th style="text-align:right;">Udział WaterAI/ESCO</th></tr></thead><tbody>${tymRows}</tbody></table>`
-      : `<div class="anw-desc"><p style="margin:0;">Brak analiz TYM w tym raporcie.</p></div>`);
-
-  const secReg=regAnals.length?sec('Metoda pomocnicza — regresja liniowa',`
-    <table class="anw-t"><thead><tr><th>Analiza (regresja)</th><th style="text-align:right;">Śr. redukcja temp. zasilania</th><th style="text-align:right;">Śr. redukcja zużycia</th></tr></thead><tbody>${regRows}</tbody></table>
-    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Regresja jest technicznym dowodem działania systemu (zmiana charakterystyki pracy) i nie zastępuje metody TYM w rozliczeniu finansowym.</p></div>`):'';
-
-  const secOther=otherAnals.length?sec('Pozostałe analizy korygujące',`
-    <table class="anw-t"><thead><tr><th>Typ</th><th>Analiza</th><th style="text-align:right;">Redukcja</th><th style="text-align:right;">Oszczędność</th><th style="text-align:right;">Wartość</th></tr></thead><tbody>${otherRows}</tbody></table>`):'';
-
-  const secFin=sec('Rozliczenie finansowe ESCO',`
-    <div class="anw-rgrid">
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(r.savedMoneyTotal||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie)</div></div>
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#7B1FA2;font-variant-numeric:tabular-nums;">${_fmtA(escoSum,2)} ${cur}</div><div class="k">Udział WaterAI / ESCO</div></div>
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#27500A;font-variant-numeric:tabular-nums;">${clientSum!=null?_fmtA(clientSum,2)+' '+cur:'—'}</div><div class="k">Udział klienta</div></div>
-    </div>
-    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Udział WaterAI / ESCO to suma udziałów z poszczególnych analiz rozliczeniowych (TYM). Pozostała część wartości oszczędności przypada klientowi. Kwoty stanowią podstawę do wystawienia faktury za oszczędności.</p></div>`);
-
-  const secCmp=sec('Porównanie metod',`
-    <div class="anw-desc">
-      <p style="margin:0 0 6px;"><b>TYM</b> porównuje CAŁKOWITE zużycie sprowadzone do tych samych warunków pogodowych — obejmuje efekty dzienne i sezonowe; to podstawa faktur.</p>
-      <p style="margin:0 0 6px;"><b>Regresja</b> analizuje INTENSYWNOŚĆ grzewczą (zużycie na jednostkę temperatury) — izoluje czysty efekt sterowania.</p>
-      <p style="margin:0;"><b>Różnica między metodami nie jest błędem.</b> Każda mierzy inny aspekt tej samej oszczędności, dlatego wzajemnie się weryfikują.</p>
-    </div>`);
-
-  const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
-
-  return `
+  // ── okładka ESCO ──
+  const cover=`
   <div class="anw-cover">
     <div class="anw-cover-top">
       <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
@@ -3556,13 +3544,11 @@ function escoReportBodyHTML(rep){
         <div class="anw-cover-num-val">${escapeHtml(rep.reportNumber||'—')}</div>
       </div>
     </div>
-
     <div class="anw-cover-title">
       <div class="anw-cover-kicker">Raport ESCO · Energy Service Company</div>
       <h1>Raport rozliczeniowy ESCO</h1>
-      <div class="anw-cover-method">Zbiorcze rozliczenie oszczędności energii — metoda główna TYM, weryfikacja regresją liniową</div>
+      <div class="anw-cover-method">Zbiorcze rozliczenie oszczędności energii — metoda główna TYM (stopniodni), weryfikacja metodą pomocniczą (regresja liniowa)</div>
     </div>
-
     <div class="anw-cover-meta">
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Dla kogo</div>
@@ -3575,16 +3561,15 @@ function escoReportBodyHTML(rep){
         <div class="anw-cm-sub">Data raportu: ${fmtDate(rep.reportDate)}</div>
       </div>
       <div class="anw-cover-meta-card">
-        <div class="anw-cm-lbl">Okres rozliczeniowy</div>
-        <div class="anw-cm-val anw-cm-period">${fmtDate(rep.periodFrom)} → ${fmtDate(rep.periodTo)}</div>
+        <div class="anw-cm-lbl">Okres rozliczeniowy (liczenia oszczędności)</div>
+        <div class="anw-cm-val anw-cm-period">${fmtDate(pFrom)} → ${fmtDate(pTo)}</div>
       </div>
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Status raportu</div>
         <div class="anw-cm-val"><span style="display:inline-block;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;background:${stMeta.color}22;color:${stMeta.color};">${stMeta.label}</span></div>
-        <div class="anw-cm-sub">Analiz w raporcie: ${all.length}</div>
+        <div class="anw-cm-sub">Analiz w raporcie: ${all.length} (TYM: ${tymAnals.length}, regresja: ${regAnals.length})</div>
       </div>
     </div>
-
     <div class="anw-cover-result">
       <div class="anw-cover-result-head">Wynik końcowy</div>
       <div class="anw-cover-osz ${pos?'pos':'neg'}">
@@ -3592,35 +3577,75 @@ function escoReportBodyHTML(rep){
         <div class="anw-cover-osz-val">${pctNum!=null?(pos?'':'−')+_fmtA(Math.abs(pctNum),1):'—'}<span>%</span></div>
       </div>
       <div class="anw-cover-kpis">
-        <div class="anw-cover-kpi">
-          <div class="v">${_fmtA(r.savedEnergyTotal||0,2)} <span>${u}</span></div>
-          <div class="k">Energia zaoszczędzona</div>
-        </div>
-        <div class="anw-cover-kpi">
-          <div class="v">${_fmtA(r.savedMoneyTotal||0,2)} <span>${cur}</span></div>
-          <div class="k">Wartość oszczędności</div>
-        </div>
-        <div class="anw-cover-kpi">
-          <div class="v">${_fmtA(escoSum||0,2)} <span>${cur}</span></div>
-          <div class="k">Udział WaterAI/ESCO</div>
-        </div>
+        <div class="anw-cover-kpi"><div class="v">${_fmtA(r.savedEnergyTotal||0,2)} <span>${u}</span></div><div class="k">Energia zaoszczędzona</div></div>
+        <div class="anw-cover-kpi"><div class="v">${_fmtA(r.savedMoneyTotal||0,2)} <span>${cur}</span></div><div class="k">Wartość oszczędności</div></div>
+        <div class="anw-cover-kpi"><div class="v">${_fmtA(escoSum||0,2)} <span>${cur}</span></div><div class="k">Udział WaterAI/ESCO</div></div>
       </div>
     </div>
-
     <div class="anw-cover-foot">
       <span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span>
       <span>control.waterai.cloud</span>
     </div>
-  </div>
+  </div>`;
 
-  ${secPodstawa}
-  ${secTym}
-  ${secReg}
-  ${secOther}
-  ${secFin}
-  ${secCmp}
-  ${secNotes}
+  const secMetodyka=sec('Metodyka rozliczenia — dwie metody',`
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;"><b>Metoda główna (rozliczeniowa) — korekta do Typowego Roku Meteorologicznego (TYM).</b> Opiera się na zmierzonym zużyciu (licznik / faktury) sprowadzonym do wspólnych warunków pogodowych za pomocą stopniodni grzewczych (HDD). Dzięki temu porównanie okresu bazowego (PRZED) i okresu po wdrożeniu (PO) jest niezależne od tego, czy dany sezon był cieplejszy, czy chłodniejszy od normy. To certyfikowana, kontraktowa podstawa do rozliczeń i wystawienia faktury za oszczędności.</p>
+      <p style="margin:0 0 8px;"><b>Metoda pomocnicza (weryfikacyjna) — regresja liniowa.</b> Na podstawie ciągłych pomiarów (co 10 min: temp. zewnętrzna, zasilania, zużycie) wyznacza charakterystyki pracy obiektu y = a·x + b dla okresu PRZED i PO. Porównanie prostych pokazuje techniczną zmianę intensywności grzewczej (zużycie i temperatura zasilania na jednostkę temperatury zewnętrznej). Stanowi niezależny, inżynierski dowód działania systemu i nie zastępuje metody TYM w rozliczeniu finansowym.</p>
+      <p style="margin:0;">Pełne obliczenia, wzory, tabele i wykresy obu metod znajdują się w dalszej części raportu (sekcje „Dowód").</p>
+    </div>`);
 
+  const secPrzeglad=sec('Zakres raportu — uwzględnione analizy', all.length
+    ? `<table class="anw-t"><thead><tr><th>Typ</th><th>Analiza</th><th style="text-align:right;">Okres (PO)</th><th style="text-align:right;">Wynik</th></tr></thead><tbody>${overviewRows}</tbody></table>`
+    : `<div class="anw-desc"><p style="margin:0;">Brak analiz w raporcie.</p></div>`);
+
+  const secFin=sec('Rozliczenie finansowe ESCO',`
+    <div class="anw-rgrid">
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(r.savedMoneyTotal||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie)</div></div>
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#7B1FA2;font-variant-numeric:tabular-nums;">${_fmtA(escoSum,2)} ${cur}</div><div class="k">Udział WaterAI / ESCO</div></div>
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#27500A;font-variant-numeric:tabular-nums;">${clientSum!=null?_fmtA(clientSum,2)+' '+cur:'—'}</div><div class="k">Udział klienta</div></div>
+    </div>
+    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Udział WaterAI / ESCO to suma udziałów z analiz rozliczeniowych (TYM). Pozostała część wartości oszczędności przypada klientowi. Kwoty stanowią podstawę do wystawienia faktury za osiągnięte oszczędności.</p></div>`);
+
+  const secCmp=sec('Porównanie metod',`
+    <div class="anw-desc">
+      <p style="margin:0 0 6px;"><b>TYM</b> porównuje CAŁKOWITE zużycie sprowadzone do tych samych warunków pogodowych — obejmuje efekty dzienne i sezonowe; to podstawa faktur.</p>
+      <p style="margin:0 0 6px;"><b>Regresja</b> analizuje INTENSYWNOŚĆ grzewczą (zużycie i temperatura zasilania na jednostkę temperatury zewnętrznej) — izoluje czysty efekt sterowania.</p>
+      <p style="margin:0;"><b>Różnica między metodami nie jest błędem.</b> Każda mierzy inny aspekt tej samej oszczędności, dlatego wzajemnie się weryfikują i wspólnie potwierdzają wynik.</p>
+    </div>`);
+
+  const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
+
+  // ── DOWODY: pełne raporty metod ──
+  const drawDatas=[];
+  const divider=(kicker,title)=>`<div class="anw-step-card" style="page-break-before:always;break-before:page;border-left:4px solid #0C447C;background:#EEF4FB;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#1a6bb5;">${kicker}</div>
+      <div style="font-size:16px;font-weight:800;color:#0f2f4f;margin-top:3px;">${title}</div>
+    </div>`;
+  const failCard=(a,msg)=>{ const t=typeMeta(a); return `<div class="anw-step-card"><h4>${t.icon} ${escapeHtml(a.name)}</h4><div class="anw-desc"><p style="margin:0;">${msg} Wynik skrótowy: ${headline(a)}.</p></div></div>`; };
+
+  let proofs='';
+  tymAnals.forEach((a,i)=>{
+    try{ const data=_analReportData({saved:a}); drawDatas.push(data);
+      proofs+=divider('Dowód · metoda główna (TYM)'+(tymAnals.length>1?` — ${i+1}/${tymAnals.length}`:''), escapeHtml(a.name))+_analReportBody(data);
+    }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu tej analizy TYM.'); }
+  });
+  regAnals.forEach((a,i)=>{
+    try{
+      const reg=(a.inputParams&&a.inputParams.reg)?a.inputParams.reg:null;
+      const model=reg?_analRegModel(reg):null;
+      const o=ObjectsModule.find(a.objectId);
+      if(reg&&model) proofs+=divider('Dowód · metoda pomocnicza (regresja)'+(regAnals.length>1?` — ${i+1}/${regAnals.length}`:''), escapeHtml(a.name))+_analRegReportBody(a,reg,model,o);
+      else proofs+=failCard(a,'Brak zapisanych danych źródłowych regresji (CSV) dla tej analizy.');
+    }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu regresji.'); }
+  });
+  otherAnals.forEach(a=>{
+    try{ const data=_analReportData({saved:a}); drawDatas.push(data);
+      proofs+=divider('Dowód · analiza dodatkowa', escapeHtml(a.name))+_analReportBody(data);
+    }catch(e){ proofs+=failCard(a,'Pełny raport tej analizy jest niedostępny.'); }
+  });
+
+  const signatures=`
   <div class="anw-sign">
     <div class="anw-sign-box">
       <div class="anw-sign-line"></div>
@@ -3632,7 +3657,13 @@ function escoReportBodyHTML(rep){
       <div class="anw-sign-cap">Rozliczenia ESCO — WaterAI Energy.</div>
     </div>
   </div>`;
+
+  const html=cover+secMetodyka+secPrzeglad+secFin+secCmp+secNotes+proofs+signatures;
+  return {html, drawDatas};
 }
+
+// Zgodność wstecz: zwraca samo HTML (bez listy wykresów do narysowania).
+function escoReportBodyHTML(rep){ return escoBuildReportParts(rep).html; }
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
