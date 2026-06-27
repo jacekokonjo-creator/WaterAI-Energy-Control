@@ -1980,6 +1980,137 @@ function _analRegResultsHtml(reg, model, opts) {
     </div>`;
 }
 
+// Pełny raport regresji w stylu raportu ESCO (TYM): okładka + numerowane sekcje z opisem.
+function _analRegReportBody(a, reg, model, o) {
+  if (!model || !model.cons || !model.sup) {
+    return `<div class="reminder-card" style="border-left:4px solid #c0392b;"><strong>Nie udało się odtworzyć analizy regresji</strong>
+      <div class="reminder-meta">Brak policzonych linii bazowych lub danych okresu analizowanego. Otwórz analizę w kreatorze i uzupełnij dane (Metoda 1/2 + import CSV okresu analizowanego).</div></div>`;
+  }
+  const c = model.cons, s = model.sup;
+  if (model.range) { c.range = model.range; s.range = model.range; }
+  const number = (window.AnalysesModule && AnalysesModule.getNumber) ? (AnalysesModule.getNumber(a.id) || ('A/#' + a.id)) : ('A/#' + a.id);
+  const cl = (window.ClientsModule) ? ClientsModule.find(a.clientId) : null;
+  const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
+  const pid = reg.baseLines ? reg.baseLines.periodId : null;
+  let bp = null; try { bp = (window.RegressionBaseModule && pid != null) ? RegressionBaseModule.find(a.objectId, pid) : null; } catch (e) {}
+  const baseFrom = bp && bp.periodFrom ? bp.periodFrom : '';
+  const baseTo = bp && bp.periodTo ? bp.periodTo : '';
+  const poFrom = (reg.billing && reg.billing.from) ? String(reg.billing.from).slice(0, 10) : ((reg.analyzed && reg.analyzed.from) ? String(reg.analyzed.from).slice(0, 10) : '');
+  const poTo = (reg.billing && reg.billing.to) ? String(reg.billing.to).slice(0, 10) : ((reg.analyzed && reg.analyzed.to) ? String(reg.analyzed.to).slice(0, 10) : '');
+  const pct = c.avgPct;
+  const pos = (pct == null) || pct >= 0;
+  const methodTxt = model.method === 'binned'
+    ? 'Metoda 2 — dopasowanie do średnich wartości na każdy zaokrąglony stopień temperatury zewnętrznej (jak linia trendu w arkuszu referencyjnym)'
+    : 'Metoda 1 — dopasowanie do wszystkich punktów pomiarowych';
+  const rngTxt = model.range ? `${model.range.from}…${model.range.to} °C (krok ${model.range.step} °C)` : '−15…+10 °C';
+  const wN = model.waterai || {};
+  const subsetNote = (wN.nRows != null && wN.nAll != null)
+    ? ` Linię WaterAI policzono z <b>${wN.nRows}</b> z ${wN.nAll} odczytów okresu analizowanego.` : '';
+  return `
+  <div class="anw-cover">
+    <div class="anw-cover-top">
+      <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
+      <div class="anw-cover-num"><div class="anw-cover-num-lbl">Nr analizy</div><div class="anw-cover-num-val">${_escA(number)}</div></div>
+    </div>
+    <div class="anw-cover-title">
+      <div class="anw-cover-kicker">Raport ESCO · Analiza techniczna</div>
+      <h1>Analiza techniczna — regresja liniowa</h1>
+      <div class="anw-cover-method">Porównanie parametrów pracy obiektu PRZED / PO wdrożeniu wg równań y = a·x + b</div>
+    </div>
+    <div class="anw-cover-meta">
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Dla kogo</div><div class="anw-cm-val">${_escA((cl && cl.name) || '—')}</div><div class="anw-cm-sub">Obiekt: ${_escA((o && o.name) || '—')}</div></div>
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Wykonał — Energy Analyst</div><div class="anw-cm-val">${_escA(a.author || '—')}</div><div class="anw-cm-sub">Data wykonania: ${_fmtDateA(a.executedAt)}</div></div>
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres bazowy (PRZED)</div><div class="anw-cm-val anw-cm-period">${baseFrom ? _fmtDateA(baseFrom) : '—'} → ${baseTo ? _fmtDateA(baseTo) : '—'}</div></div>
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres analizowany (PO)</div><div class="anw-cm-val anw-cm-period">${poFrom ? _fmtDateA(poFrom) : '—'} → ${poTo ? _fmtDateA(poTo) : '—'}</div></div>
+    </div>
+    <div class="anw-cover-result">
+      <div class="anw-cover-result-head">Wynik końcowy</div>
+      <div class="anw-cover-osz ${pos ? 'pos' : 'neg'}">
+        <div class="anw-cover-osz-lbl">Obniżenie<br>zużycia ciepła</div>
+        <div class="anw-cover-osz-val">${pct == null ? '—' : (pos ? '' : '−') + _fmtA(Math.abs(pct), 1)}<span>%</span></div>
+      </div>
+      <div class="anw-cover-kpis">
+        <div class="anw-cover-kpi"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) : '—'} <span>MJ</span></div><div class="k">Średnia różnica zużycia (w zakresie T)</div></div>
+        <div class="anw-cover-kpi"><div class="v">${s.avgPct != null ? _fmtA(s.avgPct, 1) : '—'}<span>%</span></div><div class="k">Średnie obniżenie temp. zasilania</div></div>
+        <div class="anw-cover-kpi"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) : '—'} <span>°C</span></div><div class="k">Średnia różnica temp. zasilania</div></div>
+      </div>
+    </div>
+    <div class="anw-cover-foot"><span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span><span>control.waterai.cloud</span></div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">1</span> Model regresji liniowej — założenia i dane wejściowe</h4>
+    <div class="anw-desc">
+      <p style="margin:0 0 8px;">Regresja liniowa opisuje zależność wybranego parametru pracy instalacji od temperatury zewnętrznej. Pozwala porównać, jak obiekt reaguje na warunki pogodowe PRZED i PO wdrożeniu — niezależnie od tego, że oba okresy mogły mieć inny przebieg temperatur. Dzięki temu efekt optymalizacji ocenia się technicznie, a nie tylko przez surowe sumy zużycia.</p>
+      <p style="margin:0;">Dla każdego okresu wyznacza się prostą najlepszego dopasowania do chmury punktów pomiarowych (metodą najmniejszych kwadratów):</p>
+    </div>
+    <div class="anw-formula">y = a·x + b</div>
+    <div class="anw-desc">
+      <p style="margin:0 0 4px;">gdzie:</p>
+      <ul style="margin:0 0 8px 18px;padding:0;">
+        <li><b>y</b> — parametr zależny: zużycie ciepła [MJ] (przyrost wskazań licznika między kolejnymi odczytami) lub temperatura zasilania [°C],</li>
+        <li><b>x</b> — temperatura zewnętrzna [°C],</li>
+        <li><b>a</b> — współczynnik kierunkowy: o ile zmienia się y przy wzroście temperatury zewnętrznej o 1 °C (dla ogrzewania a jest ujemne — im zimniej, tym wyższe zużycie i temperatura zasilania),</li>
+        <li><b>b</b> — wyraz wolny: teoretyczna wartość y przy temperaturze zewnętrznej 0 °C.</li>
+      </ul>
+      <p style="margin:0 0 6px;">W analizie zestawia się dwie proste:</p>
+      <p style="margin:0 0 6px;"><b>a) Tryb pogodowy (baza)</b> — regresja wyznaczona dla okresu bazowego (PRZED), opisująca pierwotną charakterystykę cieplną obiektu przed wdrożeniem.</p>
+      <p style="margin:0 0 6px;"><b>b) WaterAI (po)</b> — regresja wyznaczona dla okresu analizowanego (PO), na podstawie danych z czujników po wdrożeniu optymalizacji.</p>
+      <p style="margin:0;">Dopasowanie wykonano w wariancie: <b>${methodTxt}</b>. Zakres temperatur do porównania i uśrednienia przyjęto na <b>${rngTxt}</b>.</p>
+    </div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">2</span> Równania regresji wyznaczone dla obu okresów</h4>
+    <div class="anw-desc"><p style="margin:0 0 8px;">Z danych pomiarowych obu okresów otrzymano poniższe równania prostych. Wartość <b>n</b> w nawiasie to liczba punktów wykorzystanych w dopasowaniu danej linii.</p></div>
+    <div class="anw-g2">
+      <div class="anw-formula" style="border-color:#9aa5b1;">Zużycie · Tryb pogodowy:&nbsp; ${_analRegLineTxt(c.base)}</div>
+      <div class="anw-formula" style="border-color:#1E7B34;">Zużycie · WaterAI:&nbsp; ${_analRegLineTxt(c.waterai)}</div>
+      <div class="anw-formula" style="border-color:#9aa5b1;">T zasilania · Tryb pogodowy:&nbsp; ${_analRegLineTxt(s.base)}</div>
+      <div class="anw-formula" style="border-color:#185FA5;">T zasilania · WaterAI:&nbsp; ${_analRegLineTxt(s.waterai)}</div>
+    </div>
+    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Porównując obie proste przy tej samej temperaturze zewnętrznej, odczytuje się, o ile niższe (lub wyższe) jest po wdrożeniu zużycie ciepła oraz temperatura zasilania. Różnica między prostymi <b>Tryb pogodowy</b> a <b>WaterAI</b> jest techniczną miarą efektu optymalizacji.</p></div>
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">3</span> Porównanie zużycia ciepła w funkcji temperatury zewnętrznej</h4>
+    <div class="anw-desc"><p style="margin:0 0 8px;">Wykres przedstawia zużycie ciepła wyznaczone z równań regresji dla całego przyjętego zakresu temperatur. Tabela zbiorcza zestawia wartości obu trybów, procentowe obniżenie oraz różnicę bezwzględną dla każdego stopnia temperatury zewnętrznej.</p></div>
+    ${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}
+    ${_analRegTableHtml(c, 'zużycie', 'MJ')}
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">4</span> Porównanie temperatury zasilania w funkcji temperatury zewnętrznej</h4>
+    <div class="anw-desc"><p style="margin:0 0 8px;">Analogiczne zestawienie dla temperatury zasilania instalacji. Niższa temperatura zasilania przy tej samej temperaturze zewnętrznej oznacza łagodniejszą pracę źródła ciepła, mniejsze straty przesyłu i potencjalnie wyższą sprawność wytwarzania.</p></div>
+    ${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}
+    ${_analRegTableHtml(s, 'T zasilania', '°C')}
+  </div>
+
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">5</span> Wynik — uśrednione obniżenie w przyjętym zakresie temperatur</h4>
+    <div class="anw-desc"><p style="margin:0 0 8px;">Uśredniając obniżenie w całym przyjętym zakresie temperatur (${rngTxt}), otrzymuje się techniczny wskaźnik poprawy charakterystyki cieplnej obiektu po wdrożeniu:</p></div>
+    <div class="anw-rgrid">
+      <div class="anw-tile"><div class="v">${c.avgPct != null ? _fmtA(c.avgPct, 1) + '%' : '—'}</div><div class="k">Średnie obniżenie zużycia ciepła</div></div>
+      <div class="anw-tile"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) + ' MJ' : '—'}</div><div class="k">Średnia różnica zużycia</div></div>
+      <div class="anw-tile"><div class="v">${s.avgPct != null ? _fmtA(s.avgPct, 1) + '%' : '—'}</div><div class="k">Średnie obniżenie temp. zasilania</div></div>
+      <div class="anw-tile"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) + ' °C' : '—'}</div><div class="k">Średnia różnica temp. zasilania</div></div>
+    </div>
+    <div class="anw-desc" style="margin-top:10px;"><p style="margin:0;"><b>Tryb pogodowy</b> = regresja okresu bazowego (PRZED). <b>WaterAI</b> = regresja okresu analizowanego (PO) na danych z czujników.${subsetNote} Wynik ma charakter techniczny (porównanie charakterystyk pracy), niezależny od rozliczenia finansowego ESCO.</p></div>
+  </div>
+
+  <div class="anw-sign">
+    <div class="anw-sign-box">
+      <div class="anw-sign-line"></div>
+      <div class="anw-sign-cap">Klient — podpis i data</div>
+    </div>
+    <div class="anw-sign-box anw-sign-wateria">
+      <div class="anw-stamp">WaterAI Energy</div>
+      <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
+      <div class="anw-sign-cap">Analizy energetyczne WaterAI Energy.</div>
+    </div>
+  </div>`;
+}
+
 function _analRegRun() {
   const reg = ANAL.reg || {};
   const problems = [];
@@ -2690,13 +2821,9 @@ function analView(id) {
     container.innerHTML = ANAL_STYLE + `
       <div class="anw-act anw-noprint" style="justify-content:space-between;margin-bottom:14px;">
         <button class="small-button" onclick="renderAnalysesModule()">← Lista analiz</button>
-        <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="window.print()">🖨 Drukuj</button>
+        <button class="anw-run" style="font-size:14px;padding:11px 22px;" onclick="analPrintPDF()">🖨 Drukuj</button>
       </div>
-      <div class="anw-report">
-        <h2 style="margin:0 0 4px;font-size:18px;color:#0C447C;">${_escA(a.name || 'Analiza regresji')}</h2>
-        <div class="anw-muted" style="margin-bottom:10px;font-size:12px;">Obiekt: ${_escA(o ? o.name : '—')} · Wykonał: ${_escA(a.author || '—')} · Data: ${_escA(a.executedAt || '—')} · Okres rozliczeniowy: ${_escA(reg && reg.billing ? ((reg.billing.from || '?') + ' → ' + (reg.billing.to || '?')) : '—')}</div>
-        ${(reg && model) ? _analRegResultsHtml(reg, model, { withSave: false }) : '<div class="reminder-card">Brak zapisanych danych wejściowych tej analizy.</div>'}
-      </div>`;
+      <div id="anw-report" class="anw-report">${(reg && model) ? _analRegReportBody(a, reg, model, o) : '<div class="reminder-card">Brak zapisanych danych wejściowych tej analizy.</div>'}</div>`;
     return;
   }
   const data = _analReportData({ saved: a });
