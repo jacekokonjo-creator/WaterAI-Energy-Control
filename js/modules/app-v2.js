@@ -1980,6 +1980,136 @@ function _analRegResultsHtml(reg, model, opts) {
     </div>`;
 }
 
+// Punkty pomiarowe (chmura) danej metryki z podanych wierszy — ta sama logika co dopasowanie linii.
+function _analRegPtsFromRows(rows, metric) {
+  if (metric === 'sup') {
+    return (rows || []).filter(r => r && r.tOutdoor != null && r.tSupply != null).map(r => ({ x: +r.tOutdoor, y: +r.tSupply }));
+  }
+  const chrono = (rows || []).filter(r => r && r.heatConsumption != null && r.readTime)
+    .map((r, i) => ({ r, i }))
+    .sort((A, B) => { const am = (typeof _regTs === 'function') ? _regTs(A.r.readTime) : 0, bm = (typeof _regTs === 'function') ? _regTs(B.r.readTime) : 0; return (am == null ? 0 : am) - (bm == null ? 0 : bm); });
+  return (typeof _consDeltas === 'function') ? _consDeltas(chrono.map(o => Object.assign({}, o.r, { _idx: o.i }))).map(p => ({ x: p.x, y: p.y })) : [];
+}
+
+// Zestawy punktów PRZED (baza) i PO (WaterAI) dla scatter-plotów zużycia i temperatury zasilania.
+function _analRegScatterSets(a, reg, model) {
+  const out = { cons: { base: [], wai: [] }, sup: { base: [], wai: [] } };
+  const allRows = (reg.analyzed && reg.analyzed.rows) || [];
+  const bf = (reg.billing && reg.billing.from && typeof _regTs === 'function') ? _regTs(reg.billing.from) : null;
+  const bt = (reg.billing && reg.billing.to && typeof _regTs === 'function') ? _regTs(reg.billing.to) : null;
+  const waiRows = (bf == null && bt == null) ? allRows : allRows.filter(r => {
+    const ms = (r && r.readTime && typeof _regTs === 'function') ? _regTs(r.readTime) : null;
+    if (ms == null) return false;
+    if (bf != null && ms < bf) return false;
+    if (bt != null && ms > bt) return false;
+    return true;
+  });
+  out.cons.wai = _analRegPtsFromRows(waiRows, 'cons');
+  out.sup.wai = _analRegPtsFromRows(waiRows, 'sup');
+  const pid = reg.baseLines ? reg.baseLines.periodId : null;
+  if (pid != null && typeof _regViews === 'function' && window.RegressionBaseModule) {
+    let bpp = null; try { bpp = RegressionBaseModule.find(a.objectId, pid); } catch (e) {}
+    const sf = window._regBaseFrom, st = window._regBaseTo;
+    window._regBaseFrom = (bpp && bpp.periodFrom) ? bpp.periodFrom : '';
+    window._regBaseTo = (bpp && bpp.periodTo) ? bpp.periodTo : '';
+    try {
+      const v = _regViews(pid);
+      out.cons.base = (v.cons_raw && v.cons_raw.pts) ? v.cons_raw.pts.map(p => ({ x: p.x, y: p.y })) : [];
+      out.sup.base = (v.sup_raw && v.sup_raw.pts) ? v.sup_raw.pts.map(p => ({ x: p.x, y: p.y })) : [];
+    } catch (e) {}
+    window._regBaseFrom = sf; window._regBaseTo = st;
+  }
+  return out;
+}
+
+// Próbkowanie punktów dla wydajności renderu SVG (chmura bywa tysiącami odczytów).
+function _analRegSub(pts, max) {
+  if (!pts || pts.length <= max) return pts || [];
+  const step = pts.length / max, out = [];
+  for (let i = 0; i < pts.length; i += step) out.push(pts[Math.floor(i)]);
+  return out;
+}
+
+// Scatter: chmura punktów PRZED/PO + obie linie regresji (jak w arkuszu referencyjnym).
+function _analRegScatterSvg(title, basePts, waiPts, baseLine, waiLine, yLabel) {
+  basePts = basePts || []; waiPts = waiPts || [];
+  const all = basePts.concat(waiPts);
+  if (all.length < 1) return `<div class="anw-muted" style="font-size:11px;margin-top:6px;">Brak zapisanych punktów pomiarowych do wykresu „${_escA(title)}".</div>`;
+  let xmin = Math.min.apply(null, all.map(p => p.x)), xmax = Math.max.apply(null, all.map(p => p.x));
+  let ymin = Math.min.apply(null, all.map(p => p.y)), ymax = Math.max.apply(null, all.map(p => p.y));
+  if (xmin === xmax) { xmin -= 1; xmax += 1; }
+  if (ymin === ymax) { ymin -= 1; ymax += 1; }
+  const padY = (ymax - ymin) * 0.08; ymin -= padY; ymax += padY;
+  const W = 580, H = 320, L = 60, R = 16, T = 30, Bm = 54;
+  const xspan = (xmax - xmin) || 1, yspan = (ymax - ymin) || 1;
+  const px = t => L + (t - xmin) / xspan * (W - L - R);
+  const py = v => T + (1 - (v - ymin) / yspan) * (H - T - Bm);
+  let grid = '';
+  for (let i = 0; i <= 4; i++) { const val = ymin + yspan * i / 4, y = py(val);
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${val.toFixed(0)}</text>`; }
+  let xlab = '';
+  const xstep = xspan > 30 ? 10 : (xspan > 12 ? 5 : (xspan > 4 ? 2 : 1));
+  for (let t = Math.ceil(xmin / xstep) * xstep; t <= xmax + 1e-9; t += xstep) { const x = px(t);
+    xlab += `<line x1="${x.toFixed(1)}" y1="${H - Bm}" x2="${x.toFixed(1)}" y2="${H - Bm + 4}" stroke="#9aa5b1"/><text x="${x.toFixed(1)}" y="${H - Bm + 16}" text-anchor="middle" font-size="9" fill="#7a8794">${t}</text>`; }
+  const dots = (pts, color) => _analRegSub(pts, 700).map(p => `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="2" fill="${color}" fill-opacity="0.45"/>`).join('');
+  const seg = (Ln, dash) => { if (!Ln || Ln.a == null) return '';
+    const y1 = Ln.a * xmin + Ln.b, y2 = Ln.a * xmax + Ln.b;
+    return `<line x1="${px(xmin).toFixed(1)}" y1="${py(y1).toFixed(1)}" x2="${px(xmax).toFixed(1)}" y2="${py(y2).toFixed(1)}" stroke="#1a1a1a" stroke-width="2.2" ${dash ? 'stroke-dasharray="7 5"' : ''}/>`; };
+  const cx = (L + (W - R)) / 2, cy = (T + (H - Bm)) / 2;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;background:#fff;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <text x="${L}" y="18" font-size="12" font-weight="600" fill="#0C447C">${title}</text>
+    ${grid}${xlab}
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <line x1="${L}" y1="${H - Bm}" x2="${W - R}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    ${dots(basePts, '#3F7FBF')}${dots(waiPts, '#E08A3C')}
+    ${seg(baseLine, false)}${seg(waiLine, true)}
+    <text x="${cx.toFixed(0)}" y="${H - 18}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670">Temperatura zewnętrzna [°C]</text>
+    <text x="14" y="${cy.toFixed(0)}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670" transform="rotate(-90 14 ${cy.toFixed(0)})">${yLabel || ''}</text>
+    <g font-size="10">
+      <circle cx="${L + 8}" cy="${T + 4}" r="3" fill="#3F7FBF" fill-opacity="0.6"/><text x="${L + 16}" y="${T + 7}" fill="#5b6670">Tryb pogodowy (PRZED)</text>
+      <circle cx="${L + 158}" cy="${T + 4}" r="3" fill="#E08A3C" fill-opacity="0.7"/><text x="${L + 166}" y="${T + 7}" fill="#5b6670">WaterAI (PO)</text>
+      <line x1="${L + 270}" y1="${T + 4}" x2="${L + 288}" y2="${T + 4}" stroke="#1a1a1a" stroke-width="2"/><text x="${L + 292}" y="${T + 7}" fill="#5b6670">linia PRZED</text>
+      <line x1="${L + 372}" y1="${T + 4}" x2="${L + 390}" y2="${T + 4}" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="5 4"/><text x="${L + 394}" y="${T + 7}" fill="#5b6670">linia PO</text>
+    </g>
+  </svg>`;
+}
+
+// Wykres słupkowy redukcji (% obniżenia) danej metryki dla każdego stopnia temperatury zewnętrznej.
+function _analRegReductionSvg(title, m) {
+  const rows = (m && m.rows) || [];
+  if (!rows.length) return '';
+  const W = 580, H = 300, L = 56, R = 16, T = 30, Bm = 52;
+  const ds = rows.map(r => (r.D != null && isFinite(r.D)) ? r.D : 0);
+  let ymax = Math.max.apply(null, ds.concat([0])), ymin = Math.min.apply(null, ds.concat([0]));
+  if (ymax === ymin) { ymax += 1; ymin -= 1; }
+  const pad = (ymax - ymin) * 0.1; ymax += pad; ymin -= pad;
+  const xs = rows.map(r => r.t), xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs);
+  const xspan = (xmax - xmin) || 1, yspan = (ymax - ymin) || 1;
+  const px = t => L + (t - xmin) / xspan * (W - L - R);
+  const py = v => T + (1 - (v - ymin) / yspan) * (H - T - Bm);
+  const bw = Math.max(2, (W - L - R) / rows.length * 0.7);
+  const y0 = py(0);
+  let grid = '';
+  for (let i = 0; i <= 4; i++) { const val = ymin + yspan * i / 4, y = py(val);
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${val.toFixed(0)}%</text>`; }
+  let xlab = '';
+  const xstep = xspan > 30 ? 10 : (xspan > 12 ? 5 : (xspan > 4 ? 2 : 1));
+  for (let t = Math.ceil(xmin / xstep) * xstep; t <= xmax + 1e-9; t += xstep) { const x = px(t);
+    xlab += `<line x1="${x.toFixed(1)}" y1="${H - Bm}" x2="${x.toFixed(1)}" y2="${H - Bm + 4}" stroke="#9aa5b1"/><text x="${x.toFixed(1)}" y="${H - Bm + 16}" text-anchor="middle" font-size="9" fill="#7a8794">${t}</text>`; }
+  const bars = rows.map(r => { const d = (r.D != null && isFinite(r.D)) ? r.D : 0; const x = px(r.t) - bw / 2; const yv = py(d);
+    const top = Math.min(yv, y0), h = Math.max(0.5, Math.abs(yv - y0));
+    return `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${d >= 0 ? '#1E7B34' : '#C0392B'}" fill-opacity="0.85"/>`; }).join('');
+  const cx = (L + (W - R)) / 2, cy = (T + (H - Bm)) / 2;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;background:#fff;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <text x="${L}" y="18" font-size="12" font-weight="600" fill="#0C447C">${title}</text>
+    ${grid}${xlab}${bars}
+    <line x1="${L}" y1="${y0.toFixed(1)}" x2="${W - R}" y2="${y0.toFixed(1)}" stroke="#9aa5b1"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${H - Bm}" stroke="#9aa5b1"/>
+    <text x="${cx.toFixed(0)}" y="${H - 18}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670">Temperatura zewnętrzna [°C]</text>
+    <text x="14" y="${cy.toFixed(0)}" text-anchor="middle" font-size="11" font-weight="600" fill="#5b6670" transform="rotate(-90 14 ${cy.toFixed(0)})">Redukcja [%]</text>
+  </svg>`;
+}
+
 // Pełny raport regresji w stylu raportu ESCO (TYM): okładka + numerowane sekcje z opisem.
 function _analRegReportBody(a, reg, model, o) {
   if (!model || !model.cons || !model.sup) {
@@ -2007,6 +2137,8 @@ function _analRegReportBody(a, reg, model, o) {
   const wN = model.waterai || {};
   const subsetNote = (wN.nRows != null && wN.nAll != null)
     ? ` Linię WaterAI wyznaczono z <b>${wN.nRows}</b> odczytów mieszczących się w zadeklarowanym okresie rozliczeniowym — z <b>${wN.nAll}</b> wszystkich odczytów w zaimportowanym pliku CSV (pozostałe leżą poza tym okresem i nie są uwzględniane).` : '';
+  let sc = { cons: { base: [], wai: [] }, sup: { base: [], wai: [] } };
+  try { sc = _analRegScatterSets(a, reg, model); } catch (e) {}
   return `
   <div class="anw-cover">
     <div class="anw-cover-top">
@@ -2075,15 +2207,19 @@ function _analRegReportBody(a, reg, model, o) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">3</span> Porównanie zużycia ciepła w funkcji temperatury zewnętrznej</h4>
-    <div class="anw-desc"><p style="margin:0 0 8px;">Wykres przedstawia zużycie ciepła wyznaczone z równań regresji dla całego przyjętego zakresu temperatur. Tabela zbiorcza zestawia wartości obu trybów, procentowe obniżenie oraz różnicę bezwzględną dla każdego stopnia temperatury zewnętrznej.</p></div>
-    ${_analRegChartSvg('📉 Zużycie ciepła — Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}
+    <div class="anw-desc"><p style="margin:0 0 8px;">Najpierw chmura rzeczywistych punktów pomiarowych obu okresów wraz z dopasowanymi prostymi regresji — to właśnie z tych punktów wyznaczane są równania. Następnie wygładzone linie obu trybów w pełnym zakresie temperatur, wykres redukcji dla każdego stopnia oraz tabela zbiorcza.</p></div>
+    ${_analRegScatterSvg('📉 Punkty pomiarowe i linie regresji — zużycie ciepła', sc.cons.base, sc.cons.wai, c.base, c.waterai, 'Zużycie [MJ]')}
+    <div style="margin-top:14px;">${_analRegChartSvg('📉 Zużycie ciepła — linie Tryb pogodowy vs WaterAI', c, 'Zużycie ciepła [MJ]')}</div>
+    <div style="margin-top:14px;">${_analRegReductionSvg('📊 Redukcja zużycia ciepła wg temperatury zewnętrznej', c)}</div>
     ${_analRegTableHtml(c, 'zużycie', 'MJ')}
   </div>
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">4</span> Porównanie temperatury zasilania w funkcji temperatury zewnętrznej</h4>
-    <div class="anw-desc"><p style="margin:0 0 8px;">Analogiczne zestawienie dla temperatury zasilania instalacji. Niższa temperatura zasilania przy tej samej temperaturze zewnętrznej oznacza łagodniejszą pracę źródła ciepła, mniejsze straty przesyłu i potencjalnie wyższą sprawność wytwarzania.</p></div>
-    ${_analRegChartSvg('🌡️ Temperatura zasilania — Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}
+    <div class="anw-desc"><p style="margin:0 0 8px;">Analogiczne zestawienie dla temperatury zasilania instalacji: chmura punktów z liniami regresji, wygładzone linie obu trybów oraz wykres redukcji dla każdego stopnia. Niższa temperatura zasilania przy tej samej temperaturze zewnętrznej oznacza łagodniejszą pracę źródła ciepła, mniejsze straty przesyłu i potencjalnie wyższą sprawność wytwarzania.</p></div>
+    ${_analRegScatterSvg('🌡️ Punkty pomiarowe i linie regresji — temperatura zasilania', sc.sup.base, sc.sup.wai, s.base, s.waterai, 'T zasilania [°C]')}
+    <div style="margin-top:14px;">${_analRegChartSvg('🌡️ Temperatura zasilania — linie Tryb pogodowy vs WaterAI', s, 'T zasilania [°C]')}</div>
+    <div style="margin-top:14px;">${_analRegReductionSvg('📊 Redukcja temperatury zasilania wg temperatury zewnętrznej', s)}</div>
     ${_analRegTableHtml(s, 'T zasilania', '°C')}
   </div>
 
