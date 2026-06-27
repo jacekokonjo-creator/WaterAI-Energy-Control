@@ -4574,21 +4574,24 @@ function _binnedFit(pts) {
 // rows: wiersze w kolejności chronologicznej. Zwraca [{x:tOutdoor, y:Δ, readTime, idx}].
 function _consDeltas(rows) {
   const out = [];
-  let lastHc = null, lastMs = null;
+  let lastHc = null, lastMs = null, lastTout = null;
   for (const r of rows) {
     if (r.heatConsumption == null || r.tOutdoor == null) continue;
     const hc = Number(r.heatConsumption);
     if (!isFinite(hc) || hc <= 0) continue;          // pusty/zerowy odczyt licznika — pomijamy
     const ms = (typeof _regTs === 'function') ? _regTs(r.readTime) : null;
-    if (lastHc == null) { lastHc = hc; lastMs = ms; continue; }
+    const tout = Number(r.tOutdoor);
+    if (lastHc == null) { lastHc = hc; lastMs = ms; lastTout = tout; continue; }
     const d = hc - lastHc;
-    const dtH = (ms != null && lastMs != null) ? (ms - lastMs) / 3600000 : null;   // Δczas w godzinach
-    // Emitujemy STRUMIEŃ zużycia [MJ/h] = Δlicznika ÷ Δczas — niezależny od częstotliwości odczytów.
-    // Pomijamy luki > 48 h i Δt ≤ 0 (resync bez emisji), żeby pojedyncza luka nie zawyżała zużycia.
-    if (d > 0 && dtH != null && dtH > 0 && dtH <= 48) {
-      out.push({ x: Number(r.tOutdoor), y: d / dtH, readTime: r.readTime, idx: r._idx });
-      lastHc = hc; lastMs = ms;
-    } else { lastHc = hc; lastMs = ms; }            // spadek/reset/luka — resync bez emisji
+    if (d === 0) continue;                            // licznik bez zmiany — czekamy na przyrost; KOTWICY nie ruszamy
+    if (d < 0) { lastHc = hc; lastMs = ms; lastTout = tout; continue; }   // reset/spadek — resync bez emisji
+    const dtH = (ms != null && lastMs != null) ? (ms - lastMs) / 3600000 : null;   // Δczas od ostatniego PRZYROSTU
+    // Strumień zużycia [MJ/h] = Δlicznika ÷ Δczas; pomijamy luki > 48 h. x = średnia T z interwału akumulacji.
+    if (dtH != null && dtH > 0 && dtH <= 48) {
+      const xAvg = (lastTout != null && isFinite(lastTout)) ? (lastTout + tout) / 2 : tout;
+      out.push({ x: xAvg, y: d / dtH, readTime: r.readTime, idx: r._idx });
+    }
+    lastHc = hc; lastMs = ms; lastTout = tout;        // kotwicę przesuwamy dopiero przy przyroście
   }
   return out;
 }
