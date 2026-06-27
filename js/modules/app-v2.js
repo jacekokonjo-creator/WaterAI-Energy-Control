@@ -1993,8 +1993,8 @@ function _analRegReportBody(a, reg, model, o) {
   const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
   const pid = reg.baseLines ? reg.baseLines.periodId : null;
   let bp = null; try { bp = (window.RegressionBaseModule && pid != null) ? RegressionBaseModule.find(a.objectId, pid) : null; } catch (e) {}
-  const baseFrom = bp && bp.periodFrom ? bp.periodFrom : '';
-  const baseTo = bp && bp.periodTo ? bp.periodTo : '';
+  const baseFrom = bp && bp.periodFrom ? String(bp.periodFrom).slice(0, 10) : '';
+  const baseTo = bp && bp.periodTo ? String(bp.periodTo).slice(0, 10) : '';
   const poFrom = (reg.billing && reg.billing.from) ? String(reg.billing.from).slice(0, 10) : ((reg.analyzed && reg.analyzed.from) ? String(reg.analyzed.from).slice(0, 10) : '');
   const poTo = (reg.billing && reg.billing.to) ? String(reg.billing.to).slice(0, 10) : ((reg.analyzed && reg.analyzed.to) ? String(reg.analyzed.to).slice(0, 10) : '');
   const pct = c.avgPct;
@@ -2003,9 +2003,10 @@ function _analRegReportBody(a, reg, model, o) {
     ? 'Metoda 2 — dopasowanie do średnich wartości na każdy zaokrąglony stopień temperatury zewnętrznej (jak linia trendu w arkuszu referencyjnym)'
     : 'Metoda 1 — dopasowanie do wszystkich punktów pomiarowych';
   const rngTxt = model.range ? `${model.range.from}…${model.range.to} °C (krok ${model.range.step} °C)` : '−15…+10 °C';
+  const rngShort = model.range ? `${model.range.from}…${model.range.to} °C` : '−15…+10 °C';
   const wN = model.waterai || {};
   const subsetNote = (wN.nRows != null && wN.nAll != null)
-    ? ` Linię WaterAI policzono z <b>${wN.nRows}</b> z ${wN.nAll} odczytów okresu analizowanego.` : '';
+    ? ` Linię WaterAI wyznaczono z <b>${wN.nRows}</b> odczytów mieszczących się w zadeklarowanym okresie rozliczeniowym — z <b>${wN.nAll}</b> wszystkich odczytów w zaimportowanym pliku CSV (pozostałe leżą poza tym okresem i nie są uwzględniane).` : '';
   return `
   <div class="anw-cover">
     <div class="anw-cover-top">
@@ -2030,7 +2031,7 @@ function _analRegReportBody(a, reg, model, o) {
         <div class="anw-cover-osz-val">${pct == null ? '—' : (pos ? '' : '−') + _fmtA(Math.abs(pct), 1)}<span>%</span></div>
       </div>
       <div class="anw-cover-kpis">
-        <div class="anw-cover-kpi"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) : '—'} <span>MJ</span></div><div class="k">Średnia różnica zużycia (w zakresie T)</div></div>
+        <div class="anw-cover-kpi"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) : '—'} <span>MJ</span></div><div class="k">Śr. różnica zużycia na odczyt, w zakresie temp. zewn. ${rngShort}</div></div>
         <div class="anw-cover-kpi"><div class="v">${s.avgPct != null ? _fmtA(s.avgPct, 1) : '—'}<span>%</span></div><div class="k">Średnie obniżenie temp. zasilania</div></div>
         <div class="anw-cover-kpi"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) : '—'} <span>°C</span></div><div class="k">Średnia różnica temp. zasilania</div></div>
       </div>
@@ -2088,10 +2089,10 @@ function _analRegReportBody(a, reg, model, o) {
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">5</span> Wynik — uśrednione obniżenie w przyjętym zakresie temperatur</h4>
-    <div class="anw-desc"><p style="margin:0 0 8px;">Uśredniając obniżenie w całym przyjętym zakresie temperatur (${rngTxt}), otrzymuje się techniczny wskaźnik poprawy charakterystyki cieplnej obiektu po wdrożeniu:</p></div>
+    <div class="anw-desc"><p style="margin:0 0 8px;">Wskaźniki uśrednia się po całym przyjętym zakresie temperatur zewnętrznych (${rngTxt}): dla każdego stopnia odczytuje się wartość z obu prostych i liczy ich różnicę, a wyniki uśrednia. <b>Obniżenie [%]</b> oraz <b>różnica</b> to zatem przeciętny odstęp między charakterystyką PRZED i PO. Różnica zużycia podana jest <b>na pojedynczy odczyt</b> (przyrost licznika między odczytami, w MJ), a nie jako suma za cały okres.</p></div>
     <div class="anw-rgrid">
       <div class="anw-tile"><div class="v">${c.avgPct != null ? _fmtA(c.avgPct, 1) + '%' : '—'}</div><div class="k">Średnie obniżenie zużycia ciepła</div></div>
-      <div class="anw-tile"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) + ' MJ' : '—'}</div><div class="k">Średnia różnica zużycia</div></div>
+      <div class="anw-tile"><div class="v">${c.avgDiff != null ? _fmtA(c.avgDiff, 2) + ' MJ' : '—'}</div><div class="k">Śr. różnica zużycia na odczyt (zakres T zewn. ${rngShort})</div></div>
       <div class="anw-tile"><div class="v">${s.avgPct != null ? _fmtA(s.avgPct, 1) + '%' : '—'}</div><div class="k">Średnie obniżenie temp. zasilania</div></div>
       <div class="anw-tile"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) + ' °C' : '—'}</div><div class="k">Średnia różnica temp. zasilania</div></div>
     </div>
