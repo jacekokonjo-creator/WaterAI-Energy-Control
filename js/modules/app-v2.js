@@ -2111,7 +2111,7 @@ function _analRegReductionSvg(title, m) {
 }
 
 // Pełny raport regresji w stylu raportu ESCO (TYM): okładka + numerowane sekcje z opisem.
-function _analRegReportBody(a, reg, model, o) {
+function _analRegReportBody(a, reg, model, o, embedded) {
   if (!model || !model.cons || !model.sup) {
     return `<div class="reminder-card" style="border-left:4px solid #c0392b;"><strong>Nie udało się odtworzyć analizy regresji</strong>
       <div class="reminder-meta">Brak policzonych linii bazowych lub danych okresu analizowanego. Otwórz analizę w kreatorze i uzupełnij dane (Metoda 1/2 + import CSV okresu analizowanego).</div></div>`;
@@ -2235,7 +2235,7 @@ function _analRegReportBody(a, reg, model, o) {
     <div class="anw-desc" style="margin-top:10px;"><p style="margin:0;"><b>Tryb pogodowy</b> = regresja okresu bazowego (PRZED). <b>WaterAI</b> = regresja okresu analizowanego (PO) na danych z czujników.${subsetNote} Wynik ma charakter techniczny (porównanie charakterystyk pracy), niezależny od rozliczenia finansowego ESCO.</p></div>
   </div>
 
-  <div class="anw-sign">
+  ${embedded?'':`<div class="anw-sign">
     <div class="anw-sign-box">
       <div class="anw-sign-line"></div>
       <div class="anw-sign-cap">Klient — podpis i data</div>
@@ -2245,7 +2245,7 @@ function _analRegReportBody(a, reg, model, o) {
       <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
       <div class="anw-sign-cap">Analizy energetyczne WaterAI Energy.</div>
     </div>
-  </div>`;
+  </div>`}`;
 }
 
 function _analRegRun() {
@@ -2932,7 +2932,7 @@ function _analReportBody(data) {
     </div>
   </div>
 
-  <div class="anw-sign">
+  ${(data&&data._embedded)?'':`<div class="anw-sign">
     <div class="anw-sign-box">
       <div class="anw-sign-line"></div>
       <div class="anw-sign-cap">Klient — podpis i data</div>
@@ -2942,7 +2942,7 @@ function _analReportBody(data) {
       <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
       <div class="anw-sign-cap">Analizy energetyczne WaterAI Energy.</div>
     </div>
-  </div>`;
+  </div>`}`;
 }
 
 function analPrintPDF() { window.print(); }
@@ -3267,6 +3267,12 @@ function _escoAnalPct(a){
 // Fallback: before, top-level periodFrom/To, data wykonania.
 function _escoAnalPeriod(a){
   const ip=(a&&a.inputParams)||{};
+  // Regresja trzyma okres PO w inputParams.reg (billing → analyzed), nie w before/after.
+  if(a&&a.analysisType==='REGRESSION'&&ip.reg){
+    const rb=ip.reg.billing||{}, ra=ip.reg.analyzed||{};
+    const rf=rb.from||ra.from||'', rt=rb.to||ra.to||'';
+    if(rf||rt) return {from:rf?String(rf).slice(0,10):'', to:rt?String(rt).slice(0,10):''};
+  }
   const af=ip.after||{}, bf=ip.before||{};
   const from=af.from||bf.from||a.periodFrom||a.executedAt||'';
   const to  =af.to  ||bf.to  ||a.periodTo  ||a.executedAt||'';
@@ -3626,7 +3632,7 @@ function escoBuildReportParts(rep){
 
   let proofs='';
   tymAnals.forEach((a,i)=>{
-    try{ const data=_analReportData({saved:a}); drawDatas.push(data);
+    try{ const data=_analReportData({saved:a}); data._embedded=true; drawDatas.push(data);
       proofs+=divider('Dowód · metoda główna (TYM)'+(tymAnals.length>1?` — ${i+1}/${tymAnals.length}`:''), escapeHtml(a.name))+_analReportBody(data);
     }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu tej analizy TYM.'); }
   });
@@ -3635,12 +3641,12 @@ function escoBuildReportParts(rep){
       const reg=(a.inputParams&&a.inputParams.reg)?a.inputParams.reg:null;
       const model=reg?_analRegModel(reg):null;
       const o=ObjectsModule.find(a.objectId);
-      if(reg&&model) proofs+=divider('Dowód · metoda pomocnicza (regresja)'+(regAnals.length>1?` — ${i+1}/${regAnals.length}`:''), escapeHtml(a.name))+_analRegReportBody(a,reg,model,o);
+      if(reg&&model) proofs+=divider('Dowód · metoda pomocnicza (regresja)'+(regAnals.length>1?` — ${i+1}/${regAnals.length}`:''), escapeHtml(a.name))+_analRegReportBody(a,reg,model,o,true);
       else proofs+=failCard(a,'Brak zapisanych danych źródłowych regresji (CSV) dla tej analizy.');
     }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu regresji.'); }
   });
   otherAnals.forEach(a=>{
-    try{ const data=_analReportData({saved:a}); drawDatas.push(data);
+    try{ const data=_analReportData({saved:a}); data._embedded=true; drawDatas.push(data);
       proofs+=divider('Dowód · analiza dodatkowa', escapeHtml(a.name))+_analReportBody(data);
     }catch(e){ proofs+=failCard(a,'Pełny raport tej analizy jest niedostępny.'); }
   });
