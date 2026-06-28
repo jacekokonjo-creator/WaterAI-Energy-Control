@@ -1100,6 +1100,9 @@ const ANAL_STYLE = `<style>
   table.anw-bvs th.anw-sep,table.anw-bvs td.anw-sep{border-left:2px solid var(--color-border-tertiary);}
   /* ── pełny raport analizy ── */
   .anw-report{background:var(--color-background-primary);}
+  .anw-proof-banner{border-radius:10px;padding:10px 14px;margin:0 0 14px;}
+  .anw-proof-kicker{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+  .anw-proof-title{font-size:15px;font-weight:800;color:#0f2f4f;margin-top:2px;}
   .anw-rephead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0C447C;padding-bottom:12px;margin-bottom:16px;}
   .anw-rephead .brand{font-size:20px;font-weight:800;color:#0C447C;letter-spacing:.3px;}
   .anw-rephead .sub{font-size:12px;color:var(--color-text-secondary);}
@@ -1157,6 +1160,7 @@ const ANAL_STYLE = `<style>
     .anw-noprint{display:none !important;}
     /* Okładka = pełna strona 1 */
     .anw-cover{min-height:244mm;box-shadow:none;page-break-after:always;break-after:page;border:1px solid #dbe5f0;}
+    .anw-cover-embed{min-height:0 !important;box-shadow:none;page-break-before:always;break-before:page;page-break-after:auto !important;break-after:auto !important;}
     /* Treść płynie i gęsto wypełnia strony — karty mogą się dzielić między stronami */
     .anw-step-card{break-inside:auto;page-break-inside:auto;margin-bottom:10px;padding:12px 14px;}
     .anw-step-card h4{break-after:avoid;page-break-after:avoid;}
@@ -2111,7 +2115,7 @@ function _analRegReductionSvg(title, m) {
 }
 
 // Pełny raport regresji w stylu raportu ESCO (TYM): okładka + numerowane sekcje z opisem.
-function _analRegReportBody(a, reg, model, o, embedded) {
+function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
   if (!model || !model.cons || !model.sup) {
     return `<div class="reminder-card" style="border-left:4px solid #c0392b;"><strong>Nie udało się odtworzyć analizy regresji</strong>
       <div class="reminder-meta">Brak policzonych linii bazowych lub danych okresu analizowanego. Otwórz analizę w kreatorze i uzupełnij dane (Metoda 1/2 + import CSV okresu analizowanego).</div></div>`;
@@ -2140,7 +2144,8 @@ function _analRegReportBody(a, reg, model, o, embedded) {
   let sc = { cons: { base: [], wai: [] }, sup: { base: [], wai: [] } };
   try { sc = _analRegScatterSets(a, reg, model); } catch (e) {}
   return `
-  <div class="anw-cover">
+  <div class="anw-cover${embedded?' anw-cover-embed':''}">
+    ${bannerHTML||''}
     <div class="anw-cover-top">
       <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
       <div class="anw-cover-num"><div class="anw-cover-num-lbl">Nr analizy</div><div class="anw-cover-num-val">${_escA(number)}</div></div>
@@ -2771,7 +2776,8 @@ function _analReportBody(data) {
     ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
     : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
   return `
-  <div class="anw-cover">
+  <div class="anw-cover${(data&&data._embedded)?' anw-cover-embed':''}">
+    ${(data&&data._proofBannerHTML)||''}
     <div class="anw-cover-top">
       <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
       <div class="anw-cover-num">
@@ -3265,6 +3271,78 @@ function _escoAnalPct(a){
 
 // Okres liczenia oszczędności (PO) analizy. TYM/obj: inputParams.after.{from,to}.
 // Fallback: before, top-level periodFrom/To, data wykonania.
+// Tekst metodyki (sekcja 1) i porównania metod (sekcja 4) — ZALEŻNY od metody podstawowej.
+// Metodą podstawową (rozliczeniową) może być dowolna korekta; regresja jest zawsze pomocnicza.
+function _escoMethodCopy(primType, hasReg){
+  const M={
+    TYM:{head:'korekta do Typowego Roku Meteorologicznego (TYM)',
+      p:[
+        'Podstawą rozliczenia finansowego jest metoda korekty zużycia do warunków Typowego Roku Meteorologicznego (TYM). Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, które następnie są normalizowane z wykorzystaniem stopniodni grzewczych (HDD).',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje przeliczone do identycznych warunków pogodowych. Eliminuje to wpływ różnic klimatycznych pomiędzy analizowanymi sezonami grzewczymi i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Metoda TYM stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Korekta TYM</b> porównuje CAŁKOWITE zużycie sprowadzone do tych samych warunków pogodowych — obejmuje efekty dzienne i sezonowe; to podstawa faktur.'},
+    OCCUPANCY:{head:'korekta obłożenia',
+      p:[
+        'Podstawą rozliczenia finansowego jest metoda korekty zużycia do poziomu obłożenia obiektu. Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, które są normalizowane względem miary obłożenia (np. liczby osobodni lub udziału wykorzystanych pokoi) w analizowanym okresie.',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje sprowadzone do porównywalnego poziomu obłożenia. Eliminuje to wpływ różnic w intensywności użytkowania obiektu pomiędzy analizowanymi okresami i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Metoda korekty obłożenia stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Korekta obłożenia</b> porównuje CAŁKOWITE zużycie sprowadzone do tego samego poziomu obłożenia obiektu — obejmuje pełny efekt eksploatacyjny; to podstawa faktur.'},
+    AREA:{head:'korekta powierzchni',
+      p:[
+        'Podstawą rozliczenia finansowego jest metoda korekty zużycia do powierzchni ogrzewanej obiektu. Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, odniesione do powierzchni użytkowej (zużycie na jednostkę powierzchni).',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje sprowadzone do porównywalnej powierzchni odniesienia. Eliminuje to wpływ zmian zakresu ogrzewanej powierzchni pomiędzy analizowanymi okresami i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Metoda korekty powierzchni stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Korekta powierzchni</b> porównuje CAŁKOWITE zużycie odniesione do tej samej powierzchni ogrzewanej — obejmuje pełny efekt; to podstawa faktur.'},
+    VOLUME:{head:'korekta intensywności',
+      p:[
+        'Podstawą rozliczenia finansowego jest metoda korekty zużycia do intensywności pracy obiektu. Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, normalizowane względem przyjętej bazy intensywności charakteryzującej obciążenie cieplne obiektu.',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje sprowadzone do porównywalnej intensywności pracy. Eliminuje to wpływ różnic w obciążeniu obiektu pomiędzy analizowanymi okresami i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Metoda korekty intensywności stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Korekta intensywności</b> porównuje CAŁKOWITE zużycie sprowadzone do tej samej intensywności pracy obiektu — obejmuje pełny efekt; to podstawa faktur.'},
+    SCHEDULE:{head:'korekta harmonogramu',
+      p:[
+        'Podstawą rozliczenia finansowego jest metoda korekty zużycia do harmonogramu pracy obiektu. Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, normalizowane względem czasu i trybu pracy instalacji (np. godzin lub dni eksploatacji) w analizowanym okresie.',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje sprowadzone do porównywalnego harmonogramu pracy. Eliminuje to wpływ różnic w czasie eksploatacji obiektu pomiędzy analizowanymi okresami i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Metoda korekty harmonogramu stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Korekta harmonogramu</b> porównuje CAŁKOWITE zużycie sprowadzone do tego samego harmonogramu pracy — obejmuje pełny efekt eksploatacyjny; to podstawa faktur.'},
+    CUSTOM:{head:'metoda niestandardowa',
+      p:[
+        'Podstawą rozliczenia finansowego jest indywidualnie zdefiniowana metoda korekty zużycia, dobrana do specyfiki obiektu. Wykorzystuje ona rzeczywiste dane o zużyciu energii pozyskane z liczników lub faktur, normalizowane względem przyjętej w analizie bazy odniesienia.',
+        'Dzięki temu zużycie energii w okresie bazowym (PRZED) oraz po wdrożeniu systemu (PO) zostaje sprowadzone do porównywalnych warunków odniesienia. Eliminuje to wpływ różnic warunków eksploatacji pomiędzy analizowanymi okresami i pozwala na wiarygodne określenie rzeczywistych efektów wdrożenia.',
+        'Przyjęta metoda stanowi podstawę rozliczeń kontraktowych oraz wyliczenia oszczędności będących podstawą wystawienia faktury.'
+      ],
+      cmp:'<b>Metoda niestandardowa</b> porównuje CAŁKOWITE zużycie sprowadzone do przyjętej bazy odniesienia — obejmuje pełny efekt; to podstawa faktur.'}
+  };
+  const m=M[primType]||M.TYM;
+  const regBlock=hasReg?`
+      <p style="margin:12px 0 4px;font-weight:700;color:#0f2f4f;">Metoda pomocnicza (weryfikacyjna) – analiza regresji liniowej</p>
+      <p style="margin:0 0 8px;">Niezależnym potwierdzeniem uzyskanych wyników jest analiza regresji liniowej wykonana na podstawie ciągłych pomiarów eksploatacyjnych rejestrowanych co 10 minut (m.in. temperatury zewnętrznej, temperatury zasilania oraz zużycia energii).</p>
+      <p style="margin:0 0 4px;">Dla okresów PRZED i PO wyznaczane są charakterystyki pracy obiektu opisane równaniem:</p>
+      <div class="anw-formula">y = a · x + b</div>
+      <p style="margin:8px 0 8px;">Porównanie otrzymanych charakterystyk pozwala ocenić zmianę intensywności pracy instalacji grzewczej oraz potwierdzić techniczny efekt działania wdrożonego systemu.</p>
+      <p style="margin:0 0 8px;">Analiza regresji pełni funkcję dowodu inżynierskiego i stanowi niezależną weryfikację uzyskanych rezultatów, jednak nie zastępuje metody podstawowej jako podstawy rozliczeń finansowych.</p>`:'';
+  const sec1=`
+    <div class="anw-desc">
+      <p style="margin:0 0 10px;">W celu zapewnienia rzetelnej i obiektywnej oceny uzyskanych oszczędności zastosowano ${hasReg?'dwie wzajemnie uzupełniające się metody analizy':'metodę analizy opisaną poniżej'}.</p>
+      <p style="margin:0 0 4px;font-weight:700;color:#0f2f4f;">Metoda podstawowa (rozliczeniowa) – ${m.head}</p>
+      ${m.p.map(t=>`<p style="margin:0 0 8px;">${t}</p>`).join('')}
+      ${regBlock}
+      <p style="margin:10px 0 0;">Szczegółowe obliczenia, wzory matematyczne, tabele wyników oraz wykresy ${hasReg?'dla obu metod':'metody'} przedstawiono w dalszej części raportu, w rozdziale „Dowód uzyskanych oszczędności".</p>
+    </div>`;
+  const sec4=`
+    <div class="anw-desc">
+      <p style="margin:0 0 6px;">${m.cmp}</p>
+      <p style="margin:0 0 6px;"><b>Regresja</b> analizuje INTENSYWNOŚĆ grzewczą (zużycie i temperatura zasilania na jednostkę temperatury zewnętrznej) — izoluje czysty efekt sterowania.</p>
+      <p style="margin:0;"><b>Różnica między metodami nie jest błędem.</b> Każda mierzy inny aspekt tej samej oszczędności, dlatego wzajemnie się weryfikują i wspólnie potwierdzają wynik.</p>
+    </div>`;
+  return {sec1, sec4};
+}
+
 function _escoAnalPeriod(a){
   const ip=(a&&a.inputParams)||{};
   // Regresja trzyma okres PO w inputParams.reg (billing → analyzed), nie w before/after.
@@ -3503,6 +3581,10 @@ function escoBuildReportParts(rep){
   const regAnals=(rep.analysisIdsREG||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
   const trSet=new Set([...(rep.analysisIdsTYM||[]),...(rep.analysisIdsREG||[])].map(Number));
   const otherAnals=all.filter(a=>!trSet.has(Number(a.id)));
+  // Metoda podstawowa = wszystkie analizy poza regresją (TYM lub inna korekta). Regresja = pomocnicza.
+  const primaryAnals=all.filter(a=>a.analysisType!=='REGRESSION');
+  const regProofAnals=all.filter(a=>a.analysisType==='REGRESSION');
+  const primType=(primaryAnals[0]&&primaryAnals[0].analysisType)||'TYM';
 
   // okres — z raportu; gdy pusty (stare raporty) policz na żywo z analiz (preferuj TYM)
   let pFrom=rep.periodFrom, pTo=rep.periodTo;
@@ -3573,7 +3655,7 @@ function escoBuildReportParts(rep){
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Status raportu</div>
         <div class="anw-cm-val"><span style="display:inline-block;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;background:${stMeta.color}22;color:${stMeta.color};">${stMeta.label}</span></div>
-        <div class="anw-cm-sub">Analiz w raporcie: ${all.length} (TYM: ${tymAnals.length}, regresja: ${regAnals.length})</div>
+        <div class="anw-cm-sub">Analiz w raporcie: ${all.length} (metoda główna: ${primaryAnals.length}, regresja: ${regProofAnals.length})</div>
       </div>
     </div>
     <div class="anw-cover-result">
@@ -3594,12 +3676,8 @@ function escoBuildReportParts(rep){
     </div>
   </div>`;
 
-  const secMetodyka=sec('Metodyka rozliczenia — dwie metody',`
-    <div class="anw-desc">
-      <p style="margin:0 0 8px;"><b>Metoda główna (rozliczeniowa) — korekta do Typowego Roku Meteorologicznego (TYM).</b> Opiera się na zmierzonym zużyciu (licznik / faktury) sprowadzonym do wspólnych warunków pogodowych za pomocą stopniodni grzewczych (HDD). Dzięki temu porównanie okresu bazowego (PRZED) i okresu po wdrożeniu (PO) jest niezależne od tego, czy dany sezon był cieplejszy, czy chłodniejszy od normy. To certyfikowana, kontraktowa podstawa do rozliczeń i wystawienia faktury za oszczędności.</p>
-      <p style="margin:0 0 8px;"><b>Metoda pomocnicza (weryfikacyjna) — regresja liniowa.</b> Na podstawie ciągłych pomiarów (co 10 min: temp. zewnętrzna, zasilania, zużycie) wyznacza charakterystyki pracy obiektu y = a·x + b dla okresu PRZED i PO. Porównanie prostych pokazuje techniczną zmianę intensywności grzewczej (zużycie i temperatura zasilania na jednostkę temperatury zewnętrznej). Stanowi niezależny, inżynierski dowód działania systemu i nie zastępuje metody TYM w rozliczeniu finansowym.</p>
-      <p style="margin:0;">Pełne obliczenia, wzory, tabele i wykresy obu metod znajdują się w dalszej części raportu (sekcje „Dowód").</p>
-    </div>`);
+  const _mc=_escoMethodCopy(primType, regProofAnals.length>0);
+  const secMetodyka=sec('Metodyka rozliczenia oszczędności', _mc.sec1);
 
   const secPrzeglad=sec('Zakres raportu — uwzględnione analizy', all.length
     ? `<table class="anw-t"><thead><tr><th>Typ</th><th>Analiza</th><th style="text-align:right;">Okres (PO)</th><th style="text-align:right;">Wynik</th></tr></thead><tbody>${overviewRows}</tbody></table>`
@@ -3613,42 +3691,35 @@ function escoBuildReportParts(rep){
     </div>
     <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Udział WaterAI / ESCO to suma udziałów z analiz rozliczeniowych (TYM). Pozostała część wartości oszczędności przypada klientowi. Kwoty stanowią podstawę do wystawienia faktury za osiągnięte oszczędności.</p></div>`);
 
-  const secCmp=sec('Porównanie metod',`
-    <div class="anw-desc">
-      <p style="margin:0 0 6px;"><b>TYM</b> porównuje CAŁKOWITE zużycie sprowadzone do tych samych warunków pogodowych — obejmuje efekty dzienne i sezonowe; to podstawa faktur.</p>
-      <p style="margin:0 0 6px;"><b>Regresja</b> analizuje INTENSYWNOŚĆ grzewczą (zużycie i temperatura zasilania na jednostkę temperatury zewnętrznej) — izoluje czysty efekt sterowania.</p>
-      <p style="margin:0;"><b>Różnica między metodami nie jest błędem.</b> Każda mierzy inny aspekt tej samej oszczędności, dlatego wzajemnie się weryfikują i wspólnie potwierdzają wynik.</p>
-    </div>`);
+  const secCmp=regProofAnals.length? sec('Porównanie metod', _mc.sec4) : '';
 
   const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
 
   // ── DOWODY: pełne raporty metod ──
+  // Zamiast osobnej strony-przekładki, baner „Dowód · …" wchodzi NA stronę okładki danego dowodu
+  // (okładka dostaje klasę anw-cover-embed → zaczyna nową stronę, bez pustej kartki). Regresja ma
+  // odrębny, zielony akcent, żeby metoda pomocnicza była wizualnie odznaczona.
   const drawDatas=[];
-  const divider=(kicker,title)=>`<div class="anw-step-card" style="page-break-before:always;break-before:page;border-left:4px solid #0C447C;background:#EEF4FB;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#1a6bb5;">${kicker}</div>
-      <div style="font-size:16px;font-weight:800;color:#0f2f4f;margin-top:3px;">${title}</div>
-    </div>`;
-  const failCard=(a,msg)=>{ const t=typeMeta(a); return `<div class="anw-step-card"><h4>${t.icon} ${escapeHtml(a.name)}</h4><div class="anw-desc"><p style="margin:0;">${msg} Wynik skrótowy: ${headline(a)}.</p></div></div>`; };
+  const proofBanner=(kicker,title,accent,bg)=>`<div class="anw-proof-banner" style="border-left:5px solid ${accent};background:${bg};"><div class="anw-proof-kicker" style="color:${accent};">${kicker}</div><div class="anw-proof-title">${escapeHtml(title)}</div></div>`;
+  const failCard=(a,msg)=>{ const t=typeMeta(a); return `<div class="anw-step-card" style="page-break-before:always;break-before:page;"><h4>${t.icon} ${escapeHtml(a.name)}</h4><div class="anw-desc"><p style="margin:0;">${msg} Wynik skrótowy: ${headline(a)}.</p></div></div>`; };
 
   let proofs='';
-  tymAnals.forEach((a,i)=>{
-    try{ const data=_analReportData({saved:a}); data._embedded=true; drawDatas.push(data);
-      proofs+=divider('Dowód · metoda główna (TYM)'+(tymAnals.length>1?` — ${i+1}/${tymAnals.length}`:''), escapeHtml(a.name))+_analReportBody(data);
-    }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu tej analizy TYM.'); }
+  primaryAnals.forEach((a,i)=>{
+    try{ const data=_analReportData({saved:a}); data._embedded=true;
+      data._proofBannerHTML=proofBanner('Dowód · metoda główna ('+typeMeta(a).label+')'+(primaryAnals.length>1?` — ${i+1}/${primaryAnals.length}`:''), a.name, '#0C447C', '#EEF4FB');
+      drawDatas.push(data);
+      proofs+=_analReportBody(data);
+    }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu tej analizy.'); }
   });
-  regAnals.forEach((a,i)=>{
+  regProofAnals.forEach((a,i)=>{
     try{
       const reg=(a.inputParams&&a.inputParams.reg)?a.inputParams.reg:null;
       const model=reg?_analRegModel(reg):null;
       const o=ObjectsModule.find(a.objectId);
-      if(reg&&model) proofs+=divider('Dowód · metoda pomocnicza (regresja)'+(regAnals.length>1?` — ${i+1}/${regAnals.length}`:''), escapeHtml(a.name))+_analRegReportBody(a,reg,model,o,true);
+      const banner=proofBanner('Dowód · metoda pomocnicza (regresja)'+(regProofAnals.length>1?` — ${i+1}/${regProofAnals.length}`:''), a.name, '#0E8A6B', '#E7F6F0');
+      if(reg&&model) proofs+=_analRegReportBody(a,reg,model,o,true,banner);
       else proofs+=failCard(a,'Brak zapisanych danych źródłowych regresji (CSV) dla tej analizy.');
     }catch(e){ proofs+=failCard(a,'Nie udało się odtworzyć pełnego raportu regresji.'); }
-  });
-  otherAnals.forEach(a=>{
-    try{ const data=_analReportData({saved:a}); data._embedded=true; drawDatas.push(data);
-      proofs+=divider('Dowód · analiza dodatkowa', escapeHtml(a.name))+_analReportBody(data);
-    }catch(e){ proofs+=failCard(a,'Pełny raport tej analizy jest niedostępny.'); }
   });
 
   const signatures=`
@@ -4024,6 +4095,7 @@ function _analReportBodyVOL(data) {
     ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
     : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
   return `
+  ${(data&&data._embedded)?`<div style="page-break-before:always;break-before:page;">${(data._proofBannerHTML)||''}</div>`:''}
   <style>
     .anw-rep-title{font-size:18px;color:#0C447C;margin:14px 0 6px;font-weight:700;}
     .anw-rep-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--color-text-secondary);margin-bottom:14px;}
