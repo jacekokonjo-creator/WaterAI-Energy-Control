@@ -3239,7 +3239,7 @@ function renderESCOReports() {
       <div id="esco-summary-box" style="display:none;" class="anal-result-box" style="background:linear-gradient(135deg,#0C447C,#1a6bb5);">
         <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.7;margin-bottom:12px;">PODSUMOWANIE RAPORTU ESCO</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
-          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji (śr.)</div></div>
+          <div><div style="font-size:28px;font-weight:700;" id="esco-res-pct">—</div><div style="font-size:11px;opacity:.8;">% redukcji</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-energy">—</div><div style="font-size:11px;opacity:.8;">oszczędność energii</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-money">—</div><div style="font-size:11px;opacity:.8;">wartość oszczędności</div></div>
           <div><div style="font-size:28px;font-weight:700;" id="esco-res-reg">—</div><div style="font-size:11px;opacity:.8;">wybrane analizy</div></div>
@@ -3405,11 +3405,20 @@ function updateESCOSummary() {
     if(r.savedMoney)  totalMoney+=Number(r.savedMoney);
     if(ip.energyUnit) unit=ip.energyUnit;
     if(ip.currency)   currency=ip.currency;
-    const p=_escoAnalPct(a); if(p!=null) pctVals.push(p);
+    const p=_escoAnalPct(a); if(p!=null) pctVals.push({t:((AnalysesModule.TYPES[a.analysisType]||{}).label||a.analysisType), p});
   });
-  const pct=pctVals.length?(pctVals.reduce((s,v)=>s+v,0)/pctVals.length).toFixed(1)+'%':'—';
+  const pct=pctVals.map(x=>`${x.t}: ${x.p.toFixed(1)}%`).join(' | ')||'—';
 
-  document.getElementById('esco-res-pct').textContent=pct;
+  const pctEl=document.getElementById('esco-res-pct');
+  if(pctEl){
+    if(pctVals.length<=1){
+      pctEl.style.fontSize='28px'; pctEl.style.lineHeight='';
+      pctEl.textContent=pctVals.length?pctVals[0].p.toFixed(1)+'%':'—';
+    }else{
+      pctEl.style.fontSize='15px'; pctEl.style.lineHeight='1.6';
+      pctEl.innerHTML=pctVals.map(x=>`${escapeHtml(x.t)}: <b>${x.p.toFixed(1)}%</b>`).join('<br>');
+    }
+  }
   document.getElementById('esco-res-energy').textContent=totalSaved.toFixed(2)+' '+(unit||'');
   document.getElementById('esco-res-money').textContent=totalMoney.toFixed(2)+' '+(currency||'');
   document.getElementById('esco-res-reg').textContent=String(anals.length);
