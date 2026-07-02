@@ -2037,6 +2037,14 @@ function _analRegSub(pts, max) {
 // Scatter: chmura punktów PRZED/PO + obie linie regresji (jak w arkuszu referencyjnym).
 function _analRegScatterSvg(title, basePts, waiPts, baseLine, waiLine, yLabel) {
   basePts = basePts || []; waiPts = waiPts || [];
+  // Okno WIDOCZNOŚCI wykresu: rysujemy tylko odczyty do 20 °C (sezon grzewczy).
+  // Dopasowanie prostych (równania, n) pozostaje liczone na wszystkich punktach — to wyłącznie prezentacja.
+  const XCAP = 20;
+  const _cf = pts => pts.filter(p => p.x <= XCAP);
+  const bpC = _cf(basePts), wpC = _cf(waiPts);
+  const trimmed = (bpC.length + wpC.length) < (basePts.length + waiPts.length);
+  if (bpC.length + wpC.length > 0) { basePts = bpC; waiPts = wpC; }
+  const capNote = trimmed ? `<div class="anw-muted" style="font-size:11px;margin-top:4px;">Wykres przedstawia zakres temperatur zewnętrznych do ${XCAP} °C; dopasowanie prostych wykonano na wszystkich punktach pomiarowych okresu (wartości n przy równaniach).</div>` : '';
   const all = basePts.concat(waiPts);
   if (all.length < 1) return `<div class="anw-muted" style="font-size:11px;margin-top:6px;">Brak zapisanych punktów pomiarowych do wykresu „${_escA(title)}".</div>`;
   let xmin = Math.min.apply(null, all.map(p => p.x)), xmax = Math.max.apply(null, all.map(p => p.x));
@@ -2075,7 +2083,7 @@ function _analRegScatterSvg(title, basePts, waiPts, baseLine, waiLine, yLabel) {
       <line x1="${L + 270}" y1="${T + 4}" x2="${L + 288}" y2="${T + 4}" stroke="#1a1a1a" stroke-width="2"/><text x="${L + 292}" y="${T + 7}" fill="#5b6670">linia PRZED</text>
       <line x1="${L + 372}" y1="${T + 4}" x2="${L + 390}" y2="${T + 4}" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="5 4"/><text x="${L + 394}" y="${T + 7}" fill="#5b6670">linia PO</text>
     </g>
-  </svg>`;
+  </svg>${capNote}`;
 }
 
 // Wykres słupkowy redukcji (% obniżenia) danej metryki dla każdego stopnia temperatury zewnętrznej.
@@ -2680,13 +2688,29 @@ function _anwPeriodTableAligned(P, ti, axis) {
   <tfoot><tr><td>∑</td><td class="calc">${P.days}</td><td></td><td class="calc">${_fmtA(P.sumR, 1)}</td><td></td><td class="calc">${_fmtA(P.sumS, 1)}</td></tr></tfoot></table>`;
 }
 
+// Linia źródła danych klimatycznych (audytowalność): dane z pól obiektu „Dane klimatyczne (TYM)".
+// Dla zamrożonych raportów ESCO używa kopii ze snapshotu (data._climate), inaczej danych obiektu.
+function _analClimateLine(data) {
+  const c = (data && data._climate) || (data && data.object) || {};
+  const st = c.weatherStation || '', src = c.weatherSource || '', url = c.weatherSourceUrl || '', dd = c.weatherDataDownloadDate || '';
+  if (!st && !src) return '';
+  const parts = [];
+  if (st) parts.push(`stacja meteorologiczna: <b>${_escA(st)}</b>`);
+  if (src) parts.push(`źródło: ${_escA(src)}`);
+  if (dd) parts.push(`dane pobrano: ${_fmtDateA(dd)}`);
+  if (url) parts.push(`<span style="word-break:break-all;">${_escA(url)}</span>`);
+  return `<div class="anw-muted" style="font-size:11px;margin-top:6px;">Temperatury rzeczywiste i normy standardowe (TYM) — ${parts.join(' · ')}.</div>`;
+}
+
 // Para paneli PRZED / PO obok siebie: rozdzielone graficznie i wyrównane wg miesięcy.
 function _anwPeriodPair(data, tiB, tiA) {
   const axis = _anwMonthAxis(data.before, data.after);
   return `<div class="anw-pair" style="margin-top:10px;">
     <div class="anw-pair-col anw-pair-before"><div class="anw-muted" style="margin-bottom:6px;color:#0C447C;font-weight:600;">Okres PRZED instalacją</div>${_anwPeriodTableAligned(data.before, tiB, axis)}</div>
     <div class="anw-pair-col anw-pair-after"><div class="anw-muted" style="margin-bottom:6px;color:#27500A;font-weight:600;">Okres PO instalacji</div>${_anwPeriodTableAligned(data.after, tiA, axis)}</div>
-  </div>`;
+  </div>
+  <div class="anw-muted" style="font-size:11px;margin-top:6px;">z₀ — liczba dni z czynnym ogrzewaniem w danym miesiącu; suma dni z₀ może być mniejsza od kalendarzowej długości okresu.</div>
+  ${_analClimateLine(data)}`;
 }
 
 // Wykres słupkowy (grupowany) na canvas — ostry przy druku (DPR)
@@ -3519,7 +3543,8 @@ function _escoFreeze(rep){
     return c;
   });
   const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
-  return { at:new Date().toISOString(), clientName:(client&&client.name)||'', objectName:(obj&&obj.name)||'', analyses };
+  const objectClimate=obj?{weatherStation:obj.weatherStation||'',weatherSource:obj.weatherSource||'',weatherSourceUrl:obj.weatherSourceUrl||'',weatherDataDownloadDate:obj.weatherDataDownloadDate||''}:null;
+  return { at:new Date().toISOString(), clientName:(client&&client.name)||'', objectName:(obj&&obj.name)||'', objectClimate, analyses };
 }
 function _escoApplyFreezePolicy(rep,refresh){
   if(rep.status==='FINAL'||rep.status==='SIGNED'){ if(refresh||!rep.frozen) rep.frozen=_escoFreeze(rep); }
@@ -3787,7 +3812,37 @@ function escoBuildReportParts(rep){
     </div>
     <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Wszystkie kwoty są kwotami <b>netto</b>. Do kwoty udziału WaterAI/ESCO zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury. Kwota udziału WaterAI/ESCO stanowi podstawę do wystawienia faktury za oszczędności osiągnięte w okresie rozliczeniowym; pozostała część wartości oszczędności przypada klientowi.</p></div>`);
 
-  const secCmp=regProofAnals.length? sec('Porównanie metod', _mc.sec4) : '';
+  // Zestawienie liczbowe obu metod (dynamiczne — wartości z analiz tego raportu; brakujące elementy pomijane)
+  let cmpNums='';
+  try{
+    const regA=regProofAnals[0];
+    const rr=regA?(regA.results||{}):{};
+    const regPct=rr.savedEnergyPct!=null?Number(rr.savedEnergyPct):null;
+    const supPct=rr.supplyPct!=null?Number(rr.supplyPct):null;
+    let rngTxt='', endTxt='', insideTxt='';
+    if(regA){
+      let regIn=(regA.inputParams&&regA.inputParams.reg)?regA.inputParams.reg:null;
+      if(!regIn&&fz){ const live=AnalysesModule.find(regA.id); regIn=(live&&live.inputParams&&live.inputParams.reg)?live.inputParams.reg:null; }
+      const mdl=regIn?_analRegModel(regIn):null;
+      if(mdl&&mdl.range) rngTxt=` w zakresie temperatur zewnętrznych ${mdl.range.from}…${mdl.range.to} °C`;
+      if(mdl&&mdl.cons&&mdl.cons.rows&&mdl.cons.rows.length>1){
+        const rws=mdl.cons.rows.filter(x=>x.D!=null&&isFinite(x.D));
+        if(rws.length>1){
+          const f=rws[0], l=rws[rws.length-1];
+          endTxt=` Redukcja wykazana regresją zmienia się z temperaturą zewnętrzną — od ok. ${_fmtA(f.D,1)}% przy ${f.t} °C do ok. ${_fmtA(l.D,1)}% przy ${l.t} °C.`;
+          const dmin=Math.min.apply(null,rws.map(x=>x.D)), dmax=Math.max.apply(null,rws.map(x=>x.D));
+          if(pctNum!=null&&pctNum>=dmin&&pctNum<=dmax) insideTxt=' Wynik metody rozliczeniowej mieści się wewnątrz przedziału wskazywanego przez regresję.';
+        }
+      }
+    }
+    if(pctNum!=null&&regPct!=null){
+      const primLabel=(AnalysesModule.TYPES[primType]||{}).label||primType;
+      const diff=Math.abs(pctNum-regPct);
+      cmpNums=`<div class="anw-desc"><p style="margin:0 0 8px;"><b>Zestawienie wyników obu metod:</b> metoda rozliczeniowa (${escapeHtml(primLabel)}) wykazała oszczędność <b>${_fmtA(pctNum,1)}%</b> całkowitego zużycia ciepła w okresie rozliczeniowym ${fmtDate(pFrom)} → ${fmtDate(pTo)}; metoda pomocnicza (regresja) — średnie obniżenie intensywności zużycia o <b>${_fmtA(regPct,1)}%</b>${rngTxt}${supPct!=null?` oraz obniżenie temperatury zasilania o ${_fmtA(supPct,1)}%`:''}.</p>
+      <p style="margin:0 0 8px;">Różnica ok. ${_fmtA(diff,1)} p.p. jest oczekiwana i nie świadczy o błędzie żadnej z metod — mierzą one różne wielkości: metoda rozliczeniowa porównuje całkowite zużycie okresu (wraz z efektami harmonogramów i dni bez ogrzewania), regresja — czystą intensywność na jednostkę temperatury zewnętrznej, uśrednioną po przyjętym zakresie.${endTxt}${insideTxt} Zgodność dwóch niezależnych metod, opartych na różnych źródłach danych (licznik główny vs czujniki), wzajemnie potwierdza wiarygodność wyniku.</p></div>`;
+    }
+  }catch(e){}
+  const secCmp=regProofAnals.length? sec('Porównanie metod', cmpNums+_mc.sec4) : '';
 
   const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
 
@@ -3803,6 +3858,7 @@ function escoBuildReportParts(rep){
   primaryAnals.forEach((a,i)=>{
     try{ const data=_analReportData({saved:a}); data._embedded=true;
       if(a._frozenNumber) data.number=a._frozenNumber;
+      if(fz&&fz.objectClimate) data._climate=fz.objectClimate;
       data._proofBannerHTML=proofBanner('Dowód · metoda główna ('+typeMeta(a).label+')'+(primaryAnals.length>1?` — ${i+1}/${primaryAnals.length}`:''), a.name, '#0C447C', '#EEF4FB');
       drawDatas.push(data);
       proofs+=_analReportBody(data);
