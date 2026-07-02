@@ -3374,6 +3374,19 @@ function _escoRepPeriod(rep){
   return {from,to};
 }
 
+// Świeże wyniki analizy — kwoty przeliczane na żywo z danych wejściowych (inputParams),
+// dzięki czemu zmiany metodyki rozliczenia działają też dla analiz zapisanych wcześniej.
+// Regresja i analizy bez danych wejściowych: fallback do zapisanych a.results.
+function _escoFreshRes(a){
+  const stored=(a&&a.results)||{};
+  if(!a||a.analysisType==='REGRESSION') return stored;
+  try{
+    const d=_analReportData({saved:a});
+    if(d&&d.savedMoney!=null) return Object.assign({},stored,{savedEnergy:d.savedEnergy,savedMoney:d.savedMoney,escoAmount:d.escoAmount});
+  }catch(e){}
+  return stored;
+}
+
 function updateESCOSummary() {
   const ids=[...document.querySelectorAll('[name="esco_anal"]:checked')].map(c=>Number(c.value));
   const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
@@ -3387,7 +3400,7 @@ function updateESCOSummary() {
   let totalSaved=0, totalMoney=0, unit='', currency='';
   const pctVals=[];
   anals.forEach(a=>{
-    const r=a.results||{}, ip=a.inputParams||{};
+    const r=_escoFreshRes(a), ip=a.inputParams||{};
     if(r.savedEnergy) totalSaved+=Number(r.savedEnergy);
     if(r.savedMoney)  totalMoney+=Number(r.savedMoney);
     if(ip.energyUnit) unit=ip.energyUnit;
@@ -3601,14 +3614,16 @@ function escoBuildReportParts(rep){
 
   const pctNum=r.savedEnergyPct!=null?(r.savedEnergyPct<1?r.savedEnergyPct*100:r.savedEnergyPct):null;
   const pos=(pctNum||0)>=0;
-  const escoSum=all.reduce((s,a)=>s+((a.results&&a.results.escoAmount!=null)?Number(a.results.escoAmount):0),0);
-  const clientSum=(r.savedMoneyTotal!=null)?Number(r.savedMoneyTotal)-escoSum:null;
+  const _fresh=all.map(a=>_escoFreshRes(a));
+  const escoSum=_fresh.reduce((s,fr)=>s+(fr.escoAmount!=null?Number(fr.escoAmount):0),0);
+  const moneyTot=_fresh.reduce((s,fr)=>s+(fr.savedMoney!=null?Number(fr.savedMoney):0),0);
+  const clientSum=moneyTot-escoSum;
   const genDate=fmtDate(new Date().toISOString().slice(0,10));
   const stMeta=escoStatusMeta(rep.status);
 
   const typeMeta=a=>((AnalysesModule.TYPES&&AnalysesModule.TYPES[a.analysisType])||{label:a.analysisType,icon:'📊'});
   const headline=a=>{
-    const ar=a.results||{}, ai=a.inputParams||{};
+    const ar=(a.analysisType==='REGRESSION')?(a.results||{}):_escoFreshRes(a), ai=a.inputParams||{};
     if(a.analysisType==='REGRESSION'){
       const c=ar.savedEnergyPct!=null?_fmtA(ar.savedEnergyPct,1)+'% zużycia ciepła':'';
       const s=ar.supplyPct!=null?_fmtA(ar.supplyPct,1)+'% temp. zasilania':'';
@@ -3670,7 +3685,7 @@ function escoBuildReportParts(rep){
       </div>
       <div class="anw-cover-kpis">
         <div class="anw-cover-kpi"><div class="v">${_fmtA(r.savedEnergyTotal||0,2)} <span>${u}</span></div><div class="k">Energia zaoszczędzona</div></div>
-        <div class="anw-cover-kpi"><div class="v">${_fmtA(r.savedMoneyTotal||0,2)} <span>${cur}</span></div><div class="k">Wartość oszczędności</div></div>
+        <div class="anw-cover-kpi"><div class="v">${_fmtA(moneyTot||0,2)} <span>${cur}</span></div><div class="k">Wartość oszczędności</div></div>
         <div class="anw-cover-kpi"><div class="v">${_fmtA(escoSum||0,2)} <span>${cur}</span></div><div class="k">Udział WaterAI/ESCO</div></div>
       </div>
     </div>
@@ -3689,7 +3704,7 @@ function escoBuildReportParts(rep){
 
   const secFin=sec('Rozliczenie finansowe ESCO',`
     <div class="anw-rgrid">
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(r.savedMoneyTotal||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie)</div></div>
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(moneyTot||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie)</div></div>
       <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#7B1FA2;font-variant-numeric:tabular-nums;">${_fmtA(escoSum,2)} ${cur}</div><div class="k">Udział WaterAI / ESCO</div></div>
       <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#27500A;font-variant-numeric:tabular-nums;">${clientSum!=null?_fmtA(clientSum,2)+' '+cur:'—'}</div><div class="k">Udział klienta</div></div>
     </div>
