@@ -1482,15 +1482,15 @@ function _analTYMSheet() {
       </div>
       <div class="anw-g2" style="margin-top:12px;">
         ${ANAL.energy.priceMode === 'VARIABLE'
-          ? `<div class="anw-f"><label>Koszt zmienny całościowy [${_escA(ANAL.energy.currency)}]</label>
-              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 1 200,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`
+          ? `<div class="anw-f"><label>Całkowity koszt energii w okresie bazowym [${_escA(ANAL.energy.currency)}]</label>
+              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 17 314,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`
           : `<div class="anw-f"><label>Cena energii (za jednostkę)</label>
               <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 0,54" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`}
         <div class="anw-f"><label>Opis (np. uwzględnia koszty przesyłu i pozostałe składowe faktury)</label>
           <input type="text" value="${_escA(ANAL.energy.priceDescription || '')}" placeholder="WaterAI redukuje zużycie, a tym samym koszty przesyłu i inne składowe…" oninput="ANAL.energy.priceDescription=this.value"></div>
       </div>
       ${ANAL.energy.priceMode === 'VARIABLE'
-        ? `<div class="anw-note">Koszt zmienny całościowy to <b>łączna kwota</b> oszczędności (energia + przesył i pozostałe składowe redukowane przez WaterAI), wpisywana wprost — nie jest mnożona przez zużycie. Udział WaterAI/ESCO liczony jest od tej kwoty. Opis trafia do analizy i raportu ESCO.</div>`
+        ? `<div class="anw-note">Wpisywana kwota to <b>całkowity koszt energii w okresie bazowym</b> (energia + przesył i pozostałe składowe redukowane przez WaterAI). Wartość oszczędności = koszt bazowy × procent oszczędności; dopiero ta kwota jest dzielona pomiędzy WaterAI/ESCO i klienta. Opis trafia do analizy i raportu ESCO.</div>`
         : ''}
     </div>
   </div>`;
@@ -2481,8 +2481,8 @@ function analRun() {
   const savedEnergy = qsBeforeNorm - after.qs;
   const savedPct = qsBeforeNorm > 0 ? savedEnergy / qsBeforeNorm * 100 : 0;
   const price = Number(ANAL.energy.price || 0);
-  // FIXED: cena za jednostkę × zaoszczędzona energia. VARIABLE: koszt zmienny całościowy wpisany wprost.
-  const savedMoney = (ANAL.energy.priceMode === 'VARIABLE') ? price : savedEnergy * price;
+  // FIXED: cena za jednostkę × zaoszczędzona energia. VARIABLE: całkowity koszt energii okresu bazowego × procent oszczędności.
+  const savedMoney = (ANAL.energy.priceMode === 'VARIABLE') ? price * savedPct / 100 : savedEnergy * price;
   const escoShare = Number(ANAL.energy.escoShare || 0);
   const escoAmount = savedMoney * escoShare / 100;
   const clientAmount = savedMoney - escoAmount;
@@ -2609,7 +2609,7 @@ function _analReportData(source) {
   const savedEnergy = (qsBeforeNorm != null && after.qs != null) ? qsBeforeNorm - after.qs : null;
   const savedPct = (qsBeforeNorm > 0 && savedEnergy != null) ? savedEnergy / qsBeforeNorm * 100 : null;
   const price = Number(energy.price || 0);
-  const savedMoney = (energy.priceMode === 'VARIABLE') ? price : (savedEnergy != null ? savedEnergy * price : null);
+  const savedMoney = (energy.priceMode === 'VARIABLE') ? (savedPct != null ? price * savedPct / 100 : null) : (savedEnergy != null ? savedEnergy * price : null);
   const escoAmount = (savedMoney != null) ? savedMoney * escoShare / 100 : null;
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
   return {
@@ -2773,7 +2773,7 @@ function _analReportBody(data) {
   const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
   const pos = (data.savedPct || 0) >= 0;
   const priceLine = data.energy.priceMode === 'VARIABLE'
-    ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
+    ? `Całkowity koszt energii w okresie bazowym: <b>${_fmtA(Number(data.energy.price || 0), 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}. Wartość oszczędności = koszt bazowy × procent oszczędności: ${_fmtA(Number(data.energy.price || 0), 2)} · ${_fmtA(data.savedPct || 0, 2)}% = <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>`
     : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
   return `
   <div class="anw-cover${(data&&data._embedded)?' anw-cover-embed':''}">
@@ -2908,9 +2908,13 @@ function _analReportBody(data) {
       <div class="anw-formula" style="border-color:#27500A;">Qs<sub>PO</sub> = ${_fmtA(Number(data.after.consumption || 0), 2)} · ${data.after.phi != null ? _fmtA(data.after.phi, 4) : '—'} = <b>${data.after.qs != null ? _fmtA(data.after.qs, 2) : '—'} ${u}</b></div>
     </div>
     <div class="anw-desc" style="margin-top:8px;">Po sprowadzeniu obu okresów do warunków Typowego Roku Meteorologicznego wynik nie zależy już od różnic pogody między sezonami. Pozostaje jednak różnica długości — okres PRZED (baza) obejmuje znacznie dłuższy przedział niż okres PO.</div>
-    <div class="anw-formula" style="margin-top:10px;">Sprowadzenie bazy do długości i warunków okresu PO:&nbsp; Qs<sub>PRZED→PO</sub> = Qs<sub>PRZED</sub> · (∑SD<sub>std,PO</sub> / ∑SD<sub>std,PRZED</sub>)</div>
-    <div class="anw-desc"><p style="margin:0;">Aby porównanie było rzetelne, skorygowane zużycie bazy sprowadza się do takiej samej ekspozycji na warunki grzewcze, jaką miał okres PO — w stosunku sumy standardowych stopniodni obu okresów. Uwzględnia to zarówno długość, jak i sezonowość (39 dni zimy ≠ 39 dni lata).</p></div>
-    <div class="anw-formula" style="border-color:#0C447C;">Qs<sub>PRZED→PO</sub> = ${_fmtA(data.before.qs || 0, 2)} · (${_fmtA(data.after.sumS, 1)} / ${_fmtA(data.before.sumS, 1)}) = <b>${_fmtA(data.qsBeforeNorm || 0, 2)} ${u}</b></div>
+    <div class="anw-formula" style="margin-top:10px;">Jednostkowe zużycie energii na jeden standardowy stopniodzień:&nbsp; q = Qs<sub>PRZED</sub> / ∑SD<sub>std,PRZED</sub></div>
+    <div class="anw-formula">Prognozowane zużycie energii dla okresu PO:&nbsp; Q<sub>PRZED→PO</sub> = q · ∑SD<sub>std,PO</sub></div>
+    <div class="anw-desc"><p style="margin:0;">Na podstawie zużycia skorygowanego okresu PRZED wyznacza się jednostkowe zużycie energii przypadające na jeden standardowy stopniodzień. Następnie jednostkowe zużycie mnoży się przez liczbę standardowych stopniodni okresu PO, otrzymując prognozowane zużycie energii, jakie wystąpiłoby w okresie PO przy zachowaniu charakterystyki energetycznej okresu PRZED.</p></div>
+    <div class="anw-g2">
+      <div class="anw-formula" style="border-color:#0C447C;">q = ${_fmtA(data.before.qs || 0, 2)} / ${_fmtA(data.before.sumS, 1)} = <b>${_fmtA(data.before.sumS > 0 ? (data.before.qs || 0) / data.before.sumS : 0, 3)} ${u}/SD</b></div>
+      <div class="anw-formula" style="border-color:#0C447C;">Q<sub>PRZED→PO</sub> = ${_fmtA(data.before.sumS > 0 ? (data.before.qs || 0) / data.before.sumS : 0, 3)} · ${_fmtA(data.after.sumS, 1)} = <b>${_fmtA(data.qsBeforeNorm || 0, 2)} ${u}</b></div>
+    </div>
   </div>
 
   <div class="anw-step-card">
@@ -2919,7 +2923,7 @@ function _analReportBody(data) {
       <p style="margin:0 0 8px;">Po sprowadzeniu zużycia obu okresów do wspólnej bazy (TYM) oszczędność energii wynika wprost z różnicy zużycia skorygowanego PRZED i PO wdrożeniu — niezależnie od tego, czy dany sezon był cieplejszy, czy chłodniejszy od normy. Wartość oszczędności oraz jej podział pomiędzy WaterAI/ESCO a klienta zależą od przyjętego sposobu wyceny energii.</p>
       <p style="margin:0;">${priceLine}.&nbsp; Udział WaterAI / ESCO: <b>${_fmtA(data.escoShare || 0, 0)}%</b>.</p>
     </div>
-    <div class="anw-formula">OSZ = (Qs<sub>PRZED→PO</sub> − Qs<sub>PO</sub>) / Qs<sub>PRZED→PO</sub> · 100%</div>
+    <div class="anw-formula">OSZ = (Q<sub>PRZED→PO</sub> − Qs<sub>PO</sub>) / Q<sub>PRZED→PO</sub> · 100%</div>
     <div class="anw-formula">Energia zaoszczędzona = ${_fmtA(data.qsBeforeNorm || 0, 2)} − ${_fmtA(data.after.qs || 0, 2)} = <b>${_fmtA(data.savedEnergy || 0, 2)} ${u}</b>&nbsp; (${pos ? '' : '−'}${_fmtA(Math.abs(data.savedPct || 0), 1)}%)</div>
     <div class="anw-rgrid" style="margin-top:10px;">
       <div class="anw-tile"><div class="v">${_fmtA(data.savedMoney || 0, 2)} ${cur}</div><div class="k">Wartość oszczędności</div></div>
@@ -3937,15 +3941,15 @@ function _analEnergyBlock() {
       </div>
       <div class="anw-g2" style="margin-top:12px;">
         ${ANAL.energy.priceMode === 'VARIABLE'
-          ? `<div class="anw-f"><label>Koszt zmienny całościowy [${_escA(ANAL.energy.currency)}]</label>
-              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 1 200,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`
+          ? `<div class="anw-f"><label>Całkowity koszt energii w okresie bazowym [${_escA(ANAL.energy.currency)}]</label>
+              <input type="number" step="0.01" min="0" value="${ANAL.energy.price}" placeholder="np. 17 314,00" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`
           : `<div class="anw-f"><label>Cena energii (za jednostkę)</label>
               <input type="number" step="0.0001" min="0" value="${ANAL.energy.price}" placeholder="np. 0,54" oninput="ANAL.energy.price=this.value;_analRecalcLive()"></div>`}
         <div class="anw-f"><label>Opis (np. uwzględnia koszty przesyłu i pozostałe składowe faktury)</label>
           <input type="text" value="${_escA(ANAL.energy.priceDescription || '')}" placeholder="WaterAI redukuje zużycie, a tym samym koszty przesyłu i inne składowe…" oninput="ANAL.energy.priceDescription=this.value"></div>
       </div>
       ${ANAL.energy.priceMode === 'VARIABLE'
-        ? `<div class="anw-note">Koszt zmienny całościowy to <b>łączna kwota</b> oszczędności, wpisywana wprost — nie jest mnożona przez zużycie. Udział WaterAI/ESCO liczony jest od tej kwoty.</div>`
+        ? `<div class="anw-note">Wpisywana kwota to <b>całkowity koszt energii w okresie bazowym</b>. Wartość oszczędności = koszt bazowy × procent oszczędności; dopiero ta kwota jest dzielona pomiędzy WaterAI/ESCO i klienta.</div>`
         : ''}
     </div>
   </div>`;
@@ -4092,7 +4096,7 @@ function _analReportBodyVOL(data) {
   const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
   const pos = (data.savedPct || 0) >= 0;
   const priceLine = data.energy.priceMode === 'VARIABLE'
-    ? `Koszt zmienny całościowy (wpisany wprost): <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}`
+    ? `Całkowity koszt energii w okresie bazowym: <b>${_fmtA(Number(data.energy.price || 0), 2)} ${cur}</b>${data.energy.priceDescription ? ' — ' + _escA(data.energy.priceDescription) : ''}. Wartość oszczędności = koszt bazowy × procent oszczędności: ${_fmtA(Number(data.energy.price || 0), 2)} · ${_fmtA(data.savedPct || 0, 2)}% = <b>${_fmtA(data.savedMoney || 0, 2)} ${cur}</b>`
     : `Cena energii: <b>${_fmtA(Number(data.energy.price || 0), 4)} ${cur}/${u}</b>`;
   return `
   ${(data&&data._embedded)?`<div style="page-break-before:always;break-before:page;">${(data._proofBannerHTML)||''}</div>`:''}
