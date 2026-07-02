@@ -3449,7 +3449,7 @@ function _regProtocolListHtml(objId) {
       <td style="padding:8px 10px;font-size:12px;text-align:right;">${n}</td>
       <td style="padding:8px 10px;text-align:right;white-space:nowrap;">
         <button class="small-button" onclick="regProtoPreview(${p.id})" class="icon-btn" style="font-size:11px;" title="Podgląd">👁</button>
-        <button class="small-button" onclick="regProtoEdit(${p.id})" style="font-size:11px;" title="Edytuj protokół">✏️</button>
+        <button class="small-button" onclick="regProtoOpen(${p.id})" style="font-size:11px;" title="Edytuj protokół (dane, selekcja, regresja)">✏️</button>
         <button class="small-button" onclick="regProtoDelete(${p.id})" style="font-size:11px;${window._regProtoDelArm == p.id ? 'color:#fff;background:#c00;border-color:#c00;font-weight:700;' : 'color:#c00;border-color:#c00;'}">${window._regProtoDelArm == p.id ? '⚠️ usuń?' : '🗑'}</button>
       </td>
     </tr>`;
