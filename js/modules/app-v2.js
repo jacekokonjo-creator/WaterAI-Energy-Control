@@ -1612,10 +1612,13 @@ function _analRegInfo() {
 // Metoda 2 = średnie per °C — dla OBU wielkości (zużycie + temp. zasilania).
 // Okres analizowany: import CSV zapisywany w rekordzie analizy.
 // ═══════════════════════════════════════════════════════════════════════════════
+// Normalizacja zapisu jednostki na dokumentach (np. 'm3' → 'm³').
+function _normUnitA(u){ u=String(u||''); return u.toLowerCase()==='m3'?'m³':u; }
+
 function _analRegLineTxt(L) {
   if (!L || L.a == null || L.b == null) return '—';
   const a = Number(L.a), b = Number(L.b);
-  return `y = ${a.toFixed(4)}·x ${b >= 0 ? '+ ' : '− '}${Math.abs(b).toFixed(2)}` + (L.n != null ? ` <span class="anw-muted">(n=${L.n})</span>` : '');
+  return `y = ${_fmtA(a, 4)}·x ${b >= 0 ? '+ ' : '− '}${_fmtA(Math.abs(b), 2)}` + (L.n != null ? ` <span class="anw-muted">(n=${L.n})</span>` : '');
 }
 
 function _analRegSheet() {
@@ -1897,7 +1900,7 @@ function _analRegChartSvg(title, m, yLabel) {
   const poly = key => rows.map(r => `${px(r.t).toFixed(1)},${py(r[key]).toFixed(1)}`).join(' ');
   let grid = '';
   for (let i = 0; i <= 4; i++) { const v = ymin + yspan * i / 4, y = py(v);
-    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef" stroke-width="1"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${v.toFixed(1)}</text>`; }
+    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" stroke="#e6eaef" stroke-width="1"/><text x="${L - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#7a8794">${_fmtA(v, 1)}</text>`; }
   let xlab = '';
   const xstep = xspan > 30 ? 10 : (xspan > 12 ? 5 : (xspan > 4 ? 2 : 1));
   for (let t = Math.ceil(xmin / xstep) * xstep; t <= xmax + 1e-9; t += xstep) { const x = px(t);
@@ -1923,10 +1926,10 @@ function _analRegTableHtml(m, valueLabel, unit) {
   const dec = (String(unit).indexOf('MJ') >= 0) ? 2 : 1;
   const body = m.rows.map(r => `<tr>
       <td style="${td}text-align:center;">${r.t}</td>
-      <td style="${td}">${r.B.toFixed(dec)}</td>
-      <td style="${td}">${r.C.toFixed(dec)}</td>
-      <td style="${td}color:#1E7B34;font-weight:600;">${r.D != null && isFinite(r.D) ? r.D.toFixed(1) + '%' : '—'}</td>
-      <td style="${td}">${r.E.toFixed(dec)}</td></tr>`).join('');
+      <td style="${td}">${_fmtA(r.B, dec)}</td>
+      <td style="${td}">${_fmtA(r.C, dec)}</td>
+      <td style="${td}color:#1E7B34;font-weight:600;">${r.D != null && isFinite(r.D) ? _fmtA(r.D, 1) + '%' : '—'}</td>
+      <td style="${td}">${_fmtA(r.E, dec)}</td></tr>`).join('');
   const rng = m.range ? `${m.range.from}…${m.range.to}°C` : '';
   return `<details open style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;color:#0C447C;font-weight:600;">Tabela zbiorcza (${rng})</summary>
     <table style="width:100%;border-collapse:collapse;margin-top:6px;">
@@ -1939,8 +1942,8 @@ function _analRegTableHtml(m, valueLabel, unit) {
       <tbody>${body}</tbody>
       <tfoot><tr style="background:var(--color-background-secondary);font-weight:700;">
         <td style="${td}text-align:center;">Średnia</td><td style="${td}">—</td><td style="${td}">—</td>
-        <td style="${td}color:#1E7B34;">${m.avgPct != null ? m.avgPct.toFixed(1) + '%' : '—'}</td>
-        <td style="${td}">${m.avgDiff != null ? m.avgDiff.toFixed(dec) : '—'}</td></tr></tfoot>
+        <td style="${td}color:#1E7B34;">${m.avgPct != null ? _fmtA(m.avgPct, 1) + '%' : '—'}</td>
+        <td style="${td}">${m.avgDiff != null ? _fmtA(m.avgDiff, dec) : '—'}</td></tr></tfoot>
     </table></details>`;
 }
 
@@ -2154,7 +2157,7 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
   return `
   <div class="anw-cover${embedded?' anw-cover-embed':''}">
     ${bannerHTML||''}
-    <div class="anw-cover-top">
+    ${embedded?'':`<div class="anw-cover-top">
       <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
       <div class="anw-cover-num"><div class="anw-cover-num-lbl">Nr analizy</div><div class="anw-cover-num-val">${_escA(number)}</div></div>
     </div>
@@ -2162,10 +2165,10 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
       <div class="anw-cover-kicker">Raport ESCO · Analiza techniczna</div>
       <h1>Analiza techniczna — regresja liniowa</h1>
       <div class="anw-cover-method">Porównanie parametrów pracy obiektu PRZED / PO wdrożeniu wg równań y = a·x + b</div>
-    </div>
+    </div>`}
     <div class="anw-cover-meta">
-      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Dla kogo</div><div class="anw-cm-val">${_escA((cl && cl.name) || '—')}</div><div class="anw-cm-sub">Obiekt: ${_escA((o && o.name) || '—')}</div></div>
-      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Wykonał — Energy Analyst</div><div class="anw-cm-val">${_escA(a.author || '—')}</div><div class="anw-cm-sub">Data wykonania: ${_fmtDateA(a.executedAt)}</div></div>
+      ${embedded?`<div class="anw-cover-meta-card"><div class="anw-cm-lbl">Nr analizy</div><div class="anw-cm-val">${_escA(number)}</div><div class="anw-cm-sub">Wykonał: ${_escA(a.author || '—')} · ${_fmtDateA(a.executedAt)}</div></div>`:`<div class="anw-cover-meta-card"><div class="anw-cm-lbl">Dla kogo</div><div class="anw-cm-val">${_escA((cl && cl.name) || '—')}</div><div class="anw-cm-sub">Obiekt: ${_escA((o && o.name) || '—')}</div></div>
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Wykonał — Energy Analyst</div><div class="anw-cm-val">${_escA(a.author || '—')}</div><div class="anw-cm-sub">Data wykonania: ${_fmtDateA(a.executedAt)}</div></div>`}
       <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres bazowy (PRZED)</div><div class="anw-cm-val anw-cm-period">${baseFrom ? _fmtDateA(baseFrom) : '—'} → ${baseTo ? _fmtDateA(baseTo) : '—'}</div></div>
       <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres analizowany (PO)</div><div class="anw-cm-val anw-cm-period">${poFrom ? _fmtDateA(poFrom) : '—'} → ${poTo ? _fmtDateA(poTo) : '—'}</div></div>
     </div>
@@ -2181,7 +2184,7 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
         <div class="anw-cover-kpi"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) : '—'} <span>°C</span></div><div class="k">Średnia różnica temp. zasilania</div></div>
       </div>
     </div>
-    <div class="anw-cover-foot"><span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span><span>control.waterai.cloud</span></div>
+    ${embedded?'':`<div class="anw-cover-foot"><span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span><span>control.waterai.cloud</span></div>`}
   </div>
 
   <div class="anw-step-card">
@@ -2617,6 +2620,7 @@ function _analReportData(source) {
   const savedEnergy = (qsBeforeNorm != null && after.qs != null) ? qsBeforeNorm - after.qs : null;
   const savedPct = (qsBeforeNorm > 0 && savedEnergy != null) ? savedEnergy / qsBeforeNorm * 100 : null;
   const price = Number(energy.price || 0);
+  energy = Object.assign({}, energy, { unit: _normUnitA(energy.unit) });
   const savedMoney = (energy.priceMode === 'VARIABLE') ? (savedPct != null ? price * savedPct / 100 : null) : (savedEnergy != null ? savedEnergy * price : null);
   const escoAmount = (savedMoney != null) ? savedMoney * escoShare / 100 : null;
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
@@ -2802,7 +2806,7 @@ function _analReportBody(data) {
   return `
   <div class="anw-cover${(data&&data._embedded)?' anw-cover-embed':''}">
     ${(data&&data._proofBannerHTML)||''}
-    <div class="anw-cover-top">
+    ${(data&&data._embedded)?'':`<div class="anw-cover-top">
       <img src="logo-waterai.png" alt="WaterAI" class="anw-cover-logo" />
       <div class="anw-cover-num">
         <div class="anw-cover-num-lbl">Nr analizy</div>
@@ -2814,10 +2818,14 @@ function _analReportBody(data) {
       <div class="anw-cover-kicker">Raport ESCO · Energy Service Company</div>
       <h1>Analiza oszczędności energii</h1>
       <div class="anw-cover-method">Metoda korekty stopniodni — Typowy Rok Meteorologiczny (TYM)</div>
-    </div>
+    </div>`}
 
     <div class="anw-cover-meta">
-      <div class="anw-cover-meta-card">
+      ${(data&&data._embedded)?`<div class="anw-cover-meta-card">
+        <div class="anw-cm-lbl">Nr analizy</div>
+        <div class="anw-cm-val">${_escA(data.number)}</div>
+        <div class="anw-cm-sub">Wykonał: ${_escA(data.author || '—')} · ${_fmtDateA(data.executedAt)}</div>
+      </div>`:`<div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Dla kogo</div>
         <div class="anw-cm-val">${_escA((data.client && data.client.name) || '—')}</div>
         <div class="anw-cm-sub">Obiekt: ${_escA((data.object && data.object.name) || '—')}</div>
@@ -2826,7 +2834,7 @@ function _analReportBody(data) {
         <div class="anw-cm-lbl">Wykonał — Energy Analyst</div>
         <div class="anw-cm-val">${_escA(data.author || '—')}</div>
         <div class="anw-cm-sub">Data wykonania: ${_fmtDateA(data.executedAt)}</div>
-      </div>
+      </div>`}
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Okres bazowy (PRZED)</div>
         <div class="anw-cm-val anw-cm-period">${_fmtDateA(data.before.from)} → ${_fmtDateA(data.before.to)}</div>
@@ -2859,10 +2867,10 @@ function _analReportBody(data) {
       </div>
     </div>
 
-    <div class="anw-cover-foot">
+    ${(data&&data._embedded)?'':`<div class="anw-cover-foot">
       <span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span>
       <span>control.waterai.cloud</span>
-    </div>
+    </div>`}
   </div>
 
   <div class="anw-step-card">
@@ -3303,7 +3311,7 @@ function _escoAnalPct(a){
 // Fallback: before, top-level periodFrom/To, data wykonania.
 // Tekst metodyki (sekcja 1) i porównania metod (sekcja 4) — ZALEŻNY od metody podstawowej.
 // Metodą podstawową (rozliczeniową) może być dowolna korekta; regresja jest zawsze pomocnicza.
-function _escoMethodCopy(primType, hasReg){
+function _escoMethodCopy(primType, hasReg, per){
   const M={
     TYM:{head:'korekta do Typowego Roku Meteorologicznego (TYM)',
       p:[
@@ -3355,7 +3363,8 @@ function _escoMethodCopy(primType, hasReg){
       <p style="margin:0 0 4px;">Dla okresów PRZED i PO wyznaczane są charakterystyki pracy obiektu opisane równaniem:</p>
       <div class="anw-formula">y = a · x + b</div>
       <p style="margin:8px 0 8px;">Porównanie otrzymanych charakterystyk pozwala ocenić zmianę intensywności pracy instalacji grzewczej oraz potwierdzić techniczny efekt działania wdrożonego systemu.</p>
-      <p style="margin:0 0 8px;">Analiza regresji pełni funkcję dowodu inżynierskiego i stanowi niezależną weryfikację uzyskanych rezultatów, jednak nie zastępuje metody podstawowej jako podstawy rozliczeń finansowych.</p>`:'';
+      <p style="margin:0 0 8px;">Analiza regresji pełni funkcję dowodu inżynierskiego i stanowi niezależną weryfikację uzyskanych rezultatów, jednak nie zastępuje metody podstawowej jako podstawy rozliczeń finansowych.</p>
+      <p style="margin:0 0 8px;">Baza regresji obejmuje okres od montażu urządzenia do aktywacji optymalizacji${(per&&per.regBaseFrom&&per.regBaseTo)?` (${fmtDate(per.regBaseFrom)} → ${fmtDate(per.regBaseTo)})`:''}, w którym instalacja pracowała w dotychczasowym trybie pogodowym — dane z czujników nie istnieją sprzed montażu, dlatego okres odniesienia regresji jest krótszy niż okres bazowy metody rozliczeniowej, oparty na danych rozliczeniowych z pełnego okresu poprzedzającego wdrożenie${(per&&per.tymFrom&&per.tymTo)?` (${fmtDate(per.tymFrom)} → ${fmtDate(per.tymTo)})`:''}. Weryfikacja regresją obejmuje część okna rozliczeniowego, według danych pomiarowych dostępnych na dzień sporządzenia analizy technicznej.</p>`:'';
   const sec1=`
     <div class="anw-desc">
       <p style="margin:0 0 10px;">W celu zapewnienia rzetelnej i obiektywnej oceny uzyskanych oszczędności zastosowano ${hasReg?'dwie wzajemnie uzupełniające się metody analizy':'metodę analizy opisaną poniżej'}.</p>
@@ -3429,7 +3438,7 @@ function updateESCOSummary() {
     const r=_escoFreshRes(a), ip=a.inputParams||{};
     if(r.savedEnergy) totalSaved+=Number(r.savedEnergy);
     if(r.savedMoney)  totalMoney+=Number(r.savedMoney);
-    if(ip.energyUnit) unit=ip.energyUnit;
+    if(ip.energyUnit) unit=_normUnitA(ip.energyUnit);
     if(ip.currency)   currency=ip.currency;
     const p=_escoAnalPct(a); if(p!=null) pctVals.push({t:((AnalysesModule.TYPES[a.analysisType]||{}).label||a.analysisType), p});
   });
@@ -3544,13 +3553,21 @@ function _escoFreeze(rep){
   });
   const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
   const objectClimate=obj?{weatherStation:obj.weatherStation||'',weatherSource:obj.weatherSource||'',weatherSourceUrl:obj.weatherSourceUrl||'',weatherDataDownloadDate:obj.weatherDataDownloadDate||''}:null;
-  return { at:new Date().toISOString(), clientName:(client&&client.name)||'', objectName:(obj&&obj.name)||'', objectClimate, analyses };
+  return { at:new Date().toISOString(), clientName:(client&&client.name)||'', objectName:(obj&&obj.name)||'', clientAddress:_escoClientAddr(client), clientVatId:(client&&client.vatId)||'', objectClimate, analyses };
 }
 function _escoApplyFreezePolicy(rep,refresh){
   if(rep.status==='FINAL'||rep.status==='SIGNED'){ if(refresh||!rep.frozen) rep.frozen=_escoFreeze(rep); }
   else if(rep.frozen){ delete rep.frozen; }
   return rep;
 }
+// Adres klienta z pól FV (ulica nr/lok, kod miasto, kraj) — do okładki raportu.
+function _escoClientAddr(c){
+  if(!c) return '';
+  const l1=([c.street,c.buildingNumber].filter(Boolean).join(' ')+(c.apartmentNumber?'/'+c.apartmentNumber:'')).trim();
+  const l2=[c.postalCode,c.city].filter(Boolean).join(' ');
+  return [l1,l2,(c.country&&c.country!=='PL')?c.country:''].filter(Boolean).join(', ');
+}
+
 // Zapis listy raportów z awaryjnym odchudzeniem zamrożonych danych regresji przy limicie pamięci
 // (surowe punkty CSV zostają w analizie źródłowej; dowód regresji dociąga je stamtąd).
 function _escoSaveAll(all){
@@ -3664,8 +3681,10 @@ function escoBuildReportParts(rep){
   const _find=id=>fz?(_byId.get(Number(id))||null):AnalysesModule.find(id);
   const clientName=fz&&fz.clientName?fz.clientName:((client&&client.name)||'—');
   const objName=fz&&fz.objectName?fz.objectName:((obj&&obj.name)||'—');
+  const clientAddr=(fz&&fz.clientAddress!=null)?fz.clientAddress:_escoClientAddr(client);
+  const clientVat=(fz&&fz.clientVatId!=null)?fz.clientVatId:((client&&client.vatId)||'');
   const r=rep.results||{};
-  const u=r.energyUnit||'kWh', cur=r.currency||'EUR';
+  const u=_normUnitA(r.energyUnit||'kWh'), cur=r.currency||'EUR';
   const all=(rep.analysisIds||[]).map(_find).filter(Boolean);
   const tymAnals=(rep.analysisIdsTYM||[]).map(_find).filter(Boolean);
   const regAnals=(rep.analysisIdsREG||[]).map(_find).filter(Boolean);
@@ -3703,11 +3722,11 @@ function escoBuildReportParts(rep){
       return [c,s].filter(Boolean).join(' · ')||'—';
     }
     const p=_escoAnalPct(a);
-    const e=ar.savedEnergy!=null?_fmtA(ar.savedEnergy,2)+' '+(ai.energyUnit||u):'';
+    const e=ar.savedEnergy!=null?_fmtA(ar.savedEnergy,2)+' '+_normUnitA(ai.energyUnit||u):'';
     const m=ar.savedMoney!=null?_fmtA(ar.savedMoney,2)+' '+(ai.currency||cur):'';
     return [p!=null?_fmtA(p,1)+'% redukcji':'',e,m].filter(Boolean).join(' · ')||'—';
   };
-  const overviewRows=all.map(a=>{
+  const overviewRows=all.slice().sort((a,b)=>((a.analysisType==='REGRESSION')?1:0)-((b.analysisType==='REGRESSION')?1:0)).map(a=>{
     const t=typeMeta(a), per=_escoAnalPeriod(a);
     return `<tr><td>${t.icon} ${escapeHtml(t.label)}</td><td>${escapeHtml(a.name)}</td><td class="calc">${fmtDate(per.from)} → ${fmtDate(per.to)}</td><td class="calc">${headline(a)}</td></tr>`;
   }).join('');
@@ -3733,6 +3752,8 @@ function escoBuildReportParts(rep){
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Dla kogo</div>
         <div class="anw-cm-val">${escapeHtml(clientName)}</div>
+        ${clientAddr?`<div class="anw-cm-sub">${escapeHtml(clientAddr)}</div>`:''}
+        ${clientVat?`<div class="anw-cm-sub">NIP/IČO: ${escapeHtml(clientVat)}</div>`:''}
         <div class="anw-cm-sub">Obiekt: ${escapeHtml(objName)}</div>
       </div>
       <div class="anw-cover-meta-card">
@@ -3769,7 +3790,21 @@ function escoBuildReportParts(rep){
     </div>
   </div>`;
 
-  const _mc=_escoMethodCopy(primType, regProofAnals.length>0);
+  const _mcPer=(()=>{
+    const out={};
+    try{
+      const pr=primaryAnals[0];
+      if(pr&&pr.inputParams&&pr.inputParams.before){ out.tymFrom=pr.inputParams.before.from||''; out.tymTo=pr.inputParams.before.to||''; }
+      const rg=regProofAnals[0];
+      if(rg&&rg.inputParams&&rg.inputParams.reg&&rg.inputParams.reg.baseLines){
+        const pid=rg.inputParams.reg.baseLines.periodId;
+        const bp=(window.RegressionBaseModule&&pid!=null)?RegressionBaseModule.find(rg.objectId,pid):null;
+        if(bp){ out.regBaseFrom=bp.periodFrom?String(bp.periodFrom).slice(0,10):''; out.regBaseTo=bp.periodTo?String(bp.periodTo).slice(0,10):''; }
+      }
+    }catch(e){}
+    return out;
+  })();
+  const _mc=_escoMethodCopy(primType, regProofAnals.length>0, _mcPer);
   const secMetodyka=sec('Metodyka rozliczenia oszczędności', _mc.sec1);
 
   const secPrzeglad=sec('Zakres raportu — uwzględnione analizy', all.length
@@ -3780,7 +3815,7 @@ function escoBuildReportParts(rep){
   const finRows=primaryAnals.map(a=>{
     let d=null; try{ d=_analReportData({saved:a}); }catch(e){}
     const fr=_escoFreshRes(a), ai=a.inputParams||{};
-    const au=(d&&d.energy&&d.energy.unit)||ai.energyUnit||u, ac=(d&&d.energy&&d.energy.currency)||ai.currency||cur;
+    const au=_normUnitA((d&&d.energy&&d.energy.unit)||ai.energyUnit||u), ac=(d&&d.energy&&d.energy.currency)||ai.currency||cur;
     const en=fr.savedEnergy!=null?_fmtA(fr.savedEnergy,2)+' '+au:'—';
     let wyc='—', obl='—';
     if(d&&d.energy){
@@ -3842,6 +3877,35 @@ function escoBuildReportParts(rep){
       <p style="margin:0 0 8px;">Różnica ok. ${_fmtA(diff,1)} p.p. jest oczekiwana i nie świadczy o błędzie żadnej z metod — mierzą one różne wielkości: metoda rozliczeniowa porównuje całkowite zużycie okresu (wraz z efektami harmonogramów i dni bez ogrzewania), regresja — czystą intensywność na jednostkę temperatury zewnętrznej, uśrednioną po przyjętym zakresie.${endTxt}${insideTxt} Zgodność dwóch niezależnych metod, opartych na różnych źródłach danych (licznik główny vs czujniki), wzajemnie potwierdza wiarygodność wyniku.</p></div>`;
     }
   }catch(e){}
+  // Prognoza roczna: q × suma standardowych stopniodni pełnego roku (TYM), per analiza rozliczeniowa
+  let secForecast='';
+  try{
+    const fRows=[]; let fTotMoney=0, fCur='', fCurMixed=false;
+    primaryAnals.forEach(a=>{
+      if(a.analysisType==='VOLUME') return;
+      let d=null; try{ d=_analReportData({saved:a}); }catch(e){ return; }
+      if(!d||!d.before||!(d.before.sumS>0)||!d.after||!(d.after.sumS>0)) return;
+      const ti=(d.tiBefore!=null&&d.tiBefore!=='')?Number(d.tiBefore):20;
+      let yearSD=0; for(let m=1;m<=12;m++){ const v=(d.std&&d.std[m])||[0,0]; yearSD+=_sd20(Number(v[0]),Number(v[1]||0),ti); }
+      if(!(yearSD>0)) return;
+      const qB=(d.before.qs||0)/d.before.sumS, qP=(d.after.qs||0)/d.after.sumS;
+      const consBase=qB*yearSD, consTech=qP*yearSD, savedE=consBase-consTech;
+      const pctF=consBase>0?savedE/consBase*100:0;
+      const au=d.energy.unit, ac=d.energy.currency||cur;
+      const prc=Number(d.energy.price||0);
+      const money=(d.energy.priceMode==='VARIABLE') ? prc*(yearSD/d.before.sumS)*(pctF/100) : savedE*prc;
+      if(!fCur) fCur=ac; else if(fCur!==ac) fCurMixed=true;
+      fTotMoney+=money;
+      fRows.push(`<tr><td>${escapeHtml(a.name)}</td><td class="calc">${_fmtA(consBase,0)} ${au}</td><td class="calc">${_fmtA(consTech,0)} ${au}</td><td class="calc"><b>${_fmtA(savedE,0)} ${au}</b> (${_fmtA(pctF,1)}%)</td><td class="calc"><b>${_fmtA(money,2)} ${ac}</b></td></tr>`);
+    });
+    if(fRows.length){
+      secForecast=sec('Prognoza roczna oszczędności (orientacyjna)',`
+    <div class="anw-desc"><p style="margin:0 0 8px;">Prognoza ekstrapoluje jednostkowe zużycie energii na standardowy stopniodzień (q), wyznaczone w części dowodowej, na <b>pełny rok w warunkach Typowego Roku Meteorologicznego</b>: prognozowane zużycie roczne = q × suma standardowych stopniodni pełnego sezonu. Zestawienie porównuje zużycie roczne przy charakterystyce energetycznej okresu bazowego (bez technologii) i okresu po wdrożeniu (z technologią WaterAI).</p></div>
+    <table class="anw-t"><thead><tr><th>Analiza</th><th style="text-align:right;">Rocznie bez technologii</th><th style="text-align:right;">Rocznie z technologią</th><th style="text-align:right;">Prognoza oszczędności energii</th><th style="text-align:right;">Prognoza wartości / rok</th></tr></thead><tbody>${fRows.join('')}</tbody>${(fRows.length>1&&!fCurMixed)?`<tfoot><tr><td colspan="4"><b>Łącznie</b></td><td class="calc"><b>${_fmtA(fTotMoney,2)} ${fCur}</b></td></tr></tfoot>`:''}</table>
+    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Prognoza ma charakter <b>orientacyjny</b> — zakłada utrzymanie charakterystyki energetycznej obu okresów oraz typowe warunki pogodowe (TYM). <b>Nie stanowi podstawy do wystawienia faktury</b>; rozliczenia dokonywane są wyłącznie za zamknięte okresy rozliczeniowe, zgodnie z sekcją „Rozliczenie finansowe ESCO".</p></div>`);
+    }
+  }catch(e){}
+
   const secCmp=regProofAnals.length? sec('Porównanie metod', cmpNums+_mc.sec4) : '';
 
   const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
@@ -3889,7 +3953,7 @@ function escoBuildReportParts(rep){
     </div>
   </div>`;
 
-  const html=cover+secMetodyka+secPrzeglad+secFin+secCmp+secNotes+proofs+signatures;
+  const html=cover+secMetodyka+secPrzeglad+secFin+secForecast+secCmp+secNotes+proofs+signatures;
   return {html, drawDatas};
 }
 
