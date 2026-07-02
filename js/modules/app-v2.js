@@ -3147,7 +3147,7 @@ function renderESCOReports() {
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((client&&client.name)||'—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml((obj&&obj.name)||'—')}</td>
       <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${(function(){const p=_escoRepPeriod(rep);return fmtDate(p.from)+' → '+fmtDate(p.to);})()}</td>
-      <td style="padding:9px 12px;">${statusCell}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">${rep.frozen?'<span title="Treść raportu zamrożona">🔒</span> ':''}${statusCell}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;align-items:center;">
           <button class="icon-btn" onclick="viewESCOReport('${rep.id}')" title="Podgląd">👁</button>
@@ -3220,6 +3220,8 @@ function renderESCOReports() {
             </select></div>
             <div class="esco-field"><label>Sporządził (Energy Analyst)</label>
               <select id="esco-prepared" name="preparedBy">${escoAnalystOptions(initSrc?initSrc.preparedBy:'')}</select></div>
+            <div class="esco-field"><label>Podstawa umowna (do rozliczenia)</label>
+              <input name="contractRef" placeholder="np. §5 ust. 2 umowy ESCO nr 12/2025" value="${initSrc?escapeHtml(initSrc.contractRef||''):''}"/></div>
           </div>
         </div>
       </div>
@@ -3477,6 +3479,7 @@ function escoBuildReportFromForm(form){
     reportDate: form.reportDate.value,
     status: form.reportStatus.value,
     preparedBy: form.preparedBy.value.trim(),
+    contractRef: (form.contractRef&&form.contractRef.value?form.contractRef.value.trim():''),
     clientId: Number(clientId),
     objectId: Number(objectId),
     periodFrom: froms[0]||'',
@@ -3505,12 +3508,42 @@ function escoBuildPreview(form){
 }
 
 // Zapis raportu z podglądu — wstaw nowy albo zaktualizuj istniejący
+// ── ZAMRAŻANIE RAPORTU (status Finalny / Podpisany) ─────────────────────────────
+// Snapshot analiz (dane wejściowe + wyniki + numery) i nazw klienta/obiektu w rekordzie
+// raportu. Zamrożony raport renderuje się z kopii — późniejsze zmiany analiz, cen ani
+// nazw nie zmieniają już jego treści. Powrót do statusu Szkic odmraża raport.
+function _escoFreeze(rep){
+  const analyses=(rep.analysisIds||[]).map(id=>AnalysesModule.find(id)).filter(Boolean).map(a=>{
+    const c=JSON.parse(JSON.stringify(a));
+    c._frozenNumber=(AnalysesModule.getNumber?AnalysesModule.getNumber(a.id):null)||('#'+a.id);
+    return c;
+  });
+  const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
+  return { at:new Date().toISOString(), clientName:(client&&client.name)||'', objectName:(obj&&obj.name)||'', analyses };
+}
+function _escoApplyFreezePolicy(rep,refresh){
+  if(rep.status==='FINAL'||rep.status==='SIGNED'){ if(refresh||!rep.frozen) rep.frozen=_escoFreeze(rep); }
+  else if(rep.frozen){ delete rep.frozen; }
+  return rep;
+}
+// Zapis listy raportów z awaryjnym odchudzeniem zamrożonych danych regresji przy limicie pamięci
+// (surowe punkty CSV zostają w analizie źródłowej; dowód regresji dociąga je stamtąd).
+function _escoSaveAll(all){
+  try{ localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all)); return true; }
+  catch(e){
+    all.forEach(rp=>{ if(rp.frozen&&rp.frozen.analyses) rp.frozen.analyses.forEach(c=>{ if(c.analysisType==='REGRESSION'&&c.inputParams&&c.inputParams.reg) delete c.inputParams.reg; }); });
+    try{ localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all)); return true; }
+    catch(e2){ alert('Nie udało się zapisać raportów ESCO — limit pamięci przeglądarki.'); return false; }
+  }
+}
+
 function escoSaveDraft(){
   const rep=window._escoDraft; if(!rep) return;
+  _escoApplyFreezePolicy(rep,true); // zapis raportu Finalnego/Podpisanego = nowy snapshot treści
   const all=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]');
   const i=all.findIndex(x=>x.id===rep.id);
   if(i>=0) all[i]=rep; else all.push(rep);
-  localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all));
+  if(!_escoSaveAll(all)) return;
   window._escoReports=all;
   window._escoDraft=null; window._escoEditId=null; window._prefillESCOAnalysisId=null;
   renderESCOReports();
@@ -3550,7 +3583,8 @@ function escoQuickStatus(id,status){
   const all=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]');
   const i=all.findIndex(x=>x.id===id); if(i<0) return;
   all[i].status=status; all[i].updatedAt=new Date().toISOString();
-  localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all));
+  _escoApplyFreezePolicy(all[i],false);
+  if(!_escoSaveAll(all)) return;
   window._escoReports=all;
   renderESCOReports();
 }
@@ -3600,11 +3634,16 @@ function escoRenderReportView(rep, isPreview){
 // Zwraca {html, drawDatas} — drawDatas to dane TYM/VOLUME do narysowania po wstawieniu do DOM.
 function escoBuildReportParts(rep){
   const client=ClientsModule.find(rep.clientId), obj=ObjectsModule.find(rep.objectId);
+  const fz=(rep.frozen&&Array.isArray(rep.frozen.analyses))?rep.frozen:null;
+  const _byId=fz?new Map(fz.analyses.map(a=>[Number(a.id),a])):null;
+  const _find=id=>fz?(_byId.get(Number(id))||null):AnalysesModule.find(id);
+  const clientName=fz&&fz.clientName?fz.clientName:((client&&client.name)||'—');
+  const objName=fz&&fz.objectName?fz.objectName:((obj&&obj.name)||'—');
   const r=rep.results||{};
   const u=r.energyUnit||'kWh', cur=r.currency||'EUR';
-  const all=(rep.analysisIds||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const tymAnals=(rep.analysisIdsTYM||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const regAnals=(rep.analysisIdsREG||[]).map(id=>AnalysesModule.find(id)).filter(Boolean);
+  const all=(rep.analysisIds||[]).map(_find).filter(Boolean);
+  const tymAnals=(rep.analysisIdsTYM||[]).map(_find).filter(Boolean);
+  const regAnals=(rep.analysisIdsREG||[]).map(_find).filter(Boolean);
   const trSet=new Set([...(rep.analysisIdsTYM||[]),...(rep.analysisIdsREG||[])].map(Number));
   const otherAnals=all.filter(a=>!trSet.has(Number(a.id)));
   // Metoda podstawowa = wszystkie analizy poza regresją (TYM lub inna korekta). Regresja = pomocnicza.
@@ -3668,8 +3707,8 @@ function escoBuildReportParts(rep){
     <div class="anw-cover-meta">
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Dla kogo</div>
-        <div class="anw-cm-val">${escapeHtml((client&&client.name)||'—')}</div>
-        <div class="anw-cm-sub">Obiekt: ${escapeHtml((obj&&obj.name)||'—')}</div>
+        <div class="anw-cm-val">${escapeHtml(clientName)}</div>
+        <div class="anw-cm-sub">Obiekt: ${escapeHtml(objName)}</div>
       </div>
       <div class="anw-cover-meta-card">
         <div class="anw-cm-lbl">Sporządził — Energy Analyst</div>
@@ -3684,6 +3723,7 @@ function escoBuildReportParts(rep){
         <div class="anw-cm-lbl">Status raportu</div>
         <div class="anw-cm-val"><span style="display:inline-block;font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;background:${stMeta.color}22;color:${stMeta.color};">${stMeta.label}</span></div>
         <div class="anw-cm-sub">Analiz w raporcie: ${all.length} (metoda główna: ${primaryAnals.length}, regresja: ${regProofAnals.length})</div>
+        ${fz?`<div class="anw-cm-sub" style="color:#7B1FA2;font-weight:600;">🔒 Treść rozliczeniowa zamrożona ${fmtDate(fz.at.slice(0,10))} — dokument niezmienny</div>`:''}
       </div>
     </div>
     <div class="anw-cover-result">
@@ -3699,7 +3739,7 @@ function escoBuildReportParts(rep){
       </div>
     </div>
     <div class="anw-cover-foot">
-      <span>Dokument wygenerowany w systemie <b>WaterAI Energy Control</b> · ${genDate}</span>
+      <span>System <b>WaterAI Energy Control</b> · Data raportu: ${fmtDate(rep.reportDate)} · Wydruk z dnia: ${genDate}${fz?` · Treść zamrożona: ${fmtDate(fz.at.slice(0,10))}`:''}</span>
       <span>control.waterai.cloud</span>
     </div>
   </div>`;
@@ -3711,13 +3751,41 @@ function escoBuildReportParts(rep){
     ? `<table class="anw-t"><thead><tr><th>Typ</th><th>Analiza</th><th style="text-align:right;">Okres (PO)</th><th style="text-align:right;">Wynik</th></tr></thead><tbody>${overviewRows}</tbody></table>`
     : `<div class="anw-desc"><p style="margin:0;">Brak analiz w raporcie.</p></div>`);
 
+  // Pełne wyprowadzenie rozliczenia — per analiza rozliczeniowa (energia, wycena, obliczenie, wartość)
+  const finRows=primaryAnals.map(a=>{
+    let d=null; try{ d=_analReportData({saved:a}); }catch(e){}
+    const fr=_escoFreshRes(a), ai=a.inputParams||{};
+    const au=(d&&d.energy&&d.energy.unit)||ai.energyUnit||u, ac=(d&&d.energy&&d.energy.currency)||ai.currency||cur;
+    const en=fr.savedEnergy!=null?_fmtA(fr.savedEnergy,2)+' '+au:'—';
+    let wyc='—', obl='—';
+    if(d&&d.energy){
+      const prc=Number(d.energy.price||0);
+      if(d.energy.priceMode==='VARIABLE'){
+        wyc=`Koszt zmienny całościowy (koszt bazowy: ${_fmtA(prc,2)} ${ac})`;
+        obl=`${_fmtA(prc,2)} ${ac} × ${_fmtA(d.savedPct||0,2)}% = <b>${_fmtA(fr.savedMoney||0,2)} ${ac}</b>`;
+      }else{
+        wyc=`Cena stała: ${_fmtA(prc,4)} ${ac}/${au}`;
+        obl=`${_fmtA(fr.savedEnergy||0,2)} ${au} × ${_fmtA(prc,4)} ${ac}/${au} = <b>${_fmtA(fr.savedMoney||0,2)} ${ac}</b>`;
+      }
+    }
+    return `<tr><td>${escapeHtml(a.name)}</td><td class="calc">${en}</td><td>${wyc}</td><td class="calc">${obl}</td></tr>`;
+  }).join('');
+  const shareSet=[...new Set(primaryAnals.map(a=>{ let d=null; try{ d=_analReportData({saved:a}); }catch(e){} return d?Number(d.escoShare||0):null; }).filter(v=>v!=null))];
+  const shareTxt=shareSet.length===1?_fmtA(shareSet[0],0)+'%':'wg udziałów przypisanych w poszczególnych analizach';
+  const contractTxt=rep.contractRef?`zgodnie z ${escapeHtml(rep.contractRef)}`:'zgodnie z zawartą umową o poprawę efektywności energetycznej (ESCO)';
   const secFin=sec('Rozliczenie finansowe ESCO',`
-    <div class="anw-rgrid">
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(moneyTot||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie)</div></div>
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#7B1FA2;font-variant-numeric:tabular-nums;">${_fmtA(escoSum,2)} ${cur}</div><div class="k">Udział WaterAI / ESCO</div></div>
-      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#27500A;font-variant-numeric:tabular-nums;">${clientSum!=null?_fmtA(clientSum,2)+' '+cur:'—'}</div><div class="k">Udział klienta</div></div>
+    <div class="anw-desc"><p style="margin:0 0 8px;"><b>Okres rozliczeniowy:</b> ${fmtDate(pFrom)} → ${fmtDate(pTo)}.&nbsp; Rozliczenie obejmuje oszczędności energii wyznaczone metodą rozliczeniową (${escapeHtml((AnalysesModule.TYPES[primType]||{}).label||primType)}) i wykazane w części dowodowej niniejszego raportu.</p></div>
+    <table class="anw-t"><thead><tr><th>Analiza rozliczeniowa</th><th style="text-align:right;">Energia zaoszczędzona</th><th>Sposób wyceny energii</th><th style="text-align:right;">Obliczenie wartości oszczędności</th></tr></thead>
+      <tbody>${finRows||'<tr><td colspan="4">Brak analiz rozliczeniowych.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="3"><b>Wartość oszczędności łącznie (netto)</b></td><td class="calc"><b>${_fmtA(moneyTot||0,2)} ${cur}</b></td></tr></tfoot></table>
+    <div class="anw-desc" style="margin-top:10px;"><p style="margin:0;"><b>Podział oszczędności</b> — udział WaterAI/ESCO: <b>${shareTxt}</b>, ${contractTxt}:</p></div>
+    <div class="anw-formula">Udział WaterAI/ESCO = ${_fmtA(moneyTot||0,2)} ${cur} × ${shareSet.length===1?_fmtA(shareSet[0],0)+'%':'udział'} = <b>${_fmtA(escoSum,2)} ${cur}</b>&nbsp;·&nbsp; Udział klienta = ${_fmtA(moneyTot||0,2)} − ${_fmtA(escoSum,2)} = <b>${_fmtA(clientSum||0,2)} ${cur}</b></div>
+    <div class="anw-rgrid" style="margin-top:10px;">
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#0C447C;font-variant-numeric:tabular-nums;">${_fmtA(moneyTot||0,2)} ${cur}</div><div class="k">Wartość oszczędności (łącznie, netto)</div></div>
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#7B1FA2;font-variant-numeric:tabular-nums;">${_fmtA(escoSum,2)} ${cur}</div><div class="k">Udział WaterAI / ESCO (netto)</div></div>
+      <div class="anw-tile"><div class="v" style="font-size:20px;font-weight:700;color:#27500A;font-variant-numeric:tabular-nums;">${clientSum!=null?_fmtA(clientSum,2)+' '+cur:'—'}</div><div class="k">Udział klienta (netto)</div></div>
     </div>
-    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Udział WaterAI / ESCO to suma udziałów z analiz rozliczeniowych (TYM). Pozostała część wartości oszczędności przypada klientowi. Kwoty stanowią podstawę do wystawienia faktury za osiągnięte oszczędności.</p></div>`);
+    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Wszystkie kwoty są kwotami <b>netto</b>. Do kwoty udziału WaterAI/ESCO zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury. Kwota udziału WaterAI/ESCO stanowi podstawę do wystawienia faktury za oszczędności osiągnięte w okresie rozliczeniowym; pozostała część wartości oszczędności przypada klientowi.</p></div>`);
 
   const secCmp=regProofAnals.length? sec('Porównanie metod', _mc.sec4) : '';
 
@@ -3734,6 +3802,7 @@ function escoBuildReportParts(rep){
   let proofs='';
   primaryAnals.forEach((a,i)=>{
     try{ const data=_analReportData({saved:a}); data._embedded=true;
+      if(a._frozenNumber) data.number=a._frozenNumber;
       data._proofBannerHTML=proofBanner('Dowód · metoda główna ('+typeMeta(a).label+')'+(primaryAnals.length>1?` — ${i+1}/${primaryAnals.length}`:''), a.name, '#0C447C', '#EEF4FB');
       drawDatas.push(data);
       proofs+=_analReportBody(data);
@@ -3741,7 +3810,8 @@ function escoBuildReportParts(rep){
   });
   regProofAnals.forEach((a,i)=>{
     try{
-      const reg=(a.inputParams&&a.inputParams.reg)?a.inputParams.reg:null;
+      let reg=(a.inputParams&&a.inputParams.reg)?a.inputParams.reg:null;
+      if(!reg&&fz){ const live=AnalysesModule.find(a.id); reg=(live&&live.inputParams&&live.inputParams.reg)?live.inputParams.reg:null; }
       const model=reg?_analRegModel(reg):null;
       const o=ObjectsModule.find(a.objectId);
       const banner=proofBanner('Dowód · metoda pomocnicza (regresja)'+(regProofAnals.length>1?` — ${i+1}/${regProofAnals.length}`:''), a.name, '#0E8A6B', '#E7F6F0');
@@ -3758,7 +3828,7 @@ function escoBuildReportParts(rep){
     </div>
     <div class="anw-sign-box anw-sign-wateria">
       <div class="anw-stamp">WaterAI Energy</div>
-      <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b> dnia ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
+      <div class="anw-sign-cap" style="margin-top:10px;">Dokument wygenerowany elektronicznie w systemie <b>WaterAI Energy Control</b>. Data raportu: ${fmtDate(rep.reportDate)}${fz?` · treść zamrożona: ${fmtDate(fz.at.slice(0,10))}`:''} · wydruk z dnia: ${genDate}. Nie wymaga podpisu ani pieczęci.</div>
       <div class="anw-sign-cap">Rozliczenia ESCO — WaterAI Energy.</div>
     </div>
   </div>`;
