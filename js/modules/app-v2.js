@@ -1659,6 +1659,7 @@ function _analRegSheet() {
           <button class="small-button" style="font-size:13px;" ${rowsCount ? '' : 'disabled'} onclick="analRegCopyBase()">📥 Kopiuj dane z okresu bazowego</button>
         </div>
         ${L ? `
+        ${(ANAL.basePeriod && L.periodId != null && String(L.periodId) !== String(ANAL.basePeriod)) ? `<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:#FFF6E5;border:1px solid #E8B84B;font-size:13px;color:#7a5200;">⚠️ Skopiowane linie bazowe pochodzą z <b>innego okresu bazowego</b> niż aktualnie wybrany. Kliknij „📥 Kopiuj dane z okresu bazowego", aby przeliczyć.</div>` : ''}
         <div class="anw-ctx" style="margin-top:12px;">
           <span>📉 Zużycie ciepła: <b>${_analRegLineTxt(L.cons)}</b></span>
           <span>🌡️ Temp. zasilania: <b>${_analRegLineTxt(L.sup)}</b></span>
@@ -2340,6 +2341,8 @@ function analOnObject(v) {
   }
   renderAnalysesModule();
 }
+// UWAGA: jedyna definicja analOnBasePeriod (wcześniej były trzy — starsze kopie z końca pliku
+// nadpisywały tę wersję i gubiły gałąź REGRESSION; usunięte podczas deduplikacji).
 function analOnBasePeriod(v) {
   ANAL.basePeriod = v || null;
   if (ANAL.type === 'REGRESSION') {
@@ -2348,8 +2351,13 @@ function analOnBasePeriod(v) {
     return;
   }
   if (v && v !== 'manual') {
-    const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
-    if (p) _analApplyBaseProtocol(p);
+    if (typeof v === 'string' && v.indexOf('int:') === 0) {
+      const it = window.BasePeriodModule ? BasePeriodModule.find(Number(v.slice(4))) : null;
+      if (it) _analApplyIntensityBase(it);
+    } else {
+      const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
+      if (p) _analApplyBaseProtocol(p);
+    }
   }
   renderAnalysesModule();
 }
@@ -4645,19 +4653,7 @@ function _analApplyIntensityBase(it) {
   if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
 }
 
-function analOnBasePeriod(v) {
-  ANAL.basePeriod = v || null;
-  if (v && v !== 'manual') {
-    if (typeof v === 'string' && v.indexOf('int:') === 0) {
-      const it = window.IntensityBaseModule ? IntensityBaseModule.find(Number(v.slice(4))) : null;
-      if (it) _analApplyIntensityBase(it);
-    } else {
-      const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
-      if (p) _analApplyBaseProtocol(p);
-    }
-  }
-  renderAnalysesModule();
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // UNIWERSALNE OKRESY BAZOWE (wszystkie typy poza TYM/Regresją) — przepływ jak w TYM:
@@ -4984,19 +4980,7 @@ function _analApplyIntensityBase(it) {
   if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
 }
 
-function analOnBasePeriod(v) {
-  ANAL.basePeriod = v || null;
-  if (v && v !== 'manual') {
-    if (typeof v === 'string' && v.indexOf('int:') === 0) {
-      const it = window.BasePeriodModule ? BasePeriodModule.find(Number(v.slice(4))) : null;
-      if (it) _analApplyIntensityBase(it);
-    } else {
-      const p = window.MeasurementsModule ? MeasurementsModule.find(Number(v)) : null;
-      if (p) _analApplyBaseProtocol(p);
-    }
-  }
-  renderAnalysesModule();
-}
+
 
 // ─── Regresja liniowa: przycisk „+ Dodaj okres bazowy" odsłaniający formularz danych czasowych ───
 function _regTabHeader() {
