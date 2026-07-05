@@ -488,7 +488,7 @@
     <section class="dashboard">
       <div class="dashboard-header">
         <img src="logo-waterai.png" alt="WaterAI" class="dashboard-logo" />
-        <button class="logout-button" onclick="changePassword()" data-i18n="changePasswordButton" style="margin-right:8px;">Zmień hasło</button>
+        <button class="logout-button" onclick="changeMyPassword()" data-i18n="changePasswordButton" style="margin-right:8px;">Zmień hasło</button>
         <button class="logout-button" onclick="logout()" data-i18n="logoutButton">Wyloguj</button>
       </div>
 
@@ -984,19 +984,20 @@
       renderDashboard();
     }
 
-    async function changePassword() {
-      const p1 = prompt(currentLanguage === "pl" ? "Nowe haslo (min. 6 znakow):" : "New password (min. 6 characters):");
+    async function changeMyPassword() {
+      const pl = currentLanguage === "pl";
+      const p1 = prompt(pl ? "Nowe haslo (min. 6 znakow):" : "New password (min. 6 characters):");
       if (p1 === null) return;
-      if (!p1 || p1.length < 6) { alert(currentLanguage === "pl" ? "Haslo musi miec min. 6 znakow." : "Password must be at least 6 characters."); return; }
-      const p2 = prompt(currentLanguage === "pl" ? "Powtorz nowe haslo:" : "Repeat new password:");
+      if (!p1 || p1.length < 6) { alert(pl ? "Haslo musi miec min. 6 znakow." : "Password must be at least 6 characters."); return; }
+      const p2 = prompt(pl ? "Powtorz nowe haslo:" : "Repeat new password:");
       if (p2 === null) return;
-      if (p1 !== p2) { alert(currentLanguage === "pl" ? "Hasla sie roznia." : "Passwords do not match."); return; }
+      if (p1 !== p2) { alert(pl ? "Hasla sie roznia." : "Passwords do not match."); return; }
       try {
         const { error } = await WaterAISupabase.client.auth.updateUser({ password: p1 });
         if (error) throw error;
-        alert(currentLanguage === "pl" ? "Haslo zostalo zmienione." : "Password changed.");
+        alert(pl ? "Haslo zostalo zmienione." : "Password changed.");
       } catch (e) {
-        alert((currentLanguage === "pl" ? "Nie udalo sie zmienic hasla: " : "Password change failed: ") + (e.message || e));
+        alert((pl ? "Nie udalo sie zmienic hasla: " : "Password change failed: ") + (e.message || e));
       }
     }
 
@@ -1011,6 +1012,11 @@
     // Auto-logowanie: jeśli w tej przeglądarce jest zapamiętana sesja, wejdź od razu.
     // (DOMContentLoaded — moduły i klient Supabase ładują się na końcu strony.)
     document.addEventListener("DOMContentLoaded", async function () {
+      if (window.WaterAISupabase && WaterAISupabase.client) {
+        WaterAISupabase.client.auth.onAuthStateChange(function (event) {
+          if (event === "PASSWORD_RECOVERY") setTimeout(changeMyPassword, 400);
+        });
+      }
       try {
         if (window.WaterAISupabase && WaterAISupabase.client && await WaterAISupabase.getSession()) {
           await enterApp();
@@ -1331,7 +1337,7 @@
 <script src="js/modules/invoicing.js?v=1782600100"></script>
 <script src="js/modules/billing-entities.js?v=1782600100"></script>
 <script src="js/modules/calendar.js?v=1782133445"></script>
-<script src="js/modules/users.js?v=1783360000"></script>
+<script src="js/modules/users.js?v=1783362000"></script>
 <script src="js/app.build.js?v=1783226000"></script>
 <script src="js/modules/app-v2.js?v=1783350000"></script>
 <script src="js/modules/readings.js?v=1783350000"></script>
