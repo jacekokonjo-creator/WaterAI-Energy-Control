@@ -1,16 +1,16 @@
 // WaterAI Energy Control
-// Objects Module v2.1.0
+// Objects Module v3.0.0 — Supabase (tabela `objects`) przez wspólny mostek WaterAIBridge.
+// Publiczne API bez zmian: getAll/saveAll/add/remove/find/findByClient/update/getNumber.
+// Klucz obcy: objects.client_id ← ClientsModule (klienci muszą być załadowani PIERWSI).
 
 const ObjectsModule = {
-  storageKey: 'waterai_objects_v2',
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(objects) {
-    localStorage.setItem(this.storageKey, JSON.stringify(objects));
-  },
+  ...WaterAIBridge.makeStore({
+    table: 'objects',
+    storageKey: 'waterai_objects_v2',
+    label: 'obiektów',
+    legacyKeys: ['waterai_objects_v1'],
+    fk: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
+  }),
 
   add(object) {
     const objects = this.getAll();
