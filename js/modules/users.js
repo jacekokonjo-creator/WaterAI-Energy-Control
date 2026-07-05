@@ -1,8 +1,16 @@
 // WaterAI Energy Control
-// Users & Roles Module v1.0.0
+// Users & Roles Module v2.0.0 — PRAWDZIWE konta (Supabase Auth + tabela profiles)
+//
+// v1 trzymał listę użytkowników w localStorage (atrapa bez wpływu na logowanie).
+// v2: lista = tabela `profiles`; dodanie użytkownika = rejestracja w Supabase Auth
+// (osobny, tymczasowy klient — sesja admina zostaje nietknięta) + wpis profilu.
+// Zalogować się może WYŁĄCZNIE konto, które ma profil (gate w enterApp).
+//
+// Publiczne API zachowane dla reszty kodu: getAll / findByRole / ROLES
+// (obiekty mają firstName/lastName/clientId jak w v1).
 
 const UsersModule = {
-  storageKey: 'waterai_users_v1',
+  storageKey: 'waterai_users_v1',   // legacy — tylko fallback offline
 
   ROLES: {
     admin:              { label: 'Admin',               icon: '🔑', color: '#7B1FA2', bg: '#F3E5F5', description: 'Pełny dostęp do systemu, zarządzanie kontami wszystkich użytkowników.' },
@@ -12,357 +20,298 @@ const UsersModule = {
     client:             { label: 'Client',              icon: '👤', color: '#555',    bg: '#F5F5F5', description: 'Podgląd własnych obiektów, pomiarów i raportów ESCO.' }
   },
 
-  // Roles that can create new accounts
-  CAN_CREATE: {
-    admin:   ['admin', 'backOffice', 'energyAnalyst', 'salesRepresentative', 'client'],
-    backOffice: ['client']
+  _cache: null,
+
+  _sb() { return (window.WaterAISupabase && WaterAISupabase.client) || null; },
+
+  _mapProfile(p) {
+    const parts = String(p.full_name || '').trim().split(/\s+/);
+    const firstName = parts.shift() || '';
+    const lastName = parts.join(' ');
+    const legacyClientId = (p.client_id && typeof ClientsModule !== 'undefined' && ClientsModule.legacyIdForRow)
+      ? ClientsModule.legacyIdForRow(p.client_id) : null;
+    return {
+      id: p.id,                       // uuid z auth.users
+      firstName, lastName,
+      fullName: p.full_name || '',
+      email: (p.data && p.data.email) || '',
+      role: p.role || 'client',
+      clientId: legacyClientId,
+      clientRowId: p.client_id || null,
+      status: 'ACTIVE',
+      createdAt: p.created_at || ''
+    };
+  },
+
+  async load() {
+    const sb = this._sb();
+    if (!sb) {
+      this._cache = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      return;
+    }
+    const { data, error } = await sb.from('profiles')
+      .select('id, full_name, role, client_id, data, created_at')
+      .order('created_at');
+    if (error) {
+      console.warn('[users] Nie udało się pobrać profili:', error.message);
+      this._cache = [];
+      return;
+    }
+    this._cache = (data || []).map(p => this._mapProfile(p));
   },
 
   getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
-  },
-
-  add(user) {
-    const items = this.getAll();
-    const id = Date.now();
-    items.push({
-      id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      firstName: user.firstName || '',
-      lastName:  user.lastName  || '',
-      email:     user.email     || '',
-      phone:     user.phone     || '',
-      role:      user.role      || 'client',
-      clientId:  user.clientId  ? Number(user.clientId) : null,
-      status:    user.status    || 'ACTIVE',   // ACTIVE | INACTIVE | PENDING
-      notes:     user.notes     || '',
-      language:  user.language  || 'pl',
-      // password stored as placeholder — real auth via backend
-      passwordHash: user.passwordHash || ''
-    });
-    this.saveAll(items);
-    return id;
-  },
-
-  update(id, data) {
-    this.saveAll(this.getAll().map(u => {
-      if (Number(u.id) !== Number(id)) return u;
-      return { ...u, ...data, updatedAt: new Date().toISOString() };
-    }));
-  },
-
-  remove(id) {
-    this.saveAll(this.getAll().filter(u => Number(u.id) !== Number(id)));
-  },
-
-  find(id) {
-    return this.getAll().find(u => Number(u.id) === Number(id));
+    if (this._cache === null) this._cache = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+    return JSON.parse(JSON.stringify(this._cache));
   },
 
   findByRole(role) {
     return this.getAll().filter(u => u.role === role);
   },
 
-  findByClient(clientId) {
-    return this.getAll().filter(u => Number(u.clientId) === Number(clientId));
+  find(id) {
+    return this.getAll().find(u => String(u.id) === String(id));
   },
 
-  STATUS_LABELS: {
-    ACTIVE:   { label: 'Aktywny',    color: '#27500A', bg: '#E6F5EC' },
-    INACTIVE: { label: 'Nieaktywny', color: '#666',    bg: '#F5F5F5' },
-    PENDING:  { label: 'Oczekujący', color: '#E65100', bg: '#FFF3E0' }
+  // ── Operacje na prawdziwych kontach (tylko admin — pilnuje też RLS) ────────
+
+  async createAccount(opts) {
+    // opts: { fullName, email, password, role, clientLegacyId }
+    const sb = this._sb();
+    if (!sb) throw new Error('Brak połączenia z bazą (Supabase).');
+    if (!window.supabase || !window.supabase.createClient) throw new Error('Biblioteka supabase-js niedostępna.');
+
+    // Tymczasowy klient — signUp NIE dotyka sesji zalogowanego admina.
+    const tmp = window.supabase.createClient(WaterAISupabase.URL, WaterAISupabase.KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } });
+
+    const { data, error } = await tmp.auth.signUp({
+      email: opts.email,
+      password: opts.password,
+      options: { data: { full_name: opts.fullName } }
+    });
+    if (error) throw new Error(error.message);
+    const user = data && data.user;
+    if (!user || !user.id) throw new Error('Rejestracja nie zwróciła identyfikatora konta.');
+    if (Array.isArray(user.identities) && user.identities.length === 0) {
+      throw new Error('Ten adres e-mail jest już zarejestrowany.');
+    }
+
+    const row = { id: user.id, full_name: opts.fullName, role: opts.role, data: { email: opts.email } };
+    if (opts.role === 'client' && opts.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds) {
+      row.client_id = ClientsModule._rowIds[String(opts.clientLegacyId)] || null;
+    }
+    const { error: e2 } = await sb.from('profiles').insert(row);
+    if (e2) throw new Error('Konto e-mail utworzone, ale zapis profilu się nie powiódł: ' + e2.message +
+      '\nBez profilu to konto NIE zaloguje się do aplikacji — spróbuj dodać je ponownie lub zgłoś problem.');
+
+    await this.load();
+    return user.id;
+  },
+
+  async updateProfile(id, patch) {
+    // patch: { fullName?, role?, clientLegacyId?, email? }
+    const sb = this._sb();
+    if (!sb) throw new Error('Brak połączenia z bazą (Supabase).');
+    const current = this.find(id);
+    const row = {};
+    if (patch.fullName != null) row.full_name = patch.fullName;
+    if (patch.role != null) row.role = patch.role;
+    if (patch.role === 'client') {
+      row.client_id = (patch.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds)
+        ? (ClientsModule._rowIds[String(patch.clientLegacyId)] || null) : null;
+    } else if (patch.role != null) {
+      row.client_id = null;
+    }
+    row.data = { email: patch.email != null ? patch.email : (current ? current.email : '') };
+    const { error } = await sb.from('profiles').update(row).eq('id', id);
+    if (error) throw new Error(error.message);
+    await this.load();
+  },
+
+  async removeProfile(id) {
+    const sb = this._sb();
+    if (!sb) throw new Error('Brak połączenia z bazą (Supabase).');
+    const { error } = await sb.from('profiles').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    await this.load();
   }
 };
 
 window.UsersModule = UsersModule;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RENDER
+// WIDOK: Użytkownicy i role
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let usersActiveRole = 'all';
 let showUserForm = false;
 let editingUserId = null;
 
+function _usrEsc(v) { return (typeof escapeHtml === 'function') ? escapeHtml(v == null ? '' : String(v)) : String(v == null ? '' : v); }
+function _usrIsAdmin() {
+  return (typeof realRole !== 'undefined' && realRole === 'admin');
+}
+
 function renderUsersModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
 
+  const sb = (window.WaterAISupabase && WaterAISupabase.client) || null;
   const allUsers = UsersModule.getAll();
-  const clients  = (typeof ClientsModule !== 'undefined') ? ClientsModule.getAll() : [];
+  const clients = (typeof ClientsModule !== 'undefined') ? ClientsModule.getAll() : [];
+  const isAdmin = _usrIsAdmin();
+  const myId = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile.id : null;
 
-  const filtered = usersActiveRole === 'all'
-    ? allUsers
-    : allUsers.filter(u => u.role === usersActiveRole);
-
+  const filtered = usersActiveRole === 'all' ? allUsers : allUsers.filter(u => u.role === usersActiveRole);
   const q = (window._usrSearch || '').toLowerCase();
-  const sort = window._usrSort || 'name_asc';
-
-  let display = filtered.filter(u => !q ||
-    (u.firstName+' '+u.lastName).toLowerCase().includes(q) ||
-    (u.email||'').toLowerCase().includes(q) ||
-    (u.phone||'').toLowerCase().includes(q) ||
-    ((ClientsModule && u.clientId ? (ClientsModule.find(u.clientId)||{}).name : '')||'').toLowerCase().includes(q)
-  );
-  display = [...display].sort((a,b) => {
-    const na = (a.firstName+' '+a.lastName).toLowerCase();
-    const nb = (b.firstName+' '+b.lastName).toLowerCase();
-    if (sort === 'name_asc')  return na.localeCompare(nb);
-    if (sort === 'name_desc') return nb.localeCompare(na);
-    if (sort === 'role_asc')  return (a.role||'').localeCompare(b.role||'');
-    if (sort === 'status_asc') return (a.status||'').localeCompare(b.status||'');
-    return 0;
-  });
-
-  const thU = (col, label) => {
-    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
-    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
-    return `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
-      onclick="window._usrSort='${next}';renderUsersModule();">${label}${arrow}</th>`;
-  };
+  const display = filtered.filter(u => !q ||
+    (u.firstName + ' ' + u.lastName).toLowerCase().includes(q) ||
+    (u.email || '').toLowerCase().includes(q));
 
   const roleCounts = {};
-  Object.keys(UsersModule.ROLES).forEach(r => {
-    roleCounts[r] = allUsers.filter(u => u.role === r).length;
-  });
+  Object.keys(UsersModule.ROLES).forEach(r => { roleCounts[r] = allUsers.filter(u => u.role === r).length; });
 
-  // Role tab buttons
   const roleTabs = `
-    <div class="meas-tabs" style="margin-bottom:20px;">
-      <button type="button" class="meas-tab ${usersActiveRole === 'all' ? 'active' : ''}"
-        onclick="usersActiveRole='all'; renderUsersModule();">
-        👥 Wszyscy (${allUsers.length})
-      </button>
+    <div class="meas-tabs" style="margin-bottom:16px;">
+      <button type="button" class="meas-tab ${usersActiveRole === 'all' ? 'active' : ''}" onclick="usersActiveRole='all';renderUsersModule();">👥 Wszyscy (${allUsers.length})</button>
       ${Object.entries(UsersModule.ROLES).map(([key, r]) => `
         <button type="button" class="meas-tab ${usersActiveRole === key ? 'active' : ''}"
           style="${usersActiveRole === key ? `color:${r.color};border-bottom-color:${r.color};` : ''}"
-          onclick="usersActiveRole='${key}'; renderUsersModule();">
-          ${r.icon} ${r.label} (${roleCounts[key] || 0})
-        </button>
-      `).join('')}
+          onclick="usersActiveRole='${key}';renderUsersModule();">${r.icon} ${r.label} (${roleCounts[key] || 0})</button>`).join('')}
     </div>`;
 
-  // Role description card
   const roleInfoCard = usersActiveRole !== 'all' ? (() => {
     const r = UsersModule.ROLES[usersActiveRole];
-    return `
-    <div style="border:1px solid ${r.color}44;border-radius:10px;padding:12px 16px;margin-bottom:16px;background:${r.bg};display:flex;align-items:center;gap:12px;">
+    return `<div style="border:1px solid ${r.color}44;border-radius:10px;padding:12px 16px;margin-bottom:16px;background:${r.bg};display:flex;align-items:center;gap:12px;">
       <span style="font-size:24px;">${r.icon}</span>
-      <div>
-        <strong style="color:${r.color};font-size:14px;">${r.label}</strong>
-        <p style="margin:2px 0 0;font-size:12px;color:${r.color};opacity:0.85;">${r.description}</p>
-      </div>
-    </div>`;
+      <div><strong style="color:${r.color};font-size:14px;">${r.label}</strong>
+      <p style="margin:2px 0 0;font-size:12px;color:${r.color};opacity:0.85;">${r.description}</p></div></div>`;
   })() : '';
 
-  // Form
-  const roleOptions = Object.entries(UsersModule.ROLES)
-    .map(([k, r]) => `<option value="${k}" ${(editingUserId ? (UsersModule.find(editingUserId)||{}).role : usersActiveRole !== 'all' ? usersActiveRole : '') === k ? 'selected' : ''}>${r.icon} ${r.label}</option>`)
-    .join('');
+  const infoBar = `
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:10px 14px;margin-bottom:16px;background:var(--color-background-secondary);font-size:12px;color:var(--color-text-secondary);">
+      🔒 Zalogować się mogą <b>wyłącznie</b> konta utworzone tutaj przez administratora. Konto założone poza aplikacją (bez profilu) jest blokowane przy wejściu.
+      ${sb ? '' : '<br><b style="color:#c00;">Brak połączenia z bazą — zarządzanie kontami jest niedostępne.</b>'}
+    </div>`;
 
-  const clientOptions = `<option value="">— brak (użytkownik wewnętrzny) —</option>` +
-    clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const lbl = 'display:block;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;';
+  const inp = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;';
 
   const editUser = editingUserId ? UsersModule.find(editingUserId) : null;
 
-  const formHtml = showUserForm ? `
-  <div style="border:1px solid #B5D4F4;border-radius:14px;padding:20px;margin-bottom:20px;background:var(--color-background-primary);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h4 style="margin:0;font-size:15px;color:#0C447C;">${editUser ? 'Edytuj użytkownika' : 'Nowe konto użytkownika'}</h4>
-      <button class="small-button" onclick="showUserForm=false;editingUserId=null;renderUsersModule();">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Imię *</label>
-        <input id="usr-firstName" value="${escapeHtml(editUser ? editUser.firstName : '')}" placeholder="np. Jan" style="width:100%;box-sizing:border-box;" />
+  const formHtml = (showUserForm && isAdmin && sb) ? `
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;margin-bottom:20px;background:var(--color-background-primary);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <b style="font-size:15px;">${editUser ? 'Edytuj użytkownika' : 'Nowe konto użytkownika'}</b>
+        <button class="small-button" onclick="showUserForm=false;editingUserId=null;renderUsersModule();">✕ Zamknij</button>
       </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Nazwisko *</label>
-        <input id="usr-lastName" value="${escapeHtml(editUser ? editUser.lastName : '')}" placeholder="np. Kowalski" style="width:100%;box-sizing:border-box;" />
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px;">
+        <div><label style="${lbl}">Imię i nazwisko</label>
+          <input id="usr-fullname" value="${_usrEsc(editUser ? editUser.fullName : '')}" placeholder="np. Jan Kowalski" style="${inp}"></div>
+        <div><label style="${lbl}">E-mail (login)</label>
+          <input id="usr-email" type="email" value="${_usrEsc(editUser ? editUser.email : '')}" placeholder="np. j.okon@waterai.cloud" style="${inp}" ${editUser ? 'disabled title="Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji"' : ''}></div>
+        ${editUser ? '' : `<div><label style="${lbl}">Hasło startowe (min. 6 znaków)</label>
+          <input id="usr-password" type="text" placeholder="użytkownik może je potem zmienić" style="${inp}"></div>`}
+        <div><label style="${lbl}">Rola</label>
+          <select id="usr-role" style="${inp}" onchange="document.getElementById('usr-client-field').style.display=this.value==='client'?'':'none';">
+            ${Object.entries(UsersModule.ROLES).map(([k, r]) => `<option value="${k}" ${(editUser ? editUser.role : 'client') === k ? 'selected' : ''}>${r.icon} ${r.label}</option>`).join('')}
+          </select></div>
+        <div id="usr-client-field" style="${(editUser ? editUser.role : 'client') === 'client' ? '' : 'display:none;'}">
+          <label style="${lbl}">Klient (dla roli Client)</label>
+          <select id="usr-client" style="${inp}">
+            <option value="">— wybierz klienta —</option>
+            ${clients.map(c => `<option value="${c.id}" ${editUser && Number(editUser.clientId) === Number(c.id) ? 'selected' : ''}>${_usrEsc(c.name)}</option>`).join('')}
+          </select></div>
       </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">E-mail *</label>
-        <input id="usr-email" type="email" value="${escapeHtml(editUser ? editUser.email : '')}" placeholder="jan.kowalski@firma.pl" style="width:100%;box-sizing:border-box;" />
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Telefon</label>
-        <input id="usr-phone" value="${escapeHtml(editUser ? editUser.phone : '')}" placeholder="+48 600 000 000" style="width:100%;box-sizing:border-box;" />
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Rola *</label>
-        <select id="usr-role" onchange="toggleUserClientField()" style="width:100%;box-sizing:border-box;">${roleOptions}</select>
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Status</label>
-        <select id="usr-status" style="width:100%;box-sizing:border-box;">
-          ${Object.entries(UsersModule.STATUS_LABELS).map(([k,v]) =>
-            `<option value="${k}" ${(editUser ? editUser.status : 'ACTIVE') === k ? 'selected' : ''}>${v.label}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div id="usr-client-field" style="${editUser && editUser.role === 'client' ? '' : 'display:none;'}grid-column:1/-1;">
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Przypisany klient (dla roli Client)</label>
-        <select id="usr-clientId" style="width:100%;box-sizing:border-box;">
-          ${clients.map(c => `<option value="${c.id}" ${editUser && Number(editUser.clientId) === Number(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Język</label>
-        <select id="usr-language" style="width:100%;box-sizing:border-box;">
-          <option value="pl" ${(editUser ? editUser.language : 'pl') === 'pl' ? 'selected' : ''}>🇵🇱 Polski</option>
-          <option value="en" ${(editUser ? editUser.language : '') === 'en' ? 'selected' : ''}>🇬🇧 English</option>
-          <option value="de" ${(editUser ? editUser.language : '') === 'de' ? 'selected' : ''}>🇩🇪 Deutsch</option>
-          <option value="cs" ${(editUser ? editUser.language : '') === 'cs' ? 'selected' : ''}>🇨🇿 Čeština</option>
-          <option value="sk" ${(editUser ? editUser.language : '') === 'sk' ? 'selected' : ''}>🇸🇰 Slovenčina</option>
-        </select>
-      </div>
-      <div style="grid-column:1/-1;">
-        <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatki</label>
-        <input id="usr-notes" value="${escapeHtml(editUser ? editUser.notes : '')}" placeholder="opcjonalne notatki" style="width:100%;box-sizing:border-box;" />
-      </div>
-      ${!editUser ? `
-      <div style="grid-column:1/-1;padding:10px 14px;background:#FFF9E6;border:1px solid #FAC775;border-radius:8px;font-size:12px;color:#633806;">
-        🔐 Hasło tymczasowe zostanie wygenerowane automatycznie i wysłane na podany adres e-mail po wdrożeniu systemu logowania.
-      </div>` : ''}
-      <div style="grid-column:1/-1;display:flex;gap:10px;margin-top:4px;">
-        <button class="primary-button" onclick="saveUser()" style="padding:9px 24px;">
-          ${editUser ? 'Zapisz zmiany' : 'Utwórz konto'}
-        </button>
+      ${editUser ? '' : `<p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 12px;">Po zapisaniu przekaż użytkownikowi e-mail i hasło startowe. Jeśli w Supabase włączone jest potwierdzanie adresu e-mail, użytkownik przed pierwszym logowaniem musi kliknąć link z wiadomości.</p>`}
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="small-button" onclick="showUserForm=false;editingUserId=null;renderUsersModule();">Anuluj</button>
+        <button class="primary-button" id="usr-save-btn" onclick="_usrSave()">${editUser ? 'Zapisz zmiany' : 'Utwórz konto'}</button>
       </div>
-    </div>
-  </div>` : '';
+    </div>` : '';
 
-  // Users table
-  const tableHtml = `
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
-    <h3 style="margin:0;font-size:15px;font-weight:500;">
-      ${usersActiveRole === 'all' ? 'Wszyscy użytkownicy' : (UsersModule.ROLES[usersActiveRole]||{}).label || ''}
-      <span style="font-size:12px;color:var(--color-text-secondary);font-weight:400;">(${display.length}${q ? ' z '+filtered.length : ''})</span>
-    </h3>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <input type="search" placeholder="Szukaj użytkownika..." value="${(window._usrSearch||'').replace(/"/g,'&quot;')}"
-        oninput="window._usrSearch=this.value;renderUsersModule();"
-        style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
-      <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;"
-        onclick="showUserForm=true;editingUserId=null;renderUsersModule();">
-        + Nowe konto
-      </button>
-    </div>
-  </div>
-  ${display.length === 0 ? `
-    <div class="reminder-card">
-      <strong>${q ? 'Brak wyników wyszukiwania' : 'Brak użytkowników'}</strong>
-      <div class="reminder-meta">${q ? 'Spróbuj innej frazy.' : 'Kliknij „+ Nowe konto" aby dodać pierwszego użytkownika.'}</div>
-    </div>` : `
-  <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="background:var(--color-background-secondary);">
-          ${thU('name','Użytkownik')}
-          ${thU('role','Rola')}
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Telefon</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Klient</th>
-          ${thU('status','Status')}
-          <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
-        </tr>
-      </thead>
-      <tbody>${display.map(u => {
-        const r = UsersModule.ROLES[u.role] || { icon: '👤', label: u.role, color: '#666', bg: '#f5f5f5' };
-        const s = UsersModule.STATUS_LABELS[u.status] || { label: u.status, color: '#666', bg: '#f5f5f5' };
-        const client = u.clientId ? ((typeof ClientsModule !== 'undefined' && ClientsModule.find(u.clientId)) || {}).name || '—' : '—';
-        return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-          <td style="padding:10px 12px;">
-            <div style="font-size:13px;font-weight:500;">${escapeHtml(u.firstName)} ${escapeHtml(u.lastName)}</div>
-            <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(u.email)}</div>
-          </td>
-          <td style="padding:10px 12px;">
-            <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span>
-          </td>
-          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(u.phone || '—')}</td>
-          <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client)}</td>
-          <td style="padding:10px 12px;">
-            <span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
-          </td>
-          <td style="padding:10px 12px;white-space:nowrap;">
-            <button class="small-button" onclick="editUser(${u.id})">Edytuj</button>
-            <button class="small-button" onclick="if(confirm('Usuń konto?')){UsersModule.remove(${u.id});renderUsersModule();}" style="color:#c00;border-color:#c00;">Usuń</button>
-          </td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>
-  </div>`}`;
+  const th = 'padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);white-space:nowrap;';
+  const td = 'padding:10px 12px;border-bottom:1px solid var(--color-border-tertiary);font-size:13px;vertical-align:middle;';
 
-  // Role overview cards
-  const roleCards = `
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px;">
-    ${Object.entries(UsersModule.ROLES).map(([key, r]) => `
-    <div style="border:1px solid ${r.color}44;border-radius:10px;padding:12px;background:${r.bg};cursor:pointer;"
-      onclick="usersActiveRole='${key}';renderUsersModule();">
-      <div style="font-size:22px;margin-bottom:4px;">${r.icon}</div>
-      <div style="font-size:20px;font-weight:700;color:${r.color};">${roleCounts[key] || 0}</div>
-      <div style="font-size:12px;color:${r.color};font-weight:500;">${r.label}</div>
-    </div>`).join('')}
-  </div>`;
+  const rows = display.map(u => {
+    const r = UsersModule.ROLES[u.role] || UsersModule.ROLES.client;
+    const clientName = u.clientId && typeof ClientsModule !== 'undefined' ? ((ClientsModule.find(u.clientId) || {}).name || '—') : '—';
+    const isMe = myId && String(u.id) === String(myId);
+    return `<tr>
+      <td style="${td}"><b>${_usrEsc((u.firstName + ' ' + u.lastName).trim() || '—')}</b>${isMe ? ' <span style="font-size:11px;color:var(--color-text-secondary);">(to Ty)</span>' : ''}</td>
+      <td style="${td}">${_usrEsc(u.email || '—')}</td>
+      <td style="${td}"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span></td>
+      <td style="${td}">${u.role === 'client' ? _usrEsc(clientName) : '—'}</td>
+      <td style="${td}white-space:nowrap;text-align:right;">
+        ${isAdmin && sb ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
+        ${isMe ? '' : `<button class="small-button" style="font-size:12px;padding:4px 10px;color:#c00;border-color:#c00;" onclick="_usrRemove('${u.id}')">Zablokuj</button>`}` : ''}
+      </td>
+    </tr>`;
+  }).join('');
 
   container.innerHTML = `
-    <style>
-      .meas-tabs { display:flex; gap:0; flex-wrap:wrap; border-bottom:2px solid var(--color-border-tertiary); }
-      .meas-tab { padding:9px 18px; font-size:13px; font-weight:500; cursor:pointer; border:none; background:transparent; color:var(--color-text-secondary); border-bottom:3px solid transparent; margin-bottom:-2px; transition:all 0.15s; }
-      .meas-tab.active { color:#0C447C; border-bottom-color:#0C447C; }
-      .meas-tab:hover:not(.active) { background:var(--color-background-secondary); }
-    </style>
-    ${usersActiveRole === 'all' ? roleCards : ''}
     ${roleTabs}
     ${roleInfoCard}
+    ${infoBar}
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+      <input id="usr-search-input" type="text" placeholder="Szukaj po nazwisku lub e-mailu…" value="${_usrEsc(window._usrSearch || '')}"
+        style="flex:1;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;"
+        oninput="window._usrSearch=this.value;renderUsersModule();document.getElementById('usr-search-input').focus();">
+      ${isAdmin && sb && !showUserForm ? '<button class="primary-button" style="font-size:13px;padding:8px 18px;white-space:nowrap;" onclick="showUserForm=true;editingUserId=null;renderUsersModule();">+ Dodaj użytkownika</button>' : ''}
+    </div>
     ${formHtml}
-    ${tableHtml}
+    ${display.length ? `
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;min-width:640px;">
+        <thead><tr><th style="${th}">Użytkownik</th><th style="${th}">E-mail (login)</th><th style="${th}">Rola</th><th style="${th}">Klient</th><th style="${th}"></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : '<p style="color:var(--color-text-secondary);font-size:14px;">Brak użytkowników w tym widoku.</p>'}
   `;
 }
 
-function saveUser() {
-  const firstName = document.getElementById('usr-firstName').value.trim();
-  const lastName  = document.getElementById('usr-lastName').value.trim();
-  const email     = document.getElementById('usr-email').value.trim();
-  if (!firstName || !lastName || !email) { alert('Podaj imię, nazwisko i e-mail.'); return; }
+async function _usrSave() {
+  const g = id => document.getElementById(id);
+  const fullName = g('usr-fullname').value.trim();
+  const role = g('usr-role').value;
+  const clientLegacyId = role === 'client' ? (g('usr-client').value || null) : null;
 
-  const role = document.getElementById('usr-role').value;
-  const clientIdEl = document.getElementById('usr-clientId');
+  if (!fullName) { alert('Podaj imię i nazwisko.'); return; }
+  if (role === 'client' && !clientLegacyId) { alert('Dla roli Client wybierz klienta.'); return; }
 
-  const data = {
-    firstName, lastName, email,
-    phone:    document.getElementById('usr-phone').value.trim(),
-    role,
-    status:   document.getElementById('usr-status').value,
-    language: document.getElementById('usr-language').value,
-    notes:    document.getElementById('usr-notes').value.trim(),
-    clientId: (role === 'client' && clientIdEl) ? clientIdEl.value : null
-  };
+  const btn = g('usr-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie…'; }
 
-  if (editingUserId) {
-    UsersModule.update(editingUserId, data);
-    editingUserId = null;
-  } else {
-    UsersModule.add(data);
+  try {
+    if (editingUserId) {
+      await UsersModule.updateProfile(editingUserId, { fullName, role, clientLegacyId });
+    } else {
+      const email = g('usr-email').value.trim();
+      const password = g('usr-password').value;
+      if (!email || email.indexOf('@') < 1) { throw new Error('Podaj poprawny adres e-mail.'); }
+      if (!password || password.length < 6) { throw new Error('Hasło startowe musi mieć min. 6 znaków.'); }
+      await UsersModule.createAccount({ fullName, email, password, role, clientLegacyId });
+      alert('Konto utworzone: ' + email + '\nPrzekaż użytkownikowi login i hasło startowe.');
+    }
+    showUserForm = false; editingUserId = null;
+    renderUsersModule();
+  } catch (e) {
+    alert('Nie udało się zapisać: ' + (e.message || e));
+    if (btn) { btn.disabled = false; btn.textContent = editingUserId ? 'Zapisz zmiany' : 'Utwórz konto'; }
   }
-
-  showUserForm = false;
-  renderUsersModule();
 }
 
-function editUser(id) {
-  editingUserId = id;
-  showUserForm = true;
-  renderUsersModule();
+async function _usrRemove(id) {
+  const u = UsersModule.find(id);
+  if (!u) return;
+  if (!confirm('Zablokować dostęp dla „' + ((u.firstName + ' ' + u.lastName).trim() || u.email) + '"?\n\nProfil zostanie usunięty — to konto nie zaloguje się już do aplikacji.')) return;
+  try {
+    await UsersModule.removeProfile(id);
+    renderUsersModule();
+  } catch (e) {
+    alert('Nie udało się usunąć profilu: ' + (e.message || e));
+  }
 }
 
-function toggleUserClientField() {
-  const role = document.getElementById('usr-role').value;
-  const field = document.getElementById('usr-client-field');
-  if (field) field.style.display = role === 'client' ? 'block' : 'none';
-}
+window.renderUsersModule = renderUsersModule;
