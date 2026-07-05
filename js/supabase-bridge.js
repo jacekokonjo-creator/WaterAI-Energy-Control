@@ -65,8 +65,11 @@ const WaterAIBridge = {
           return obj;
         });
 
-        // 3. Migracja jednorazowa — pytanie PRZED lustrem.
-        if (this._cache.length === 0 && localBefore.length > 0) {
+        // 3. Migracja jednorazowa — pytanie PRZED lustrem. TYLKO dla admina:
+        // rola client/salesRep widzi baze przycieta przez RLS, wiec "pusto w bazie"
+        // nic nie znaczy, a proba przeniesienia i tak polegnie na RLS.
+        const _prof = (window.WaterAISupabase && WaterAISupabase.profile) || null;
+        if (this._cache.length === 0 && localBefore.length > 0 && _prof && _prof.role === 'admin') {
           if (confirm(
             'Wspólna baza jest pusta, a w tej przeglądarce jest zapisanych ' + cfg.label + ': ' + localBefore.length + '.\n\n' +
             'Przenieść je teraz do wspólnej bazy (będą widoczne na każdym komputerze)?'
@@ -80,8 +83,9 @@ const WaterAIBridge = {
           return;
         }
 
-        // 4. Lustro na końcu.
-        this._mirror();
+        // 4. Lustro na końcu — ale nie dla roli client (jej widok jest przyciety
+        // przez RLS i nadpisalby pelna lokalna kopie z sesji admina w tej samej przegladarce).
+        if (!_prof || _prof.role !== 'client') this._mirror();
       },
 
       getAll() {
