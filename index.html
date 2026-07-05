@@ -946,8 +946,8 @@
           : String(e);
         console.error('[enterApp] loadProfile:', e);
         alert((currentLanguage === "pl"
-          ? "Konto istnieje, ale nie udało się odczytać profilu (roli) z bazy."
-          : "Account exists but the profile (role) could not be read from the database.")
+          ? "Dostęp zablokowany: to konto nie ma profilu w systemie WaterAI.\nKonta tworzy wyłącznie administrator w zakładce „Użytkownicy i role"."
+          : "Access blocked: this account has no profile in the WaterAI system.\nAccounts are created only by an administrator in the Users & Roles tab.")
           + "\n\nSzczegóły techniczne / technical details:\n" + det);
         await WaterAISupabase.signOut();
         return;
@@ -962,6 +962,7 @@
       if (window.ObjectsModule && window.ObjectsModule.load) await window.ObjectsModule.load();   // obiekty na wspólnej bazie
       if (window.MeasurementsModule && window.MeasurementsModule.load) await window.MeasurementsModule.load();
       if (window.ReadingsModule && window.ReadingsModule.load) await window.ReadingsModule.load();
+      if (window.UsersModule && window.UsersModule.load) await window.UsersModule.load();
       if (window.AnalysesModule && window.AnalysesModule.load) await window.AnalysesModule.load();
       if (window.EscoReportsModule && window.EscoReportsModule.load) await window.EscoReportsModule.load();
       if (window._basePeriodsStore && window._basePeriodsStore.load) await window._basePeriodsStore.load();
@@ -1308,7 +1309,7 @@
 <script src="js/modules/invoicing.js?v=1782600100"></script>
 <script src="js/modules/billing-entities.js?v=1782600100"></script>
 <script src="js/modules/calendar.js?v=1782133445"></script>
-<script src="js/modules/users.js?v=1782133445"></script>
+<script src="js/modules/users.js?v=1783360000"></script>
 <script src="js/app.build.js?v=1783226000"></script>
 <script src="js/modules/app-v2.js?v=1783350000"></script>
 <script src="js/modules/readings.js?v=1783350000"></script>
