@@ -488,6 +488,7 @@
     <section class="dashboard">
       <div class="dashboard-header">
         <img src="logo-waterai.png" alt="WaterAI" class="dashboard-logo" />
+        <button class="logout-button" onclick="changePassword()" data-i18n="changePasswordButton" style="margin-right:8px;">Zmień hasło</button>
         <button class="logout-button" onclick="logout()" data-i18n="logoutButton">Wyloguj</button>
       </div>
 
@@ -542,6 +543,7 @@
         passwordLabel: "Hasło",
         loginButton: "Zaloguj",
         logoutButton: "Wyloguj",
+        changePasswordButton: "Zmień hasło",
         dashboardTitle: "Panel główny",
         dashboardDesc: "Wybierz moduł, z którym chcesz pracować.",
         roleModeTitle: "Tryb testowy roli",
@@ -577,6 +579,7 @@
         passwordLabel: "Password",
         loginButton: "Login",
         logoutButton: "Logout",
+        changePasswordButton: "Change password",
         dashboardTitle: "Dashboard",
         dashboardDesc: "Choose the module you want to work with.",
         roleModeTitle: "Test role mode",
@@ -612,6 +615,7 @@
         passwordLabel: "Passwort",
         loginButton: "Einloggen",
         logoutButton: "Ausloggen",
+        changePasswordButton: "Passwort ändern",
         dashboardTitle: "Hauptpanel",
         dashboardDesc: "Wählen Sie das Modul aus, mit dem Sie arbeiten möchten.",
         roleModeTitle: "Testmodus der Rolle",
@@ -647,6 +651,7 @@
         passwordLabel: "Heslo",
         loginButton: "Přihlásit se",
         logoutButton: "Odhlásit se",
+        changePasswordButton: "Změnit heslo",
         dashboardTitle: "Hlavní panel",
         dashboardDesc: "Vyberte modul, se kterým chcete pracovat.",
         roleModeTitle: "Testovací režim role",
@@ -682,6 +687,7 @@
         passwordLabel: "Heslo",
         loginButton: "Prihlásiť sa",
         logoutButton: "Odhlásiť sa",
+        changePasswordButton: "Zmeniť heslo",
         dashboardTitle: "Hlavný panel",
         dashboardDesc: "Vyberte modul, s ktorým chcete pracovať.",
         roleModeTitle: "Testovací režim roly",
@@ -976,6 +982,22 @@
       document.getElementById("login-screen").classList.remove("active");
       document.getElementById("dashboard-screen").classList.add("active");
       renderDashboard();
+    }
+
+    async function changePassword() {
+      const p1 = prompt(currentLanguage === "pl" ? "Nowe haslo (min. 6 znakow):" : "New password (min. 6 characters):");
+      if (p1 === null) return;
+      if (!p1 || p1.length < 6) { alert(currentLanguage === "pl" ? "Haslo musi miec min. 6 znakow." : "Password must be at least 6 characters."); return; }
+      const p2 = prompt(currentLanguage === "pl" ? "Powtorz nowe haslo:" : "Repeat new password:");
+      if (p2 === null) return;
+      if (p1 !== p2) { alert(currentLanguage === "pl" ? "Hasla sie roznia." : "Passwords do not match."); return; }
+      try {
+        const { error } = await WaterAISupabase.client.auth.updateUser({ password: p1 });
+        if (error) throw error;
+        alert(currentLanguage === "pl" ? "Haslo zostalo zmienione." : "Password changed.");
+      } catch (e) {
+        alert((currentLanguage === "pl" ? "Nie udalo sie zmienic hasla: " : "Password change failed: ") + (e.message || e));
+      }
     }
 
     async function logout() {
