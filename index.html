@@ -946,7 +946,8 @@
       realRole = profile.role;      // faktyczna rola z Supabase (patrz changelog 2026-06-24a)
       currentRole = profile.role;
 
-      await ClientsModule.load();   // PILOT: pierwszy moduł na wspólnej bazie
+      await ClientsModule.load();                                   // klienci PIERWSI (mapa id dla kluczy obcych)
+      if (ObjectsModule && ObjectsModule.load) await ObjectsModule.load();   // obiekty na wspólnej bazie
 
       if (profile.role === "client" && profile.client_id) {
         previewClientId = ClientsModule.legacyIdForRow(profile.client_id);
@@ -1275,9 +1276,10 @@
   </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/supabase-client.js?v=1783215000"></script>
+<script src="js/supabase-bridge.js?v=1783218000"></script>
 <script src="js/modules/migration.js?v=1782133445"></script>
 <script src="js/modules/clients.js?v=1783216500"></script>
-<script src="js/modules/objects.js?v=1782133445"></script>
+<script src="js/modules/objects.js?v=1783218000"></script>
 <script src="js/modules/workflow.js?v=1782133445"></script>
 <script src="js/modules/measurements.js?v=1782133445"></script>
 <script src="js/modules/analyses.js?v=1782133445"></script>
