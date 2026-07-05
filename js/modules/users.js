@@ -90,7 +90,14 @@ const UsersModule = {
       password: opts.password,
       options: { data: { full_name: opts.fullName } }
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (/already registered/i.test(error.message || '')) {
+        throw new Error('Ten adres e-mail ma juz konto w systemie logowania (Auth). ' +
+          'Nie zakladaj go drugi raz - jesli konto nie ma profilu, dopisz profil SQL-em w Supabase, ' +
+          'a jesli ma, znajdziesz je na liscie ponizej.');
+      }
+      throw new Error(error.message);
+    }
     const user = data && data.user;
     if (!user || !user.id) throw new Error('Rejestracja nie zwróciła identyfikatora konta.');
     if (Array.isArray(user.identities) && user.identities.length === 0) {
@@ -245,6 +252,7 @@ function renderUsersModule() {
       <td style="${td}">${u.role === 'client' ? _usrEsc(clientName) : '—'}</td>
       <td style="${td}white-space:nowrap;text-align:right;">
         ${isAdmin && sb ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
+        <button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="_usrSendReset('${_usrEsc(u.email)}')">Reset hasła</button>
         ${isMe ? '' : `<button class="small-button" style="font-size:12px;padding:4px 10px;color:#c00;border-color:#c00;" onclick="_usrRemove('${u.id}')">Zablokuj</button>`}` : ''}
       </td>
     </tr>`;
@@ -315,3 +323,17 @@ async function _usrRemove(id) {
 }
 
 window.renderUsersModule = renderUsersModule;
+
+async function _usrSendReset(email) {
+  if (!email) { alert('Ten profil nie ma zapisanego adresu e-mail (pole data.email) - uzupelnij go w edycji lub SQL-em.'); return; }
+  if (!confirm('Wyslac na ' + email + ' link do ustawienia nowego hasla?')) return;
+  try {
+    const { error } = await WaterAISupabase.client.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname
+    });
+    if (error) throw error;
+    alert('Link wyslany na ' + email + '.\nPo kliknieciu w link uzytkownik trafi do aplikacji i zostanie poproszony o nowe haslo.\n\nUwaga: na darmowym planie Supabase wbudowana poczta ma niski limit wysylek - jesli mail nie dociera, skonfiguruj wlasne SMTP (Authentication -> Emails).');
+  } catch (e) {
+    alert('Nie udalo sie wyslac linku: ' + (e.message || e));
+  }
+}
