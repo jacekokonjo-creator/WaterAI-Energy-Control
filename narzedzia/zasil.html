@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>WaterAI — zasilenie wspólnej bazy</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 30px auto; padding: 0 16px; color: #1c2b36; }
+  h1 { font-size: 20px; } .muted { color: #5a6b78; font-size: 14px; line-height: 1.5; }
+  button { font-size: 15px; padding: 10px 22px; border-radius: 8px; border: 1px solid #0C447C; background: #0C447C; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #log { background: #0e1720; color: #cfe3f5; font: 13px/1.5 ui-monospace, monospace; padding: 14px; border-radius: 10px; min-height: 140px; white-space: pre-wrap; margin-top: 16px; }
+  .ok { color: #7fd48a; } .err { color: #ff9d9d; } .warn { color: #ffd27f; }
+  #loginBox input { font-size: 14px; padding: 8px; margin: 4px 6px 4px 0; }
+</style>
+</head>
+<body>
+<h1>Zasilenie wspólnej bazy danymi z tej przeglądarki</h1>
+<p class="muted">Narzędzie jednorazowe: czyta dane WaterAI zapisane w <b>tej</b> przeglądarce i wgrywa je do wspólnej bazy
+(pomiary, analizy, kalendarz, dokumenty, foldery, podmioty rozliczeniowe, raporty ESCO, faktury, bazy intensywności, okresy bazowe).
+Klientów i obiektów nie rusza — one są już w bazie. Przed wgraniem czyści docelowe tabele, więc można je uruchomić ponownie bez duplikatów.
+Dane regresji (czujniki) zostają na razie lokalnie — mają osobny plan.</p>
+
+<div id="loginBox" style="display:none">
+  <p class="muted">Brak aktywnej sesji — zaloguj się kontem WaterAI:</p>
+  <input id="em" type="email" placeholder="e-mail"> <input id="pw" type="password" placeholder="hasło">
+  <button onclick="doLogin()">Zaloguj</button>
+</div>
+
+<p><button id="go" onclick="run()" disabled>▶ Zasil bazę danymi z tej przeglądarki</button></p>
+<div id="log">Sprawdzam sesję…</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const URL_ = 'https://ysupfhzvfwnqrfmaqqoc.supabase.co';
+const KEY  = 'sb_publishable_5ATD7RaBq6BV2dargRt7sg_Imu7e0ln';
+const sb = supabase.createClient(URL_, KEY);
+
+const L = document.getElementById('log');
+function log(msg, cls) { L.innerHTML += (cls ? '<span class="'+cls+'">'+msg+'</span>' : msg) + '\n'; L.scrollTop = L.scrollHeight; }
+
+const MAP = [
+  { key: 'waterai_measurements_v2',    table: 'measurements',     label: 'Protokoły pomiarowe', fk: { col: 'object_id', prop: 'objectId', src: 'objects', required: true } },
+  { key: 'waterai_analyses_v1',        table: 'analyses',         label: 'Analizy',             fk: { col: 'object_id', prop: 'objectId', src: 'objects', required: true } },
+  { key: 'waterai_base_periods_v1',    table: 'base_periods',     label: 'Okresy bazowe',       fk: { col: 'object_id', prop: 'objectId', src: 'objects', required: true } },
+  { key: 'waterai_esco_reports_v1',    table: 'esco_reports',     label: 'Raporty ESCO',        fk: { col: 'client_id', prop: 'clientId', src: 'clients', required: true },
+                                        fk2: { col: 'object_id', prop: 'objectId', src: 'objects' } },
+  { key: 'waterai_invoices_v1',        table: 'invoices',         label: 'Faktury',             fk: { col: 'client_id', prop: 'clientId', src: 'clients', required: true } },
+  { key: 'waterai_documents_v1',       table: 'documents',        label: 'Dokumenty',           fk: { col: 'client_id', prop: 'clientId', src: 'clients' } },
+  { key: 'waterai_doc_folders_v1',     table: 'doc_folders',      label: 'Foldery dokumentów',  fk: { col: 'client_id', prop: 'clientId', src: 'clients' } },
+  { key: 'waterai_calendar_v1',        table: 'calendar_events',  label: 'Kalendarz' },
+  { key: 'waterai_billing_entities_v1',table: 'billing_entities', label: 'Podmioty rozliczeniowe' },
+  { key: 'waterai_intensity_base_v1',  table: 'intensity_bases',  label: 'Bazy intensywności' }
+];
+
+async function checkSession() {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) {
+    log('Sesja aktywna: ' + data.session.user.email, 'ok');
+    document.getElementById('go').disabled = false;
+  } else {
+    log('Brak sesji — zaloguj się powyżej.', 'warn');
+    document.getElementById('loginBox').style.display = 'block';
+  }
+}
+async function doLogin() {
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById('em').value.trim(),
+    password: document.getElementById('pw').value
+  });
+  if (error) { log('Logowanie nieudane: ' + error.message, 'err'); return; }
+  document.getElementById('loginBox').style.display = 'none';
+  checkSession();
+}
+
+async function idMap(table) {
+  const { data, error } = await sb.from(table).select('id, data');
+  if (error) throw new Error(table + ': ' + error.message);
+  const m = {};
+  (data || []).forEach(r => { if (r.data && r.data.id !== undefined) m[String(r.data.id)] = r.id; });
+  return m;
+}
+
+async function run() {
+  document.getElementById('go').disabled = true;
+  try {
+    log('\nBuduję mapy identyfikatorów (klienci, obiekty)…');
+    const maps = { clients: await idMap('clients'), objects: await idMap('objects') };
+    log('  klientów w bazie: ' + Object.keys(maps.clients).length + ', obiektów: ' + Object.keys(maps.objects).length);
+
+    let total = 0;
+    for (const cfg of MAP) {
+      let items;
+      try { items = JSON.parse(localStorage.getItem(cfg.key) || '[]'); } catch (e) { items = []; }
+      if (!Array.isArray(items) || items.length === 0) { log(cfg.label + ': brak danych lokalnych — pomijam.'); continue; }
+
+      log(cfg.label + ': ' + items.length + ' pozycji — czyszczę tabelę i wgrywam…');
+      const del = await sb.from(cfg.table).delete().not('id', 'is', null);
+      if (del.error) { log('  ✗ czyszczenie: ' + del.error.message, 'err'); continue; }
+
+      let okCount = 0;
+      for (const obj of items) {
+        const row = { data: obj };
+        let skip = null;
+        for (const f of [cfg.fk, cfg.fk2]) {
+          if (!f) continue;
+          const uuid = maps[f.src][String(obj[f.prop])];
+          if (uuid) row[f.col] = uuid;
+          else if (f.required) skip = f.prop + '=' + obj[f.prop] + ' nie istnieje w bazie';
+        }
+        if (skip) { log('  ⚠ pominięto „' + (obj.name || obj.id) + '": ' + skip, 'warn'); continue; }
+        const ins = await sb.from(cfg.table).insert(row);
+        if (ins.error) { log('  ✗ „' + (obj.name || obj.id) + '": ' + ins.error.message, 'err'); }
+        else okCount++;
+      }
+      log('  ✔ wgrano ' + okCount + '/' + items.length, okCount === items.length ? 'ok' : 'warn');
+      total += okCount;
+    }
+    log('\nGOTOWE — wgrano łącznie ' + total + ' rekordów.', 'ok');
+    log('Kontrola: otwórz aplikację w oknie incognito i sprawdź analizy/kalendarz/dokumenty.');
+  } catch (e) {
+    log('BŁĄD: ' + (e.message || e), 'err');
+  }
+  document.getElementById('go').disabled = false;
+}
+
+checkSession();
+</script>
+</body>
+</html>
