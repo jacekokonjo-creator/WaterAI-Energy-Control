@@ -2,7 +2,25 @@
 // Analyses Module v1.0.0
 // Rozszerzalny system typów analiz
 
+// TRYB AWARYJNY: bez WaterAIBridge moduł działa po staremu na localStorage.
+const _analysesStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'analyses',
+      storageKey: 'waterai_analyses_v1',
+      label: 'analiz',
+      fk: { column: 'object_id', prop: 'objectId', module: () => window.ObjectsModule }
+    })
+  : (console.warn('[analyses] Brak WaterAIBridge — tryb lokalny.'), {
+      storageKey: 'waterai_analyses_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); },
+      legacyIdForRow() { return null; }
+    });
+
 const AnalysesModule = {
+  ..._analysesStore,
+
   storageKey: 'waterai_analyses_v1',
 
   TYPES: {
@@ -19,14 +37,6 @@ const AnalysesModule = {
     DRAFT:    { label: 'Roboczy',    color: '#7A4A00' },
     COMPLETE: { label: 'Ukończony',  color: '#27500A' },
     APPROVED: { label: 'Zatwierdzony', color: '#0C447C' }
-  },
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
   },
 
   add(analysis) {
