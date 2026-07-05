@@ -946,7 +946,7 @@
           : String(e);
         console.error('[enterApp] loadProfile:', e);
         alert((currentLanguage === "pl"
-          ? "Dostęp zablokowany: to konto nie ma profilu w systemie WaterAI.\nKonta tworzy wyłącznie administrator w zakładce „Użytkownicy i role"."
+          ? "Dostęp zablokowany: to konto nie ma profilu w systemie WaterAI.\nKonta tworzy wyłącznie administrator w zakładce „Użytkownicy i role”."
           : "Access blocked: this account has no profile in the WaterAI system.\nAccounts are created only by an administrator in the Users & Roles tab.")
           + "\n\nSzczegóły techniczne / technical details:\n" + det);
         await WaterAISupabase.signOut();
