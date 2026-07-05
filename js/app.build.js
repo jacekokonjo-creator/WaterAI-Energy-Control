@@ -3273,8 +3273,8 @@ const RegressionBaseModule = {
   protoKey: oid => 'waterai_regression_protocols_' + oid,
   rowsKey:  pid => 'waterai_regression_rows_' + pid,
 
-  listByObject(oid) { try { return JSON.parse(localStorage.getItem(this.protoKey(oid)) || '[]'); } catch (e) { return []; } },
-  saveList(oid, list) { localStorage.setItem(this.protoKey(oid), JSON.stringify(list)); },
+  listByObject(oid) { return window._regressionStore.getProtocols(oid); },
+  saveList(oid, list) { window._regressionStore.saveProtocols(oid, list); },
   find(oid, pid) { return this.listByObject(oid).find(p => Number(p.id) === Number(pid)) || null; },
 
   nextNumber(oid) {
@@ -3312,11 +3312,11 @@ const RegressionBaseModule = {
 
   remove(oid, pid) {
     this.saveList(oid, this.listByObject(oid).filter(p => Number(p.id) !== Number(pid)));
-    localStorage.removeItem(this.rowsKey(pid));
+    window._regressionStore.removeRows(pid);
   },
 
-  getRows(pid)  { try { return JSON.parse(localStorage.getItem(this.rowsKey(pid)) || '[]'); } catch (e) { return []; } },
-  saveRows(pid, rows) { localStorage.setItem(this.rowsKey(pid), JSON.stringify(rows)); }
+  getRows(pid)  { return window._regressionStore.getRows(pid); },
+  saveRows(pid, rows) { window._regressionStore.saveRows(pid, rows); }
 };
 window.RegressionBaseModule = RegressionBaseModule;
 
