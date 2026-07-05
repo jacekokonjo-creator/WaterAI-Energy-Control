@@ -47,7 +47,8 @@ const WaterAISupabase = {
       .eq('id', u.user.id).single();
     if (error) throw error;
     this.profile = data;
-    return data;
+    this.profile.email = (u.user && u.user.email) || '';
+    return this.profile;
   }
 };
 
