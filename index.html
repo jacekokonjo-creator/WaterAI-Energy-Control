@@ -488,6 +488,7 @@
     <section class="dashboard">
       <div class="dashboard-header">
         <img src="logo-waterai.png" alt="WaterAI" class="dashboard-logo" />
+        <span id="current-user" style="align-self:center;margin-right:14px;font-size:13px;color:#4a5568;"></span>
         <button class="logout-button" onclick="changeMyPassword()" data-i18n="changePasswordButton" style="margin-right:8px;">Zmień hasło</button>
         <button class="logout-button" onclick="logout()" data-i18n="logoutButton">Wyloguj</button>
       </div>
@@ -962,6 +963,14 @@
       realRole = profile.role;      // faktyczna rola z Supabase (patrz changelog 2026-06-24a)
       currentRole = profile.role;
 
+      const cuEl = document.getElementById("current-user");
+      if (cuEl) {
+        const roleLabel = (window.UsersModule && UsersModule.ROLES && UsersModule.ROLES[profile.role])
+          ? UsersModule.ROLES[profile.role].label : (profile.role || "");
+        cuEl.textContent = "\uD83D\uDC64 " + (profile.full_name || profile.email || "") +
+          (profile.email && profile.full_name ? " (" + profile.email + ")" : "") + " \u00B7 " + roleLabel;
+      }
+
       // Ładowanie modułów danych — odporne na brak modułu (window.X zamiast gołej nazwy,
       // bo nieudana inicjalizacja const zostawia pułapkę TDZ rzucającą przy każdym dostępie).
       if (window.ClientsModule && window.ClientsModule.load) await window.ClientsModule.load();   // klienci PIERWSI (mapa id dla FK)
@@ -1003,6 +1012,8 @@
 
     async function logout() {
       try { await WaterAISupabase.signOut(); } catch (e) {}
+      const cuEl = document.getElementById("current-user");
+      if (cuEl) cuEl.textContent = "";
       document.getElementById("dashboard-screen").classList.remove("active");
       document.getElementById("login-screen").classList.add("active");
       document.getElementById("password").value = "";
@@ -1323,8 +1334,8 @@
     setRole("admin");
   </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/supabase-client.js?v=1783215000"></script>
-<script src="js/supabase-bridge.js?v=1783224000"></script>
+<script src="js/supabase-client.js?v=1783365000"></script>
+<script src="js/supabase-bridge.js?v=1783365000"></script>
 <script src="js/modules/migration.js?v=1782133445"></script>
 <script src="js/modules/clients.js?v=1783216500"></script>
 <script src="js/modules/objects.js?v=1783219100"></script>
