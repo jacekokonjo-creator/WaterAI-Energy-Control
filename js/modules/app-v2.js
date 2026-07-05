@@ -3059,7 +3059,7 @@ function escoSuggestNumber(clientId, objectId){
   const year=new Date().getFullYear();
   const cn=(clientId&&typeof ClientsModule.getNumber==='function')?ClientsModule.getNumber(clientId):null;
   const on=(objectId&&typeof ObjectsModule.getNumber==='function')?ObjectsModule.getNumber(objectId):null;
-  const existing=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]')
+  const existing=EscoReportsModule.getAll()
     .filter(r=>objectId&&Number(r.objectId)===Number(objectId));
   const seq=String(existing.length+1).padStart(3,'0');
   if(cn&&on) return `ESCO/${year}/${cn}/${on}/${seq}`;
@@ -3158,7 +3158,7 @@ function escoOnObjectChange(){
 function renderESCOReports() {
   const container=document.getElementById('module-content'); if(!container)return;
 
-  const allReports=(window._escoReports||JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]'))
+  const allReports=(window._escoReports||EscoReportsModule.getAll())
     .sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   window._escoReports=allReports;
 
@@ -3512,7 +3512,7 @@ function escoBuildReportFromForm(form){
 
   // przy edycji zachowaj id i createdAt
   const editId=window._escoEditId;
-  const prev=editId?(JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]').find(x=>x.id===editId)||{}):{};
+  const prev=editId?(EscoReportsModule.getAll().find(x=>x.id===editId)||{}):{};
 
   return {
     id: editId||('esco_'+Date.now()),
@@ -3581,10 +3581,10 @@ function _escoClientAddr(c){
 // Zapis listy raportów z awaryjnym odchudzeniem zamrożonych danych regresji przy limicie pamięci
 // (surowe punkty CSV zostają w analizie źródłowej; dowód regresji dociąga je stamtąd).
 function _escoSaveAll(all){
-  try{ localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all)); return true; }
+  try{ EscoReportsModule.saveAll(all); return true; }
   catch(e){
     all.forEach(rp=>{ if(rp.frozen&&rp.frozen.analyses) rp.frozen.analyses.forEach(c=>{ if(c.analysisType==='REGRESSION'&&c.inputParams&&c.inputParams.reg) delete c.inputParams.reg; }); });
-    try{ localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all)); return true; }
+    try{ EscoReportsModule.saveAll(all); return true; }
     catch(e2){ alert('Nie udało się zapisać raportów ESCO — limit pamięci przeglądarki.'); return false; }
   }
 }
@@ -3592,7 +3592,7 @@ function _escoSaveAll(all){
 function escoSaveDraft(){
   const rep=window._escoDraft; if(!rep) return;
   _escoApplyFreezePolicy(rep,true); // zapis raportu Finalnego/Podpisanego = nowy snapshot treści
-  const all=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]');
+  const all=EscoReportsModule.getAll();
   const i=all.findIndex(x=>x.id===rep.id);
   if(i>=0) all[i]=rep; else all.push(rep);
   if(!_escoSaveAll(all)) return;
@@ -3624,15 +3624,15 @@ function editESCOReport(id){
 // Usuwanie raportu
 function escoDeleteReport(id){
   if(!confirm('Usunąć raport ESCO? Tej operacji nie można cofnąć.')) return;
-  const all=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]').filter(x=>x.id!==id);
-  localStorage.setItem('waterai_esco_reports_v1',JSON.stringify(all));
+  const all=EscoReportsModule.getAll().filter(x=>x.id!==id);
+  EscoReportsModule.saveAll(all);
   window._escoReports=all;
   renderESCOReports();
 }
 
 // Szybka zmiana statusu z listy (Energy Analyst / Admin)
 function escoQuickStatus(id,status){
-  const all=JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]');
+  const all=EscoReportsModule.getAll();
   const i=all.findIndex(x=>x.id===id); if(i<0) return;
   all[i].status=status; all[i].updatedAt=new Date().toISOString();
   _escoApplyFreezePolicy(all[i],false);
@@ -3653,7 +3653,7 @@ function escoToggleAttachments(btn){
 }
 
 function viewESCOReport(id) {
-  const rep=(JSON.parse(localStorage.getItem('waterai_esco_reports_v1')||'[]')).find(r=>r.id===id);
+  const rep=(EscoReportsModule.getAll()).find(r=>r.id===id);
   if(!rep) return;
   escoRenderReportView(rep,false);
 }
@@ -4471,8 +4471,8 @@ function _analDrawChartsVOL(data) {
 
 const IntensityBaseModule = {
   storageKey: 'waterai_intensity_base_v1',
-  getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
-  saveAll(x) { localStorage.setItem(this.storageKey, JSON.stringify(x)); },
+  getAll() { return window._intensityStore.getAll(); },
+  saveAll(x) { window._intensityStore.saveAll(x); },
   add(it) { const a = this.getAll(); a.push({ ...it, id: Date.now(), createdAt: new Date().toISOString() }); this.saveAll(a); },
   update(id, it) { this.saveAll(this.getAll().map(x => Number(x.id) === Number(id) ? { ...x, ...it, id: x.id, updatedAt: new Date().toISOString() } : x)); },
   remove(id) { this.saveAll(this.getAll().filter(x => Number(x.id) !== Number(id))); },
@@ -4724,8 +4724,8 @@ function _analApplyIntensityBase(it) {
 
 const BasePeriodModule = {
   storageKey: 'waterai_base_periods_v1',
-  getAll() { try { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch (e) { return []; } },
-  saveAll(x) { localStorage.setItem(this.storageKey, JSON.stringify(x)); },
+  getAll() { try { return window._basePeriodsStore.getAll(); } catch (e) { return []; } },
+  saveAll(x) { window._basePeriodsStore.saveAll(x); },
   add(it) { const a = this.getAll(); const rec = { ...it, id: Date.now(), createdAt: new Date().toISOString() }; a.push(rec); this.saveAll(a); return rec; },
   update(id, it) { this.saveAll(this.getAll().map(x => Number(x.id) === Number(id) ? { ...x, ...it, id: x.id, updatedAt: new Date().toISOString() } : x)); },
   remove(id) { this.saveAll(this.getAll().filter(x => Number(x.id) !== Number(id))); },

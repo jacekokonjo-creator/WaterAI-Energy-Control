@@ -29,10 +29,10 @@ const WaterAIBridge = {
       _local() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
       _mirror() { try { localStorage.setItem(this.storageKey, JSON.stringify(this._cache)); } catch (e) {} },
 
-      _fkRow(obj) {
-        if (!cfg.fk) return null;
-        const parent = cfg.fk.module();
-        return (parent && parent._rowIds && parent._rowIds[String(obj[cfg.fk.prop])]) || null;
+      _fkRow(f, obj) {
+        if (!f) return null;
+        const parent = f.module();
+        return (parent && parent._rowIds && parent._rowIds[String(obj[f.prop])]) || null;
       },
 
       async load() {
@@ -107,9 +107,13 @@ const WaterAIBridge = {
             const json = JSON.stringify(obj);
             const row = { data: obj };
             if (cfg.fk) {
-              const fkVal = this._fkRow(obj);
+              const fkVal = this._fkRow(cfg.fk, obj);
               if (!fkVal) { skipped.push(obj.name || key); continue; }   // rodzic nie jest w bazie
               row[cfg.fk.column] = fkVal;
+            }
+            if (cfg.fk2) {
+              const fk2Val = this._fkRow(cfg.fk2, obj);
+              if (fk2Val) row[cfg.fk2.column] = fk2Val;   // opcjonalny — brak nie blokuje
             }
             const rowId = this._rowIds[key];
             if (!rowId) {
