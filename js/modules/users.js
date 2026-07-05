@@ -217,7 +217,7 @@ function renderUsersModule() {
         <div><label style="${lbl}">Imię i nazwisko</label>
           <input id="usr-fullname" value="${_usrEsc(editUser ? editUser.fullName : '')}" placeholder="np. Jan Kowalski" style="${inp}"></div>
         <div><label style="${lbl}">E-mail (login)</label>
-          <input id="usr-email" type="email" value="${_usrEsc(editUser ? editUser.email : '')}" placeholder="np. j.okon@waterai.cloud" style="${inp}" ${editUser ? 'disabled title="Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji"' : ''}></div>
+          <input id="usr-email" type="email" value="${_usrEsc(editUser ? editUser.email : '')}" placeholder="${editUser && !editUser.email ? 'uzupełnij e-mail (login) tego konta' : 'np. j.okon@waterai.cloud'}" style="${inp}" ${editUser && editUser.email ? 'disabled title="Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji"' : ''}></div>
         ${editUser ? '' : `<div><label style="${lbl}">Hasło startowe (min. 6 znaków)</label>
           <input id="usr-password" type="text" placeholder="użytkownik może je potem zmienić" style="${inp}"></div>`}
         <div><label style="${lbl}">Rola</label>
@@ -293,7 +293,10 @@ async function _usrSave() {
 
   try {
     if (editingUserId) {
-      await UsersModule.updateProfile(editingUserId, { fullName, role, clientLegacyId });
+      const emailEl = g('usr-email');
+      const patch = { fullName, role, clientLegacyId };
+      if (emailEl && !emailEl.disabled && emailEl.value.trim()) patch.email = emailEl.value.trim();
+      await UsersModule.updateProfile(editingUserId, patch);
     } else {
       const email = g('usr-email').value.trim();
       const password = g('usr-password').value;
