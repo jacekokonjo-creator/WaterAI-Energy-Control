@@ -1,15 +1,110 @@
 // WaterAI Energy Control
-// Clients Module v2.0.0
+// Clients Module v3.0.0 — PILOT Supabase (tabela `clients`)
+//
+// Publiczne API BEZ ZMIAN (getAll/saveAll/add/remove/find/update/getOrderedList/getNumber),
+// więc kod wołający (app.build.js, app-v2.js, index.html) pozostaje nietknięty.
+// Wzorzec mostka sync→async:
+//   • load()  — po zalogowaniu zaciąga klientów z bazy do pamięci podręcznej (JEDYNE await),
+//   • getAll()/saveAll() — działają synchronicznie na pamięci podręcznej jak dotąd,
+//   • _persist() — po każdym saveAll dosyła zmiany do Supabase w tle (diff: insert/update/delete),
+//   • localStorage pozostaje LUSTREM awaryjnym (działa BackupModule; offline nie gubi danych).
+// W bazie: jeden wiersz = jeden klient; pełny obiekt v2 (z legacy id liczbowym) w kolumnie `data`.
 
 const ClientsModule = {
   storageKey: 'waterai_clients_v2',
+  table: 'clients',
+
+  _cache: null,   // tablica klientów w kształcie v2
+  _rowIds: {},    // String(legacy id) -> uuid wiersza w bazie
+  _snap: {},      // String(legacy id) -> JSON (wykrywanie zmian, żeby nie pisać bez potrzeby)
+
+  _local() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+  _mirror() { try { localStorage.setItem(this.storageKey, JSON.stringify(this._cache)); } catch (e) {} },
+  _sb() { return (window.WaterAISupabase && WaterAISupabase.client) || null; },
+
+  // Jednorazowe zaciągnięcie z bazy — wywoływane po zalogowaniu, PRZED renderem dashboardu.
+  async load() {
+    const sb = this._sb();
+    if (!sb) { this._cache = this._local(); return; }
+
+    const { data, error } = await sb.from(this.table).select('id, data').order('created_at');
+    if (error) {
+      console.warn('[ClientsModule] Baza niedostępna, pracuję na kopii lokalnej:', error.message);
+      this._cache = this._local();
+      return;
+    }
+
+    this._rowIds = {}; this._snap = {};
+    this._cache = (data || []).map(r => {
+      const obj = r.data || {};
+      this._rowIds[String(obj.id)] = r.id;
+      this._snap[String(obj.id)] = JSON.stringify(obj);
+      return obj;
+    });
+    this._mirror();
+
+    // Migracja jednorazowa: baza pusta, a lokalnie są dane → zaproponuj przeniesienie.
+    if (this._cache.length === 0) {
+      const local = this._local();
+      if (local.length > 0 && confirm(
+        'Wspólna baza jest pusta, a w tej przeglądarce jest zapisanych klientów: ' + local.length + '.\n\n' +
+        'Przenieść ich teraz do wspólnej bazy (będą widoczni na każdym komputerze)?'
+      )) {
+        this._cache = local;
+        await this._persist();
+      }
+    }
+  },
 
   getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+    if (this._cache === null) this._cache = this._local();   // awaryjnie, gdyby ktoś wołał przed load()
+    return JSON.parse(JSON.stringify(this._cache));
   },
 
   saveAll(clients) {
-    localStorage.setItem(this.storageKey, JSON.stringify(clients));
+    this._cache = clients || [];
+    this._mirror();
+    this._persist();   // w tle; błąd zgłosi alertem, dane i tak są w lustrze lokalnym
+  },
+
+  async _persist() {
+    const sb = this._sb();
+    if (!sb) return;
+    const seen = {};
+    try {
+      for (const obj of this._cache) {
+        const key = String(obj.id);
+        seen[key] = true;
+        const json = JSON.stringify(obj);
+        const rowId = this._rowIds[key];
+        if (!rowId) {
+          const { data, error } = await sb.from(this.table).insert({ data: obj }).select('id').single();
+          if (error) throw error;
+          this._rowIds[key] = data.id;
+          this._snap[key] = json;
+        } else if (this._snap[key] !== json) {
+          const { error } = await sb.from(this.table).update({ data: obj }).eq('id', rowId);
+          if (error) throw error;
+          this._snap[key] = json;
+        }
+      }
+      for (const key of Object.keys(this._rowIds)) {
+        if (!seen[key]) {
+          const { error } = await sb.from(this.table).delete().eq('id', this._rowIds[key]);
+          if (error) throw error;
+          delete this._rowIds[key]; delete this._snap[key];
+        }
+      }
+    } catch (e) {
+      alert('Nie udało się zapisać klientów we wspólnej bazie: ' + (e.message || e) +
+            '\nZmiany pozostały zapisane lokalnie w tej przeglądarce.');
+    }
+  },
+
+  // uuid wiersza w bazie -> legacy id (potrzebne dla kont klientów: profiles.client_id).
+  legacyIdForRow(uuid) {
+    for (const k in this._rowIds) if (this._rowIds[k] === uuid) return Number(k);
+    return null;
   },
 
   add(client) {
