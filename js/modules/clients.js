@@ -27,10 +27,22 @@ const ClientsModule = {
     const sb = this._sb();
     if (!sb) { this._cache = this._local(); return; }
 
+    // KOLEJNOŚĆ KRYTYCZNA: najpierw zdejmij migawkę danych lokalnych,
+    // dopiero potem wolno cokolwiek nadpisywać lustrem (poprawka po incydencie
+    // 2026-07-05: lustro pustej bazy kasowało lokalnych klientów przed migracją).
+    let localBefore = this._local();
+    if (localBefore.length === 0) {
+      // ratunek: v2 mogło zostać nadpisane albo nigdy nie powstać — sprawdź klucz legacy v1
+      try {
+        const v1 = JSON.parse(localStorage.getItem('waterai_clients_v1') || '[]');
+        if (Array.isArray(v1) && v1.length > 0) localBefore = v1;
+      } catch (e) {}
+    }
+
     const { data, error } = await sb.from(this.table).select('id, data').order('created_at');
     if (error) {
       console.warn('[ClientsModule] Baza niedostępna, pracuję na kopii lokalnej:', error.message);
-      this._cache = this._local();
+      this._cache = localBefore;
       return;
     }
 
@@ -41,19 +53,24 @@ const ClientsModule = {
       this._snap[String(obj.id)] = JSON.stringify(obj);
       return obj;
     });
-    this._mirror();
 
-    // Migracja jednorazowa: baza pusta, a lokalnie są dane → zaproponuj przeniesienie.
-    if (this._cache.length === 0) {
-      const local = this._local();
-      if (local.length > 0 && confirm(
-        'Wspólna baza jest pusta, a w tej przeglądarce jest zapisanych klientów: ' + local.length + '.\n\n' +
+    // Migracja jednorazowa: baza pusta, a lokalnie (v2 lub v1) są dane → zaproponuj przeniesienie.
+    if (this._cache.length === 0 && localBefore.length > 0) {
+      if (confirm(
+        'Wspólna baza jest pusta, a w tej przeglądarce jest zapisanych klientów: ' + localBefore.length + '.\n\n' +
         'Przenieść ich teraz do wspólnej bazy (będą widoczni na każdym komputerze)?'
       )) {
-        this._cache = local;
+        this._cache = localBefore;
         await this._persist();
+        this._mirror();
+      } else {
+        // odmowa = NIE ruszaj danych lokalnych; pracuj na nich, bez zapisu lustra
+        this._cache = localBefore;
       }
+      return;
     }
+
+    this._mirror();   // lustro dopiero PO decyzjach o migracji
   },
 
   getAll() {
