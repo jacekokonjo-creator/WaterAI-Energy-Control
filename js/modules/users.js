@@ -176,6 +176,18 @@ function renderUsersModule() {
     (u.firstName + ' ' + u.lastName).toLowerCase().includes(q) ||
     (u.email || '').toLowerCase().includes(q));
 
+  const sort = window._usrSort || 'name_asc';
+  const clientNameOf = u => (u.role === 'client' && u.clientId && typeof ClientsModule !== 'undefined')
+    ? (((ClientsModule.find(u.clientId) || {}).name) || '') : '';
+  const sortVal = (u, col) =>
+    col === 'name' ? (u.firstName + ' ' + u.lastName).trim().toLowerCase()
+    : col === 'email' ? (u.email || '').toLowerCase()
+    : col === 'role' ? (u.role || '')
+    : clientNameOf(u).toLowerCase();
+  const sortCol = sort.replace(/_(asc|desc)$/, '');
+  const sortDir = sort.endsWith('_desc') ? -1 : 1;
+  display.sort((a, b) => sortVal(a, sortCol).localeCompare(sortVal(b, sortCol), 'pl') * sortDir);
+
   const roleCounts = {};
   Object.keys(UsersModule.ROLES).forEach(r => { roleCounts[r] = allUsers.filter(u => u.role === r).length; });
 
@@ -272,7 +284,14 @@ function renderUsersModule() {
     ${display.length ? `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:auto;">
       <table style="width:100%;border-collapse:collapse;min-width:640px;">
-        <thead><tr><th style="${th}">Użytkownik</th><th style="${th}">E-mail (login)</th><th style="${th}">Rola</th><th style="${th}">Klient</th><th style="${th}"></th></tr></thead>
+        <thead><tr>${(() => {
+          const thS = (col, label) => {
+            const next = sort === col + '_asc' ? col + '_desc' : col + '_asc';
+            const arrow = sort === col + '_asc' ? ' \u2191' : (sort === col + '_desc' ? ' \u2193' : '');
+            return `<th style="${th}cursor:pointer;" onclick="window._usrSort='${next}';renderUsersModule();">${label}${arrow}</th>`;
+          };
+          return thS('name','Użytkownik') + thS('email','E-mail (login)') + thS('role','Rola') + thS('client','Klient') + `<th style="${th}"></th>`;
+        })()}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>` : '<p style="color:var(--color-text-secondary);font-size:14px;">Brak użytkowników w tym widoku.</p>'}
