@@ -717,6 +717,8 @@
         clients: ["👥", "Klienci", "Baza klientów i danych do FV."],
         objects: ["🏢", "Obiekty", "Budynki, źródła ciepła i harmonogramy."],
         myObjects: ["🏢", "Moje obiekty", "Obiekty przypisane do konta klienta."],
+        readings: ["📟", "Pomiary", "Rejestr odczytów i zużycia dla obiektów."],
+        myReadings: ["📟", "Moje pomiary", "Odczyty i zużycie Twoich obiektów."],
         measurements: ["📊", "Okres bazowy", "Protokoły TYM — dane klimatyczne i okresy."],
         myMeasurements: ["📊", "Mój okres bazowy", "Protokoły TYM Twoich obiektów."],
         excel: ["📁", "Import Excel", "Wczytywanie danych z arkuszy."],
@@ -734,6 +736,8 @@
         clients: ["👥", "Clients", "Client database and invoice data."],
         objects: ["🏢", "Buildings", "Buildings, heat sources and schedules."],
         myObjects: ["🏢", "My buildings", "Buildings assigned to the client account."],
+        readings: ["📟", "Readings", "Meter readings and consumption per building."],
+        myReadings: ["📟", "My readings", "Readings and consumption of your buildings."],
         measurements: ["📊", "Measurements", "Energy use, costs, HDD and degree days."],
         myMeasurements: ["📊", "My measurements", "Energy data for your buildings."],
         excel: ["📁", "Excel import", "Import data from spreadsheets."],
@@ -751,6 +755,8 @@
         clients: ["👥", "Kunden", "Kundendatenbank und Rechnungsdaten."],
         objects: ["🏢", "Objekte", "Gebäude, Wärmequellen und Zeitpläne."],
         myObjects: ["🏢", "Meine Objekte", "Objekte, die dem Kundenkonto zugeordnet sind."],
+        readings: ["📟", "Ablesungen", "Zählerstände und Verbrauch je Objekt."],
+        myReadings: ["📟", "Meine Ablesungen", "Ablesungen und Verbrauch Ihrer Objekte."],
         measurements: ["📊", "Messungen", "Energieverbrauch, Kosten, HDD und Gradtage."],
         myMeasurements: ["📊", "Meine Messungen", "Energiedaten Ihrer Objekte."],
         excel: ["📁", "Excel-Import", "Import von Daten aus Tabellen."],
@@ -768,6 +774,8 @@
         clients: ["👥", "Klienti", "Databáze klientů a fakturační údaje."],
         objects: ["🏢", "Objekty", "Budovy, zdroje tepla a harmonogramy."],
         myObjects: ["🏢", "Moje objekty", "Objekty přiřazené ke klientskému účtu."],
+        readings: ["📟", "Odečty", "Odečty měřidel a spotřeba pro objekty."],
+        myReadings: ["📟", "Moje odečty", "Odečty a spotřeba vašich objektů."],
         measurements: ["📊", "Měření", "Spotřeba energie, náklady, HDD a denostupně."],
         myMeasurements: ["📊", "Moje měření", "Energetická data vašich objektů."],
         excel: ["📁", "Import Excel", "Import dat z tabulek."],
@@ -785,6 +793,8 @@
         clients: ["👥", "Klienti", "Databáza klientov a fakturačné údaje."],
         objects: ["🏢", "Objekty", "Budovy, zdroje tepla a harmonogramy."],
         myObjects: ["🏢", "Moje objekty", "Objekty priradené ku klientskemu účtu."],
+        readings: ["📟", "Odpočty", "Odpočty meradiel a spotreba pre objekty."],
+        myReadings: ["📟", "Moje odpočty", "Odpočty a spotreba vašich objektov."],
         measurements: ["📊", "Merania", "Spotreba energie, náklady, HDD a dennostupne."],
         myMeasurements: ["📊", "Moje merania", "Energetické údaje vašich objektov."],
         excel: ["📁", "Import Excel", "Import údajov z tabuliek."],
@@ -801,11 +811,11 @@
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "documents", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
-      backOffice:         ["calendar", "clients", "objects", "documents", "invoicing", "reports"],
-      energyAnalyst:      ["calendar", "objects", "documents", "measurements", "analyses", "reports"],
-      salesRepresentative:["calendar", "clients", "objects", "reports"],
-      client:             ["myObjects", "myMeasurements", "myReports"]
+      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
+      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports"],
+      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports"],
+      salesRepresentative:["calendar", "clients", "objects", "readings", "reports"],
+      client:             ["myObjects", "myReadings", "myMeasurements", "myReports"]
     };
 
     const taskRoles = ["BACK_OFFICE", "ENERGY_ANALYST", "CLIENT"];
@@ -951,6 +961,7 @@
       if (window.ClientsModule && window.ClientsModule.load) await window.ClientsModule.load();   // klienci PIERWSI (mapa id dla FK)
       if (window.ObjectsModule && window.ObjectsModule.load) await window.ObjectsModule.load();   // obiekty na wspólnej bazie
       if (window.MeasurementsModule && window.MeasurementsModule.load) await window.MeasurementsModule.load();
+      if (window.ReadingsModule && window.ReadingsModule.load) await window.ReadingsModule.load();
       if (window.AnalysesModule && window.AnalysesModule.load) await window.AnalysesModule.load();
       if (window.EscoReportsModule && window.EscoReportsModule.load) await window.EscoReportsModule.load();
       if (window._basePeriodsStore && window._basePeriodsStore.load) await window._basePeriodsStore.load();
@@ -1299,7 +1310,8 @@
 <script src="js/modules/calendar.js?v=1782133445"></script>
 <script src="js/modules/users.js?v=1782133445"></script>
 <script src="js/app.build.js?v=1783226000"></script>
-<script src="js/modules/app-v2.js?v=1783224000"></script>
+<script src="js/modules/app-v2.js?v=1783350000"></script>
+<script src="js/modules/readings.js?v=1783350000"></script>
 <script src="js/modules/backup.js?v=1782478717"></script>
 </body>
 </html>
