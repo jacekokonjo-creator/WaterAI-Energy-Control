@@ -4042,7 +4042,7 @@ function renderDashboardSummary() {
   const objects = ObjectsModule.getAll();
   const analyses = AnalysesModule.getAll();
   const invoices = InvoicingModule.getAll();
-  const documents = DocumentsModule.getAll();
+  const readingsCount = (window.ReadingsModule ? ReadingsModule.getAll().length : 0);
   const calSummary = CalendarModule.getDashboardSummary();
   const dash = InvoicingModule.getDashboard();
 
@@ -4074,10 +4074,10 @@ function renderDashboardSummary() {
         <div style="font-size:24px;font-weight:700;color:${invOverdue > 0 ? '#c00' : '#666'};">${invOverdue}</div>
         <div style="font-size:12px;color:${invOverdue > 0 ? '#c00' : '#666'};">Zaległych FV</div>
       </div>
-      <div style="padding:16px;border-radius:12px;background:#f5f5f5;border:1px solid #e0e0e0;cursor:pointer;" onclick="openModule('documents')">
-        <div style="font-size:28px;margin-bottom:6px;">🗂️</div>
-        <div style="font-size:24px;font-weight:700;color:#666;">${documents.length}</div>
-        <div style="font-size:12px;color:#666;">Dokumentów</div>
+      <div style="padding:16px;border-radius:12px;background:#f5f5f5;border:1px solid #e0e0e0;cursor:pointer;" onclick="openModule('readings')">
+        <div style="font-size:28px;margin-bottom:6px;">📟</div>
+        <div style="font-size:24px;font-weight:700;color:#666;">${readingsCount}</div>
+        <div style="font-size:12px;color:#666;">Pomiarów</div>
       </div>
       <div style="padding:16px;border-radius:12px;background:#f5f5f5;border:1px solid #e0e0e0;cursor:pointer;" onclick="openModule('analyses')">
         <div style="font-size:28px;margin-bottom:6px;">📐</div>
