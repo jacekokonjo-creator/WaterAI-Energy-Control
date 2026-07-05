@@ -3,14 +3,26 @@
 // Publiczne API bez zmian: getAll/saveAll/add/remove/find/findByClient/update/getNumber.
 // Klucz obcy: objects.client_id ← ClientsModule (klienci muszą być załadowani PIERWSI).
 
+// TRYB AWARYJNY: gdy fabryka mostków nie dojechała (np. opóźnienie CDN),
+// moduł działa po staremu na localStorage zamiast wysadzać całą aplikację.
+const _objectsStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'objects',
+      storageKey: 'waterai_objects_v2',
+      label: 'obiektów',
+      legacyKeys: ['waterai_objects_v1'],
+      fk: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
+    })
+  : (console.warn('[ObjectsModule] Brak WaterAIBridge — tryb lokalny (localStorage).'), {
+      storageKey: 'waterai_objects_v2',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(objects) { localStorage.setItem(this.storageKey, JSON.stringify(objects)); },
+      legacyIdForRow() { return null; }
+    });
+
 const ObjectsModule = {
-  ...WaterAIBridge.makeStore({
-    table: 'objects',
-    storageKey: 'waterai_objects_v2',
-    label: 'obiektów',
-    legacyKeys: ['waterai_objects_v1'],
-    fk: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
-  }),
+  ..._objectsStore,
 
   add(object) {
     const objects = this.getAll();
