@@ -906,7 +906,7 @@
       });
     }
 
-    function login() {
+    async function login() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
 
@@ -915,17 +915,60 @@
         return;
       }
 
+      try {
+        await WaterAISupabase.signIn(email, password);
+      } catch (e) {
+        alert((currentLanguage === "pl" ? "Logowanie nieudane: " : "Login failed: ") + (e.message || e));
+        return;
+      }
+      await enterApp();
+    }
+
+    // Wspólne wejście do aplikacji (po zalogowaniu LUB po odtworzeniu zapamiętanej sesji):
+    // rola z tabeli `profiles`, potem zaciągnięcie danych z bazy, dopiero potem render.
+    async function enterApp() {
+      let profile;
+      try {
+        profile = await WaterAISupabase.loadProfile();
+      } catch (e) {
+        alert(currentLanguage === "pl"
+          ? "Konto istnieje, ale nie ma profilu (roli) w bazie. Poproś administratora o nadanie roli."
+          : "Account exists but has no profile (role) in the database. Ask an administrator to assign a role.");
+        await WaterAISupabase.signOut();
+        return;
+      }
+
+      realRole = profile.role;      // faktyczna rola z Supabase (patrz changelog 2026-06-24a)
+      currentRole = profile.role;
+
+      await ClientsModule.load();   // PILOT: pierwszy moduł na wspólnej bazie
+
+      if (profile.role === "client" && profile.client_id) {
+        previewClientId = ClientsModule.legacyIdForRow(profile.client_id);
+      }
+
       document.getElementById("login-screen").classList.remove("active");
       document.getElementById("dashboard-screen").classList.add("active");
       renderDashboard();
     }
 
-    function logout() {
+    async function logout() {
+      try { await WaterAISupabase.signOut(); } catch (e) {}
       document.getElementById("dashboard-screen").classList.remove("active");
       document.getElementById("login-screen").classList.add("active");
       document.getElementById("password").value = "";
       closeModule();
     }
+
+    // Auto-logowanie: jeśli w tej przeglądarce jest zapamiętana sesja, wejdź od razu.
+    // (DOMContentLoaded — moduły i klient Supabase ładują się na końcu strony.)
+    document.addEventListener("DOMContentLoaded", async function () {
+      try {
+        if (window.WaterAISupabase && WaterAISupabase.client && await WaterAISupabase.getSession()) {
+          await enterApp();
+        }
+      } catch (e) { /* zostań na ekranie logowania */ }
+    });
 
     function closeModule() {
       document.getElementById("module-view").classList.remove("active");
@@ -1225,8 +1268,10 @@
     setLanguage("pl");
     setRole("admin");
   </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-client.js?v=1783215000"></script>
 <script src="js/modules/migration.js?v=1782133445"></script>
-<script src="js/modules/clients.js?v=1782133445"></script>
+<script src="js/modules/clients.js?v=1783215000"></script>
 <script src="js/modules/objects.js?v=1782133445"></script>
 <script src="js/modules/workflow.js?v=1782133445"></script>
 <script src="js/modules/measurements.js?v=1782133445"></script>
