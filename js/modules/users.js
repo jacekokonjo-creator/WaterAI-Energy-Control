@@ -108,7 +108,7 @@ const UsersModule = {
     if (opts.role === 'client' && opts.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds) {
       row.client_id = ClientsModule._rowIds[String(opts.clientLegacyId)] || null;
     }
-    const { error: e2 } = await sb.from('profiles').insert(row);
+    const { error: e2 } = await sb.from('profiles').upsert(row, { onConflict: 'id' });
     if (e2) throw new Error('Konto e-mail utworzone, ale zapis profilu się nie powiódł: ' + e2.message +
       '\nBez profilu to konto NIE zaloguje się do aplikacji — spróbuj dodać je ponownie lub zgłoś problem.');
 
