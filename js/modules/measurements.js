@@ -1,16 +1,26 @@
 // WaterAI Energy Control
 // Measurements / ESCO Protocol Module v2.0.1
 
+// TRYB AWARYJNY: bez WaterAIBridge moduł działa po staremu na localStorage.
+const _measStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'measurements',
+      storageKey: 'waterai_measurements_v2',
+      label: 'protokołów pomiarowych',
+      fk: { column: 'object_id', prop: 'objectId', module: () => window.ObjectsModule }
+    })
+  : (console.warn('[measurements] Brak WaterAIBridge — tryb lokalny.'), {
+      storageKey: 'waterai_measurements_v2',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); },
+      legacyIdForRow() { return null; }
+    });
+
 const MeasurementsModule = {
+  ..._measStore,
+
   storageKey: "waterai_measurements_v2",
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || "[]");
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
-  },
 
   add(protocol) {
     const items = this.getAll();
