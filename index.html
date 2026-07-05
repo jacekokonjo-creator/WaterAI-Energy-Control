@@ -931,9 +931,14 @@
       try {
         profile = await WaterAISupabase.loadProfile();
       } catch (e) {
-        alert(currentLanguage === "pl"
-          ? "Konto istnieje, ale nie ma profilu (roli) w bazie. Poproś administratora o nadanie roli."
-          : "Account exists but has no profile (role) in the database. Ask an administrator to assign a role.");
+        const det = (e && (e.message || e.code))
+          ? (e.message || '') + (e.code ? ' [kod: ' + e.code + ']' : '')
+          : String(e);
+        console.error('[enterApp] loadProfile:', e);
+        alert((currentLanguage === "pl"
+          ? "Konto istnieje, ale nie udało się odczytać profilu (roli) z bazy."
+          : "Account exists but the profile (role) could not be read from the database.")
+          + "\n\nSzczegóły techniczne / technical details:\n" + det);
         await WaterAISupabase.signOut();
         return;
       }
