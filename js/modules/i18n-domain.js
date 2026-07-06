@@ -16,6 +16,12 @@
 
   const DICT = { sk: {
  // ── Pomiary (readings.js v1.2) — układ uzgodniony w makietach ──
+ "+ Pomiar seryjny": "+ Sériové meranie",
+ "Usuń duplikaty": "Odstrániť duplikáty",
+ "zduplikowanych pomiarów (ten sam okres i wartość).": "duplicitných meraní (rovnaké obdobie a hodnota).",
+ "⚠ Wykryto": "⚠ Zistené",
+ "Nie znaleziono duplikatów.": "Nenašli sa žiadne duplikáty.",
+ "Zostawić po jednym i usunąć resztę?": "Ponechať po jednom a odstrániť zvyšok?",
  "🔥 Przelicznik gazu m³ → kWh": "🔥 Prepočet plynu m³ → kWh",
  "Zużycie z licznika [m³]": "Spotreba z meradla [m³]",
  "Współczynnik [kWh/m³]": "Koeficient [kWh/m³]",
