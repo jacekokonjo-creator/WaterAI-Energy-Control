@@ -339,7 +339,56 @@ function _rdTableHtml(obj) {
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Pomiarów: ${rows.length}</p>`;
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Pomiarów: ${rows.length}</p>
+    ${_rdEscoSummaryHtml(all)}`;
+}
+
+// Podsumowanie kosztow zmiennych (podstawa oszczednosci ESCO) w przeliczeniu na jednostke
+function _rdEscoSummaryHtml(all) {
+  const toKWh = { kWh: 1, MWh: 1000, GJ: 277.7778 };
+  const byCur = {};
+  let used = 0;
+  all.forEach(r => {
+    const items = r.invoiceItems || [];
+    if (!items.length) return;
+    let vSum = 0, fSum = 0;
+    items.forEach(it => {
+      const v = Number(it.value || 0);
+      if ((it.costType || 'VARIABLE') === 'FIXED') fSum += v; else vSum += v;
+    });
+    if (vSum <= 0) return;
+    const cur = r.currency || '?';
+    if (!byCur[cur]) byCur[cur] = { vSum: 0, fSum: 0, enKWh: 0, fuel: {} };
+    const b = byCur[cur];
+    b.vSum += vSum; b.fSum += fSum;
+    used++;
+    if (r.energyValue != null && r.energyValue > 0) {
+      b.enKWh += Number(r.energyValue) * (toKWh[r.energyUnit || 'kWh'] || 1);
+    } else if ((r.unit === 'kWh' || r.unit === 'MWh' || r.unit === 'GJ') &&
+               (r.valueType === 'CONSUMPTION' || r.dataSource === 'INVOICE')) {
+      b.enKWh += Number(r.value || 0) * toKWh[r.unit];
+    }
+    if (r.valueType === 'CONSUMPTION' || r.dataSource === 'INVOICE') {
+      const u = _rdUnit(r.unit);
+      b.fuel[u] = (b.fuel[u] || 0) + Number(r.value || 0);
+    }
+  });
+  if (!used) return '';
+  const lines = Object.keys(byCur).map(cur => {
+    const b = byCur[cur];
+    let l = '<b>' + _rdNum(b.vSum, 2) + ' ' + _rdEsc(cur) + '</b> kosztów zmiennych (stałe: ' + _rdNum(b.fSum, 2) + ')';
+    if (b.enKWh > 0) l += ' &nbsp;·&nbsp; <b>' + (b.vSum / b.enKWh).toFixed(5) + ' ' + _rdEsc(cur) + '/kWh</b>';
+    Object.keys(b.fuel).forEach(u => {
+      if (b.fuel[u] > 0) l += ' &nbsp;·&nbsp; ' + (b.vSum / b.fuel[u]).toFixed(4) + ' ' + _rdEsc(cur) + '/' + _rdEsc(u) + ' (' + _rdNum(b.fuel[u]) + ' ' + _rdEsc(u) + ')';
+    });
+    return '<div style="margin-top:4px;">' + l + '</div>';
+  }).join('');
+  return `
+    <div style="border:1px solid #BBD9A9;background:#F2F8EC;border-radius:10px;padding:12px 16px;margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.5px;color:#27500A;margin-bottom:4px;">📊 PODSUMOWANIE ESCO — KOSZTY ZMIENNE (te, na które mamy wpływ)</div>
+      <div style="font-size:13px;color:#27500A;">${lines}</div>
+      <div style="font-size:11px;color:#27500A;opacity:.75;margin-top:6px;">Na podstawie ${used} pomiarów z rozbiciem pozycji FV. Cena za jednostkę = suma pozycji zmiennych ÷ energia / paliwo z tych pomiarów.</div>
+    </div>`;
 }
 
 // ── 6. FORMULARZ POJEDYNCZY ──────────────────────────────────────────────────
@@ -375,6 +424,8 @@ function _rdSingleFormHtml(obj) {
       <button class="small-button" onclick="_rdCancel()">✕ Zamknij</button>
     </div>
 
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">📟 WSKAZANIA I OKRES</div>
+    <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 12px 0;margin-bottom:14px;">
     <div style="${grid3}">
       <div><label style="${lbl}">Data odczytu</label><input id="rd-date" type="date" value="${r.readingDate || today}" style="${inp}"></div>
       <div><label style="${lbl}">Okres od</label><input id="rd-from" type="date" value="${r.periodFrom || ''}" style="${inp}"></div>
@@ -397,7 +448,9 @@ function _rdSingleFormHtml(obj) {
       <div><label style="${lbl}">Jednostka energii</label>
         <select id="rd-eunit" style="${inp}">${['kWh', 'MWh', 'GJ'].map(u => `<option value="${u}" ${(r.energyUnit || 'kWh') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
     </div>
+    </div>
 
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">💰 KOSZTY</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:12px;">
       <div><label style="${lbl}">Koszt netto</label><input id="rd-net" type="number" step="any" value="${r.costNet != null ? r.costNet : ''}" style="${inp}" oninput="_rdSyncCost()"></div>
       <div><label style="${lbl}">VAT %</label><input id="rd-vat" type="number" step="any" value="${r.vatRate != null ? r.vatRate : '23'}" style="${inp}" oninput="_rdSyncCost()"></div>
