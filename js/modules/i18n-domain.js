@@ -15,6 +15,30 @@
   'use strict';
 
   const DICT = { sk: {
+ "Δ zużycie ciepła [MJ]": "Δ spotreba tepla [MJ]",
+ "Metoda 1: wszystkie punkty (OLS)": "Metóda 1: všetky body (OLS)",
+ "Metoda 2: średnie per °C": "Metóda 2: priemery na °C",
+ "punkty = średnie per °C": "body = priemery na °C",
+ "Zużycie ciepła [MJ]": "Spotreba tepla [MJ]",
+ "Zużycie ciepła vs T zewnętrzna": "Spotreba tepla vs vonkajšia T",
+ "Temperatura zasilania vs T zewnętrzna": "Teplota prívodu vs vonkajšia T",
+ "Intensywność: rzeczywista vs referencyjna": "Intenzita: skutočná vs referenčná",
+ "Koszty: wartość oszczędności i podział": "Náklady: hodnota úspor a rozdelenie",
+ "Oszczędność energii (baza sprowadzona do okresu PO)": "Úspora energie (báza prepočítaná na obdobie PO)",
+ "Zużycie skorygowane do warunków standardowych (Qs)": "Spotreba korigovaná na štandardné podmienky (Qs)",
+ "Zużycie sprowadzone do referencyjnej intensywności (Qs)": "Spotreba prepočítaná na referenčnú intenzitu (Qs)",
+ "PRZED": "PRED",
+ "PRZED→PO": "PRED→PO",
+ "Sty": "Jan",
+ "Lut": "Feb",
+ "Kwi": "Apr",
+ "Cze": "Jún",
+ "Lip": "Júl",
+ "Sie": "Aug",
+ "Wrz": "Sep",
+ "Paź": "Okt",
+ "Lis": "Nov",
+ "Gru": "Dec",
  "okresu bazowego": "bázového obdobia",
  "okresie bazowym": "bázovom období",
  "okresy bazowe": "bázové obdobia",
@@ -1587,6 +1611,18 @@
     if (typeof _setLang === 'function') {
       window.setLanguage = function (l) { _setLang(l); schedule(); };
     }
+    // tłumaczenie napisów rysowanych na wykresach (canvas) — bez zmian w kodzie rysującym
+    if (window.CanvasRenderingContext2D) {
+      const proto = CanvasRenderingContext2D.prototype;
+      ['fillText', 'strokeText'].forEach(function (fn) {
+        const orig = proto[fn];
+        proto[fn] = function (text) {
+          if (DICT[lang()] && typeof text === 'string') arguments[0] = translateString(text);
+          return orig.apply(this, arguments);
+        };
+      });
+    }
+
     apply();
   }
 
