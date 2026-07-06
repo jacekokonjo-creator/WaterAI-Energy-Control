@@ -1,5 +1,8 @@
 // WaterAI Energy Control
-// Readings Module v1.0.0 — zakładka „Pomiary" (rejestr odczytów/zużycia per obiekt)
+// Readings Module v1.1.0 — zakładka „Pomiary" (rejestr odczytów/zużycia per obiekt)
+// v1.1.0: uproszczony formularz pod wpis ręczny z FV — sekcja „Dane z faktury"
+// (medium, okres, zużycie, nr FV, dostawca), rozpisane koszty Z/S z automatycznym
+// podsumowaniem i kosztem jednostkowym, reszta pól w zwijanych „Szczegółach".
 //
 // Dane: tabela `readings` w Supabase (wzorzec hybrydowy: kolumna data jsonb),
 // lustro localStorage: waterai_readings_v1. Załączniki: Supabase Storage,
@@ -91,6 +94,8 @@ const RD_UNITS = ['GJ', 'MWh', 'kWh', 'm3', 'Gcal'];
 const RD_UNIT_LABELS = { m3: 'm³' };
 const RD_CURRENCIES = ['PLN', 'EUR', 'CZK', 'GBP'];
 const RD_VALUE_TYPES = { READING: 'Wskazanie licznika', CONSUMPTION: 'Zużycie w okresie' };
+const RD_MEDIA = { HEAT: 'Ciepło sieciowe', GAS: 'Gaz', ELECTRICITY: 'Energia elektryczna', WATER: 'Woda', OTHER: 'Inne' };
+const RD_MEDIUM_UNIT = { HEAT: 'GJ', GAS: 'kWh', ELECTRICITY: 'kWh', WATER: 'm3' };
 const RD_FV_TEMPLATES = [
   'Energia czynna (prąd)',
   'Paliwo gazowe / energia czynna (SOPo)',
@@ -291,6 +296,7 @@ function _rdTableHtml(obj) {
       ? att.map(a => `<a href="#" onclick="_rdOpenAttachment('${_rdEsc(a.path)}');return false;" style="font-size:12px;color:var(--color-text-secondary);text-decoration:underline;margin-right:8px;">📎 ${_rdEsc(a.name)}</a>`).join('')
       : '';
     const metaBits = [];
+    if (r.invoiceNumber || r.supplier) metaBits.push('FV: ' + [r.invoiceNumber, r.supplier].filter(Boolean).map(_rdEsc).join(' — '));
     if (r.performedBy) metaBits.push('Odczyt: ' + _rdEsc(r.performedBy));
     if (r.enteredByName) metaBits.push('Wprowadził: ' + _rdEsc(r.enteredByName) + (r.enteredAt ? ', ' + _rdDatePL(r.enteredAt) : ''));
     if (r.energyValue != null && r.energyValue !== 0) metaBits.push('Energia: ' + _rdNum(r.energyValue) + ' ' + _rdEsc(_rdUnit(r.energyUnit || 'kWh')));
@@ -312,7 +318,7 @@ function _rdTableHtml(obj) {
         <td style="${td}color:var(--color-text-secondary);">${lpOf[r.id]}</td>
         <td style="${td}">${_rdDatePL(r.readingDate)}<div style="font-size:11px;color:var(--color-text-secondary);">${_rdDatePL(r.periodFrom)} – ${_rdDatePL(r.periodTo)}</div></td>
         <td style="${td}"><span style="background:${src.bg};color:${src.fg};border-radius:10px;padding:2px 8px;font-size:12px;white-space:nowrap;">${src.icon} ${src.label}</span></td>
-        <td style="${td}text-align:right;">${_rdNum(r.value)} ${_rdEsc(_rdUnit(r.unit))}<div style="font-size:11px;color:var(--color-text-secondary);">${RD_VALUE_TYPES[r.valueType] || ''}</div></td>
+        <td style="${td}text-align:right;">${_rdNum(r.value)} ${_rdEsc(_rdUnit(r.unit))}<div style="font-size:11px;color:var(--color-text-secondary);">${r.medium && RD_MEDIA[r.medium] ? RD_MEDIA[r.medium] + ' · ' : ''}${RD_VALUE_TYPES[r.valueType] || ''}</div></td>
         <td style="${td}text-align:right;">${gross != null ? '<b>' + _rdNum(gross, 2) + '</b> ' + _rdEsc(r.currency || '') : '—'}${r.costNet != null ? '<div style="font-size:11px;color:var(--color-text-secondary);">netto ' + _rdNum(r.costNet, 2) + '</div>' : ''}</td>
         <td style="${td}text-align:center;">${att.length ? '📎 ' + att.length : ''}</td>
         <td style="${td}text-align:right;white-space:nowrap;">
@@ -408,6 +414,7 @@ function _rdSingleFormHtml(obj) {
 
   if (editing) _rdKeepAtt = (r.attachments || []).slice();
   if (editing) _rdItems = (r.invoiceItems || []).slice();
+  if (editing && (r.note || r.energyValue != null || r.valueType === 'READING')) window._rdDetailsOpen = true;
 
   const performedHints = [];
   ReadingsModule.findByObject(obj.id).forEach(x => { if (x.performedBy && performedHints.indexOf(x.performedBy) === -1) performedHints.push(x.performedBy); });
@@ -424,61 +431,70 @@ function _rdSingleFormHtml(obj) {
       <button class="small-button" onclick="_rdCancel()">✕ Zamknij</button>
     </div>
 
-    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">📟 WSKAZANIA I OKRES</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">🧾 DANE Z FAKTURY / ODCZYTU</div>
     <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px 12px 0;margin-bottom:14px;">
     <div style="${grid3}">
-      <div><label style="${lbl}">Data odczytu</label><input id="rd-date" type="date" value="${r.readingDate || today}" style="${inp}"></div>
+      <div><label style="${lbl}">Medium</label>
+        <select id="rd-medium" style="${inp}" onchange="_rdMediumChanged(this.value)">${Object.keys(RD_MEDIA).map(k => `<option value="${k}" ${(r.medium || 'HEAT') === k ? 'selected' : ''}>${RD_MEDIA[k]}</option>`).join('')}</select></div>
       <div><label style="${lbl}">Okres od</label><input id="rd-from" type="date" value="${r.periodFrom || ''}" style="${inp}"></div>
       <div><label style="${lbl}">Okres do</label><input id="rd-to" type="date" value="${r.periodTo || ''}" style="${inp}"></div>
-    </div>
-
-    <div style="${grid3}">
-      <div><label style="${lbl}">Źródło danych</label>
-        <select id="rd-source" style="${inp}">${Object.keys(RD_SOURCES).map(k => `<option value="${k}" ${defSource === k ? 'selected' : ''}>${RD_SOURCES[k].label}</option>`).join('')}</select></div>
-      <div><label style="${lbl}">Typ wartości</label>
-        <select id="rd-vtype" style="${inp}">${Object.keys(RD_VALUE_TYPES).map(k => `<option value="${k}" ${(r.valueType || 'READING') === k ? 'selected' : ''}>${RD_VALUE_TYPES[k]}</option>`).join('')}</select></div>
-      <div><label style="${lbl}">Wskazanie / ilość</label><input id="rd-value" type="number" step="any" value="${r.value != null ? r.value : ''}" style="${inp}"></div>
+      <div><label style="${lbl}">Zużycie / wskazanie</label><input id="rd-value" type="number" step="any" value="${r.value != null ? r.value : ''}" style="${inp}" oninput="_rdItemsSum()"></div>
       <div><label style="${lbl}">Jednostka</label>
-        <select id="rd-unit" style="${inp}">${RD_UNITS.map(u => `<option value="${u}" ${defUnit === u ? 'selected' : ''}>${_rdUnit(u)}</option>`).join('')}</select></div>
+        <select id="rd-unit" style="${inp}" onchange="_rdItemsSum()">${RD_UNITS.map(u => `<option value="${u}" ${defUnit === u ? 'selected' : ''}>${_rdUnit(u)}</option>`).join('')}</select></div>
     </div>
-
     <div style="${grid3}">
-      <div><label style="${lbl}">Energia po przeliczeniu <span style="color:var(--color-text-secondary);">(opcjonalnie, np. kWh z FV za gaz)</span></label>
-        <input id="rd-energy" type="number" step="any" value="${r.energyValue != null ? r.energyValue : ''}" style="${inp}"></div>
-      <div><label style="${lbl}">Jednostka energii</label>
-        <select id="rd-eunit" style="${inp}">${['kWh', 'MWh', 'GJ'].map(u => `<option value="${u}" ${(r.energyUnit || 'kWh') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
+      <div><label style="${lbl}">Nr faktury <span style="color:var(--color-text-secondary);">(jeśli wpis z FV)</span></label>
+        <input id="rd-invno" type="text" value="${_rdEsc(r.invoiceNumber || '')}" placeholder="np. 034015/2025" style="${inp}"></div>
+      <div><label style="${lbl}">Dostawca</label>
+        <input id="rd-supplier" type="text" value="${_rdEsc(r.supplier || '')}" placeholder="np. LPEC / Veolia / Energie2" style="${inp}"></div>
     </div>
     </div>
 
-    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">💰 KOSZTY</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:12px;">
-      <div><label style="${lbl}">Koszt netto</label><input id="rd-net" type="number" step="any" value="${r.costNet != null ? r.costNet : ''}" style="${inp}" oninput="_rdSyncCost()"></div>
-      <div><label style="${lbl}">VAT %</label><input id="rd-vat" type="number" step="any" value="${r.vatRate != null ? r.vatRate : '23'}" style="${inp}" oninput="_rdSyncCost()"></div>
-      <div><label style="${lbl}">Koszt brutto</label><input id="rd-gross" type="number" step="any" value="${r.costGross != null ? r.costGross : ''}" style="${inp}"></div>
-      <div><label style="${lbl}">Koszt jednostkowy</label><input id="rd-unitcost" type="number" step="any" value="${r.unitCost != null ? r.unitCost : ''}" style="${inp}"></div>
-      <div><label style="${lbl}">Waluta</label>
-        <select id="rd-currency" style="${inp}">${RD_CURRENCIES.map(c => `<option value="${c}" ${defCur === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
-    </div>
-
-    <div style="border-top:1px solid var(--color-border-tertiary);padding-top:12px;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <b style="font-size:13px;">Pozycje z faktury</b>
-        <span style="font-size:12px;color:var(--color-text-secondary);">(opcjonalnie — suma pozycji wypełni koszt netto)</span>
-      </div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--color-text-secondary);margin:2px 0 8px;">💰 ROZPISANE KOSZTY NETTO — co za co idzie</div>
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:12px;margin-bottom:14px;">
       <div id="rd-items"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-        <button class="small-button" style="font-size:12px;" onclick="_rdAddItem()">+ Dodaj pozycję</button>
-        <span id="rd-items-sum" style="font-size:13px;"></span>
-      </div>
+      <button class="small-button" style="font-size:12px;margin-top:4px;" onclick="_rdAddItem()">+ Dodaj pozycję</button>
+      <div id="rd-items-sum" style="margin-top:10px;"></div>
     </div>
 
-    <div style="border-top:1px solid var(--color-border-tertiary);padding-top:12px;margin-bottom:12px;">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
-        <div><label style="${lbl}">Wprowadził do systemu (automatycznie)</label>
-          <input type="text" value="${_rdEsc(enteredName)}" style="${inp}background:var(--color-background-secondary);" disabled></div>
-        <div><label style="${lbl}">Odczytu dokonał (dowolny wpis)</label>
-          <input id="rd-performed" type="text" list="rd-who" value="${_rdEsc(defPerformed)}" placeholder="np. p. Novák — konserwator" style="${inp}">
-          <datalist id="rd-who">${performedHints.map(h => `<option value="${_rdEsc(h)}">`).join('')}</datalist></div>
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;cursor:pointer;" onclick="_rdToggleDetails()">
+        <b style="font-size:13px;"><span id="rd-details-chev">${window._rdDetailsOpen ? '▾' : '▸'}</span> Szczegóły (opcjonalnie)</b>
+        <span style="font-size:12px;color:var(--color-text-secondary);">data odczytu · źródło · typ wartości · energia po przeliczeniu · VAT i brutto · kto odczytał · uwagi</span>
+      </div>
+      <div id="rd-details-body" style="display:${window._rdDetailsOpen ? 'block' : 'none'};padding:0 14px 12px;">
+        <div style="${grid3}">
+          <div><label style="${lbl}">Data odczytu</label><input id="rd-date" type="date" value="${r.readingDate || today}" style="${inp}"></div>
+          <div><label style="${lbl}">Źródło danych</label>
+            <select id="rd-source" style="${inp}">${Object.keys(RD_SOURCES).map(k => `<option value="${k}" ${defSource === k ? 'selected' : ''}>${RD_SOURCES[k].label}</option>`).join('')}</select></div>
+          <div><label style="${lbl}">Typ wartości</label>
+            <select id="rd-vtype" style="${inp}" onchange="_rdItemsSum()">${Object.keys(RD_VALUE_TYPES).map(k => `<option value="${k}" ${(r.valueType || 'CONSUMPTION') === k ? 'selected' : ''}>${RD_VALUE_TYPES[k]}</option>`).join('')}</select></div>
+        </div>
+        <div style="${grid3}">
+          <div><label style="${lbl}">Energia po przeliczeniu <span style="color:var(--color-text-secondary);">(np. kWh z FV za gaz)</span></label>
+            <input id="rd-energy" type="number" step="any" value="${r.energyValue != null ? r.energyValue : ''}" style="${inp}" oninput="_rdItemsSum()"></div>
+          <div><label style="${lbl}">Jednostka energii</label>
+            <select id="rd-eunit" style="${inp}" onchange="_rdItemsSum()">${['kWh', 'MWh', 'GJ'].map(u => `<option value="${u}" ${(r.energyUnit || 'kWh') === u ? 'selected' : ''}>${u}</option>`).join('')}</select></div>
+          <div><label style="${lbl}">Waluta</label>
+            <select id="rd-currency" style="${inp}" onchange="_rdItemsSum()">${RD_CURRENCIES.map(c => `<option value="${c}" ${defCur === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:12px;">
+          <div><label style="${lbl}">Koszt netto <span style="color:var(--color-text-secondary);">(z pozycji)</span></label><input id="rd-net" type="number" step="any" value="${r.costNet != null ? r.costNet : ''}" style="${inp}" oninput="_rdSyncCost()"></div>
+          <div><label style="${lbl}">VAT %</label><input id="rd-vat" type="number" step="any" value="${r.vatRate != null ? r.vatRate : '23'}" style="${inp}" oninput="_rdSyncCost()"></div>
+          <div><label style="${lbl}">Koszt brutto</label><input id="rd-gross" type="number" step="any" value="${r.costGross != null ? r.costGross : ''}" style="${inp}"></div>
+          <div><label style="${lbl}">Koszt jedn. zmienny <span style="color:var(--color-text-secondary);">(auto)</span></label><input id="rd-unitcost" type="number" step="any" value="${r.unitCost != null ? r.unitCost : ''}" style="${inp}"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px;">
+          <div><label style="${lbl}">Wprowadził do systemu (automatycznie)</label>
+            <input type="text" value="${_rdEsc(enteredName)}" style="${inp}background:var(--color-background-secondary);" disabled></div>
+          <div><label style="${lbl}">Odczytu dokonał (dowolny wpis)</label>
+            <input id="rd-performed" type="text" list="rd-who" value="${_rdEsc(defPerformed)}" placeholder="np. p. Novák — konserwator" style="${inp}">
+            <datalist id="rd-who">${performedHints.map(h => `<option value="${_rdEsc(h)}">`).join('')}</datalist></div>
+        </div>
+        <div>
+          <label style="${lbl}">Uwagi</label>
+          <input id="rd-note" type="text" value="${_rdEsc(r.note || '')}" placeholder="np. odczyt przy wymianie licznika" style="${inp}">
+        </div>
       </div>
     </div>
 
@@ -491,11 +507,6 @@ function _rdSingleFormHtml(obj) {
         ? `<input id="rd-files" type="file" multiple onchange="_rdFilesChosen(this)" style="font-size:13px;margin-bottom:8px;">
            <div id="rd-file-chips" style="display:flex;gap:8px;flex-wrap:wrap;"></div>`
         : `<p style="font-size:12px;color:var(--color-text-secondary);margin:0;">Załączniki wymagają połączenia ze wspólną bazą (Supabase). W trybie lokalnym są wyłączone.</p>`}
-    </div>
-
-    <div style="margin-bottom:14px;">
-      <label style="${lbl}">Uwagi</label>
-      <input id="rd-note" type="text" value="${_rdEsc(r.note || '')}" placeholder="np. odczyt przy wymianie licznika" style="${inp}">
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -511,6 +522,19 @@ function _rdSyncCost() {
   if (!isNaN(net) && !isNaN(vat)) {
     document.getElementById('rd-gross').value = (net * (1 + vat / 100)).toFixed(2);
   }
+}
+
+function _rdToggleDetails() {
+  window._rdDetailsOpen = !window._rdDetailsOpen;
+  const b = document.getElementById('rd-details-body');
+  const c = document.getElementById('rd-details-chev');
+  if (b) b.style.display = window._rdDetailsOpen ? 'block' : 'none';
+  if (c) c.textContent = window._rdDetailsOpen ? '\u25be' : '\u25b8';
+}
+
+function _rdMediumChanged(v) {
+  const u = document.getElementById('rd-unit');
+  if (u && RD_MEDIUM_UNIT[v]) { u.value = RD_MEDIUM_UNIT[v]; _rdItemsSum(); }
 }
 
 // ── 6a. Pozycje z faktury ────────────────────────────────────────────────────
@@ -547,22 +571,41 @@ function _rdItemsSum() {
     }
   });
   const el = document.getElementById('rd-items-sum');
+  const curEl = document.getElementById('rd-currency');
+  const cur = curEl ? curEl.value : 'PLN';
+  // Podstawa kosztu jednostkowego: energia po przeliczeniu, a gdy jej brak — zużycie w okresie.
+  const enEl = document.getElementById('rd-energy');
+  const euEl = document.getElementById('rd-eunit');
+  const vEl = document.getElementById('rd-value');
+  const vtEl = document.getElementById('rd-vtype');
+  const uEl = document.getElementById('rd-unit');
+  let denom = enEl ? parseFloat(enEl.value) : NaN;
+  let denomUnit = euEl ? euEl.value : 'kWh';
+  if ((isNaN(denom) || denom <= 0) && vtEl && vtEl.value === 'CONSUMPTION' && vEl) {
+    denom = parseFloat(vEl.value);
+    denomUnit = uEl ? _rdUnit(uEl.value) : '';
+  }
+  const unitVar = (varSum > 0 && !isNaN(denom) && denom > 0) ? varSum / denom : null;
   if (el) {
-    let html = '';
-    if (any) {
-      html = 'Netto: <b>' + _rdNum(sum, 2) + '</b> &nbsp;·&nbsp; zmienne: <b>' + _rdNum(varSum, 2) + '</b> &nbsp;·&nbsp; stałe: <b>' + _rdNum(fixSum, 2) + '</b>';
-      const enEl = document.getElementById('rd-energy');
-      const euEl = document.getElementById('rd-eunit');
-      const en = enEl ? parseFloat(enEl.value) : NaN;
-      if (!isNaN(en) && en > 0 && varSum > 0) {
-        html += ' &nbsp;·&nbsp; cena zmienna: <b>' + (varSum / en).toFixed(5) + '</b>/' + (euEl ? euEl.value : 'kWh');
-      }
+    if (!any) { el.innerHTML = ''; }
+    else {
+      const chip = (label, val, strong) =>
+        '<div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:8px;padding:8px 12px;">' +
+        '<div style="font-size:11px;color:var(--color-text-secondary);">' + label + '</div>' +
+        '<div style="font-size:16px;font-weight:700;' + (strong ? 'color:#27500A;' : '') + '">' + val + '</div></div>';
+      el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">' +
+        chip('Koszt zmienny (Z)', _rdNum(varSum, 2) + ' ' + _rdEsc(cur), true) +
+        chip('Koszt stały (S)', _rdNum(fixSum, 2) + ' ' + _rdEsc(cur)) +
+        chip('Razem netto', _rdNum(sum, 2) + ' ' + _rdEsc(cur)) +
+        chip('Koszt jedn. zmienny', unitVar != null ? unitVar.toFixed(5) + ' ' + _rdEsc(cur) + '/' + _rdEsc(denomUnit) : '—') +
+        '</div>';
     }
-    el.innerHTML = html;
   }
   if (any) {
     const net = document.getElementById('rd-net');
     if (net) { net.value = sum.toFixed(2); _rdSyncCost(); }
+    const uc = document.getElementById('rd-unitcost');
+    if (uc && unitVar != null) uc.value = unitVar.toFixed(5);
   }
 }
 function _rdRenderItems() {
@@ -645,7 +688,7 @@ async function _rdSaveSingle() {
 
   if (!readingDate || !periodFrom || !periodTo) { alert('Uzupełnij datę odczytu oraz okres od–do.'); return; }
   if (periodTo < periodFrom) { alert('„Okres do" jest wcześniejszy niż „okres od".'); return; }
-  if (isNaN(value)) { alert('Podaj wskazanie / ilość.'); return; }
+  if (isNaN(value)) { alert('Podaj zużycie / wskazanie.'); return; }
 
   const valueType = g('rd-vtype').value;
   if (valueType === 'READING' && !_rdEditingId) {
@@ -668,6 +711,9 @@ async function _rdSaveSingle() {
     valueType,
     value,
     unit: g('rd-unit').value,
+    medium: g('rd-medium') ? g('rd-medium').value : (ReadingsModule.find(_rdEditingId) || {}).medium || 'HEAT',
+    invoiceNumber: g('rd-invno') ? g('rd-invno').value.trim() : '',
+    supplier: g('rd-supplier') ? g('rd-supplier').value.trim() : '',
     energyValue: g('rd-energy').value,
     energyUnit: g('rd-eunit').value,
     costNet: g('rd-net').value,
