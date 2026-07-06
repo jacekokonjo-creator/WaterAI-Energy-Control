@@ -15,6 +15,27 @@
   'use strict';
 
   const DICT = { sk: {
+ // ── Pomiary (readings.js v1.2) — układ uzgodniony w makietach ──
+ "🔥 Przelicznik gazu m³ → kWh": "🔥 Prepočet plynu m³ → kWh",
+ "Zużycie z licznika [m³]": "Spotreba z meradla [m³]",
+ "Współczynnik [kWh/m³]": "Koeficient [kWh/m³]",
+ "Wstaw ilość do pozycji kWh": "Vložiť množstvo do položiek kWh",
+ "Podaj zużycie z licznika [m³] i współczynnik [kWh/m³].": "Zadajte spotrebu z meradla [m³] a koeficient [kWh/m³].",
+ "Brak pozycji z jednostką kWh — najpierw dodaj pozycje, potem wstaw ilość.": "Žiadne položky s jednotkou kWh — najprv pridajte položky, potom vložte množstvo.",
+ "Dodaj przynajmniej jedną pozycję zmienną (Z) z ilością w jednostce energii lub paliwa (kWh, MWh, GJ, m³, t) — z niej liczone jest zużycie.": "Pridajte aspoň jednu variabilnú položku (Z) s množstvom v jednotke energie alebo paliva (kWh, MWh, GJ, m³, t) — z nej sa počíta spotreba.",
+ "Pelet": "Pelety",
+ "Pozycja": "Položka",
+ "Ilość": "Množstvo",
+ "Cena": "Cena",
+ "Wartość": "Hodnota",
+ "Jedn. ceny": "Jedn. ceny",
+ "Szczegóły": "Detaily",
+ "Opis kosztów": "Popis nákladov",
+ "Koszt zmienny (Z) netto": "Variabilné náklady (Z) netto",
+ "Koszt stały (S) netto": "Fixné náklady (S) netto",
+ "Razem brutto:": "Spolu brutto:",
+ "własna nazwa": "vlastný názov",
+ "np. rozliczenie 01–17.03 wg licznika; od 18.03 nowa taryfa; korekta K/413/24 uwzględniona": "napr. vyúčtovanie 01–17.03 podľa meradla; od 18.03 nová tarifa; korekcia K/413/24 zohľadnená",
  // ── Pomiary (readings.js v1.1) — uproszczony formularz FV ──
  "🧾 DANE Z FAKTURY / ODCZYTU": "🧾 ÚDAJE Z FAKTÚRY / ODPOČTU",
  "💰 ROZPISANE KOSZTY NETTO — co za co idzie": "💰 ROZPÍSANÉ NÁKLADY NETTO — čo za čo ide",
