@@ -92,6 +92,7 @@ const RD_UNIT_LABELS = { m3: 'm³' };
 const RD_CURRENCIES = ['PLN', 'EUR', 'CZK', 'GBP'];
 const RD_VALUE_TYPES = { READING: 'Wskazanie licznika', CONSUMPTION: 'Zużycie w okresie' };
 const RD_FV_TEMPLATES = [
+  'Energia czynna (prąd)',
   'Paliwo gazowe / energia czynna (SOPo)',
   'Opłata dystrybucyjna zmienna',
   'Opłata dystrybucyjna stała',
@@ -102,11 +103,15 @@ const RD_FV_TEMPLATES = [
   'Opłata mocowa',
   'Opłata jakościowa',
   'Opłata OZE i kogeneracyjna',
+  'Opłata handlowa',
+  'Opłata sieciowa stała (moc umowna)',
+  'Opłata przejściowa',
   'Akcyza / podatek od energii',
   'Inna pozycja'
 ];
 // Domyslny typ kosztu pozycji: VARIABLE (zalezny od zuzycia) / FIXED (staly)
 const RD_FV_DEFAULT_TYPE = {
+  'Energia czynna (prąd)': 'VARIABLE',
   'Paliwo gazowe / energia czynna (SOPo)': 'VARIABLE',
   'Opłata dystrybucyjna zmienna': 'VARIABLE',
   'Opłata dystrybucyjna stała': 'FIXED',
@@ -114,7 +119,10 @@ const RD_FV_DEFAULT_TYPE = {
   'Magazynowanie gazu (SOPs)': 'VARIABLE',
   'Opłata za przesył (transport) — zmienna': 'VARIABLE',
   'Opłata abonamentowa': 'FIXED',
-  'Opłata mocowa': 'FIXED',
+  'Opłata mocowa': 'VARIABLE',
+  'Opłata handlowa': 'FIXED',
+  'Opłata sieciowa stała (moc umowna)': 'FIXED',
+  'Opłata przejściowa': 'FIXED',
   'Opłata jakościowa': 'VARIABLE',
   'Opłata OZE i kogeneracyjna': 'VARIABLE',
   'Akcyza / podatek od energii': 'VARIABLE',
@@ -249,7 +257,25 @@ function _rdCanEdit(r) {
 }
 
 function _rdTableHtml(obj) {
-  const rows = ReadingsModule.findByObject(obj.id);
+  const all = ReadingsModule.findByObject(obj.id);
+  // L.p. chronologiczne wg okresu (najstarszy pomiar = 1) — stale, niezalezne od sortowania
+  const chrono = all.slice().sort((a, b) =>
+    String(a.periodFrom || '').localeCompare(String(b.periodFrom || '')) || (Number(a.id) - Number(b.id)));
+  const lpOf = {};
+  chrono.forEach((r, i) => { lpOf[r.id] = i + 1; });
+
+  const sort = window._rdSort || 'lp_desc';
+  const col = sort.replace(/_(asc|desc)$/, '');
+  const dir = sort.endsWith('_desc') ? -1 : 1;
+  const sv = r =>
+    col === 'date' ? String(r.readingDate || '') :
+    col === 'value' ? Number(r.value || 0) :
+    lpOf[r.id];
+  const rows = all.slice().sort((a, b) => {
+    const va = sv(a), vb = sv(b);
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
+  });
+
   if (rows.length === 0) {
     return '<p style="color:var(--color-text-secondary);font-size:14px;">Brak pomiarów dla tego obiektu. Dodaj pierwszy przyciskiem „+ Dodaj pomiar" lub wklej listę przez „Wpis seryjny".</p>';
   }
@@ -278,11 +304,12 @@ function _rdTableHtml(obj) {
     }
     if (r.note) metaBits.push('Uwagi: ' + _rdEsc(r.note));
     const meta = (metaBits.length || attHtml)
-      ? `<tr><td colspan="6" style="padding:0 10px 8px;font-size:12px;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-tertiary);">${metaBits.join(' · ')}${attHtml ? '<br>' + attHtml : ''}</td></tr>`
+      ? `<tr><td colspan="7" style="padding:0 10px 8px;font-size:12px;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-tertiary);">${metaBits.join(' · ')}${attHtml ? '<br>' + attHtml : ''}</td></tr>`
       : '';
     const gross = r.costGross != null ? r.costGross : (r.costNet != null && r.vatRate != null ? r.costNet * (1 + r.vatRate / 100) : null);
     return `
       <tr>
+        <td style="${td}color:var(--color-text-secondary);">${lpOf[r.id]}</td>
         <td style="${td}">${_rdDatePL(r.readingDate)}<div style="font-size:11px;color:var(--color-text-secondary);">${_rdDatePL(r.periodFrom)} – ${_rdDatePL(r.periodTo)}</div></td>
         <td style="${td}"><span style="background:${src.bg};color:${src.fg};border-radius:10px;padding:2px 8px;font-size:12px;white-space:nowrap;">${src.icon} ${src.label}</span></td>
         <td style="${td}text-align:right;">${_rdNum(r.value)} ${_rdEsc(_rdUnit(r.unit))}<div style="font-size:11px;color:var(--color-text-secondary);">${RD_VALUE_TYPES[r.valueType] || ''}</div></td>
@@ -298,11 +325,17 @@ function _rdTableHtml(obj) {
   return `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:auto;">
       <table style="width:100%;border-collapse:collapse;min-width:640px;">
-        <thead><tr>
-          <th style="${th}">Data / okres</th><th style="${th}">Źródło danych</th>
-          <th style="${th}text-align:right;">Wartość</th><th style="${th}text-align:right;">Koszt</th>
-          <th style="${th}text-align:center;">Pliki</th><th style="${th}"></th>
-        </tr></thead>
+        <thead><tr>${(() => {
+          const thS = (c, label, extra) => {
+            const next = sort === c + '_asc' ? c + '_desc' : c + '_asc';
+            const arrow = sort === c + '_asc' ? ' \u2191' : (sort === c + '_desc' ? ' \u2193' : '');
+            return `<th style="${th}${extra || ''}cursor:pointer;" onclick="window._rdSort='${next}';renderReadingsModule(_rdLockClientId);">${label}${arrow}</th>`;
+          };
+          return thS('lp', 'L.p.') + thS('date', 'Data / okres') +
+            `<th style="${th}">Źródło danych</th>` +
+            thS('value', 'Wartość', 'text-align:right;') +
+            `<th style="${th}text-align:right;">Koszt</th><th style="${th}text-align:center;">Pliki</th><th style="${th}"></th>`;
+        })()}</tr></thead>
         <tbody>${body}</tbody>
       </table>
     </div>
