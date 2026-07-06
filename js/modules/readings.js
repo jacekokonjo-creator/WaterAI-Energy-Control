@@ -222,7 +222,7 @@ function renderReadingsModule(lockClientId) {
       <span>Waluta: <b style="color:var(--color-text-primary);">${_rdEsc(obj.currency || 'PLN')}</b></span>
       <span style="margin-left:auto;display:flex;gap:8px;">
         ${_rdMode ? '' : `<button class="primary-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('single')">+ Dodaj pomiar</button>
-        <button class="small-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('serial')">≡ Wpis seryjny</button>`}
+        <button class="small-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('serial')">+ Pomiar seryjny</button>`}
       </span>
     </div>`;
 
@@ -284,8 +284,21 @@ function _rdTableHtml(obj) {
   });
 
   if (rows.length === 0) {
-    return '<p style="color:var(--color-text-secondary);font-size:14px;">Brak pomiarów dla tego obiektu. Dodaj pierwszy przyciskiem „+ Dodaj pomiar" lub wklej listę przez „Wpis seryjny".</p>';
+    return '<p style="color:var(--color-text-secondary);font-size:14px;">Brak pomiarów dla tego obiektu. Dodaj pierwszy przyciskiem „+ Dodaj pomiar" lub wklej listę przez „+ Pomiar seryjny".</p>';
   }
+
+  // Wykrywanie duplikatów (ten sam okres, typ, wartość i jednostka)
+  const dupSeen = {};
+  let dupCount = 0;
+  all.forEach(r => {
+    const key = [r.periodFrom, r.periodTo, r.valueType, r.value, r.unit].join('|');
+    if (dupSeen[key]) dupCount++; else dupSeen[key] = true;
+  });
+  const dupBar = (dupCount && _rdIsInternal()) ? `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #F0C987;background:#FDF6E9;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#854F0B;">
+      <span>⚠ Wykryto <b>${dupCount}</b> zduplikowanych pomiarów (ten sam okres i wartość).</span>
+      <button class="small-button" style="font-size:12px;" onclick="_rdDedupe()">Usuń duplikaty</button>
+    </div>` : '';
 
   const th = 'text-align:left;padding:8px 10px;font-size:11px;font-weight:600;color:var(--color-text-secondary);border-bottom:2px solid var(--color-border-tertiary);background:var(--color-background-secondary);white-space:nowrap;';
   const td = 'padding:8px 10px;font-size:13px;vertical-align:top;';
@@ -330,7 +343,7 @@ function _rdTableHtml(obj) {
       </tr>${meta}`;
   }).join('');
 
-  return `
+  return dupBar + `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:auto;">
       <table style="width:100%;border-collapse:collapse;min-width:640px;">
         <thead><tr>${(() => {
@@ -792,6 +805,23 @@ function _rdEdit(id) {
   renderReadingsModule(_rdLockClientId);
 }
 
+function _rdDedupe() {
+  const all = ReadingsModule.getAll();
+  const seen = {};
+  const keep = [];
+  let removed = 0;
+  all.slice().sort((a, b) => Number(a.id) - Number(b.id)).forEach(r => {
+    const key = [r.objectId, r.periodFrom, r.periodTo, r.valueType, r.value, r.unit].join('|');
+    if (seen[key]) { removed++; return; }
+    seen[key] = true; keep.push(r);
+  });
+  if (!removed) { alert('Nie znaleziono duplikatów.'); return; }
+  if (!confirm('Znaleziono ' + removed + ' zduplikowanych pomiarów (ten sam obiekt, okres, typ i wartość — we wszystkich obiektach). Zostawić po jednym i usunąć resztę?')) return;
+  ReadingsModule.saveAll(keep);
+  alert('Usunięto ' + removed + ' duplikatów. Pozostało ' + keep.length + ' pomiarów.');
+  renderReadingsModule(_rdLockClientId);
+}
+
 function _rdDelete(id) {
   const r = ReadingsModule.find(id);
   if (!r) return;
@@ -898,10 +928,14 @@ function _rdSaveSerial() {
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
 
+  // Jeden zbiorczy saveAll: wywoływanie add() w pętli uruchamiało nakładające się
+  // synchronizacje z bazą i powielało wiersze (bug 2026-07-06).
   let idBase = Date.now();
+  const items = ReadingsModule.getAll();
   rows.forEach(r => {
-    ReadingsModule.add({
+    items.push(ReadingsModule._normalize({
       id: idBase++,
+      createdAt: now,
       clientId: _rdClientId,
       objectId: _rdObjectId,
       readingDate: today,
@@ -919,8 +953,9 @@ function _rdSaveSerial() {
       enteredById: p ? p.id : null,
       enteredByName: p ? (p.full_name || '') : '',
       enteredAt: now
-    });
+    }));
   });
+  ReadingsModule.saveAll(items);
   alert('Zapisano ' + rows.length + ' pomiarów.');
   _rdCancel();
 }
