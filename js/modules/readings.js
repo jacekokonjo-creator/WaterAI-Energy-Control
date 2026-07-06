@@ -92,17 +92,34 @@ const RD_UNIT_LABELS = { m3: 'm³' };
 const RD_CURRENCIES = ['PLN', 'EUR', 'CZK', 'GBP'];
 const RD_VALUE_TYPES = { READING: 'Wskazanie licznika', CONSUMPTION: 'Zużycie w okresie' };
 const RD_FV_TEMPLATES = [
-  'Paliwo gazowe / energia czynna',
+  'Paliwo gazowe / energia czynna (SOPo)',
   'Opłata dystrybucyjna zmienna',
   'Opłata dystrybucyjna stała',
+  'Opłata stała za punkt poboru',
+  'Magazynowanie gazu (SOPs)',
+  'Opłata za przesył (transport) — zmienna',
   'Opłata abonamentowa',
   'Opłata mocowa',
   'Opłata jakościowa',
   'Opłata OZE i kogeneracyjna',
-  'Opłata przesyłowa',
   'Akcyza / podatek od energii',
   'Inna pozycja'
 ];
+// Domyslny typ kosztu pozycji: VARIABLE (zalezny od zuzycia) / FIXED (staly)
+const RD_FV_DEFAULT_TYPE = {
+  'Paliwo gazowe / energia czynna (SOPo)': 'VARIABLE',
+  'Opłata dystrybucyjna zmienna': 'VARIABLE',
+  'Opłata dystrybucyjna stała': 'FIXED',
+  'Opłata stała za punkt poboru': 'FIXED',
+  'Magazynowanie gazu (SOPs)': 'VARIABLE',
+  'Opłata za przesył (transport) — zmienna': 'VARIABLE',
+  'Opłata abonamentowa': 'FIXED',
+  'Opłata mocowa': 'FIXED',
+  'Opłata jakościowa': 'VARIABLE',
+  'Opłata OZE i kogeneracyjna': 'VARIABLE',
+  'Akcyza / podatek od energii': 'VARIABLE',
+  'Inna pozycja': 'VARIABLE'
+};
 const RD_BUCKET = 'reading-attachments';
 
 // ── 3. STAN WIDOKU ───────────────────────────────────────────────────────────
@@ -251,6 +268,14 @@ function _rdTableHtml(obj) {
     if (r.performedBy) metaBits.push('Odczyt: ' + _rdEsc(r.performedBy));
     if (r.enteredByName) metaBits.push('Wprowadził: ' + _rdEsc(r.enteredByName) + (r.enteredAt ? ', ' + _rdDatePL(r.enteredAt) : ''));
     if (r.energyValue != null && r.energyValue !== 0) metaBits.push('Energia: ' + _rdNum(r.energyValue) + ' ' + _rdEsc(_rdUnit(r.energyUnit || 'kWh')));
+    if (r.invoiceItems && r.invoiceItems.length) {
+      let vSum = 0, fSum = 0;
+      r.invoiceItems.forEach(it => { const v = Number(it.value || 0); if ((it.costType || 'VARIABLE') === 'FIXED') fSum += v; else vSum += v; });
+      let fv = 'FV netto — zmienne: ' + _rdNum(vSum, 2) + ' · stałe: ' + _rdNum(fSum, 2) + ' ' + _rdEsc(r.currency || '');
+      const enBase = (r.energyValue != null && r.energyValue > 0) ? r.energyValue : null;
+      if (enBase && vSum > 0) fv += ' · cena zmienna: ' + (vSum / enBase).toFixed(5) + ' ' + _rdEsc(r.currency || '') + '/' + _rdEsc(_rdUnit(r.energyUnit || 'kWh'));
+      metaBits.push(fv);
+    }
     if (r.note) metaBits.push('Uwagi: ' + _rdEsc(r.note));
     const meta = (metaBits.length || attHtml)
       ? `<tr><td colspan="6" style="padding:0 10px 8px;font-size:12px;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-tertiary);">${metaBits.join(' · ')}${attHtml ? '<br>' + attHtml : ''}</td></tr>`
@@ -405,12 +430,17 @@ function _rdSyncCost() {
 // ── 6a. Pozycje z faktury ────────────────────────────────────────────────────
 
 function _rdAddItem() {
-  _rdItems.push({ name: RD_FV_TEMPLATES[0], customName: '', qty: '', unit: '', unitPrice: '', value: '' });
+  _rdItems.push({ name: RD_FV_TEMPLATES[0], ctype: RD_FV_DEFAULT_TYPE[RD_FV_TEMPLATES[0]] || 'VARIABLE', customName: '', qty: '', unit: '', unitPrice: '', value: '' });
   _rdRenderItems();
 }
 function _rdRemoveItem(i) { _rdItems.splice(i, 1); _rdRenderItems(); }
 function _rdItemChange(i, field, v) {
   _rdItems[i][field] = v;
+  if (field === 'name') {
+    _rdItems[i].ctype = RD_FV_DEFAULT_TYPE[v] || 'VARIABLE';
+    const sel = document.getElementById('rd-item-ctype-' + i);
+    if (sel) sel.value = _rdItems[i].ctype;
+  }
   if (field === 'qty' || field === 'unitPrice') {
     const q = parseFloat(_rdItems[i].qty), c = parseFloat(_rdItems[i].unitPrice);
     if (!isNaN(q) && !isNaN(c)) {
@@ -422,10 +452,28 @@ function _rdItemChange(i, field, v) {
   _rdItemsSum();
 }
 function _rdItemsSum() {
-  let sum = 0, any = false;
-  _rdItems.forEach(it => { const v = parseFloat(it.value); if (!isNaN(v)) { sum += v; any = true; } });
+  let sum = 0, varSum = 0, fixSum = 0, any = false;
+  _rdItems.forEach(it => {
+    const v = parseFloat(it.value);
+    if (!isNaN(v)) {
+      sum += v; any = true;
+      if ((it.ctype || 'VARIABLE') === 'FIXED') fixSum += v; else varSum += v;
+    }
+  });
   const el = document.getElementById('rd-items-sum');
-  if (el) el.innerHTML = any ? 'Suma pozycji (netto): <b>' + _rdNum(sum, 2) + '</b>' : '';
+  if (el) {
+    let html = '';
+    if (any) {
+      html = 'Netto: <b>' + _rdNum(sum, 2) + '</b> &nbsp;·&nbsp; zmienne: <b>' + _rdNum(varSum, 2) + '</b> &nbsp;·&nbsp; stałe: <b>' + _rdNum(fixSum, 2) + '</b>';
+      const enEl = document.getElementById('rd-energy');
+      const euEl = document.getElementById('rd-eunit');
+      const en = enEl ? parseFloat(enEl.value) : NaN;
+      if (!isNaN(en) && en > 0 && varSum > 0) {
+        html += ' &nbsp;·&nbsp; cena zmienna: <b>' + (varSum / en).toFixed(5) + '</b>/' + (euEl ? euEl.value : 'kWh');
+      }
+    }
+    el.innerHTML = html;
+  }
   if (any) {
     const net = document.getElementById('rd-net');
     if (net) { net.value = sum.toFixed(2); _rdSyncCost(); }
@@ -436,13 +484,17 @@ function _rdRenderItems() {
   if (!box) return;
   const inp = 'box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;';
   box.innerHTML = _rdItems.map((it, i) => `
-    <div style="display:grid;grid-template-columns:minmax(160px,2fr) 70px 60px 84px 92px 28px;gap:6px;margin-bottom:6px;align-items:center;">
+    <div style="display:grid;grid-template-columns:minmax(140px,2fr) 76px 70px 56px 84px 92px 28px;gap:6px;margin-bottom:6px;align-items:center;">
       <span style="display:flex;flex-direction:column;gap:4px;">
         <select style="${inp}width:100%;" onchange="_rdItemChange(${i},'name',this.value)">
           ${RD_FV_TEMPLATES.map(t => `<option value="${_rdEsc(t)}" ${it.name === t ? 'selected' : ''}>${_rdEsc(t)}</option>`).join('')}
         </select>
         ${it.name === 'Inna pozycja' ? `<input type="text" placeholder="własna nazwa" value="${_rdEsc(it.customName || '')}" style="${inp}width:100%;" oninput="_rdItemChange(${i},'customName',this.value)">` : ''}
       </span>
+      <select id="rd-item-ctype-${i}" style="${inp}" title="Zmienna: zależy od zużycia (podstawa oszczędności ESCO). Stała: niezależna od zużycia." onchange="_rdItemChange(${i},'ctype',this.value)">
+        <option value="VARIABLE" ${(it.ctype||'VARIABLE')==='VARIABLE'?'selected':''}>Zmienna</option>
+        <option value="FIXED" ${it.ctype==='FIXED'?'selected':''}>Stała</option>
+      </select>
       <input type="number" step="any" placeholder="ilość" value="${it.qty}" style="${inp}text-align:right;" oninput="_rdItemChange(${i},'qty',this.value)">
       <input type="text" placeholder="jedn." value="${_rdEsc(it.unit)}" style="${inp}" oninput="_rdItemChange(${i},'unit',this.value)">
       <input type="number" step="any" placeholder="cena" value="${it.unitPrice}" style="${inp}text-align:right;" oninput="_rdItemChange(${i},'unitPrice',this.value)">
@@ -520,7 +572,7 @@ async function _rdSaveSingle() {
   const p = _rdProfile();
   const cleanItems = _rdItems
     .filter(it => it.qty !== '' || it.value !== '' || it.customName)
-    .map(it => ({ name: it.name === 'Inna pozycja' && it.customName ? it.customName : it.name, qty: it.qty === '' ? null : Number(it.qty), unit: it.unit || '', unitPrice: it.unitPrice === '' ? null : Number(it.unitPrice), value: it.value === '' ? null : Number(it.value) }));
+    .map(it => ({ name: it.name === 'Inna pozycja' && it.customName ? it.customName : it.name, costType: it.ctype || 'VARIABLE', qty: it.qty === '' ? null : Number(it.qty), unit: it.unit || '', unitPrice: it.unitPrice === '' ? null : Number(it.unitPrice), value: it.value === '' ? null : Number(it.value) }));
 
   const rec = {
     clientId: _rdClientId,
@@ -572,7 +624,7 @@ function _rdEdit(id) {
   _rdMode = 'single';
   _rdFiles = [];
   const r = ReadingsModule.find(id);
-  _rdItems = r && r.invoiceItems ? r.invoiceItems.map(it => ({ name: RD_FV_TEMPLATES.indexOf(it.name) >= 0 ? it.name : 'Inna pozycja', customName: RD_FV_TEMPLATES.indexOf(it.name) >= 0 ? '' : it.name, qty: it.qty != null ? it.qty : '', unit: it.unit || '', unitPrice: it.unitPrice != null ? it.unitPrice : '', value: it.value != null ? it.value : '' })) : [];
+  _rdItems = r && r.invoiceItems ? r.invoiceItems.map(it => ({ name: RD_FV_TEMPLATES.indexOf(it.name) >= 0 ? it.name : 'Inna pozycja', customName: RD_FV_TEMPLATES.indexOf(it.name) >= 0 ? '' : it.name, ctype: it.costType || RD_FV_DEFAULT_TYPE[it.name] || 'VARIABLE', qty: it.qty != null ? it.qty : '', unit: it.unit || '', unitPrice: it.unitPrice != null ? it.unitPrice : '', value: it.value != null ? it.value : '' })) : [];
   renderReadingsModule(_rdLockClientId);
 }
 
