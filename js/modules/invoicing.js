@@ -1,7 +1,29 @@
 // WaterAI Energy Control
-// Invoicing Module v1.0.0
+// Invoicing Module v2.0.0 — faktury na wspólnym mostku Supabase (tabela `invoices`).
+// v1 trzymał faktury wyłącznie w localStorage; v2 przechodzi na WaterAIBridge
+// (wzorzec jak AnalysesModule/ReadingsModule): load() po zalogowaniu, getAll/saveAll
+// synchronicznie na cache, zapis do bazy w tle, lustro localStorage bez zmian.
+// Publiczne API (add/remove/find/update/getDashboard/…) — bez zmian.
+
+// TRYB AWARYJNY: bez WaterAIBridge moduł działa po staremu na localStorage.
+const _invoicingStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'invoices',
+      storageKey: 'waterai_invoices_v1',
+      label: 'faktur',
+      fk: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
+    })
+  : (console.warn('[invoicing] Brak WaterAIBridge — tryb lokalny.'), {
+      storageKey: 'waterai_invoices_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); },
+      legacyIdForRow() { return null; }
+    });
 
 const InvoicingModule = {
+  ..._invoicingStore,
+
   storageKey: 'waterai_invoices_v1',
 
   TYPES: {
@@ -17,14 +39,6 @@ const InvoicingModule = {
     PAID:     { label: 'Opłacona',             color: '#27500A', bg: '#EAF3DE' },
     PARTIAL:  { label: 'Częściowo opłacona',   color: '#633806', bg: '#FEF3DC' },
     OVERDUE:  { label: 'Po terminie',          color: '#c00',    bg: '#fee' }
-  },
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
   },
 
   add(inv) {
