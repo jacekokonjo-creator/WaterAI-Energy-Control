@@ -735,6 +735,7 @@
         calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
         invoicing: ["🧾", "Faktury", "Wystawione faktury, należności i rozliczenia."],
         analyses: ["📐", "Analizy", "TYM, regresja, obłożenie, powierzchnia i inne."],
+        visibility: ["👁️", "Widoczność", "Kto widzi i edytuje poszczególne dokumenty."],
         documents: ["🗂️", "Dokumenty", "Faktury klienta, umowy, dokumentacja, zdjęcia."],
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
@@ -754,6 +755,7 @@
         calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
         invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
         analyses: ["📐", "Analyses", "TYM, regression, occupancy, area and more."],
+        visibility: ["👁️", "Visibility", "Who can view and edit each document."],
         documents: ["🗂️", "Documents", "Client invoices, contracts, documentation, photos."],
         users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."]
@@ -773,6 +775,7 @@
         calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
         invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
         analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
+        visibility: ["👁️", "Sichtbarkeit", "Wer einzelne Dokumente sehen und bearbeiten kann."],
         documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."]
@@ -792,6 +795,7 @@
         calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
         invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
         analyses: ["📐", "Analýzy", "TYM, regrese, obsazenost, plocha a další."],
+        visibility: ["👁️", "Viditelnost", "Kdo vidí a upravuje jednotlivé dokumenty."],
         documents: ["🗂️", "Dokumenty", "Faktury klientů, smlouvy, dokumentace, fotografie."],
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
         settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."]
@@ -811,6 +815,7 @@
         calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
         invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
         analyses: ["📐", "Analýzy", "TYM, regresia, obsadenosť, plocha a ďalšie."],
+        visibility: ["👁️", "Viditeľnosť", "Kto vidí a upravuje jednotlivé dokumenty."],
         documents: ["🗂️", "Dokumenty", "Faktúry klientov, zmluvy, dokumentácia, fotografie."],
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
         settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."]
@@ -818,9 +823,9 @@
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
-      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports"],
-      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports"],
+      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "visibility", "users", "settings"],
+      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports", "visibility"],
+      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "visibility"],
       salesRepresentative:["calendar", "clients", "objects", "readings", "reports"],
       client:             ["myObjects", "myReadings", "myMeasurements", "myReports"]
     };
@@ -978,6 +983,7 @@
       if (window.MeasurementsModule && window.MeasurementsModule.load) await window.MeasurementsModule.load();
       if (window.ReadingsModule && window.ReadingsModule.load) await window.ReadingsModule.load();
       if (window.UsersModule && window.UsersModule.load) await window.UsersModule.load();
+      if (window.SharesModule && window.SharesModule.load) await window.SharesModule.load();
       if (window.AnalysesModule && window.AnalysesModule.load) await window.AnalysesModule.load();
       if (window.EscoReportsModule && window.EscoReportsModule.load) await window.EscoReportsModule.load();
       if (window._basePeriodsStore && window._basePeriodsStore.load) await window._basePeriodsStore.load();
@@ -1353,6 +1359,7 @@
 <script src="js/modules/app-v2.js?v=1783350000"></script>
 <script src="js/modules/i18n-domain.js?v=6"></script>
 <script src="js/modules/readings.js?v=1783380003"></script>
+<script src="js/modules/shares.js?v=1783460000"></script>
 <script src="js/modules/backup.js?v=1782478717"></script>
 </body>
 </html>
