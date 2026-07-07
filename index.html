@@ -731,6 +731,7 @@
         excel: ["📁", "Import Excel", "Wczytywanie danych z arkuszy."],
         pdf: ["📄", "Import PDF", "Analiza dokumentów i faktur PDF."],
         reports: ["📈", "Raporty ESCO", "Oszczędności, rozliczenia i raporty."],
+        simulation: ["💡", "Symulacja oszczędności", "Wieloletnia prognoza: payback, zysk, ROI, scenariusze."],
         myReports: ["📈", "Moje raporty", "Raporty oszczędności dostępne dla klienta."],
         calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
         invoicing: ["🧾", "Faktury", "Wystawione faktury, należności i rozliczenia."],
@@ -751,6 +752,7 @@
         excel: ["📁", "Excel import", "Import data from spreadsheets."],
         pdf: ["📄", "PDF import", "Analyze PDF documents and invoices."],
         reports: ["📈", "ESCO reports", "Savings, settlements and reports."],
+        simulation: ["💡", "Savings simulation", "Multi-year forecast: payback, profit, ROI, scenarios."],
         myReports: ["📈", "My reports", "Savings reports available for the client."],
         calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
         invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
@@ -771,6 +773,7 @@
         excel: ["📁", "Excel-Import", "Import von Daten aus Tabellen."],
         pdf: ["📄", "PDF-Import", "Analyse von PDF-Dokumenten und Rechnungen."],
         reports: ["📈", "ESCO-Berichte", "Einsparungen, Abrechnungen und Berichte."],
+        simulation: ["💡", "Einsparsimulation", "Mehrjahresprognose: Payback, Gewinn, ROI, Szenarien."],
         myReports: ["📈", "Meine Berichte", "Für den Kunden verfügbare Einsparberichte."],
         calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
         invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
@@ -791,6 +794,7 @@
         excel: ["📁", "Import Excel", "Import dat z tabulek."],
         pdf: ["📄", "Import PDF", "Analýza PDF dokumentů a faktur."],
         reports: ["📈", "ESCO reporty", "Úspory, vyúčtování a reporty."],
+        simulation: ["💡", "Simulace úspor", "Víceletá prognóza: návratnost, zisk, ROI, scénáře."],
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
         calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
         invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
@@ -811,6 +815,7 @@
         excel: ["📁", "Import Excel", "Import údajov z tabuliek."],
         pdf: ["📄", "Import PDF", "Analýza PDF dokumentov a faktúr."],
         reports: ["📈", "ESCO reporty", "Úspory, vyúčtovania a reporty."],
+        simulation: ["💡", "Simulácia úspor", "Viacročná prognóza: návratnosť, zisk, ROI, scenáre."],
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
         calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
         invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
@@ -823,10 +828,10 @@
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "visibility", "users", "settings"],
-      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports", "visibility"],
-      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "visibility"],
-      salesRepresentative:["calendar", "clients", "objects", "readings", "reports"],
+      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "simulation", "invoicing", "visibility", "users", "settings"],
+      backOffice:         ["calendar", "clients", "objects", "readings", "reports", "simulation", "invoicing", "visibility"],
+      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "simulation", "visibility"],
+      salesRepresentative:["calendar", "clients", "objects", "readings", "reports", "simulation"],
       client:             ["myObjects", "myReadings", "myMeasurements", "myReports"]
     };
 
@@ -985,6 +990,7 @@
       if (window.UsersModule && window.UsersModule.load) await window.UsersModule.load();
       if (window.SharesModule && window.SharesModule.load) await window.SharesModule.load();
       if (window.InvoicingModule && window.InvoicingModule.load) await window.InvoicingModule.load();
+      if (window.SimulationsModule && window.SimulationsModule.load) await window.SimulationsModule.load();
       if (window.AnalysesModule && window.AnalysesModule.load) await window.AnalysesModule.load();
       if (window.EscoReportsModule && window.EscoReportsModule.load) await window.EscoReportsModule.load();
       if (window._basePeriodsStore && window._basePeriodsStore.load) await window._basePeriodsStore.load();
@@ -1361,6 +1367,7 @@
 <script src="js/modules/i18n-domain.js?v=6"></script>
 <script src="js/modules/readings.js?v=1783380003"></script>
 <script src="js/modules/shares.js?v=1783460000"></script>
+<script src="js/modules/simulations.js?v=1783460200"></script>
 <script src="js/modules/backup.js?v=1782478717"></script>
 </body>
 </html>
