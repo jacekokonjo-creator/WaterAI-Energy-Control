@@ -211,7 +211,13 @@ window.simCalcScenario = simCalcScenario;
 
 // ── 3. POMOCNICZE ────────────────────────────────────────────────────────────
 
-const _SIM_COLORS = ['#0C447C', '#27500A', '#E65100'];
+const _SIM_COLORS = ['#0C447C', '#27500A', '#E65100', '#6A1B9A', '#00838F', '#AD1457', '#4E342E', '#33691E'];
+// Kolor scenariusza dla dowolnego indeksu: paleta bazowa, potem generowane HSL.
+function _simColor(i) {
+  if (i < _SIM_COLORS.length) return _SIM_COLORS[i];
+  const hue = (i * 47) % 360;                 // rozrzut barw dla dalszych indeksów
+  return `hsl(${hue}, 55%, 34%)`;
+}
 
 function _simFmt(v, d) {
   if (v === null || v === undefined || isNaN(v)) return '—';
@@ -271,7 +277,18 @@ window.simSuggestNumber = simSuggestNumber;
 function _simLineChart(cv, series, investment, currency) {
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
-  const W = cv.clientWidth || 640, H = 300;
+  const W = cv.clientWidth || 640;
+  // Oszacuj liczbę wierszy legendy, by zarezerwować na nią miejsce (wiele scenariuszy = zawijanie).
+  const legendW = W - 8;
+  let rowGuess = 1, curW = 0;
+  series.forEach(sr => {
+    const w = 14 + (('Scenariusz ' + sr.label + ' (' + _simFmt(sr.savingsPct, 1) + '%)').length * 6) + 20;
+    if (curW + w > legendW) { rowGuess++; curW = 0; }
+    curW += w;
+  });
+  const legendH = rowGuess * 16;
+  const H = 270 + legendH;
+  cv.style.height = H + 'px';
   cv.width = W * dpr; cv.height = H * dpr;
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
@@ -280,7 +297,7 @@ function _simLineChart(cv, series, investment, currency) {
   ctx.fillStyle = '#999'; ctx.textAlign = 'right'; ctx.font = '10px sans-serif';
   ctx.fillText('[' + (currency || 'PLN') + ']', W - 12, 16);
 
-  const pad = { l: 68, r: 16, t: 30, b: 44 };
+  const pad = { l: 68, r: 16, t: 30, b: 44 + legendH };
   const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
   const years = Math.max(...series.map(sr => sr.rows.length));
   let maxV = investment;
@@ -309,7 +326,7 @@ function _simLineChart(cv, series, investment, currency) {
   }
 
   series.forEach((sr, si) => {
-    const col = _SIM_COLORS[si % _SIM_COLORS.length];
+    const col = _simColor(si);
     ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.beginPath();
     sr.rows.forEach((r, i) => { const x = xFor(r.year), y = yFor(r.H); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
     ctx.stroke(); ctx.lineWidth = 1;
@@ -324,14 +341,18 @@ function _simLineChart(cv, series, investment, currency) {
     }
   });
 
-  let lx = pad.l, ly = H - 10;
+  // Legenda z zawijaniem — obszar zaczyna się pod osią X.
+  const legTop = H - legendH + 6;
+  let lx = pad.l, ly = legTop;
+  ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
   series.forEach((sr, si) => {
-    const col = _SIM_COLORS[si % _SIM_COLORS.length];
-    ctx.fillStyle = col; ctx.fillRect(lx, ly - 8, 10, 10);
-    ctx.fillStyle = '#555'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+    const col = _simColor(si);
     const label = 'Scenariusz ' + sr.label + ' (' + _simFmt(sr.savingsPct, 1) + '%)';
-    ctx.fillText(label, lx + 14, ly);
-    lx += ctx.measureText(label).width + 32;
+    const w = 14 + ctx.measureText(label).width + 20;
+    if (lx + w > W - pad.r && lx > pad.l) { lx = pad.l; ly += 16; }   // zawiń wiersz
+    ctx.fillStyle = col; ctx.fillRect(lx, ly - 8, 10, 10);
+    ctx.fillStyle = '#555'; ctx.fillText(label, lx + 14, ly);
+    lx += w;
   });
 }
 
@@ -348,7 +369,7 @@ function _simDrawCharts(sim, cid) {
         label: 'R' + (y + 1),
         bars: results.map((r, i) => ({
           v: r.rows[y] ? r.rows[y].F : 0,
-          c: _SIM_COLORS[i % 3],
+          c: _simColor(i),
           n: 'Scenariusz ' + r.label
         }))
       });
@@ -384,7 +405,7 @@ const SIM_STYLE = `<style>
   .sim-t tr.sim-pb td { background:#EAF3DE; }
   .sim-scen-hdr { display:flex; align-items:center; gap:8px; margin:16px 0 8px; }
   .sim-scen-dot { width:12px; height:12px; border-radius:3px; display:inline-block; flex:0 0 auto; }
-  canvas.sim-cv { width:100%; height:300px; border:1px solid var(--color-border-tertiary); border-radius:8px; background:#fff; }
+  canvas.sim-cv { width:100%; min-height:270px; border:1px solid var(--color-border-tertiary); border-radius:8px; background:#fff; }
   canvas.sim-cv-bar { width:100%; height:260px; border:1px solid var(--color-border-tertiary); border-radius:8px; background:#fff; }
 
   /* ── Dokument (podgląd/druk) w stylistyce raportu ESCO ── */
@@ -487,7 +508,7 @@ function renderSimulationsModule() {
       ? ((sim.scenarios || []).map(sc => simCalcScenario(sim, sc.savingsPct).kpi.paybackYear).filter(x => x).sort((a, b) => a - b)[0] || null)
       : null;
     const scen = (sim.scenarios || []).map((sc, i) =>
-      `<span style="font-size:11px;font-weight:600;color:${_SIM_COLORS[i % 3]};margin-right:8px;">${escapeHtml(sc.label)}: ${_simFmt(sc.savingsPct, 1)}%</span>`).join('');
+      `<span style="font-size:11px;font-weight:600;color:${_simColor(i)};margin-right:8px;">${escapeHtml(sc.label)}: ${_simFmt(sc.savingsPct, 1)}%</span>`).join('');
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:10px 12px;font-size:13px;">
         <div style="font-weight:500;">${escapeHtml(sim.name || ('Symulacja #' + sim.id))}</div>
@@ -614,12 +635,11 @@ function simEdit(id) {
           Rata zwrotu: część oszczędności zwracana klientowi z udziału WaterAI — do wysokości kaucji
           (klient wpłaca kaucję, firma zwraca ją ze swojej części oszczędności).</p>
 
-        <h4>Scenariusze (% oszczędności)</h4>
+        <h4>Scenariusze oszczędności</h4>
         <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 8px;">
-          Kropka = scenariusz bazowy (trafia na okładkę i do podsumowania wykonawczego).</p>
+          Dodaj dowolną liczbę wariantów % oszczędności. Kropka = scenariusz bazowy (trafia na okładkę i do podsumowania wykonawczego).</p>
         <div id="sim-scenarios">${_simScenarioInputs()}</div>
-        ${(_simDraft.scenarios || []).length < 3
-          ? `<button class="small-button sim-noprint" onclick="_simAddScenario()">＋ Dodaj scenariusz</button>` : ''}
+        <button class="small-button sim-noprint" onclick="_simAddScenario()" style="margin-top:2px;">＋ Dodaj wariant</button>
 
         <div class="sim-field" style="margin-top:14px;"><label>Status</label>
           <select id="sim-status" onchange="_simRecalc()">
@@ -643,21 +663,27 @@ function _simObjectOptions(clientId, objectId) {
 }
 
 function _simScenarioInputs() {
-  return (_simDraft.scenarios || []).map((sc, i) => `
-    <div style="border:1px solid var(--color-border-tertiary);border-radius:8px;padding:8px;margin-bottom:8px;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
-        <input type="radio" name="sim-base" title="Scenariusz bazowy" ${sc.base ? 'checked' : ''}
-          onchange="_simDraft.scenarios.forEach((s,j)=>s.base=(j===${i}));_simRecalc(true)">
-        <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
-        <input style="width:52px;font-size:13px;" value="${escapeHtml(sc.label)}" oninput="_simDraft.scenarios[${i}].label=this.value;_simRecalc(true)">
-        <input style="flex:1;font-size:13px;" type="number" step="0.1" min="0" max="100" value="${sc.savingsPct}"
-          oninput="_simDraft.scenarios[${i}].savingsPct=Number(this.value)||0;_simRecalc(true)">
-        <span style="font-size:12px;color:var(--color-text-secondary);">%</span>
-        ${(_simDraft.scenarios.length > 1)
-          ? `<button class="small-button" onclick="_simRemoveScenario(${i})" title="Usuń scenariusz">✕</button>` : ''}
+  const list = _simDraft.scenarios || [];
+  return list.map((sc, i) => `
+    <div style="border:1px solid var(--color-border-tertiary);border-left:4px solid ${_simColor(i)};border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary);white-space:nowrap;cursor:pointer;">
+          <input type="radio" name="sim-base" title="Scenariusz bazowy" ${sc.base ? 'checked' : ''}
+            onchange="_simDraft.scenarios.forEach((s,j)=>s.base=(j===${i}));_simRecalc(true)"> bazowy</label>
+        <span style="flex:1;"></span>
+        ${(list.length > 1)
+          ? `<button class="small-button" onclick="_simRemoveScenario(${i})" title="Usuń wariant">✕</button>` : ''}
       </div>
-      <input style="width:100%;box-sizing:border-box;font-size:12px;" value="${escapeHtml(sc.note || '')}"
-        placeholder="uzasadnienie scenariusza (opcjonalnie, trafi do dokumentu)"
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label style="font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Nazwa wariantu</label>
+          <input style="width:100%;box-sizing:border-box;font-size:13px;" value="${escapeHtml(sc.label)}"
+            oninput="_simDraft.scenarios[${i}].label=this.value;_simRecalc(true)"></div>
+        <div><label style="font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:2px;">Oszczędność [%]</label>
+          <input style="width:100%;box-sizing:border-box;font-size:13px;" type="number" step="0.1" min="0" max="100" value="${sc.savingsPct}"
+            oninput="_simDraft.scenarios[${i}].savingsPct=Number(this.value)||0;_simRecalc(true)"></div>
+      </div>
+      <input style="width:100%;box-sizing:border-box;font-size:12px;margin-top:8px;" value="${escapeHtml(sc.note || '')}"
+        placeholder="uzasadnienie wariantu (opcjonalnie, trafi do dokumentu)"
         oninput="_simDraft.scenarios[${i}].note=this.value;_simRecalc(true)">
     </div>`).join('');
 }
@@ -686,8 +712,10 @@ function _simObjectChanged() {
 window._simObjectChanged = _simObjectChanged;
 
 function _simAddScenario() {
-  const labels = ['A', 'B', 'C'];
-  _simDraft.scenarios.push({ label: labels[_simDraft.scenarios.length] || '?', savingsPct: 18, note: '', base: false });
+  const n = _simDraft.scenarios.length;
+  const label = n < 26 ? String.fromCharCode(65 + n) : String(n + 1);   // A..Z, potem 27, 28…
+  const prev = _simDraft.scenarios[n - 1];
+  _simDraft.scenarios.push({ label, savingsPct: prev ? prev.savingsPct : 18, note: '', base: false });
   simRerenderScenarioInputs();
   _simRecalc(true);
 }
@@ -779,22 +807,22 @@ function _simKpiCards(sim, results) {
   const stType = sim.settlementType || 'DEPOSIT';
   const roiLbl = stType === 'FEE' ? 'ROI (zysk / opłata)' : 'ROI (zysk / kaucja)';
   return results.map((r, i) => `
-    ${inv > 0 ? `<div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+    ${inv > 0 ? `<div class="sim-kpi" style="border-top:3px solid ${_simColor(i)};">
       <div class="v">${r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—'}</div>
       <div class="k">Payback · scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)</div>
-    </div>` : `<div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+    </div>` : `<div class="sim-kpi" style="border-top:3px solid ${_simColor(i)};">
       <div class="v">${_simFmt(r.kpi.totalSavings)} <span style="font-size:11px;">${cur}</span></div>
       <div class="k">Suma oszczędności · scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)</div>
     </div>`}
-    <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+    <div class="sim-kpi" style="border-top:3px solid ${_simColor(i)};">
       <div class="v">${_simFmt(r.kpi.netProfit)} <span style="font-size:11px;">${cur}</span></div>
       <div class="k">Zysk netto klienta po ${_simYearsTxt(sim.years)}</div>
     </div>
-    <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+    <div class="sim-kpi" style="border-top:3px solid ${_simColor(i)};">
       <div class="v">${inv > 0 ? ('×' + _simFmt(r.kpi.roi, 2)) : '—'}</div>
       <div class="k">${roiLbl}</div>
     </div>
-    <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+    <div class="sim-kpi" style="border-top:3px solid ${_simColor(i)};">
       <div class="v">${r.kpi.cagr === null ? '—' : _simPct(r.kpi.cagr)}</div>
       <div class="k">CAGR</div>
     </div>`).join('');
@@ -809,7 +837,7 @@ function _simScenTables(sim, results) {
   const zeroLbl = stType === 'FEE' ? 'rok zwrotu opłaty' : 'rok zwrotu kaucji';
   return results.map((r, i) => `
     <div class="sim-scen-hdr">
-      <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
+      <span class="sim-scen-dot" style="background:${_simColor(i)};"></span>
       <strong style="font-size:13px;">Scenariusz ${escapeHtml(r.label)} — oszczędność ${_simFmt(r.savingsPct, 1)}%${r.base ? ' · bazowy' : ''}</strong>
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;margin-bottom:6px;">
@@ -934,7 +962,7 @@ function _simComparisonHtml(sim, results) {
   const stType = sim.settlementType || 'DEPOSIT';
   const paybackLbl = stType === 'FEE' ? 'Payback (rok zwrotu opłaty)' : 'Payback (rok zwrotu kaucji)';
   const roiLbl = stType === 'FEE' ? 'ROI (zysk / opłata)' : 'ROI (zysk / kaucja)';
-  const th = results.map((r, i) => `<th style="color:${_SIM_COLORS[i % 3]};">Scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)${r.base ? ' ·bazowy' : ''}</th>`).join('');
+  const th = results.map((r, i) => `<th style="color:${_simColor(i)};">Scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)${r.base ? ' ·bazowy' : ''}</th>`).join('');
   const row = (label, fn) => `<tr><td>${label}</td>${results.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`;
   return `
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
@@ -1066,7 +1094,7 @@ function _simDocHtml(sim) {
     </tbody></table>
     <div style="height:12px;"></div>
     ${results.map((r, i) => `<div class="sim-scen-chip">
-      <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
+      <span class="sim-scen-dot" style="background:${_simColor(i)};"></span>
       <span class="pct">${escapeHtml(r.label)}: ${_simFmt(r.savingsPct, 1)}%</span>
       ${r.base ? '<span class="base">bazowy</span>' : ''}
       ${r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : ''}
