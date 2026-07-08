@@ -1,7 +1,15 @@
 // WaterAI Energy Control
-// Simulations Module v1.0.0 — „Symulacja oszczędności" (prognoza wieloletnia).
+// Simulations Module v1.1.0 — „Symulacja oszczędności" (prognoza wieloletnia).
 //
-// Silnik obliczeniowy odwzorowuje 1:1 arkusz „ZYSK" z pliku Kalkulacja.xlsx:
+// v1.1 (2026-07-07): wydruk przebudowany na pełny dokument w stylistyce raportów
+// ESCO — okładka (osobna strona), podsumowanie wykonawcze, statyczna sekcja
+// metodyki (TYM / obłożenie / powierzchnia / intensywność / harmonogram /
+// niestandardowa + dowód regresją), założenia, wyniki, porównanie scenariuszy,
+// mechanizm rozliczenia ESCO z osią czasu, zastrzeżenia. Numeracja SYM/rok/…
+// jak w raportach. Poprawki KPI dla inwestycji = 0 (czysty ESCO bez wkładu).
+//
+// Silnik obliczeniowy odwzorowuje 1:1 arkusz „ZYSK" z pliku Kalkulacja.xlsx
+// (ZWERYFIKOWANY LICZBOWO — nie zmieniać bez ponownej weryfikacji):
 //   E(rok)  = roczny koszt ogrzewania rosnący o wzrost cen
 //   F       = E × zakładana oszczędność
 //   K       = F × udział klienta w oszczędnościach (Excel: 50%)
@@ -11,7 +19,6 @@
 //   Payback = pierwszy rok, w którym skumulowane wpływy ≥ koszt inwestycji
 //   KPI: zysk netto, CAGR = (zysk/inwestycja)^(1/lata) − 1, ROI
 //
-// Scenariusze A/B/C: te same parametry, różny % oszczędności — porównanie obok siebie.
 // Dane w tabeli `simulations` (mostek WaterAIBridge), lustro waterai_simulations_v1.
 // Udostępnianie: zakładka „Widoczność" (resource_shares, typ 'simulation').
 // Ładowany PO shares.js — rozszerza window.openModule o 'simulation'.
@@ -53,7 +60,7 @@ const SimulationsModule = {
     clientSharePct: 50,
     paybackReturnPct: 25,
     currency: 'PLN',
-    scenarios: [{ label: 'A', savingsPct: 18 }]
+    scenarios: [{ label: 'A', savingsPct: 18, note: '', base: true }]
   },
 
   add(sim) {
@@ -80,7 +87,7 @@ const SimulationsModule = {
 };
 window.SimulationsModule = SimulationsModule;
 
-// ── 2. SILNIK (odwzorowanie arkusza ZYSK) ────────────────────────────────────
+// ── 2. SILNIK (odwzorowanie arkusza ZYSK) — NIE ZMIENIAĆ BEZ WERYFIKACJI ─────
 
 // p: {years, investment, heatingCost, priceGrowthPct, clientSharePct, paybackReturnPct}
 // savingsPct: % oszczędności scenariusza. Zwraca {rows, kpi}.
@@ -115,6 +122,7 @@ function simCalcScenario(p, savingsPct) {
   const kpi = {
     paybackYear,
     totalInflows: last.H,
+    totalSavings: rows.reduce((a, r) => a + r.F, 0),
     netProfit: last.I,
     roi: last.roi,
     cagr: (inv > 0 && last.I > 0) ? Math.pow(last.I / inv, 1 / years) - 1 : null
@@ -131,10 +139,39 @@ function _simFmt(v, d) {
   if (v === null || v === undefined || isNaN(v)) return '—';
   return Number(v).toLocaleString('pl-PL', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
 }
-function _simPct(v, d) { return v === null ? '—' : (v * 100).toLocaleString('pl-PL', { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
-function _simCliName(id) { const c = window.ClientsModule ? ClientsModule.find(id) : null; return c ? c.name : '—'; }
+function _simPct(v, d) { return (v === null || v === undefined) ? '—' : (v * 100).toLocaleString('pl-PL', { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
+function _simCli(id) { return window.ClientsModule ? ClientsModule.find(id) : null; }
+function _simCliName(id) { const c = _simCli(id); return c ? c.name : '—'; }
 function _simObjName(id) { const o = (id && window.ObjectsModule) ? ObjectsModule.find(id) : null; return o ? o.name : '—'; }
 function _simIsStaff() { return typeof currentRole === 'undefined' || ['admin', 'backOffice', 'energyAnalyst'].includes(currentRole); }
+function _simYearsTxt(y) { return y === 1 ? '1 roku' : (y + ' latach'); }
+function _simUserName() {
+  const p = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile : null;
+  if (!p) return '';
+  return p.fullName || p.full_name || ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.email || '';
+}
+function _simBaseScenario(sim) {
+  const sc = sim.scenarios || [];
+  return sc.find(x => x.base) || sc[0] || null;
+}
+function _simCliAddr(c) {
+  if (!c) return '';
+  const l1 = [c.street, c.buildingNumber].filter(Boolean).join(' ') + (c.apartmentNumber ? '/' + c.apartmentNumber : '');
+  const l2 = [c.postalCode, c.city].filter(Boolean).join(' ');
+  return [l1.trim(), l2, c.country].filter(Boolean).join(', ');
+}
+
+// Numeracja jak w raportach ESCO: SYM/rok/nrKlienta/nrObiektu/nr kolejny.
+function simSuggestNumber(clientId, objectId) {
+  const year = new Date().getFullYear();
+  const cn = (clientId && window.ClientsModule && typeof ClientsModule.getNumber === 'function') ? ClientsModule.getNumber(clientId) : null;
+  const on = (objectId && window.ObjectsModule && typeof ObjectsModule.getNumber === 'function') ? ObjectsModule.getNumber(objectId) : null;
+  const seq = String(SimulationsModule.getAll().filter(s => Number(s.clientId) === Number(clientId)).length + 1).padStart(3, '0');
+  if (cn && on) return `SYM/${year}/${cn}/${on}/${seq}`;
+  if (cn) return `SYM/${year}/${cn}/${seq}`;
+  return `SYM/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${seq}`;
+}
+window.simSuggestNumber = simSuggestNumber;
 
 // Wykres liniowy: skumulowane wpływy klienta per scenariusz + linia kosztu inwestycji.
 function _simLineChart(cv, series, investment, currency) {
@@ -168,7 +205,6 @@ function _simLineChart(cv, series, investment, currency) {
   ctx.textAlign = 'center'; ctx.fillStyle = '#555'; ctx.font = '600 11px sans-serif';
   for (let y = 1; y <= years; y++) ctx.fillText('R' + y, xFor(y), H - pad.b + 18);
 
-  // linia inwestycji
   if (investment > 0) {
     const yi = yFor(investment);
     ctx.strokeStyle = '#c00'; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.4;
@@ -186,7 +222,7 @@ function _simLineChart(cv, series, investment, currency) {
     sr.rows.forEach(r => {
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(xFor(r.year), yFor(r.H), 3, 0, Math.PI * 2); ctx.fill();
     });
-    if (sr.kpi.paybackYear) {   // znacznik payback
+    if (investment > 0 && sr.kpi.paybackYear) {
       const r = sr.rows[sr.kpi.paybackYear - 1];
       ctx.fillStyle = '#fff'; ctx.strokeStyle = col; ctx.lineWidth = 2.4;
       ctx.beginPath(); ctx.arc(xFor(r.year), yFor(r.H), 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -194,7 +230,6 @@ function _simLineChart(cv, series, investment, currency) {
     }
   });
 
-  // legenda
   let lx = pad.l, ly = H - 10;
   series.forEach((sr, si) => {
     const col = _SIM_COLORS[si % _SIM_COLORS.length];
@@ -204,6 +239,29 @@ function _simLineChart(cv, series, investment, currency) {
     ctx.fillText(label, lx + 14, ly);
     lx += ctx.measureText(label).width + 32;
   });
+}
+
+function _simDrawCharts(sim, cid) {
+  const results = (sim.scenarios || []).map(sc => ({ ...simCalcScenario(sim, sc.savingsPct), label: sc.label, savingsPct: sc.savingsPct }));
+  if (!results.length) return;
+  _simLineChart(document.getElementById(cid + '-line'), results, Number(sim.investment) || 0, sim.currency);
+
+  if (typeof _anwBar === 'function') {
+    const years = results[0].rows.length;
+    const groups = [];
+    for (let y = 0; y < years; y++) {
+      groups.push({
+        label: 'R' + (y + 1),
+        bars: results.map((r, i) => ({
+          v: r.rows[y] ? r.rows[y].F : 0,
+          c: _SIM_COLORS[i % 3],
+          n: 'Scenariusz ' + r.label
+        }))
+      });
+    }
+    _anwBar(document.getElementById(cid + '-bars'), groups,
+      { title: 'Generowane roczne oszczędności', unit: sim.currency || 'PLN' });
+  }
 }
 
 // ── 4. STAN I STYL ───────────────────────────────────────────────────────────
@@ -231,15 +289,89 @@ const SIM_STYLE = `<style>
   .sim-t td:first-child { text-align:left; font-weight:600; }
   .sim-t tr.sim-pb td { background:#EAF3DE; }
   .sim-scen-hdr { display:flex; align-items:center; gap:8px; margin:16px 0 8px; }
-  .sim-scen-dot { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .sim-scen-dot { width:12px; height:12px; border-radius:3px; display:inline-block; flex:0 0 auto; }
   canvas.sim-cv { width:100%; height:300px; border:1px solid var(--color-border-tertiary); border-radius:8px; background:#fff; }
   canvas.sim-cv-bar { width:100%; height:260px; border:1px solid var(--color-border-tertiary); border-radius:8px; background:#fff; }
+
+  /* ── Dokument (podgląd/druk) w stylistyce raportu ESCO ── */
+  #sim-print { max-width:900px; margin:0 auto; }
+  .sim-cover { border:1px solid #dbe5f0; border-radius:18px; padding:34px 38px 26px; background:#fff;
+    box-shadow:0 10px 26px rgba(12,68,124,.08); display:flex; flex-direction:column; margin-bottom:26px; }
+  .sim-cover-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:26px; }
+  .sim-cover-logo { height:52px; width:auto; max-width:60%; object-fit:contain; }
+  .sim-cover-num { text-align:right; }
+  .sim-cover-num-lbl { font-size:10px; letter-spacing:1.4px; text-transform:uppercase; color:var(--color-text-tertiary); font-weight:700; }
+  .sim-cover-num-val { font-size:17px; font-weight:800; color:#0C447C; font-variant-numeric:tabular-nums; }
+  .sim-cover-kicker { display:inline-block; font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+    color:#0C447C; background:#E6F1FB; border-radius:20px; padding:4px 14px; margin-bottom:12px; }
+  .sim-cover h1 { margin:0 0 8px; font-size:32px; color:#111; }
+  .sim-cover-sub { font-size:13px; color:var(--color-text-secondary); margin-bottom:22px; max-width:640px; }
+  .sim-cover-meta { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:8px; }
+  .sim-cm-card { border:1px solid #e6edf5; border-radius:12px; padding:14px 16px; background:#FAFCFE; }
+  .sim-cm-lbl { font-size:10px; letter-spacing:1.2px; text-transform:uppercase; color:#0C447C; font-weight:700; margin-bottom:6px; }
+  .sim-cm-val { font-size:16px; font-weight:700; color:#111; }
+  .sim-cm-sub { font-size:12px; color:var(--color-text-secondary); margin-top:3px; }
+  .sim-cover-result { margin-top:auto; padding-top:24px; }
+  .sim-cover-result-head { font-size:12px; text-transform:uppercase; letter-spacing:1.4px; color:var(--color-text-tertiary); font-weight:700; margin-bottom:10px; }
+  .sim-hero { background:linear-gradient(135deg,#0C447C,#1a6bb5); color:#fff; border-radius:16px; padding:20px 28px;
+    display:flex; justify-content:space-between; align-items:center; gap:16px; box-shadow:0 8px 22px rgba(12,68,124,.26);
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sim-hero-lbl { font-size:16px; font-weight:600; opacity:.94; text-transform:uppercase; letter-spacing:.6px; line-height:1.2; }
+  .sim-hero-val { font-size:56px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .sim-hero-val span { font-size:26px; font-weight:700; margin-left:4px; }
+  .sim-cover-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px; }
+  .sim-cover-kpi { border:1px solid #e6edf5; border-radius:12px; padding:16px 14px; background:#fff; text-align:center; }
+  .sim-cover-kpi .v { font-size:21px; font-weight:800; color:#0C447C; font-variant-numeric:tabular-nums; }
+  .sim-cover-kpi .v span { font-size:13px; font-weight:600; }
+  .sim-cover-kpi .k { font-size:11px; color:var(--color-text-secondary); margin-top:6px; line-height:1.3; }
+  .sim-cover-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:22px; padding-top:14px;
+    border-top:1px solid #e6edf5; font-size:11px; color:var(--color-text-tertiary); }
+  .sim-sec { margin-bottom:24px; }
+  .sim-sec-h { display:flex; align-items:baseline; gap:10px; border-bottom:2px solid #0C447C; padding-bottom:6px; margin-bottom:12px; }
+  .sim-sec-h .n { font-size:13px; font-weight:800; color:#0C447C; }
+  .sim-sec-h h3 { margin:0; font-size:17px; color:#0C447C; }
+  .sim-desc { font-size:13px; line-height:1.55; color:#222; margin:0 0 10px; }
+  .sim-formula { border-left:3px solid #0C447C; background:#F4F8FC; border-radius:0 10px 10px 0; padding:10px 16px;
+    font-family:Georgia,'Times New Roman',serif; font-size:14px; margin:10px 0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sim-method { border:1px solid #e6edf5; border-radius:12px; padding:12px 16px; margin-bottom:10px; background:#fff; }
+  .sim-method h5 { margin:0 0 6px; font-size:13px; color:#0C447C; }
+  .sim-method h5 .tag { font-size:10px; font-weight:700; color:#27500A; background:#EAF3DE; border-radius:12px; padding:2px 9px; margin-left:8px; vertical-align:1px; }
+  .sim-method p { margin:0; font-size:12px; line-height:1.5; color:#333; }
+  .sim-method .sim-formula { margin:8px 0 0; font-size:13px; }
+  .sim-method.proof { border-color:#cfe3cf; background:#FBFDF9; }
+  .sim-method.proof h5 { color:#27500A; }
+  .sim-params { width:100%; border-collapse:collapse; font-size:13px; }
+  .sim-params td { padding:7px 10px; border-bottom:1px solid var(--color-border-tertiary); }
+  .sim-params td:first-child { color:var(--color-text-secondary); width:46%; }
+  .sim-params td:last-child { font-weight:600; text-align:right; font-variant-numeric:tabular-nums; }
+  .sim-scen-chip { display:flex; align-items:center; gap:10px; border:1px solid #e6edf5; border-radius:10px; padding:9px 12px; margin-bottom:8px; background:#fff; }
+  .sim-scen-chip .pct { font-weight:800; color:#0C447C; font-size:15px; white-space:nowrap; }
+  .sim-scen-chip .base { font-size:10px; font-weight:700; color:#0C447C; background:#E6F1FB; border-radius:12px; padding:2px 9px; }
+  .sim-scen-chip .note { font-size:12px; color:var(--color-text-secondary); }
+  .sim-cmp th, .sim-cmp td { text-align:center; }
+  .sim-cmp td:first-child, .sim-cmp th:first-child { text-align:left; }
+  .sim-steps { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .sim-step { flex:1 1 150px; border:1px solid #e6edf5; border-radius:10px; padding:10px 12px; background:#FAFCFE; }
+  .sim-step .no { font-size:11px; font-weight:800; color:#0C447C; }
+  .sim-step .t { font-size:12px; font-weight:600; margin-top:2px; }
+  .sim-step .d { font-size:11px; color:var(--color-text-secondary); margin-top:3px; line-height:1.4; }
+  .sim-footnote { font-size:10px; color:var(--color-text-tertiary); line-height:1.5; }
+
+  @media(max-width:680px){ .sim-cover{padding:22px 18px 18px;} .sim-cover h1{font-size:24px;}
+    .sim-cover-meta{grid-template-columns:1fr;} .sim-cover-kpis{grid-template-columns:1fr;}
+    .sim-hero{flex-direction:column;align-items:flex-start;} .sim-hero-val{font-size:42px;} }
+
   @media print {
     body * { visibility:hidden !important; }
     #sim-print, #sim-print * { visibility:visible !important; }
-    #sim-print { position:absolute; left:0; top:0; width:100%; margin:0; padding:0; border:none; }
+    #sim-print { position:absolute; left:0; top:0; width:100%; max-width:none; margin:0; padding:0; border:none; }
     .sim-noprint { display:none !important; }
-    .sim-kpis, .sim-t, canvas.sim-cv, canvas.sim-cv-bar { break-inside:avoid; page-break-inside:avoid; }
+    .sim-cover { min-height:244mm; box-shadow:none; page-break-after:always; break-after:page; border:1px solid #dbe5f0; }
+    .sim-sec { break-inside:auto; page-break-inside:auto; }
+    .sim-sec-h { break-after:avoid; page-break-after:avoid; }
+    .sim-desc { orphans:3; widows:3; }
+    .sim-kpis, table.sim-t, table.sim-params, .sim-formula, .sim-method, .sim-scen-chip, .sim-steps,
+    canvas.sim-cv, canvas.sim-cv-bar { break-inside:avoid; page-break-inside:avoid; }
     @page { margin: 12mm; }
   }
 </style>`;
@@ -256,13 +388,16 @@ function renderSimulationsModule() {
 
   const rows = sims.map(sim => {
     const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
-    const best = (sim.scenarios || []).map(sc => simCalcScenario(sim, sc.savingsPct).kpi.paybackYear).filter(x => x).sort((a, b) => a - b)[0] || null;
+    const inv = Number(sim.investment) || 0;
+    const best = inv > 0
+      ? ((sim.scenarios || []).map(sc => simCalcScenario(sim, sc.savingsPct).kpi.paybackYear).filter(x => x).sort((a, b) => a - b)[0] || null)
+      : null;
     const scen = (sim.scenarios || []).map((sc, i) =>
       `<span style="font-size:11px;font-weight:600;color:${_SIM_COLORS[i % 3]};margin-right:8px;">${escapeHtml(sc.label)}: ${_simFmt(sc.savingsPct, 1)}%</span>`).join('');
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:10px 12px;font-size:13px;">
         <div style="font-weight:500;">${escapeHtml(sim.name || ('Symulacja #' + sim.id))}</div>
-        <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(_simCliName(sim.clientId))} · ${escapeHtml(_simObjName(sim.objectId))}</div>
+        <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.simNumber || '—')} · ${escapeHtml(_simCliName(sim.clientId))} · ${escapeHtml(_simObjName(sim.objectId))}</div>
       </td>
       <td style="padding:10px 12px;">${scen}</td>
       <td style="padding:10px 12px;font-size:13px;text-align:center;">${best ? ('rok ' + best) : '—'}</td>
@@ -314,7 +449,12 @@ function simEdit(id) {
   _simEditId = id;
   _simDraft = id
     ? JSON.parse(JSON.stringify(SimulationsModule.find(id)))
-    : { ...JSON.parse(JSON.stringify(SimulationsModule.DEFAULTS)), name: '', clientId: '', objectId: '', status: 'DRAFT', notes: '' };
+    : { ...JSON.parse(JSON.stringify(SimulationsModule.DEFAULTS)),
+        name: '', simNumber: '', clientId: '', objectId: '', status: 'DRAFT', notes: '',
+        preparedBy: _simUserName() };
+  if (!(_simDraft.scenarios || []).some(sc => sc.base) && _simDraft.scenarios && _simDraft.scenarios.length) {
+    _simDraft.scenarios[0].base = true;
+  }
 
   const clients = window.ClientsModule ? ClientsModule.getAll() : [];
 
@@ -330,13 +470,19 @@ function simEdit(id) {
         <h4>Parametry symulacji</h4>
         <div class="sim-field"><label>Nazwa symulacji</label>
           <input id="sim-name" value="${escapeHtml(_simDraft.name || '')}" placeholder="np. Modernizacja węzła — wariant 2026" oninput="_simRecalc()"></div>
+        <div class="sim-g2">
+          <div class="sim-field"><label>Numer symulacji</label>
+            <input id="sim-number" value="${escapeHtml(_simDraft.simNumber || '')}" placeholder="SYM/rok/klient/obiekt/nr" oninput="_simRecalc()"></div>
+          <div class="sim-field"><label>Sporządził</label>
+            <input id="sim-prepared" value="${escapeHtml(_simDraft.preparedBy || '')}" oninput="_simRecalc()"></div>
+        </div>
         <div class="sim-field"><label>Klient</label>
           <select id="sim-client" onchange="_simClientChanged()">
             <option value="">— wybierz —</option>
             ${clients.map(c => `<option value="${c.id}" ${String(_simDraft.clientId) === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
           </select></div>
         <div class="sim-field"><label>Obiekt</label>
-          <select id="sim-object" onchange="_simRecalc()">${_simObjectOptions(_simDraft.clientId, _simDraft.objectId)}</select></div>
+          <select id="sim-object" onchange="_simObjectChanged()">${_simObjectOptions(_simDraft.clientId, _simDraft.objectId)}</select></div>
         <div class="sim-g2">
           <div class="sim-field"><label>Koszt inwestycji</label>
             <input id="sim-investment" type="number" step="0.01" min="0" value="${_simDraft.investment}" oninput="_simRecalc()"></div>
@@ -364,6 +510,8 @@ function simEdit(id) {
           (klient finansuje inwestycję, firma ją spłaca ze swojej części).</p>
 
         <h4>Scenariusze (% oszczędności)</h4>
+        <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 8px;">
+          Kropka = scenariusz bazowy (trafia na okładkę i do podsumowania wykonawczego).</p>
         <div id="sim-scenarios">${_simScenarioInputs()}</div>
         ${(_simDraft.scenarios || []).length < 3
           ? `<button class="small-button sim-noprint" onclick="_simAddScenario()">＋ Dodaj scenariusz</button>` : ''}
@@ -391,14 +539,21 @@ function _simObjectOptions(clientId, objectId) {
 
 function _simScenarioInputs() {
   return (_simDraft.scenarios || []).map((sc, i) => `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-      <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
-      <input style="width:52px;font-size:13px;" value="${escapeHtml(sc.label)}" oninput="_simDraft.scenarios[${i}].label=this.value;_simRecalc(true)">
-      <input style="flex:1;font-size:13px;" type="number" step="0.1" min="0" max="100" value="${sc.savingsPct}"
-        oninput="_simDraft.scenarios[${i}].savingsPct=Number(this.value)||0;_simRecalc(true)">
-      <span style="font-size:12px;color:var(--color-text-secondary);">%</span>
-      ${(_simDraft.scenarios.length > 1)
-        ? `<button class="small-button" onclick="_simRemoveScenario(${i})" title="Usuń scenariusz">✕</button>` : ''}
+    <div style="border:1px solid var(--color-border-tertiary);border-radius:8px;padding:8px;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <input type="radio" name="sim-base" title="Scenariusz bazowy" ${sc.base ? 'checked' : ''}
+          onchange="_simDraft.scenarios.forEach((s,j)=>s.base=(j===${i}));_simRecalc(true)">
+        <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
+        <input style="width:52px;font-size:13px;" value="${escapeHtml(sc.label)}" oninput="_simDraft.scenarios[${i}].label=this.value;_simRecalc(true)">
+        <input style="flex:1;font-size:13px;" type="number" step="0.1" min="0" max="100" value="${sc.savingsPct}"
+          oninput="_simDraft.scenarios[${i}].savingsPct=Number(this.value)||0;_simRecalc(true)">
+        <span style="font-size:12px;color:var(--color-text-secondary);">%</span>
+        ${(_simDraft.scenarios.length > 1)
+          ? `<button class="small-button" onclick="_simRemoveScenario(${i})" title="Usuń scenariusz">✕</button>` : ''}
+      </div>
+      <input style="width:100%;box-sizing:border-box;font-size:12px;" value="${escapeHtml(sc.note || '')}"
+        placeholder="uzasadnienie scenariusza (opcjonalnie, trafi do dokumentu)"
+        oninput="_simDraft.scenarios[${i}].note=this.value;_simRecalc(true)">
     </div>`).join('');
 }
 
@@ -407,13 +562,27 @@ function _simClientChanged() {
   _simDraft.clientId = sel.value ? Number(sel.value) : '';
   _simDraft.objectId = '';
   document.getElementById('sim-object').innerHTML = _simObjectOptions(_simDraft.clientId, '');
+  const numEl = document.getElementById('sim-number');
+  if (numEl && !numEl.value && _simDraft.clientId) numEl.value = simSuggestNumber(_simDraft.clientId, null);
   _simRecalc();
 }
 window._simClientChanged = _simClientChanged;
 
+function _simObjectChanged() {
+  const objSel = document.getElementById('sim-object');
+  const numEl = document.getElementById('sim-number');
+  const objId = objSel.value ? Number(objSel.value) : '';
+  // odśwież sugestię numeru tylko jeśli pole ma nadal automatyczny wzorzec SYM/… lub jest puste
+  if (numEl && _simDraft.clientId && (!numEl.value || /^SYM\//.test(numEl.value)) && !_simEditId) {
+    numEl.value = simSuggestNumber(_simDraft.clientId, objId || null);
+  }
+  _simRecalc();
+}
+window._simObjectChanged = _simObjectChanged;
+
 function _simAddScenario() {
   const labels = ['A', 'B', 'C'];
-  _simDraft.scenarios.push({ label: labels[_simDraft.scenarios.length] || '?', savingsPct: 18 });
+  _simDraft.scenarios.push({ label: labels[_simDraft.scenarios.length] || '?', savingsPct: 18, note: '', base: false });
   simRerenderScenarioInputs();
   _simRecalc(true);
 }
@@ -421,6 +590,7 @@ window._simAddScenario = _simAddScenario;
 
 function _simRemoveScenario(i) {
   _simDraft.scenarios.splice(i, 1);
+  if (_simDraft.scenarios.length && !_simDraft.scenarios.some(sc => sc.base)) _simDraft.scenarios[0].base = true;
   simRerenderScenarioInputs();
   _simRecalc(true);
 }
@@ -438,6 +608,8 @@ function _simRecalc(skipForm) {
     const g = id => document.getElementById(id);
     if (g('sim-name')) {
       _simDraft.name = g('sim-name').value;
+      _simDraft.simNumber = g('sim-number').value.trim();
+      _simDraft.preparedBy = g('sim-prepared').value.trim();
       _simDraft.objectId = g('sim-object').value ? Number(g('sim-object').value) : '';
       _simDraft.investment = Number(g('sim-investment').value) || 0;
       _simDraft.currency = g('sim-currency').value;
@@ -458,97 +630,316 @@ window._simRecalc = _simRecalc;
 
 function simSave() {
   if (!_simDraft.clientId) { alert('Wybierz klienta symulacji.'); return; }
-  if (!(_simDraft.investment > 0)) { alert('Podaj koszt inwestycji (> 0).'); return; }
   if (!(_simDraft.heatingCost > 0)) { alert('Podaj roczny koszt ogrzewania (> 0).'); return; }
   if (!_simDraft.name) _simDraft.name = 'Symulacja — ' + _simCliName(_simDraft.clientId);
+  if (!_simDraft.simNumber) _simDraft.simNumber = simSuggestNumber(_simDraft.clientId, _simDraft.objectId || null);
   if (_simEditId) SimulationsModule.update(_simEditId, _simDraft);
   else SimulationsModule.add(_simDraft);
   renderSimulationsModule();
 }
 window.simSave = simSave;
 
-// ── 7. WYNIKI (wspólne dla edytora i podglądu/druku) ─────────────────────────
+// ── 7. WYNIKI (panel „na żywo" w edytorze) ───────────────────────────────────
 
-function _simResultsHtml(sim, cid) {
-  const results = (sim.scenarios || []).map(sc => ({ ...simCalcScenario(sim, sc.savingsPct), label: sc.label, savingsPct: sc.savingsPct }));
-  if (!results.length) return '<div class="reminder-card"><strong>Dodaj co najmniej jeden scenariusz.</strong></div>';
+function _simCalcAll(sim) {
+  return (sim.scenarios || []).map(sc => ({ ...simCalcScenario(sim, sc.savingsPct), label: sc.label, savingsPct: sc.savingsPct, note: sc.note || '', base: !!sc.base }));
+}
+
+function _simKpiCards(sim, results) {
   const cur = sim.currency || 'PLN';
-
-  const kpiCards = results.map((r, i) => `
-    <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+  const inv = Number(sim.investment) || 0;
+  return results.map((r, i) => `
+    ${inv > 0 ? `<div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—'}</div>
       <div class="k">Payback · scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)</div>
-    </div>
+    </div>` : `<div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
+      <div class="v">${_simFmt(r.kpi.totalSavings)} <span style="font-size:11px;">${cur}</span></div>
+      <div class="k">Suma oszczędności · scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)</div>
+    </div>`}
     <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${_simFmt(r.kpi.netProfit)} <span style="font-size:11px;">${cur}</span></div>
-      <div class="k">Zysk netto klienta po ${sim.years} lat.</div>
+      <div class="k">Zysk netto klienta po ${_simYearsTxt(sim.years)}</div>
     </div>
     <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
-      <div class="v">${r.kpi.roi === null ? '—' : _simFmt(r.kpi.roi, 2)}</div>
-      <div class="k">ROI (× inwestycja)</div>
+      <div class="v">${inv > 0 ? ('×' + _simFmt(r.kpi.roi, 2)) : '—'}</div>
+      <div class="k">ROI (zysk / inwestycja)</div>
     </div>
     <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${r.kpi.cagr === null ? '—' : _simPct(r.kpi.cagr)}</div>
       <div class="k">CAGR</div>
     </div>`).join('');
+}
 
-  const tables = results.map((r, i) => `
+function _simScenTables(sim, results) {
+  const cur = sim.currency || 'PLN';
+  const inv = Number(sim.investment) || 0;
+  return results.map((r, i) => `
     <div class="sim-scen-hdr">
       <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
-      <strong style="font-size:13px;">Scenariusz ${escapeHtml(r.label)} — oszczędność ${_simFmt(r.savingsPct, 1)}%</strong>
+      <strong style="font-size:13px;">Scenariusz ${escapeHtml(r.label)} — oszczędność ${_simFmt(r.savingsPct, 1)}%${r.base ? ' · bazowy' : ''}</strong>
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;margin-bottom:6px;">
       <table class="sim-t"><thead><tr>
         <th>Rok</th><th>Koszt ogrzewania</th><th>Oszczędności</th><th>Udział klienta</th>
         <th>Rata zwrotu</th><th>Wpływy klienta</th><th>Narastająco</th><th>Wynik vs inwestycja</th><th>ROI</th>
       </tr></thead><tbody>
-      ${r.rows.map(row => `<tr ${r.kpi.paybackYear === row.year ? 'class="sim-pb" title="Rok zwrotu inwestycji"' : ''}>
+      ${r.rows.map(row => `<tr ${inv > 0 && r.kpi.paybackYear === row.year ? 'class="sim-pb" title="Rok zwrotu inwestycji"' : ''}>
         <td>${row.year}</td><td>${_simFmt(row.E)}</td><td>${_simFmt(row.F)}</td><td>${_simFmt(row.K)}</td>
         <td>${_simFmt(row.M)}</td><td>${_simFmt(row.G)}</td><td>${_simFmt(row.H)}</td>
         <td style="color:${row.I >= 0 ? '#27500A' : '#c00'};font-weight:600;">${_simFmt(row.I)}</td>
-        <td>${_simFmt(row.roi, 2)}</td></tr>`).join('')}
+        <td>${inv > 0 ? '×' + _simFmt(row.roi, 2) : '—'}</td></tr>`).join('')}
       </tbody></table></div>
     <p style="font-size:10px;color:var(--color-text-secondary);margin:0 0 14px;">Kwoty w ${cur} netto. Wiersz zielony = rok zwrotu inwestycji.</p>`).join('');
+}
 
+function _simResultsHtml(sim, cid) {
+  const results = _simCalcAll(sim);
+  if (!results.length) return '<div class="reminder-card"><strong>Dodaj co najmniej jeden scenariusz.</strong></div>';
   return `
-    <div class="sim-kpis">${kpiCards}</div>
+    <div class="sim-kpis">${_simKpiCards(sim, results)}</div>
     <canvas id="${cid}-line" class="sim-cv"></canvas>
     <div style="height:12px;"></div>
     <canvas id="${cid}-bars" class="sim-cv-bar"></canvas>
     <div style="height:6px;"></div>
-    ${tables}`;
+    ${_simScenTables(sim, results)}`;
 }
 
-function _simDrawCharts(sim, cid) {
-  const results = (sim.scenarios || []).map(sc => ({ ...simCalcScenario(sim, sc.savingsPct), label: sc.label, savingsPct: sc.savingsPct }));
-  if (!results.length) return;
-  _simLineChart(document.getElementById(cid + '-line'), results, Number(sim.investment) || 0, sim.currency);
+// ── 8. DOKUMENT (podgląd / druk w stylu raportu ESCO) ────────────────────────
 
-  if (typeof _anwBar === 'function') {
-    const years = results[0].rows.length;
-    const groups = [];
-    for (let y = 0; y < years; y++) {
-      groups.push({
-        label: 'R' + (y + 1),
-        bars: results.map((r, i) => ({
-          v: r.rows[y] ? r.rows[y].F : 0,
-          c: _SIM_COLORS[i % 3],
-          n: 'Scenariusz ' + r.label
-        }))
-      });
-    }
-    _anwBar(document.getElementById(cid + '-bars'), groups,
-      { title: 'Generowane roczne oszczędności', unit: sim.currency || 'PLN' });
+function _simSection(no, title, inner) {
+  return `<div class="sim-sec">
+    <div class="sim-sec-h"><span class="n">${no}</span><h3>${title}</h3></div>${inner}</div>`;
+}
+
+// Sekcja 2 — statyczny opis metod pomiaru i rozliczania (zawsze ten sam).
+function _simMethodsHtml() {
+  return `
+    <p class="sim-desc">Symulacja pokazuje potencjał finansowy wdrożenia. Rzeczywiste oszczędności — po uruchomieniu systemu — są mierzone i rozliczane według jednej z poniższych metod, uzgodnionej w umowie ESCO, a wynik każdorazowo weryfikowany niezależnym dowodem technicznym (regresja liniowa). Dokładnie w ten sposób powstają cykliczne raporty rozliczeniowe ESCO, które klient otrzymuje po każdym zamkniętym okresie.</p>
+
+    <div class="sim-method">
+      <h5>Korekta TYM — stopniodni <span class="tag">metoda domyślna</span></h5>
+      <p>Zużycie okresu bazowego (PRZED) i okresu po wdrożeniu (PO) jest przeliczane do identycznych, standardowych warunków pogodowych Typowego Roku Meteorologicznego z użyciem stopniodni grzewczych (HDD). Eliminuje wpływ różnic klimatycznych między sezonami — porównujemy jabłka z jabłkami, niezależnie od tego, czy zima była łagodna, czy sroga.</p>
+      <div class="sim-formula">Qs = Q<sub>c.o.</sub> · φ&nbsp;&nbsp;&nbsp;gdzie&nbsp;&nbsp;φ = ΣSD<sub>std</sub> / ΣSD<sub>rzecz</sub></div>
+    </div>
+
+    <div class="sim-method">
+      <h5>Korekta obłożenia</h5>
+      <p>Dla obiektów o zmiennym obłożeniu (hotele, pensjonaty, obiekty opieki) zużycie odnosi się do rzeczywistej liczby osobodób. Wynik nie jest zaburzony przez sezonowość gości — mierzymy sprawność energetyczną, nie frekwencję.</p>
+      <div class="sim-formula">q = Q / liczba osobodób w okresie</div>
+    </div>
+
+    <div class="sim-method">
+      <h5>Korekta powierzchni</h5>
+      <p>Gdy między okresami zmienia się powierzchnia ogrzewana (rozbudowa, wyłączenie skrzydła, zmiana najemców), zużycie przelicza się na metr kwadratowy rzeczywiście ogrzewanej powierzchni.</p>
+      <div class="sim-formula">q = Q / m² powierzchni ogrzewanej</div>
+    </div>
+
+    <div class="sim-method">
+      <h5>Korekta intensywności</h5>
+      <p>Porównanie jednostkowego zużycia energii przypadającego na jeden standardowy stopniodzień. Pozwala zestawiać okresy o różnej długości i różnym przebiegu pogody na wspólnej, znormalizowanej bazie.</p>
+      <div class="sim-formula">q = Qs / ΣSD<sub>std</sub></div>
+    </div>
+
+    <div class="sim-method">
+      <h5>Korekta harmonogramu</h5>
+      <p>Dla obiektów o zmiennym trybie pracy (szkoły, biura, hale produkcyjne) zużycie normalizuje się do rzeczywistych dni i godzin pracy instalacji — dni wolne, przerwy i zmiany harmonogramu nie zniekształcają wyniku.</p>
+    </div>
+
+    <div class="sim-method">
+      <h5>Metoda niestandardowa</h5>
+      <p>Uzgodniona umownie kombinacja powyższych korekt, dopasowana do specyfiki obiektu i dostępnych danych pomiarowych — stosowana tam, gdzie pojedyncza korekta nie oddaje charakteru eksploatacji.</p>
+    </div>
+
+    <div class="sim-method proof">
+      <h5>Dowód techniczny — regresja liniowa</h5>
+      <p>Niezależnie od metody rozliczeniowej każdy wynik jest weryfikowany analizą regresji liniowej na ciągłych odczytach czujników (co 10 minut: temperatura zewnętrzna, temperatura zasilania, zużycie). Dla okresów PRZED i PO wyznacza się charakterystyki pracy obiektu, a porównanie prostych izoluje czysty efekt sterowania — to dowód inżynierski, niezależny od danych rozliczeniowych z liczników i faktur.</p>
+      <div class="sim-formula">y = a·x + b&nbsp;&nbsp;&nbsp;(osobno dla okresu PRZED i PO)</div>
+    </div>
+
+    <p class="sim-desc" style="margin-top:10px;">Podstawą faktur są wyłącznie zamknięte okresy rozliczeniowe, rozliczone metodą zapisaną w umowie ESCO i udokumentowane raportem rozliczeniowym z pełną częścią dowodową.</p>`;
+}
+
+function _simExecSummary(sim, results) {
+  const cur = sim.currency || 'PLN';
+  const inv = Number(sim.investment) || 0;
+  const bs = results.find(r => r.base) || results[0];
+  const effPct = Math.min(100, (Number(sim.clientSharePct) || 0) + (Number(sim.paybackReturnPct) || 0));
+  const objTxt = sim.objectId ? (' w obiekcie ' + escapeHtml(_simObjName(sim.objectId))) : '';
+
+  let s1 = `W horyzoncie ${sim.years} lat, przy założeniu oszczędności ${_simFmt(bs.savingsPct, 1)}% (scenariusz bazowy ${escapeHtml(bs.label)}), `
+    + `system WaterAI wygeneruje${objTxt} oszczędności o łącznej wartości około ${_simFmt(bs.kpi.totalSavings)} ${cur} netto. `
+    + `Z tej kwoty wpływy klienta wyniosą ${_simFmt(bs.kpi.totalInflows)} ${cur}`;
+  if (inv > 0) {
+    s1 += `, a inwestycja ${_simFmt(inv)} ${cur} zwróci się ${bs.kpi.paybackYear ? ('w roku ' + bs.kpi.paybackYear) : 'poza przyjętym horyzontem'} — `
+      + `do czasu spłaty klient otrzymuje efektywnie ${_simFmt(effPct, 1)}% generowanych oszczędności, po spłacie ${_simFmt(sim.clientSharePct, 1)}%. `
+      + `Zysk netto klienta po ${_simYearsTxt(sim.years)} wynosi ${_simFmt(bs.kpi.netProfit)} ${cur}`
+      + (bs.kpi.cagr !== null ? ` (CAGR ${_simPct(bs.kpi.cagr)})` : '') + '.';
+  } else {
+    s1 += ` — wdrożenie nie wymaga wkładu inwestycyjnego klienta (pełne finansowanie w modelu ESCO), więc cała kwota stanowi czysty zysk netto.`;
   }
+
+  let s2 = '';
+  if (results.length > 1) {
+    const sorted = results.slice().sort((a, b) => a.savingsPct - b.savingsPct);
+    s2 = ` Zależnie od scenariusza (${_simFmt(sorted[0].savingsPct, 1)}–${_simFmt(sorted[sorted.length - 1].savingsPct, 1)}% oszczędności) `
+      + `zysk netto klienta po ${_simYearsTxt(sim.years)} mieści się w przedziale od ${_simFmt(sorted[0].kpi.netProfit)} do ${_simFmt(sorted[sorted.length - 1].kpi.netProfit)} ${cur}.`;
+  }
+  const s3 = ` Sposób pomiaru i rozliczania osiągniętych oszczędności przedstawia sekcja 2 — po wdrożeniu wyniki są potwierdzane cyklicznymi raportami ESCO z pełną częścią dowodową.`;
+
+  return `<p class="sim-desc">${s1}${s2}${s3}</p>`;
 }
 
-// ── 8. PODGLĄD / DRUK ────────────────────────────────────────────────────────
+function _simComparisonHtml(sim, results) {
+  const cur = sim.currency || 'PLN';
+  const inv = Number(sim.investment) || 0;
+  const th = results.map((r, i) => `<th style="color:${_SIM_COLORS[i % 3]};">Scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)${r.base ? ' ·bazowy' : ''}</th>`).join('');
+  const row = (label, fn) => `<tr><td>${label}</td>${results.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`;
+  return `
+    <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
+    <table class="sim-t sim-cmp"><thead><tr><th>Wskaźnik</th>${th}</tr></thead><tbody>
+      ${inv > 0 ? row('Payback (rok zwrotu inwestycji)', r => r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—') : ''}
+      ${row('Suma wygenerowanych oszczędności [' + cur + ']', r => _simFmt(r.kpi.totalSavings))}
+      ${row('Łączne wpływy klienta [' + cur + ']', r => _simFmt(r.kpi.totalInflows))}
+      ${row('Zysk netto klienta [' + cur + ']', r => _simFmt(r.kpi.netProfit))}
+      ${inv > 0 ? row('ROI (zysk / inwestycja)', r => '×' + _simFmt(r.kpi.roi, 2)) : ''}
+      ${inv > 0 ? row('CAGR', r => r.kpi.cagr === null ? '—' : _simPct(r.kpi.cagr)) : ''}
+    </tbody></table></div>`;
+}
+
+function _simMechanismHtml(sim, results) {
+  const cur = sim.currency || 'PLN';
+  const inv = Number(sim.investment) || 0;
+  const k = Number(sim.clientSharePct) || 0, l = Number(sim.paybackReturnPct) || 0;
+  const bs = results.find(r => r.base) || results[0];
+  const r1 = bs.rows[0];
+
+  const splitTxt = (inv > 0 && l > 0)
+    ? `Do czasu spłaty inwestycji klient otrzymuje dodatkowo ratę zwrotu ${_simFmt(l, 1)}% oszczędności rocznie (łącznie efektywnie ${_simFmt(Math.min(100, k + l), 1)}%), finansowaną z udziału WaterAI — aż do zwrotu pełnej kwoty inwestycji. Po spłacie obowiązuje docelowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`
+    : `Rata zwrotu nie występuje — podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% obowiązuje od pierwszego roku.`;
+
+  return `
+    <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. Udział klienta w wygenerowanych oszczędnościach wynosi ${_simFmt(k, 1)}%. ${splitTxt}</p>
+    <div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}
+      &nbsp;·&nbsp; rata zwrotu = ${_simFmt(r1.M)} ${cur} &nbsp;→&nbsp; <strong>wpływy klienta ${_simFmt(r1.G)} ${cur}</strong></div>
+    <div class="sim-steps">
+      <div class="sim-step"><div class="no">1</div><div class="t">Audyt i symulacja</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
+      <div class="sim-step"><div class="no">2</div><div class="t">Umowa ESCO</div><div class="d">Ustalenie metody rozliczeniowej, udziałów i okresu bazowego.</div></div>
+      <div class="sim-step"><div class="no">3</div><div class="t">Montaż i okres bazowy</div><div class="d">Instalacja systemu, rejestracja charakterystyki odniesienia.</div></div>
+      <div class="sim-step"><div class="no">4</div><div class="t">Aktywacja optymalizacji</div><div class="d">Uruchomienie sterowania WaterAI, ciągły pomiar co 10 minut.</div></div>
+      <div class="sim-step"><div class="no">5</div><div class="t">Raporty i rozliczenia</div><div class="d">Cykliczne raporty ESCO z częścią dowodową — podstawa rozliczeń.</div></div>
+    </div>`;
+}
+
+function _simDocHtml(sim) {
+  const results = _simCalcAll(sim);
+  if (!results.length) return '<div class="reminder-card"><strong>Dodaj co najmniej jeden scenariusz.</strong></div>';
+  const cur = sim.currency || 'PLN';
+  const inv = Number(sim.investment) || 0;
+  const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
+  const bs = results.find(r => r.base) || results[0];
+  const c = _simCli(sim.clientId);
+  const addr = _simCliAddr(c);
+  const today = new Date().toLocaleDateString('pl-PL');
+  const created = sim.createdAt ? sim.createdAt.slice(0, 10) : '—';
+
+  // Hero + kafle okładki (wariant z inwestycją i bez)
+  const hero = inv > 0
+    ? `<div class="sim-hero"><div class="sim-hero-lbl">Zwrot inwestycji<br>(payback)</div>
+       <div class="sim-hero-val">${bs.kpi.paybackYear ? ('rok ' + bs.kpi.paybackYear) : '> ' + sim.years + ' lat'}</div></div>`
+    : `<div class="sim-hero"><div class="sim-hero-lbl">Zysk netto klienta<br>po ${_simYearsTxt(sim.years)}</div>
+       <div class="sim-hero-val">${_simFmt(bs.kpi.netProfit)}<span>${cur}</span></div></div>`;
+
+  const coverKpis = inv > 0
+    ? `<div class="sim-cover-kpi"><div class="v">${_simFmt(bs.kpi.netProfit)} <span>${cur}</span></div><div class="k">Zysk netto klienta po ${_simYearsTxt(sim.years)}</div></div>
+       <div class="sim-cover-kpi"><div class="v">${_simFmt(bs.kpi.totalInflows)} <span>${cur}</span></div><div class="k">Łączne wpływy klienta</div></div>
+       <div class="sim-cover-kpi"><div class="v">${bs.kpi.cagr === null ? '—' : _simPct(bs.kpi.cagr)}</div><div class="k">CAGR</div></div>`
+    : `<div class="sim-cover-kpi"><div class="v">${_simFmt(bs.kpi.totalSavings)} <span>${cur}</span></div><div class="k">Suma wygenerowanych oszczędności</div></div>
+       <div class="sim-cover-kpi"><div class="v">${_simFmt(bs.kpi.totalInflows)} <span>${cur}</span></div><div class="k">Łączne wpływy klienta</div></div>
+       <div class="sim-cover-kpi"><div class="v">${_simFmt(sim.clientSharePct, 1)}%</div><div class="k">Udział klienta w oszczędnościach</div></div>`;
+
+  const cover = `
+    <div class="sim-cover">
+      <div class="sim-cover-head">
+        <img src="logo-waterai.png" alt="WaterAI" class="sim-cover-logo" />
+        <div class="sim-cover-num"><div class="sim-cover-num-lbl">Nr symulacji</div>
+          <div class="sim-cover-num-val">${escapeHtml(sim.simNumber || '—')}</div></div>
+      </div>
+      <div><span class="sim-cover-kicker">Symulacja oszczędności · Prognoza ESCO</span></div>
+      <h1>Symulacja oszczędności energii</h1>
+      <div class="sim-cover-sub">Wieloletnia prognoza efektu wdrożenia systemu WaterAI — potencjał finansowy, scenariusze oraz metodyka pomiaru i rozliczania oszczędności w modelu ESCO</div>
+      <div class="sim-cover-meta">
+        <div class="sim-cm-card"><div class="sim-cm-lbl">Dla kogo</div>
+          <div class="sim-cm-val">${escapeHtml(_simCliName(sim.clientId))}</div>
+          ${addr ? `<div class="sim-cm-sub">${escapeHtml(addr)}</div>` : ''}
+          ${c && c.vatId ? `<div class="sim-cm-sub">NIP/IČO: ${escapeHtml(c.vatId)}</div>` : ''}
+          ${sim.objectId ? `<div class="sim-cm-sub">Obiekt: ${escapeHtml(_simObjName(sim.objectId))}</div>` : ''}</div>
+        <div class="sim-cm-card"><div class="sim-cm-lbl">Sporządził</div>
+          <div class="sim-cm-val">${escapeHtml(sim.preparedBy || '—')}</div>
+          <div class="sim-cm-sub">Data utworzenia: ${created}</div></div>
+        <div class="sim-cm-card"><div class="sim-cm-lbl">Założenia główne</div>
+          <div class="sim-cm-val">${_simFmt(sim.heatingCost)} ${cur}/rok</div>
+          <div class="sim-cm-sub">koszt ogrzewania · wzrost cen ${_simFmt(sim.priceGrowthPct, 2)}%/rok · horyzont ${sim.years} lat</div>
+          <div class="sim-cm-sub">Koszt inwestycji: ${_simFmt(inv)} ${cur}</div></div>
+        <div class="sim-cm-card"><div class="sim-cm-lbl">Status symulacji</div>
+          <div><span style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;background:${st.bg};color:${st.color};">${st.label}</span></div>
+          <div class="sim-cm-sub" style="margin-top:8px;">Scenariuszy: ${results.length} · bazowy: ${escapeHtml(bs.label)} (${_simFmt(bs.savingsPct, 1)}%)</div></div>
+      </div>
+      <div class="sim-cover-result">
+        <div class="sim-cover-result-head">Wynik prognozy — scenariusz bazowy</div>
+        ${hero}
+        <div class="sim-cover-kpis">${coverKpis}</div>
+      </div>
+      <div class="sim-cover-foot">
+        <div>System <strong>WaterAI Energy Control</strong> · Utworzono: ${created} · Wydruk z dnia: ${today}</div>
+        <div>control.waterai.cloud</div>
+      </div>
+    </div>`;
+
+  const s3 = `
+    <table class="sim-params"><tbody>
+      <tr><td>Roczny koszt ogrzewania (rok 1)</td><td>${_simFmt(sim.heatingCost)} ${cur}</td></tr>
+      <tr><td>Roczny wzrost cen energii</td><td>${_simFmt(sim.priceGrowthPct, 2)}%</td></tr>
+      <tr><td>Koszt inwestycji</td><td>${_simFmt(inv)} ${cur}</td></tr>
+      <tr><td>Udział klienta w oszczędnościach</td><td>${_simFmt(sim.clientSharePct, 1)}%</td></tr>
+      <tr><td>Rata zwrotu inwestycji</td><td>${_simFmt(sim.paybackReturnPct, 1)}% oszczędności / rok</td></tr>
+      <tr><td>Horyzont symulacji</td><td>${sim.years} lat</td></tr>
+      <tr><td>Waluta</td><td>${cur}</td></tr>
+    </tbody></table>
+    <div style="height:12px;"></div>
+    ${results.map((r, i) => `<div class="sim-scen-chip">
+      <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
+      <span class="pct">${escapeHtml(r.label)}: ${_simFmt(r.savingsPct, 1)}%</span>
+      ${r.base ? '<span class="base">bazowy</span>' : ''}
+      ${r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : ''}
+    </div>`).join('')}
+    <p class="sim-footnote">Parametry przyjęto ręcznie na podstawie danych klienta i doświadczeń z obiektów referencyjnych; wartości można zweryfikować po udostępnieniu faktur i danych pomiarowych.</p>`;
+
+  const s4 = `
+    <div class="sim-kpis">${_simKpiCards(sim, results)}</div>
+    <canvas id="sim-doc-line" class="sim-cv"></canvas>
+    <div style="height:12px;"></div>
+    <canvas id="sim-doc-bars" class="sim-cv-bar"></canvas>
+    <div style="height:8px;"></div>
+    ${_simScenTables(sim, results)}`;
+
+  const s7 = `
+    <p class="sim-footnote">Dokument ma charakter poglądowy. Przedstawione wartości są prognozą opartą na przyjętych założeniach (roczny koszt ogrzewania, wzrost cen energii, zakładany procent oszczędności) i nie stanowią oferty w rozumieniu Kodeksu cywilnego ani gwarancji wyniku. Rzeczywiste rozliczenia będą dokonywane wyłącznie za zamknięte okresy rozliczeniowe, metodą opisaną w sekcji 2 i zapisaną w umowie ESCO, na podstawie zmierzonych danych, i dokumentowane cyklicznymi raportami rozliczeniowymi. WaterAI Energy Control.</p>
+    ${sim.notes ? `<p class="sim-desc" style="margin-top:8px;"><strong>Notatki:</strong> ${escapeHtml(sim.notes)}</p>` : ''}`;
+
+  return cover
+    + _simSection(1, 'Podsumowanie wykonawcze', _simExecSummary(sim, results))
+    + _simSection(2, 'Jak zmierzymy i udowodnimy oszczędności', _simMethodsHtml())
+    + _simSection(3, 'Założenia symulacji i scenariusze', s3)
+    + _simSection(4, 'Wyniki scenariuszy', s4)
+    + _simSection(5, 'Porównanie scenariuszy', _simComparisonHtml(sim, results))
+    + _simSection(6, 'Mechanizm rozliczenia ESCO i dalsze kroki', _simMechanismHtml(sim, results))
+    + _simSection(7, 'Zastrzeżenia', s7);
+}
 
 function simView(id) {
   const sim = SimulationsModule.find(id);
   const container = document.getElementById('module-content');
   if (!sim || !container) return;
-  const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
 
   container.innerHTML = SIM_STYLE + `
     <div class="sim-noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
@@ -558,32 +949,7 @@ function simView(id) {
         <button class="primary-button" onclick="simPrintPDF()" style="font-size:13px;padding:9px 18px;">🖨 Drukuj / PDF</button>
       </div>
     </div>
-    <div id="sim-print">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:2px solid var(--color-border-tertiary);padding-bottom:12px;margin-bottom:14px;">
-        <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--color-text-tertiary);font-weight:700;">Symulacja oszczędności</div>
-          <h2 style="margin:4px 0 6px;font-size:20px;">${escapeHtml(sim.name || ('Symulacja #' + sim.id))}</h2>
-          <div style="font-size:13px;color:var(--color-text-secondary);">
-            Klient: <strong>${escapeHtml(_simCliName(sim.clientId))}</strong> ·
-            Obiekt: <strong>${escapeHtml(_simObjName(sim.objectId))}</strong></div>
-        </div>
-        <div style="text-align:right;font-size:12px;color:var(--color-text-secondary);">
-          <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};">${st.label}</span>
-          <div style="margin-top:6px;">Utworzono: ${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</div>
-        </div>
-      </div>
-      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:14px;">
-        Koszt inwestycji: <strong>${_simFmt(sim.investment)} ${sim.currency}</strong> ·
-        Roczny koszt ogrzewania: <strong>${_simFmt(sim.heatingCost)} ${sim.currency}</strong> ·
-        Wzrost cen: <strong>${_simFmt(sim.priceGrowthPct, 2)}%/rok</strong> ·
-        Udział klienta: <strong>${_simFmt(sim.clientSharePct, 1)}%</strong> ·
-        Rata zwrotu: <strong>${_simFmt(sim.paybackReturnPct, 1)}%</strong> ·
-        Horyzont: <strong>${sim.years} lat</strong></div>
-      <div id="sim-view-results">${_simResultsHtml(sim, 'sim-doc')}</div>
-      ${sim.notes ? `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:10px;"><strong>Notatki:</strong> ${escapeHtml(sim.notes)}</div>` : ''}
-      <div style="margin-top:16px;padding-top:10px;border-top:1px solid var(--color-border-tertiary);font-size:10px;color:var(--color-text-tertiary);">
-        Dokument ma charakter poglądowy — prognoza na podstawie przyjętych założeń, nie stanowi oferty w rozumieniu Kodeksu cywilnego. WaterAI Energy Control.</div>
-    </div>`;
+    <div id="sim-print">${_simDocHtml(sim)}</div>`;
 
   requestAnimationFrame(() => _simDrawCharts(sim, 'sim-doc'));
 }
