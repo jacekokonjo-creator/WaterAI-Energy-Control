@@ -83,7 +83,8 @@ const SimulationsModule = {
     clientSharePct: 50,
     paybackReturnPct: 25,
     currency: 'PLN',
-    scenarios: [{ label: 'A', savingsPct: 18, note: '', base: true }]
+    scenarios: [{ label: 'A', savingsPct: 18, note: '', base: true }],
+    photos: []
   },
 
   add(sim) {
@@ -441,6 +442,10 @@ const SIM_STYLE = `<style>
   .sim-cover-kpi .k { font-size:11px; color:var(--color-text-secondary); margin-top:6px; line-height:1.3; }
   .sim-cover-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:22px; padding-top:14px;
     border-top:1px solid #e6edf5; font-size:11px; color:var(--color-text-tertiary); }
+  .sim-cover-photos { display:grid; gap:12px; margin-top:20px; }
+  .sim-cover-photo { border:1px solid #e6edf5; border-radius:12px; overflow:hidden; background:#f4f7fa; }
+  .sim-cover-photo img { width:100%; height:200px; object-fit:cover; display:block;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .sim-sec { margin-bottom:24px; }
   .sim-sec-h { display:flex; align-items:baseline; gap:10px; border-bottom:2px solid #0C447C; padding-bottom:6px; margin-bottom:12px; }
   .sim-sec-h .n { font-size:13px; font-weight:800; color:#0C447C; }
@@ -482,6 +487,8 @@ const SIM_STYLE = `<style>
     #sim-print { position:absolute; left:0; top:0; width:100%; max-width:none; margin:0; padding:0; border:none; }
     .sim-noprint { display:none !important; }
     .sim-cover { min-height:244mm; box-shadow:none; page-break-after:always; break-after:page; border:1px solid #dbe5f0; }
+    .sim-cover-photos { margin-top:14px; }
+    .sim-cover-photo img { height:150px; }
     .sim-sec { break-inside:auto; page-break-inside:auto; }
     .sim-sec-h { break-after:avoid; page-break-after:avoid; }
     .sim-desc { orphans:3; widows:3; }
@@ -648,6 +655,11 @@ function simEdit(id) {
           </select></div>
         <div class="sim-field"><label>Notatki</label>
           <textarea id="sim-notes" rows="3" oninput="_simRecalc()">${escapeHtml(_simDraft.notes || '')}</textarea></div>
+
+        <h4 style="margin-top:14px;">Zdjęcia obiektu (na okładkę)</h4>
+        <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 8px;">
+          Do 2 zdjęć obiektu — pojawią się na pierwszej stronie dokumentu, pod danymi.</p>
+        <div id="sim-photos">${_simPhotoInputs()}</div>
       </div>
       <div id="sim-results"></div>
     </div>`;
@@ -720,6 +732,65 @@ function _simAddScenario() {
   _simRecalc(true);
 }
 window._simAddScenario = _simAddScenario;
+
+// ── Zdjęcia obiektu (base64 w danych, kompresja przez canvas) ────────────────
+
+function _simPhotoInputs() {
+  const photos = _simDraft.photos || [];
+  const thumbs = photos.map((src, i) => `
+    <div style="position:relative;border:1px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;">
+      <img src="${src}" style="width:100%;height:90px;object-fit:cover;display:block;">
+      <button class="small-button" onclick="_simRemovePhoto(${i})" title="Usuń zdjęcie"
+        style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,.9);">✕</button>
+    </div>`).join('');
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">${thumbs}</div>
+    ${photos.length < 2
+      ? `<label class="small-button sim-noprint" style="display:inline-block;cursor:pointer;">＋ Dodaj zdjęcie
+           <input type="file" accept="image/*" style="display:none;" onchange="_simAddPhoto(this)"></label>`
+      : `<p style="font-size:11px;color:var(--color-text-secondary);margin:0;">Dodano maksymalnie 2 zdjęcia.</p>`}`;
+}
+
+function _simRerenderPhotos() {
+  const box = document.getElementById('sim-photos');
+  if (box) box.innerHTML = _simPhotoInputs();
+}
+
+function _simAddPhoto(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { alert('Wybierz plik graficzny.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // skaluj do maks. 1200 px dłuższego boku i kompresuj do JPEG ~0,82
+      const maxSide = 1200;
+      let w = img.width, h = img.height;
+      if (Math.max(w, h) > maxSide) {
+        const s = maxSide / Math.max(w, h);
+        w = Math.round(w * s); h = Math.round(h * s);
+      }
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = cv.toDataURL('image/jpeg', 0.82);
+      if (!_simDraft.photos) _simDraft.photos = [];
+      _simDraft.photos.push(dataUrl);
+      _simRerenderPhotos();
+    };
+    img.onerror = () => alert('Nie udało się wczytać obrazu.');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+window._simAddPhoto = _simAddPhoto;
+
+function _simRemovePhoto(i) {
+  if (_simDraft.photos) _simDraft.photos.splice(i, 1);
+  _simRerenderPhotos();
+}
+window._simRemovePhoto = _simRemovePhoto;
 
 function _simRemoveScenario(i) {
   _simDraft.scenarios.splice(i, 1);
@@ -980,29 +1051,22 @@ function _simMechanismHtml(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
   const stType = sim.settlementType || 'DEPOSIT';
-  const setl = SimulationsModule.SETTLEMENTS[stType] || SimulationsModule.SETTLEMENTS.DEPOSIT;
   const k = Number(sim.clientSharePct) || 0, l = Number(sim.paybackReturnPct) || 0;
-  const bs = results.find(r => r.base) || results[0];
-  const r1 = bs.rows[0];
 
-  let variantTxt, formula;
+  let variantTxt;
   if (stType === 'DEPOSIT') {
     variantTxt = (inv > 0 && l > 0)
       ? `W wariancie „kaucja zwrotna” klient wpłaca zwrotną kaucję ${_simFmt(inv)} ${cur}. Do czasu jej zwrotu otrzymuje podwyższony udział: swój stały ${_simFmt(k, 1)}% oszczędności powiększony o ratę zwrotu ${_simFmt(l, 1)}% (łącznie efektywnie ${_simFmt(Math.min(100, k + l), 1)}%), aż kaucja zostanie zwrócona w całości. Po zwrocie obowiązuje docelowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`
       : `W wariancie „kaucja zwrotna” klient otrzymuje stały udział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% od pierwszego roku.`;
-    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}
-      &nbsp;·&nbsp; rata zwrotu kaucji = ${_simFmt(r1.M)} ${cur} &nbsp;→&nbsp; <strong>wpływy klienta ${_simFmt(r1.G)} ${cur}</strong></div>`;
   } else if (stType === 'FEE') {
     variantTxt = `W wariancie „opłata niezwrotna” klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Opłata jest kosztem początkowym — łączny wynik klienta liczony jest po jej odjęciu; zwraca się w momencie, gdy skumulowany udział w oszczędnościach ją pokryje.`;
-    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → <strong>udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}</strong>&nbsp;·&nbsp; opłata wstępna ${_simFmt(inv)} ${cur} (jednorazowo)</div>`;
   } else { // FREE
     variantTxt = `W wariancie „bez opłat” klient nie ponosi żadnej opłaty wstępnej i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Całość jego wpływów stanowi czysty zysk.`;
-    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → <strong>wpływy klienta ${_simFmt(r1.K)} ${cur}</strong> (udział ${_simFmt(k, 1)}%, bez opłaty)</div>`;
   }
 
   return `
     <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. ${variantTxt}</p>
-    ${formula}
+    <p class="sim-desc">Poza wskazanym wyżej rozliczeniem oszczędności klient nie ponosi żadnych dodatkowych kosztów: brak opłat za serwis, utrzymanie, konserwację, aktualizacje oprogramowania czy wsparcie techniczne. W całym okresie współpracy WaterAI na bieżąco monitoruje instalację oraz wprowadza korekty nastaw, aktualizacje i optymalizacje sterowania — ponieważ nasze wynagrodzenie zależy wprost od uzyskanego wyniku, utrzymanie i poprawa efektu leżą w naszym wspólnym interesie.</p>
     <div class="sim-steps">
       <div class="sim-step"><div class="no">1</div><div class="t">Audyt i symulacja</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
       <div class="sim-step"><div class="no">2</div><div class="t">Umowa ESCO</div><div class="d">Ustalenie metody rozliczeniowej, udziałów i okresu bazowego.</div></div>
@@ -1042,6 +1106,13 @@ function _simDocHtml(sim) {
        <div class="sim-cover-kpi"><div class="v">${_simFmt(bs.kpi.totalInflows)} <span>${cur}</span></div><div class="k">Łączne wpływy klienta</div></div>
        <div class="sim-cover-kpi"><div class="v">${_simFmt(sim.clientSharePct, 1)}%</div><div class="k">Udział klienta w oszczędnościach</div></div>`;
 
+  const photos = (sim.photos || []).filter(Boolean);
+  const photosHtml = photos.length
+    ? `<div class="sim-cover-photos" style="grid-template-columns:repeat(${photos.length}, 1fr);">
+        ${photos.map(src => `<div class="sim-cover-photo"><img src="${src}" alt="Zdjęcie obiektu"></div>`).join('')}
+      </div>`
+    : '';
+
   const cover = `
     <div class="sim-cover">
       <div class="sim-cover-head">
@@ -1075,6 +1146,7 @@ function _simDocHtml(sim) {
         ${hero}
         <div class="sim-cover-kpis">${coverKpis}</div>
       </div>
+      ${photosHtml}
       <div class="sim-cover-foot">
         <div>System <strong>WaterAI Energy Control</strong> · Utworzono: ${created} · Wydruk z dnia: ${today}</div>
         <div>control.waterai.cloud</div>
