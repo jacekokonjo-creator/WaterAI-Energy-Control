@@ -1756,7 +1756,15 @@
  "Payback (rok zwrotu kaucji)": "Návratnosť (rok vrátenia kaucie)",
  "Payback (rok zwrotu opłaty)": "Návratnosť (rok návratu poplatku)",
  "rok zwrotu kaucji": "rok vrátenia kaucie",
- "rok zwrotu opłaty": "rok návratu poplatku"
+ "rok zwrotu opłaty": "rok návratu poplatku",
+ // ── Symulacja: dowolna liczba wariantów ──
+ "Scenariusze oszczędności": "Scenáre úspor",
+ "Dodaj dowolną liczbę wariantów % oszczędności. Kropka = scenariusz bazowy (trafia na okładkę i do podsumowania wykonawczego).": "Pridajte ľubovoľný počet variantov % úspor. Bodka = bázový scenár (ide na obálku a do zhrnutia pre vedenie).",
+ "＋ Dodaj wariant": "＋ Pridať variant",
+ "Nazwa wariantu": "Názov variantu",
+ "Oszczędność [%]": "Úspora [%]",
+ "uzasadnienie wariantu (opcjonalnie, trafi do dokumentu)": "zdôvodnenie variantu (voliteľné, dostane sa do dokumentu)",
+ "Usuń wariant": "Odstrániť variant"
 } };
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
