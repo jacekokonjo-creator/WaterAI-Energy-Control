@@ -52,7 +52,30 @@ const SimulationsModule = {
     ACCEPTED:  { label: 'Zaakceptowana',  color: '#27500A', bg: '#EAF3DE' }
   },
 
+  // Warianty rozliczenia — kaucja zwrotna / opłata niezwrotna / bez opłat.
+  SETTLEMENTS: {
+    DEPOSIT: {
+      label: 'Kaucja zwrotna',
+      short: 'kaucja zwrotna',
+      feeLabel: 'Kaucja zwrotna',
+      desc: 'Klient wpłaca zwrotną kaucję i do czasu jej zwrotu otrzymuje podwyższony udział w oszczędnościach; po zwrocie obowiązuje udział docelowy.'
+    },
+    FEE: {
+      label: 'Opłata niezwrotna',
+      short: 'opłata za wdrożenie',
+      feeLabel: 'Opłata za wdrożenie',
+      desc: 'Klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.'
+    },
+    FREE: {
+      label: 'Bez opłat',
+      short: 'bez opłat',
+      feeLabel: '—',
+      desc: 'Klient nie ponosi żadnej opłaty i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.'
+    }
+  },
+
   DEFAULTS: {
+    settlementType: 'DEPOSIT',
     years: 10,
     investment: 0,
     heatingCost: 0,
@@ -87,11 +110,22 @@ const SimulationsModule = {
 };
 window.SimulationsModule = SimulationsModule;
 
-// ── 2. SILNIK (odwzorowanie arkusza ZYSK) — NIE ZMIENIAĆ BEZ WERYFIKACJI ─────
-
-// p: {years, investment, heatingCost, priceGrowthPct, clientSharePct, paybackReturnPct}
+// ── 2. SILNIK ────────────────────────────────────────────────────────────────
+//
+// Trzy warianty rozliczenia (p.settlementType):
+//   'DEPOSIT' — kaucja zwrotna: 75/25 → 50/50 do czasu zwrotu kaucji, potem stały
+//               udział. ODWZOROWANIE 1:1 arkusza ZYSK (Kalkulacja.xlsx),
+//               ZWERYFIKOWANE LICZBOWO — NIE ZMIENIAĆ tej gałęzi bez ponownej weryfikacji.
+//   'FEE'     — opłata niezwrotna z góry: klient płaci jednorazowo (p.investment),
+//               opłata jest kosztem policzonym OSOBNO (nie odrabia się z oszczędności),
+//               klient dostaje stały % (clientSharePct) od roku 1, bez raty zwrotu (M=0).
+//   'FREE'    — klient nic nie płaci: FEE z opłatą 0 (stały % od roku 1).
+//
+// p: {years, investment, heatingCost, priceGrowthPct, clientSharePct, paybackReturnPct, settlementType}
 // savingsPct: % oszczędności scenariusza. Zwraca {rows, kpi}.
-function simCalcScenario(p, savingsPct) {
+
+// Gałąź kaucji zwrotnej — kod przepisany BEZ ZMIAN z wersji zweryfikowanej z Excelem.
+function _simEngineDeposit(p, savingsPct) {
   const years = Math.max(1, Math.min(30, Number(p.years) || 10));
   const inv = Number(p.investment) || 0;
   const g = (Number(p.priceGrowthPct) || 0) / 100;
@@ -129,6 +163,50 @@ function simCalcScenario(p, savingsPct) {
   };
   return { rows, kpi };
 }
+
+// Gałąź opłaty niezwrotnej (FEE) i „za darmo" (FREE = fee 0).
+// Klient dostaje stały % oszczędności od roku 1; opłata to koszt początkowy,
+// od którego liczymy skumulowany wynik (I = wpływy narastająco − opłata).
+function _simEngineFee(p, savingsPct) {
+  const years = Math.max(1, Math.min(30, Number(p.years) || 10));
+  const fee = Number(p.investment) || 0;   // to samo pole UI: opłata jednorazowa
+  const g = (Number(p.priceGrowthPct) || 0) / 100;
+  const s = (Number(savingsPct) || 0) / 100;
+  const kShare = (Number(p.clientSharePct) || 0) / 100;
+
+  const rows = [];
+  let E = Number(p.heatingCost) || 0;
+  let H = 0, paybackYear = null;
+
+  for (let y = 1; y <= years; y++) {
+    if (y > 1) E = E * (1 + g);
+    const F = E * s;                 // generowane roczne oszczędności
+    const K = F * kShare;            // stały udział klienta (od roku 1)
+    const M = 0;                     // brak raty zwrotu w tym wariancie
+    const G = K;                     // wpływy klienta = sam udział
+    H += G;
+    const I = H - fee;               // wynik narastająco po odjęciu opłaty
+    const roi = fee > 0 ? I / fee : 0;
+    if (paybackYear === null && I >= 0) paybackYear = y;
+    rows.push({ year: y, E, F, K, M, G, H, I, roi });
+  }
+
+  const last = rows[rows.length - 1];
+  const kpi = {
+    paybackYear,                     // dla FREE (fee=0) → rok 1; UI i tak ukryje payback gdy fee=0
+    totalInflows: last.H,
+    totalSavings: rows.reduce((a, r) => a + r.F, 0),
+    netProfit: last.I,
+    roi: last.roi,
+    cagr: (fee > 0 && last.I > 0) ? Math.pow(last.I / fee, 1 / years) - 1 : null
+  };
+  return { rows, kpi };
+}
+
+function simCalcScenario(p, savingsPct) {
+  const t = p.settlementType || 'DEPOSIT';
+  return (t === 'FEE' || t === 'FREE') ? _simEngineFee(p, savingsPct) : _simEngineDeposit(p, savingsPct);
+}
 window.simCalcScenario = simCalcScenario;
 
 // ── 3. POMOCNICZE ────────────────────────────────────────────────────────────
@@ -149,6 +227,22 @@ function _simUserName() {
   const p = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile : null;
   if (!p) return '';
   return p.fullName || p.full_name || ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.email || '';
+}
+// Lista pracowników (admin/backOffice/energyAnalyst) dla pola „Sporządził".
+function _simPreparedOptions(selectedName) {
+  let staff = [];
+  if (typeof UsersModule !== 'undefined' && UsersModule.findByRole) {
+    ['admin', 'backOffice', 'energyAnalyst'].forEach(r => { staff = staff.concat(UsersModule.findByRole(r)); });
+  }
+  const names = [];
+  staff.forEach(u => {
+    const n = (u.fullName || ((u.firstName || '') + ' ' + (u.lastName || '')).trim()).trim();
+    if (n && !names.includes(n)) names.push(n);
+  });
+  if (selectedName && !names.includes(selectedName)) names.unshift(selectedName); // zachowaj historyczną wartość
+  const opts = names.map(n => `<option value="${escapeHtml(n)}" ${selectedName === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('');
+  return `<option value="">— wybierz —</option>` + opts +
+    (names.length ? '' : `<option value="" disabled>brak użytkowników (admin / backOffice / energyAnalyst)</option>`);
 }
 function _simBaseScenario(sim) {
   const sc = sim.scenarios || [];
@@ -474,7 +568,7 @@ function simEdit(id) {
           <div class="sim-field"><label>Numer symulacji</label>
             <input id="sim-number" value="${escapeHtml(_simDraft.simNumber || '')}" placeholder="SYM/rok/klient/obiekt/nr" oninput="_simRecalc()"></div>
           <div class="sim-field"><label>Sporządził</label>
-            <input id="sim-prepared" value="${escapeHtml(_simDraft.preparedBy || '')}" oninput="_simRecalc()"></div>
+            <select id="sim-prepared" onchange="_simRecalc()">${_simPreparedOptions(_simDraft.preparedBy || '')}</select></div>
         </div>
         <div class="sim-field"><label>Klient</label>
           <select id="sim-client" onchange="_simClientChanged()">
@@ -483,8 +577,18 @@ function simEdit(id) {
           </select></div>
         <div class="sim-field"><label>Obiekt</label>
           <select id="sim-object" onchange="_simObjectChanged()">${_simObjectOptions(_simDraft.clientId, _simDraft.objectId)}</select></div>
+
+        <div class="sim-field"><label>Wariant rozliczenia</label>
+          <select id="sim-settlement" onchange="_simSettlementChanged()">
+            ${Object.keys(SimulationsModule.SETTLEMENTS).map(k =>
+              `<option value="${k}" ${(_simDraft.settlementType || 'DEPOSIT') === k ? 'selected' : ''}>${SimulationsModule.SETTLEMENTS[k].label}</option>`).join('')}
+          </select></div>
+        <p id="sim-settlement-desc" style="font-size:11px;color:var(--color-text-secondary);margin:-4px 0 12px;">
+          ${SimulationsModule.SETTLEMENTS[_simDraft.settlementType || 'DEPOSIT'].desc}</p>
+
         <div class="sim-g2">
-          <div class="sim-field"><label>Koszt inwestycji</label>
+          <div class="sim-field" id="sim-fee-wrap" style="${(_simDraft.settlementType === 'FREE') ? 'display:none;' : ''}">
+            <label id="sim-fee-label">${SimulationsModule.SETTLEMENTS[_simDraft.settlementType || 'DEPOSIT'].feeLabel}</label>
             <input id="sim-investment" type="number" step="0.01" min="0" value="${_simDraft.investment}" oninput="_simRecalc()"></div>
           <div class="sim-field"><label>Waluta</label>
             <select id="sim-currency" onchange="_simRecalc()">
@@ -502,12 +606,13 @@ function simEdit(id) {
         <div class="sim-g2">
           <div class="sim-field"><label>Udział klienta w oszczędnościach [%]</label>
             <input id="sim-kshare" type="number" step="0.1" min="0" max="100" value="${_simDraft.clientSharePct}" oninput="_simRecalc()"></div>
-          <div class="sim-field"><label>Rata zwrotu inwestycji [% oszcz./rok]</label>
+          <div class="sim-field" id="sim-lshare-wrap" style="${(_simDraft.settlementType || 'DEPOSIT') !== 'DEPOSIT' ? 'display:none;' : ''}">
+            <label>Rata zwrotu kaucji [% oszcz./rok]</label>
             <input id="sim-lshare" type="number" step="0.1" min="0" max="100" value="${_simDraft.paybackReturnPct}" oninput="_simRecalc()"></div>
         </div>
-        <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 12px;">
-          Rata zwrotu: część oszczędności zwracana klientowi z udziału WaterAI — do wysokości kosztu inwestycji
-          (klient finansuje inwestycję, firma ją spłaca ze swojej części).</p>
+        <p id="sim-lshare-hint" style="font-size:11px;color:var(--color-text-secondary);margin:0 0 12px;${(_simDraft.settlementType || 'DEPOSIT') !== 'DEPOSIT' ? 'display:none;' : ''}">
+          Rata zwrotu: część oszczędności zwracana klientowi z udziału WaterAI — do wysokości kaucji
+          (klient wpłaca kaucję, firma zwraca ją ze swojej części oszczędności).</p>
 
         <h4>Scenariusze (% oszczędności)</h4>
         <p style="font-size:11px;color:var(--color-text-secondary);margin:0 0 8px;">
@@ -601,6 +706,27 @@ function simRerenderScenarioInputs() {
   if (box) box.innerHTML = _simScenarioInputs();
 }
 
+function _simSettlementChanged() {
+  const sel = document.getElementById('sim-settlement');
+  if (!sel) return;
+  const t = sel.value;
+  _simDraft.settlementType = t;
+  const cfg = SimulationsModule.SETTLEMENTS[t] || SimulationsModule.SETTLEMENTS.DEPOSIT;
+  const desc = document.getElementById('sim-settlement-desc');
+  if (desc) desc.textContent = cfg.desc;
+  const feeWrap = document.getElementById('sim-fee-wrap');
+  const feeLbl = document.getElementById('sim-fee-label');
+  if (feeWrap) feeWrap.style.display = (t === 'FREE') ? 'none' : '';
+  if (feeLbl) feeLbl.textContent = cfg.feeLabel;
+  const lWrap = document.getElementById('sim-lshare-wrap');
+  const lHint = document.getElementById('sim-lshare-hint');
+  if (lWrap) lWrap.style.display = (t === 'DEPOSIT') ? '' : 'none';
+  if (lHint) lHint.style.display = (t === 'DEPOSIT') ? '' : 'none';
+  if (t === 'FREE') { const inv = document.getElementById('sim-investment'); if (inv) inv.value = 0; }
+  _simRecalc();
+}
+window._simSettlementChanged = _simSettlementChanged;
+
 // skipForm=true: nie czytaj pól formularza (zmiana przyszła spoza inputów parametrów)
 function _simRecalc(skipForm) {
   if (!_simDraft) return;
@@ -611,6 +737,7 @@ function _simRecalc(skipForm) {
       _simDraft.simNumber = g('sim-number').value.trim();
       _simDraft.preparedBy = g('sim-prepared').value.trim();
       _simDraft.objectId = g('sim-object').value ? Number(g('sim-object').value) : '';
+      if (g('sim-settlement')) _simDraft.settlementType = g('sim-settlement').value;
       _simDraft.investment = Number(g('sim-investment').value) || 0;
       _simDraft.currency = g('sim-currency').value;
       _simDraft.heatingCost = Number(g('sim-heating').value) || 0;
@@ -618,6 +745,7 @@ function _simRecalc(skipForm) {
       _simDraft.years = Number(g('sim-years').value) || 10;
       _simDraft.clientSharePct = Number(g('sim-kshare').value) || 0;
       _simDraft.paybackReturnPct = Number(g('sim-lshare').value) || 0;
+      if (_simDraft.settlementType === 'FREE') _simDraft.investment = 0;
       _simDraft.status = g('sim-status').value;
       _simDraft.notes = g('sim-notes').value;
     }
@@ -648,6 +776,8 @@ function _simCalcAll(sim) {
 function _simKpiCards(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
+  const roiLbl = stType === 'FEE' ? 'ROI (zysk / opłata)' : 'ROI (zysk / kaucja)';
   return results.map((r, i) => `
     ${inv > 0 ? `<div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—'}</div>
@@ -662,7 +792,7 @@ function _simKpiCards(sim, results) {
     </div>
     <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${inv > 0 ? ('×' + _simFmt(r.kpi.roi, 2)) : '—'}</div>
-      <div class="k">ROI (zysk / inwestycja)</div>
+      <div class="k">${roiLbl}</div>
     </div>
     <div class="sim-kpi" style="border-top:3px solid ${_SIM_COLORS[i % 3]};">
       <div class="v">${r.kpi.cagr === null ? '—' : _simPct(r.kpi.cagr)}</div>
@@ -673,6 +803,10 @@ function _simKpiCards(sim, results) {
 function _simScenTables(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
+  const showReturn = stType === 'DEPOSIT';   // kolumna „Rata zwrotu" tylko dla kaucji
+  const vsLbl = stType === 'FEE' ? 'Wynik vs opłata' : (stType === 'FREE' ? 'Zysk narastająco' : 'Wynik vs kaucja');
+  const zeroLbl = stType === 'FEE' ? 'rok zwrotu opłaty' : 'rok zwrotu kaucji';
   return results.map((r, i) => `
     <div class="sim-scen-hdr">
       <span class="sim-scen-dot" style="background:${_SIM_COLORS[i % 3]};"></span>
@@ -681,15 +815,15 @@ function _simScenTables(sim, results) {
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;margin-bottom:6px;">
       <table class="sim-t"><thead><tr>
         <th>Rok</th><th>Koszt ogrzewania</th><th>Oszczędności</th><th>Udział klienta</th>
-        <th>Rata zwrotu</th><th>Wpływy klienta</th><th>Narastająco</th><th>Wynik vs inwestycja</th><th>ROI</th>
+        ${showReturn ? '<th>Rata zwrotu</th>' : ''}<th>Wpływy klienta</th><th>Narastająco</th><th>${vsLbl}</th>${inv > 0 ? '<th>ROI</th>' : ''}
       </tr></thead><tbody>
-      ${r.rows.map(row => `<tr ${inv > 0 && r.kpi.paybackYear === row.year ? 'class="sim-pb" title="Rok zwrotu inwestycji"' : ''}>
+      ${r.rows.map(row => `<tr ${inv > 0 && r.kpi.paybackYear === row.year ? `class="sim-pb" title="${zeroLbl}"` : ''}>
         <td>${row.year}</td><td>${_simFmt(row.E)}</td><td>${_simFmt(row.F)}</td><td>${_simFmt(row.K)}</td>
-        <td>${_simFmt(row.M)}</td><td>${_simFmt(row.G)}</td><td>${_simFmt(row.H)}</td>
+        ${showReturn ? `<td>${_simFmt(row.M)}</td>` : ''}<td>${_simFmt(row.G)}</td><td>${_simFmt(row.H)}</td>
         <td style="color:${row.I >= 0 ? '#27500A' : '#c00'};font-weight:600;">${_simFmt(row.I)}</td>
-        <td>${inv > 0 ? '×' + _simFmt(row.roi, 2) : '—'}</td></tr>`).join('')}
+        ${inv > 0 ? `<td>×${_simFmt(row.roi, 2)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div>
-    <p style="font-size:10px;color:var(--color-text-secondary);margin:0 0 14px;">Kwoty w ${cur} netto. Wiersz zielony = rok zwrotu inwestycji.</p>`).join('');
+    <p style="font-size:10px;color:var(--color-text-secondary);margin:0 0 14px;">Kwoty w ${cur} netto.${inv > 0 ? ' Wiersz zielony = ' + zeroLbl + '.' : ''}</p>`).join('');
 }
 
 function _simResultsHtml(sim, cid) {
@@ -762,6 +896,7 @@ function _simMethodsHtml() {
 function _simExecSummary(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
   const bs = results.find(r => r.base) || results[0];
   const effPct = Math.min(100, (Number(sim.clientSharePct) || 0) + (Number(sim.paybackReturnPct) || 0));
   const objTxt = sim.objectId ? (' w obiekcie ' + escapeHtml(_simObjName(sim.objectId))) : '';
@@ -769,13 +904,17 @@ function _simExecSummary(sim, results) {
   let s1 = `W horyzoncie ${sim.years} lat, przy założeniu oszczędności ${_simFmt(bs.savingsPct, 1)}% (scenariusz bazowy ${escapeHtml(bs.label)}), `
     + `system WaterAI wygeneruje${objTxt} oszczędności o łącznej wartości około ${_simFmt(bs.kpi.totalSavings)} ${cur} netto. `
     + `Z tej kwoty wpływy klienta wyniosą ${_simFmt(bs.kpi.totalInflows)} ${cur}`;
-  if (inv > 0) {
-    s1 += `, a inwestycja ${_simFmt(inv)} ${cur} zwróci się ${bs.kpi.paybackYear ? ('w roku ' + bs.kpi.paybackYear) : 'poza przyjętym horyzontem'} — `
-      + `do czasu spłaty klient otrzymuje efektywnie ${_simFmt(effPct, 1)}% generowanych oszczędności, po spłacie ${_simFmt(sim.clientSharePct, 1)}%. `
+  if (stType === 'DEPOSIT' && inv > 0) {
+    s1 += `, a wpłacona kaucja ${_simFmt(inv)} ${cur} zostanie zwrócona ${bs.kpi.paybackYear ? ('w roku ' + bs.kpi.paybackYear) : 'poza przyjętym horyzontem'} — `
+      + `do czasu jej zwrotu klient otrzymuje efektywnie ${_simFmt(effPct, 1)}% generowanych oszczędności, później ${_simFmt(sim.clientSharePct, 1)}%. `
       + `Zysk netto klienta po ${_simYearsTxt(sim.years)} wynosi ${_simFmt(bs.kpi.netProfit)} ${cur}`
       + (bs.kpi.cagr !== null ? ` (CAGR ${_simPct(bs.kpi.cagr)})` : '') + '.';
+  } else if (stType === 'FEE' && inv > 0) {
+    s1 += `. Klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje stały udział ${_simFmt(sim.clientSharePct, 1)}% oszczędności; `
+      + `opłata zwróci się ${bs.kpi.paybackYear ? ('w roku ' + bs.kpi.paybackYear) : 'poza przyjętym horyzontem'}. `
+      + `Zysk netto klienta po ${_simYearsTxt(sim.years)} (po odjęciu opłaty) wynosi ${_simFmt(bs.kpi.netProfit)} ${cur}.`;
   } else {
-    s1 += ` — wdrożenie nie wymaga wkładu inwestycyjnego klienta (pełne finansowanie w modelu ESCO), więc cała kwota stanowi czysty zysk netto.`;
+    s1 += ` — klient nie ponosi żadnej opłaty wstępnej i od pierwszego roku otrzymuje stały udział ${_simFmt(sim.clientSharePct, 1)}% oszczędności, więc cała kwota stanowi czysty zysk netto.`;
   }
 
   let s2 = '';
@@ -792,16 +931,19 @@ function _simExecSummary(sim, results) {
 function _simComparisonHtml(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
+  const paybackLbl = stType === 'FEE' ? 'Payback (rok zwrotu opłaty)' : 'Payback (rok zwrotu kaucji)';
+  const roiLbl = stType === 'FEE' ? 'ROI (zysk / opłata)' : 'ROI (zysk / kaucja)';
   const th = results.map((r, i) => `<th style="color:${_SIM_COLORS[i % 3]};">Scen. ${escapeHtml(r.label)} (${_simFmt(r.savingsPct, 1)}%)${r.base ? ' ·bazowy' : ''}</th>`).join('');
   const row = (label, fn) => `<tr><td>${label}</td>${results.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`;
   return `
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">
     <table class="sim-t sim-cmp"><thead><tr><th>Wskaźnik</th>${th}</tr></thead><tbody>
-      ${inv > 0 ? row('Payback (rok zwrotu inwestycji)', r => r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—') : ''}
+      ${inv > 0 ? row(paybackLbl, r => r.kpi.paybackYear ? ('rok ' + r.kpi.paybackYear) : '—') : ''}
       ${row('Suma wygenerowanych oszczędności [' + cur + ']', r => _simFmt(r.kpi.totalSavings))}
       ${row('Łączne wpływy klienta [' + cur + ']', r => _simFmt(r.kpi.totalInflows))}
       ${row('Zysk netto klienta [' + cur + ']', r => _simFmt(r.kpi.netProfit))}
-      ${inv > 0 ? row('ROI (zysk / inwestycja)', r => '×' + _simFmt(r.kpi.roi, 2)) : ''}
+      ${inv > 0 ? row(roiLbl, r => '×' + _simFmt(r.kpi.roi, 2)) : ''}
       ${inv > 0 ? row('CAGR', r => r.kpi.cagr === null ? '—' : _simPct(r.kpi.cagr)) : ''}
     </tbody></table></div>`;
 }
@@ -809,18 +951,30 @@ function _simComparisonHtml(sim, results) {
 function _simMechanismHtml(sim, results) {
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
+  const setl = SimulationsModule.SETTLEMENTS[stType] || SimulationsModule.SETTLEMENTS.DEPOSIT;
   const k = Number(sim.clientSharePct) || 0, l = Number(sim.paybackReturnPct) || 0;
   const bs = results.find(r => r.base) || results[0];
   const r1 = bs.rows[0];
 
-  const splitTxt = (inv > 0 && l > 0)
-    ? `Do czasu spłaty inwestycji klient otrzymuje dodatkowo ratę zwrotu ${_simFmt(l, 1)}% oszczędności rocznie (łącznie efektywnie ${_simFmt(Math.min(100, k + l), 1)}%), finansowaną z udziału WaterAI — aż do zwrotu pełnej kwoty inwestycji. Po spłacie obowiązuje docelowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`
-    : `Rata zwrotu nie występuje — podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% obowiązuje od pierwszego roku.`;
+  let variantTxt, formula;
+  if (stType === 'DEPOSIT') {
+    variantTxt = (inv > 0 && l > 0)
+      ? `W wariancie „kaucja zwrotna” klient wpłaca zwrotną kaucję ${_simFmt(inv)} ${cur}. Do czasu jej zwrotu otrzymuje podwyższony udział: swój stały ${_simFmt(k, 1)}% oszczędności powiększony o ratę zwrotu ${_simFmt(l, 1)}% (łącznie efektywnie ${_simFmt(Math.min(100, k + l), 1)}%), aż kaucja zostanie zwrócona w całości. Po zwrocie obowiązuje docelowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`
+      : `W wariancie „kaucja zwrotna” klient otrzymuje stały udział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% od pierwszego roku.`;
+    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}
+      &nbsp;·&nbsp; rata zwrotu kaucji = ${_simFmt(r1.M)} ${cur} &nbsp;→&nbsp; <strong>wpływy klienta ${_simFmt(r1.G)} ${cur}</strong></div>`;
+  } else if (stType === 'FEE') {
+    variantTxt = `W wariancie „opłata niezwrotna” klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Opłata jest kosztem początkowym — łączny wynik klienta liczony jest po jej odjęciu; zwraca się w momencie, gdy skumulowany udział w oszczędnościach ją pokryje.`;
+    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → <strong>udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}</strong>&nbsp;·&nbsp; opłata wstępna ${_simFmt(inv)} ${cur} (jednorazowo)</div>`;
+  } else { // FREE
+    variantTxt = `W wariancie „bez opłat” klient nie ponosi żadnej opłaty wstępnej i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Całość jego wpływów stanowi czysty zysk.`;
+    formula = `<div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → <strong>wpływy klienta ${_simFmt(r1.K)} ${cur}</strong> (udział ${_simFmt(k, 1)}%, bez opłaty)</div>`;
+  }
 
   return `
-    <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. Udział klienta w wygenerowanych oszczędnościach wynosi ${_simFmt(k, 1)}%. ${splitTxt}</p>
-    <div class="sim-formula">Rok 1 (scenariusz ${escapeHtml(bs.label)}): oszczędność ${_simFmt(r1.F)} ${cur} → udział klienta ${_simFmt(k, 1)}% = ${_simFmt(r1.K)} ${cur}
-      &nbsp;·&nbsp; rata zwrotu = ${_simFmt(r1.M)} ${cur} &nbsp;→&nbsp; <strong>wpływy klienta ${_simFmt(r1.G)} ${cur}</strong></div>
+    <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. ${variantTxt}</p>
+    ${formula}
     <div class="sim-steps">
       <div class="sim-step"><div class="no">1</div><div class="t">Audyt i symulacja</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
       <div class="sim-step"><div class="no">2</div><div class="t">Umowa ESCO</div><div class="d">Ustalenie metody rozliczeniowej, udziałów i okresu bazowego.</div></div>
@@ -835,6 +989,8 @@ function _simDocHtml(sim) {
   if (!results.length) return '<div class="reminder-card"><strong>Dodaj co najmniej jeden scenariusz.</strong></div>';
   const cur = sim.currency || 'PLN';
   const inv = Number(sim.investment) || 0;
+  const stType = sim.settlementType || 'DEPOSIT';
+  const setl = SimulationsModule.SETTLEMENTS[stType] || SimulationsModule.SETTLEMENTS.DEPOSIT;
   const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
   const bs = results.find(r => r.base) || results[0];
   const c = _simCli(sim.clientId);
@@ -842,9 +998,10 @@ function _simDocHtml(sim) {
   const today = new Date().toLocaleDateString('pl-PL');
   const created = sim.createdAt ? sim.createdAt.slice(0, 10) : '—';
 
-  // Hero + kafle okładki (wariant z inwestycją i bez)
+  // Hero + kafle okładki. payback ma sens tylko gdy jest opłata/kaucja (inv>0).
+  const paybackLbl = stType === 'FEE' ? 'Zwrot opłaty<br>(payback)' : 'Zwrot kaucji<br>(payback)';
   const hero = inv > 0
-    ? `<div class="sim-hero"><div class="sim-hero-lbl">Zwrot inwestycji<br>(payback)</div>
+    ? `<div class="sim-hero"><div class="sim-hero-lbl">${paybackLbl}</div>
        <div class="sim-hero-val">${bs.kpi.paybackYear ? ('rok ' + bs.kpi.paybackYear) : '> ' + sim.years + ' lat'}</div></div>`
     : `<div class="sim-hero"><div class="sim-hero-lbl">Zysk netto klienta<br>po ${_simYearsTxt(sim.years)}</div>
        <div class="sim-hero-val">${_simFmt(bs.kpi.netProfit)}<span>${cur}</span></div></div>`;
@@ -879,10 +1036,11 @@ function _simDocHtml(sim) {
         <div class="sim-cm-card"><div class="sim-cm-lbl">Założenia główne</div>
           <div class="sim-cm-val">${_simFmt(sim.heatingCost)} ${cur}/rok</div>
           <div class="sim-cm-sub">koszt ogrzewania · wzrost cen ${_simFmt(sim.priceGrowthPct, 2)}%/rok · horyzont ${sim.years} lat</div>
-          <div class="sim-cm-sub">Koszt inwestycji: ${_simFmt(inv)} ${cur}</div></div>
-        <div class="sim-cm-card"><div class="sim-cm-lbl">Status symulacji</div>
-          <div><span style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;background:${st.bg};color:${st.color};">${st.label}</span></div>
-          <div class="sim-cm-sub" style="margin-top:8px;">Scenariuszy: ${results.length} · bazowy: ${escapeHtml(bs.label)} (${_simFmt(bs.savingsPct, 1)}%)</div></div>
+          ${setl.feeLabel !== '—' ? `<div class="sim-cm-sub">${setl.feeLabel}: ${_simFmt(inv)} ${cur}</div>` : `<div class="sim-cm-sub">Bez opłaty wstępnej</div>`}
+          <div class="sim-cm-sub">Scenariuszy: ${results.length} · bazowy ${escapeHtml(bs.label)} (${_simFmt(bs.savingsPct, 1)}%)</div></div>
+        <div class="sim-cm-card"><div class="sim-cm-lbl">Rozliczenie i status</div>
+          <div class="sim-cm-val">${setl.label}</div>
+          <div class="sim-cm-sub" style="margin-top:6px;"><span style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;background:${st.bg};color:${st.color};">${st.label}</span></div></div>
       </div>
       <div class="sim-cover-result">
         <div class="sim-cover-result-head">Wynik prognozy — scenariusz bazowy</div>
@@ -897,11 +1055,12 @@ function _simDocHtml(sim) {
 
   const s3 = `
     <table class="sim-params"><tbody>
+      <tr><td>Wariant rozliczenia</td><td>${setl.label}</td></tr>
       <tr><td>Roczny koszt ogrzewania (rok 1)</td><td>${_simFmt(sim.heatingCost)} ${cur}</td></tr>
       <tr><td>Roczny wzrost cen energii</td><td>${_simFmt(sim.priceGrowthPct, 2)}%</td></tr>
-      <tr><td>Koszt inwestycji</td><td>${_simFmt(inv)} ${cur}</td></tr>
+      ${setl.feeLabel !== '—' ? `<tr><td>${setl.feeLabel}</td><td>${_simFmt(inv)} ${cur}</td></tr>` : `<tr><td>Opłata wstępna</td><td>brak</td></tr>`}
       <tr><td>Udział klienta w oszczędnościach</td><td>${_simFmt(sim.clientSharePct, 1)}%</td></tr>
-      <tr><td>Rata zwrotu inwestycji</td><td>${_simFmt(sim.paybackReturnPct, 1)}% oszczędności / rok</td></tr>
+      ${stType === 'DEPOSIT' ? `<tr><td>Rata zwrotu kaucji</td><td>${_simFmt(sim.paybackReturnPct, 1)}% oszczędności / rok</td></tr>` : ''}
       <tr><td>Horyzont symulacji</td><td>${sim.years} lat</td></tr>
       <tr><td>Waluta</td><td>${cur}</td></tr>
     </tbody></table>
