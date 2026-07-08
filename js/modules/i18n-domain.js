@@ -1764,7 +1764,16 @@
  "Nazwa wariantu": "Názov variantu",
  "Oszczędność [%]": "Úspora [%]",
  "uzasadnienie wariantu (opcjonalnie, trafi do dokumentu)": "zdôvodnenie variantu (voliteľné, dostane sa do dokumentu)",
- "Usuń wariant": "Odstrániť variant"
+ "Usuń wariant": "Odstrániť variant",
+ // ── Symulacja: zdjęcia obiektu + brak dodatkowych opłat ──
+ "Zdjęcia obiektu (na okładkę)": "Fotografie objektu (na obálku)",
+ "Do 2 zdjęć obiektu — pojawią się na pierwszej stronie dokumentu, pod danymi.": "Až 2 fotografie objektu — zobrazia sa na prvej strane dokumentu, pod údajmi.",
+ "＋ Dodaj zdjęcie": "＋ Pridať fotografiu",
+ "Dodano maksymalnie 2 zdjęcia.": "Pridané maximálne 2 fotografie.",
+ "Usuń zdjęcie": "Odstrániť fotografiu",
+ "Wybierz plik graficzny.": "Vyberte obrázkový súbor.",
+ "Nie udało się wczytać obrazu.": "Obrázok sa nepodarilo načítať.",
+ "Poza wskazanym wyżej rozliczeniem oszczędności klient nie ponosi żadnych dodatkowych kosztów: brak opłat za serwis, utrzymanie, konserwację, aktualizacje oprogramowania czy wsparcie techniczne. W całym okresie współpracy WaterAI na bieżąco monitoruje instalację oraz wprowadza korekty nastaw, aktualizacje i optymalizacje sterowania — ponieważ nasze wynagrodzenie zależy wprost od uzyskanego wyniku, utrzymanie i poprawa efektu leżą w naszym wspólnym interesie.": "Okrem vyššie uvedeného vyúčtovania úspor klient nenesie žiadne ďalšie náklady: bez poplatkov za servis, údržbu, aktualizácie softvéru či technickú podporu. Počas celej spolupráce WaterAI priebežne monitoruje inštaláciu a zavádza úpravy nastavení, aktualizácie a optimalizácie riadenia — keďže naša odmena závisí priamo od dosiahnutého výsledku, udržanie a zlepšenie efektu je v našom spoločnom záujme."
 } };
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
