@@ -1730,7 +1730,33 @@
  "Uruchomienie sterowania WaterAI, ciągły pomiar co 10 minut.": "Spustenie riadenia WaterAI, priebežné meranie každých 10 minút.",
  "Raporty i rozliczenia": "Reporty a vyúčtovania",
  "Cykliczne raporty ESCO z częścią dowodową — podstawa rozliczeń.": "Cyklické ESCO reporty s dôkazovou časťou — podklad pre vyúčtovania.",
- "Dokument ma charakter poglądowy. Przedstawione wartości są prognozą opartą na przyjętych założeniach (roczny koszt ogrzewania, wzrost cen energii, zakładany procent oszczędności) i nie stanowią oferty w rozumieniu Kodeksu cywilnego ani gwarancji wyniku. Rzeczywiste rozliczenia będą dokonywane wyłącznie za zamknięte okresy rozliczeniowe, metodą opisaną w sekcji 2 i zapisaną w umowie ESCO, na podstawie zmierzonych danych, i dokumentowane cyklicznymi raportami rozliczeniowymi. WaterAI Energy Control.": "Dokument má informatívny charakter. Uvedené hodnoty sú prognózou založenou na prijatých predpokladoch (ročné náklady na vykurovanie, rast cien energie, predpokladané percento úspor) a nepredstavujú ponuku v zmysle Občianskeho zákonníka ani záruku výsledku. Skutočné vyúčtovania sa budú vykonávať výlučne za uzavreté zúčtovacie obdobia, metódou opísanou v sekcii 2 a zapísanou v zmluve ESCO, na základe nameraných údajov, a dokumentované cyklickými zúčtovacími reportmi. WaterAI Energy Control."
+ "Dokument ma charakter poglądowy. Przedstawione wartości są prognozą opartą na przyjętych założeniach (roczny koszt ogrzewania, wzrost cen energii, zakładany procent oszczędności) i nie stanowią oferty w rozumieniu Kodeksu cywilnego ani gwarancji wyniku. Rzeczywiste rozliczenia będą dokonywane wyłącznie za zamknięte okresy rozliczeniowe, metodą opisaną w sekcji 2 i zapisaną w umowie ESCO, na podstawie zmierzonych danych, i dokumentowane cyklicznymi raportami rozliczeniowymi. WaterAI Energy Control.": "Dokument má informatívny charakter. Uvedené hodnoty sú prognózou založenou na prijatých predpokladoch (ročné náklady na vykurovanie, rast cien energie, predpokladané percento úspor) a nepredstavujú ponuku v zmysle Občianskeho zákonníka ani záruku výsledku. Skutočné vyúčtovania sa budú vykonávať výlučne za uzavreté zúčtovacie obdobia, metódou opísanou v sekcii 2 a zapísanou v zmluve ESCO, na základe nameraných údajov, a dokumentované cyklickými zúčtovacími reportmi. WaterAI Energy Control.",
+ // ── Symulacja v1.2 — warianty rozliczenia (kaucja / opłata / bez opłat) ──
+ "Wariant rozliczenia": "Variant vyúčtovania",
+ "Kaucja zwrotna": "Vratná kaucia",
+ "Opłata niezwrotna": "Nevratný poplatok",
+ "Bez opłat": "Bez poplatkov",
+ "Opłata za wdrożenie": "Poplatok za nasadenie",
+ "Klient wpłaca zwrotną kaucję i do czasu jej zwrotu otrzymuje podwyższony udział w oszczędnościach; po zwrocie obowiązuje udział docelowy.": "Klient vloží vratnú kauciu a do jej vrátenia dostáva zvýšený podiel na úsporách; po vrátení platí cieľový podiel.",
+ "Klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.": "Klient uhrádza jednorazový, nevratný poplatok za nasadenie a od prvého roka dostáva stanovený podiel na úsporách.",
+ "Klient nie ponosi żadnej opłaty i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.": "Klient neplatí žiadny poplatok a od prvého roka dostáva stanovený podiel na úsporách.",
+ "Rata zwrotu kaucji [% oszcz./rok]": "Splátka vrátenia kaucie [% úspor/rok]",
+ "Rata zwrotu: część oszczędności zwracana klientowi z udziału WaterAI — do wysokości kaucji (klient wpłaca kaucję, firma zwraca ją ze swojej części oszczędności).": "Splátka vrátenia: časť úspor vrátená klientovi z podielu WaterAI — do výšky kaucie (klient vloží kauciu, firma ju vracia zo svojej časti úspor).",
+ "Rozliczenie i status": "Vyúčtovanie a stav",
+ "Bez opłaty wstępnej": "Bez vstupného poplatku",
+ "Zwrot kaucji": "Vrátenie kaucie",
+ "Zwrot opłaty": "Návratnosť poplatku",
+ "Opłata wstępna": "Vstupný poplatok",
+ "brak": "žiadny",
+ "ROI (zysk / opłata)": "ROI (zisk / poplatok)",
+ "ROI (zysk / kaucja)": "ROI (zisk / kaucia)",
+ "Wynik vs opłata": "Výsledok vs poplatok",
+ "Wynik vs kaucja": "Výsledok vs kaucia",
+ "Zysk narastająco": "Zisk kumulatívne",
+ "Payback (rok zwrotu kaucji)": "Návratnosť (rok vrátenia kaucie)",
+ "Payback (rok zwrotu opłaty)": "Návratnosť (rok návratu poplatku)",
+ "rok zwrotu kaucji": "rok vrátenia kaucie",
+ "rok zwrotu opłaty": "rok návratu poplatku"
 } };
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
