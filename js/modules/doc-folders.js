@@ -1,5 +1,5 @@
 // WaterAI Energy Control
-// Document Folders Module v1.0.0
+// Document Folders Module v2.0.0 — Supabase (tabela `doc_folders`) przez mostek WaterAIBridge.
 // Struktura:
 //   type: 'client'  → katalog główny klienta (auto)
 //   type: 'object'  → katalog obiektu (auto, przy pierwszym dok.)
@@ -8,16 +8,22 @@
 // parentId: null → korzeń (poziom klienta)
 //           id   → podfolder
 
+const _docFoldersStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'doc_folders',
+      storageKey: 'waterai_doc_folders_v1',
+      label: 'folderów dokumentów',
+      fk2: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
+    })
+  : (console.warn('[DocFoldersModule] Brak WaterAIBridge — tryb lokalny (localStorage).'), {
+      storageKey: 'waterai_doc_folders_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); }
+    });
+
 const DocFoldersModule = {
-  storageKey: 'waterai_doc_folders_v1',
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
-  },
+  ..._docFoldersStore,
 
   add(folder) {
     const items = this.getAll();
