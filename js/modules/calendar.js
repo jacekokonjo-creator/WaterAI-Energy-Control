@@ -1,8 +1,23 @@
 // WaterAI Energy Control
-// Calendar Module v1.0.0
+// Calendar Module v2.0.0 — Supabase (tabela `calendar_events`) przez mostek WaterAIBridge.
+// Publiczne API bez zmian. Wcześniej: wyłącznie localStorage (limit 5 MB!).
+
+const _calendarStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'calendar_events',
+      storageKey: 'waterai_calendar_v1',
+      label: 'wydarzeń kalendarza',
+      fk2: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule }
+    })
+  : (console.warn('[CalendarModule] Brak WaterAIBridge — tryb lokalny (localStorage).'), {
+      storageKey: 'waterai_calendar_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); }
+    });
 
 const CalendarModule = {
-  storageKey: 'waterai_calendar_v1',
+  ..._calendarStore,
 
   EVENT_TYPES: {
     MEASUREMENT_DUE:  { label: 'Termin pomiarów',            icon: '📊', color: '#185FA5' },
@@ -25,14 +40,6 @@ const CalendarModule = {
     QUARTERLY:   'Co kwartał',
     HALF_YEAR:   'Co pół roku',
     YEARLY:      'Co rok'
-  },
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
   },
 
   add(event) {
