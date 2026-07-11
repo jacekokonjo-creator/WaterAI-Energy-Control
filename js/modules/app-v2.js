@@ -121,7 +121,7 @@ function renderDocumentsModule(clientId, _objectId) {
       <td style="padding:9px 12px;font-size:12px;white-space:nowrap;">${fmtDate(d.documentDate)}</td>
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;align-items:center;">
-          ${d.fileUrl?`<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>`:''}
+          ${(d.fileUrl || d.storagePath)?`<button class="small-button" onclick="downloadDoc('${d.id}')">Pobierz</button>`:''}
           ${allFolders.length?`<select style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--color-border-tertiary);" onchange="moveDocToFolder(${d.id},this.value,${filterClientId});this.value=''"><option value="">Przenieś →</option>${moveOptions}</select>`:''}
           <button class="small-button" onclick="if(confirm('Usuń dokument?')){DocumentsModule.remove(${d.id});renderDocumentsModule(${filterClientId});}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
         </div>
@@ -315,7 +315,7 @@ function saveDocument(clientId) {
     }
   }
 
-  DocumentsModule.add({
+  const rec = DocumentsModule.add({
     clientId,
     objectId,
     folderId,
@@ -330,12 +330,27 @@ function saveDocument(clientId) {
     fileType
   });
 
+  // Plik do bucketa Storage w tle; po sukcesie rekord chudnie (bez base64).
+  if (rec && fileUrl && fileUrl.indexOf('data:') === 0 && DocumentsModule.uploadFile) {
+    DocumentsModule.uploadFile(rec.id, fileName, fileUrl).then(path => {
+      if (path) DocumentsModule.update(rec.id, { storagePath: path, fileUrl: '' });
+    }).catch(e => console.warn('[documents] Upload w tle nieudany — plik zostaje lokalnie:', e));
+  }
+
   renderDocumentsModule(clientId);
 }
 
-function downloadDoc(docId) {
+async function downloadDoc(docId) {
   const d = DocumentsModule.find(Number(docId));
-  if (!d || !d.fileUrl) return;
+  if (!d) return;
+
+  if (d.storagePath && DocumentsModule.fileUrlFor) {
+    const url = await DocumentsModule.fileUrlFor(d);
+    if (url) { window.open(url, '_blank'); return; }
+    alert('Nie udało się pobrać pliku ze wspólnej bazy. Sprawdź połączenie i spróbuj ponownie.');
+    return;
+  }
+  if (!d.fileUrl) return;
 
   if (d.fileUrl.startsWith('data:')) {
     // base64 — trigger download
@@ -374,7 +389,7 @@ function searchDocuments(clientId, query) {
         <div style="font-size:13px;font-weight:500;">${escapeHtml(d.name)}</div>
         <div style="font-size:11px;color:var(--color-text-secondary);">${fmtDate(d.documentDate)} · ${cat ? cat.label : ''}</div>
       </div>
-      ${d.fileUrl ? `<button class="small-button" onclick="window.open('${escapeHtml(d.fileUrl)}','_blank')">⬇</button>` : ''}
+      ${(d.fileUrl || d.storagePath) ? `<button class="small-button" onclick="downloadDoc('${d.id}')">⬇</button>` : ''}
     </div>`;
   }).join('');
 }
