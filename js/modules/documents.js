@@ -1,8 +1,27 @@
 // WaterAI Energy Control
-// Documents Module v1.0.0
+// Documents Module v2.0.0 — Supabase: metadane w tabeli `documents` (mostek),
+// pliki w buckecie Storage `document-files` (w rekordzie tylko `storagePath`).
+// Jednorazowa migracja przenosi stare pliki base64 z localStorage do bucketa.
+
+const DOC_BUCKET = 'document-files';
+
+const _documentsStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'documents',
+      storageKey: 'waterai_documents_v1',
+      label: 'dokumentów',
+      fk: { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule },
+      fk2: { column: 'object_id', prop: 'objectId', module: () => window.ObjectsModule }
+    })
+  : (console.warn('[DocumentsModule] Brak WaterAIBridge — tryb lokalny (localStorage).'), {
+      storageKey: 'waterai_documents_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); }
+    });
 
 const DocumentsModule = {
-  storageKey: 'waterai_documents_v1',
+  ..._documentsStore,
 
   CATEGORIES: {
     INVOICE_HEAT:        { label: 'Faktura za ciepło',        icon: '🔥', group: 'Faktury od klienta' },
@@ -25,17 +44,9 @@ const DocumentsModule = {
     OTHER:               { label: 'Inne',                     icon: '📁', group: 'Inne' }
   },
 
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
-  },
-
   add(doc) {
     const items = this.getAll();
-    items.push({
+    const rec = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
 
@@ -54,11 +65,68 @@ const DocumentsModule = {
       fileType: doc.fileType || '',
       fileSize: doc.fileSize || 0,
       fileUrl: doc.fileUrl || '',
+      storagePath: doc.storagePath || '',
       thumbnailUrl: doc.thumbnailUrl || '',
 
       uploadedBy: doc.uploadedBy || ''
-    });
+    };
+    items.push(rec);
     this.saveAll(items);
+    return rec;
+  },
+
+  // ── Pliki w buckecie Storage ──────────────────────────────────────────────
+  _sbc() { return (window.WaterAISupabase && WaterAISupabase.client) || null; },
+  _safeName(n) { return String(n || 'plik').replace(/[^\w.\-]+/g, '_').slice(-80); },
+  _dataUrlToBlob(u) {
+    const parts = u.split(',');
+    const mime = (parts[0].match(/data:([^;]+)/) || [null, 'application/octet-stream'])[1];
+    const bin = atob(parts[1]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  },
+
+  async uploadFile(docId, fileName, blobOrDataUrl) {
+    const sb = this._sbc();
+    if (!sb) return null;
+    const blob = typeof blobOrDataUrl === 'string' ? this._dataUrlToBlob(blobOrDataUrl) : blobOrDataUrl;
+    const path = docId + '/' + this._safeName(fileName);
+    const { error } = await sb.storage.from(DOC_BUCKET).upload(path, blob, { upsert: true });
+    if (error) { console.warn('[documents] Upload pliku nieudany:', error.message); return null; }
+    return path;
+  },
+
+  async fileUrlFor(doc) {
+    if (doc && doc.storagePath) {
+      const sb = this._sbc();
+      if (!sb) return null;
+      const { data, error } = await sb.storage.from(DOC_BUCKET).createSignedUrl(doc.storagePath, 600);
+      if (error) { console.warn('[documents] Nie udało się pobrać linku:', error.message); return null; }
+      return data.signedUrl;
+    }
+    return (doc && doc.fileUrl) || null;
+  },
+
+  // Jednorazowo: stare pliki base64 (fileUrl 'data:...') → bucket Storage.
+  // Odchudza localStorage (limit 5 MB) i tabelę `documents`.
+  async migrateFilesToStorage() {
+    const sb = this._sbc();
+    if (!sb) return;
+    const prof = (window.WaterAISupabase && WaterAISupabase.profile) || null;
+    if (!prof || ['admin', 'backOffice', 'energyAnalyst'].indexOf(prof.role) < 0) return;
+    const items = this.getAll();
+    let moved = 0;
+    for (const d of items) {
+      if (d.fileUrl && d.fileUrl.indexOf('data:') === 0 && !d.storagePath) {
+        const path = await this.uploadFile(d.id, d.fileName || d.name, d.fileUrl);
+        if (path) { d.storagePath = path; d.fileUrl = ''; moved++; }
+      }
+    }
+    if (moved) {
+      console.log('[documents] Przeniesiono ' + moved + ' plik(ów) do Storage (bucket ' + DOC_BUCKET + ').');
+      this.saveAll(items);
+    }
   },
 
   move(docId, targetFolderId) {
