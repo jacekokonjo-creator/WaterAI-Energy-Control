@@ -1,6 +1,6 @@
 // WaterAI Energy Control
-// Fabryka mostków Supabase v1.1.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
-// v1.1.0 (2026-07-11): (a) _persist zserializowany kolejką — równoległe saveAll
+// Fabryka mostków Supabase v1.2.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// v1.2.0 (2026-07-11): (a) _persist zserializowany kolejką — równoległe saveAll
 // wyścigały się i podwójnie insertowały te same rekordy; (b) load() wykrywa
 // w bazie wiersze-duplikaty (ten sam data.id), pomija je i kasuje z tabeli.
 //
@@ -93,6 +93,19 @@ const WaterAIBridge = {
             this._cache = localBefore;   // odmowa nie rusza danych lokalnych
           }
           return;
+        }
+
+        // 3b. Auto-odzysk: rekordy z lokalnego lustra, których nie ma w bazie
+        // (np. zapis przy wygasłej sesji — insert odbił się o 401, a lustro zdążyło).
+        // Tylko role widzące pełną bazę (RLS); dla client/salesRep „brak w bazie" nic nie znaczy.
+        if (_prof && ['admin', 'backOffice', 'energyAnalyst'].indexOf(_prof.role) >= 0 && localBefore.length) {
+          const known = new Set(this._cache.map(o => String(o.id)));
+          const lost = localBefore.filter(o => o && o.id != null && !known.has(String(o.id)));
+          if (lost.length) {
+            console.warn('[' + this.table + '] Przywracam ' + lost.length + ' rekord(ów) z lokalnego lustra nieobecnych w bazie (np. zapis przy wygasłej sesji).');
+            this._cache = this._cache.concat(lost);
+            this._persist();
+          }
         }
 
         // 4. Lustro na końcu — ale nie dla roli client (jej widok jest przyciety
