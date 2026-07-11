@@ -297,11 +297,11 @@ function _rdTableHtml(obj) {
 
   const filterBar = `
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;">
-      <b style="font-size:12px;">Pokaż okres:</b>
-      <input type="date" value="${fFrom}" style="padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
+      <b style="font-size:12px;white-space:nowrap;">Pokaż okres:</b>
+      <input type="date" value="${fFrom}" style="width:150px;flex:0 0 auto;display:inline-block;padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
         onchange="window._rdFilterFrom=this.value;renderReadingsModule(_rdLockClientId);">
       <span>–</span>
-      <input type="date" value="${fTo}" style="padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
+      <input type="date" value="${fTo}" style="width:150px;flex:0 0 auto;display:inline-block;padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
         onchange="window._rdFilterTo=this.value;renderReadingsModule(_rdLockClientId);">
       ${(fFrom || fTo) ? `<button class="small-button" style="font-size:12px;" onclick="window._rdFilterFrom='';window._rdFilterTo='';renderReadingsModule(_rdLockClientId);">✕ Wyczyść filtr</button>
       <span>· widoczne: <b>${rows.length}</b> z ${all.length}</span>` : ''}
