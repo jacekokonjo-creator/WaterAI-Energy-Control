@@ -222,7 +222,8 @@ function renderReadingsModule(lockClientId) {
       <span>Waluta: <b style="color:var(--color-text-primary);">${_rdEsc(obj.currency || 'PLN')}</b></span>
       <span style="margin-left:auto;display:flex;gap:8px;">
         ${_rdMode ? '' : `<button class="primary-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('single')">+ Dodaj pomiar</button>
-        <button class="small-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('serial')">+ Pomiar seryjny</button>`}
+        <button class="small-button" style="font-size:13px;padding:7px 14px;" onclick="_rdOpenForm('serial')">+ Pomiar seryjny</button>
+        ${_rdIsInternal() ? `<button class="small-button" style="font-size:12px;color:#8A2E2E;" onclick="_rdWipeObject()" title="Usuwa wszystkie pomiary tego obiektu — także ze wspólnej bazy">🗑 Wyczyść obiekt</button>` : ''}`}
       </span>
     </div>`;
 
@@ -291,7 +292,7 @@ function _rdTableHtml(obj) {
   const dupSeen = {};
   let dupCount = 0;
   all.forEach(r => {
-    const key = [r.periodFrom, r.periodTo, r.valueType, r.value, r.unit].join('|');
+    const key = [r.periodFrom, r.periodTo, Number(r.value || 0)].join('|');
     if (dupSeen[key]) dupCount++; else dupSeen[key] = true;
   });
   const dupBar = (dupCount && _rdIsInternal()) ? `
@@ -805,18 +806,29 @@ function _rdEdit(id) {
   renderReadingsModule(_rdLockClientId);
 }
 
+function _rdWipeObject() {
+  const obj = ObjectsModule.find(_rdObjectId);
+  const mine = ReadingsModule.findByObject(_rdObjectId);
+  if (!mine.length) { alert('Ten obiekt nie ma pomiarów.'); return; }
+  if (!confirm('Usunąć WSZYSTKIE pomiary obiektu „' + (obj ? obj.name : '') + '" (' + mine.length + ' szt.)?')) return;
+  if (!confirm('Na pewno? To skasuje ' + mine.length + ' pomiarów również ze wspólnej bazy. Operacji nie można cofnąć.')) return;
+  const keep = ReadingsModule.getAll().filter(r => String(r.objectId) !== String(_rdObjectId));
+  ReadingsModule.saveAll(keep);
+  renderReadingsModule(_rdLockClientId);
+}
+
 function _rdDedupe() {
   const all = ReadingsModule.getAll();
   const seen = {};
   const keep = [];
   let removed = 0;
   all.slice().sort((a, b) => Number(a.id) - Number(b.id)).forEach(r => {
-    const key = [r.objectId, r.periodFrom, r.periodTo, r.valueType, r.value, r.unit].join('|');
+    const key = [r.objectId, r.periodFrom, r.periodTo, Number(r.value || 0)].join('|');
     if (seen[key]) { removed++; return; }
     seen[key] = true; keep.push(r);
   });
   if (!removed) { alert('Nie znaleziono duplikatów.'); return; }
-  if (!confirm('Znaleziono ' + removed + ' zduplikowanych pomiarów (ten sam obiekt, okres, typ i wartość — we wszystkich obiektach). Zostawić po jednym i usunąć resztę?')) return;
+  if (!confirm('Znaleziono ' + removed + ' zduplikowanych pomiarów (ten sam obiekt, okres i wartość — we wszystkich obiektach). Zostawić po jednym i usunąć resztę?')) return;
   ReadingsModule.saveAll(keep);
   alert('Usunięto ' + removed + ' duplikatów. Pozostało ' + keep.length + ' pomiarów.');
   renderReadingsModule(_rdLockClientId);
