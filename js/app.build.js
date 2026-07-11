@@ -1261,7 +1261,6 @@ function renderObjectsModule() {
                   <option value="">— wybierz —</option>
                   ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('backOffice') : [])
                     .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
-                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.backOfficeOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('backOffice').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
               <div class="obj-field">
@@ -1270,7 +1269,6 @@ function renderObjectsModule() {
                   <option value="">— wybierz —</option>
                   ${usersForOwnerSelect('salesRepresentative')
                     .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
-                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.salesRepresentative; const exists = v && (typeof UsersModule !== 'undefined') && usersForOwnerSelect('salesRepresentative').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
               <div class="obj-field">
@@ -1279,7 +1277,6 @@ function renderObjectsModule() {
                   <option value="">— wybierz —</option>
                   ${usersForOwnerSelect('energyAnalyst')
                     .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
-                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.energyAnalystOwner; const exists = v && (typeof UsersModule !== 'undefined') && usersForOwnerSelect('energyAnalyst').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
             </div>
