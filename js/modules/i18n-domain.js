@@ -18,6 +18,11 @@
  // ── Pomiary (readings.js v1.2) — układ uzgodniony w makietach ──
  "+ Pomiar seryjny": "+ Sériové meranie",
  "🗑 Wyczyść obiekt": "🗑 Vyčistiť objekt",
+ "Pokaż okres:": "Zobraziť obdobie:",
+ "✕ Wyczyść filtr": "✕ Zrušiť filter",
+ "Brak pomiarów w wybranym zakresie dat.": "Žiadne merania vo zvolenom rozsahu dátumov.",
+ "widoczne:": "zobrazené:",
+ "ogółem)": "celkovo)",
  "Ten obiekt nie ma pomiarów.": "Tento objekt nemá žiadne merania.",
  "Na pewno? To skasuje": "Naozaj? Vymaže to",
  "pomiarów również ze wspólnej bazy. Operacji nie można cofnąć.": "meraní aj zo spoločnej databázy. Operáciu nemožno vrátiť.",
