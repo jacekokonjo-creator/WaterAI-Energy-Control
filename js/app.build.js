@@ -419,7 +419,7 @@ function renderClientsList() {
             .cli-field label { font-size:12px; color:var(--color-text-secondary); display:block; margin-bottom:4px; }
             .cli-field input, .cli-field select { width:100%; box-sizing:border-box; }
           </style>
-          <form onsubmit="createClient(this); return false;">
+          <form onsubmit="try{createClient(this)}catch(e){console.error(e);alert('Błąd zapisu — dane NIE zostały zapisane. Zgłoś tę treść: '+(e.message||e));}return false;">
 
             <!-- DANE PODSTAWOWE -->
             <div class="cli-section" style="border:1px solid #B5D4F4;">
@@ -1198,7 +1198,7 @@ function renderObjectsModule() {
           <h3 style="margin:0;font-size:16px;color:#0C447C;">${editingObjectId ? "Edytuj obiekt" : "Nowy obiekt"}</h3>
           <button class="small-button" type="button" onclick="showObjectForm=false;editingObjectId=null;renderObjectsModule();">✕ Zamknij</button>
         </div>
-        <form onsubmit="createObject(this); return false;">
+        <form onsubmit="try{createObject(this)}catch(e){console.error(e);alert('Błąd zapisu — dane NIE zostały zapisane. Zgłoś tę treść: '+(e.message||e));}return false;">
 
         <!-- DANE PODSTAWOWE -->
         <div class="obj-section" style="border:1px solid #B5D4F4;">
@@ -1605,7 +1605,7 @@ function renderWorkflowModule() {
   }
 
   container.innerHTML = `
-    <form onsubmit="createWorkflowItem(this); return false;" class="calendar-form">
+    <form onsubmit="try{createWorkflowItem(this)}catch(e){console.error(e);alert('Błąd zapisu — dane NIE zostały zapisane. Zgłoś tę treść: '+(e.message||e));}return false;" class="calendar-form">
       <div style="grid-column: 1 / -1;">
         <h3>Workflow / Przypomnienie</h3>
       </div>
@@ -2859,7 +2859,7 @@ function renderMeasurementsModule() {
     })()}
   </div>
 
-  ${activeMeasurementsTab === 'regression' ? '' : activeMeasurementsTab !== 'tym' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="createMeasurement(this); return false;">
+  ${activeMeasurementsTab === 'regression' ? '' : activeMeasurementsTab !== 'tym' ? '' : (!showMeasurementForm ? '' : `<form onsubmit="try{createMeasurement(this)}catch(e){console.error(e);alert('Błąd zapisu — dane NIE zostały zapisane. Zgłoś tę treść: '+(e.message||e));}return false;">
 
     <!-- ═══ WYBÓR KLIENTA I OBIEKTU ═══ -->
     <div class="tym-section" style="border:1px solid #B5D4F4;">
