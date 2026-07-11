@@ -738,7 +738,7 @@ function createObject(form) {
   const savedObj = savedObjectId
     ? allObjs.find(o => Number(o.id) === Number(savedObjectId))
     : allObjs[allObjs.length - 1];
-  if (savedObj) syncObjectBillingToCalendar(savedObj);
+  if (savedObj) { try { syncObjectBillingToCalendar(savedObj); } catch (e) { console.warn('Sync dat rozliczeniowych do kalendarza nieudany (zapis obiektu OK):', e); } }
 
   form.reset();
   showObjectForm = false;
