@@ -279,13 +279,39 @@ function _rdTableHtml(obj) {
     col === 'date' ? String(r.readingDate || '') :
     col === 'value' ? Number(r.value || 0) :
     lpOf[r.id];
-  const rows = all.slice().sort((a, b) => {
+  // Filtr zakresu dat (okres pomiaru nachodzący na wybrany zakres)
+  const fFrom = window._rdFilterFrom || '';
+  const fTo = window._rdFilterTo || '';
+  const inRange = r => {
+    const pf = r.periodFrom || r.readingDate || '';
+    const pt = r.periodTo || r.periodFrom || r.readingDate || '';
+    if (fFrom && pt < fFrom) return false;
+    if (fTo && pf > fTo) return false;
+    return true;
+  };
+  const filtered = all.filter(inRange);
+  const rows = filtered.slice().sort((a, b) => {
     const va = sv(a), vb = sv(b);
     return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
   });
 
-  if (rows.length === 0) {
+  const filterBar = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--color-text-secondary);margin-bottom:10px;">
+      <b style="font-size:12px;">Pokaż okres:</b>
+      <input type="date" value="${fFrom}" style="padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
+        onchange="window._rdFilterFrom=this.value;renderReadingsModule(_rdLockClientId);">
+      <span>–</span>
+      <input type="date" value="${fTo}" style="padding:5px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;font-size:12px;"
+        onchange="window._rdFilterTo=this.value;renderReadingsModule(_rdLockClientId);">
+      ${(fFrom || fTo) ? `<button class="small-button" style="font-size:12px;" onclick="window._rdFilterFrom='';window._rdFilterTo='';renderReadingsModule(_rdLockClientId);">✕ Wyczyść filtr</button>
+      <span>· widoczne: <b>${rows.length}</b> z ${all.length}</span>` : ''}
+    </div>`;
+
+  if (all.length === 0) {
     return '<p style="color:var(--color-text-secondary);font-size:14px;">Brak pomiarów dla tego obiektu. Dodaj pierwszy przyciskiem „+ Dodaj pomiar" lub wklej listę przez „+ Pomiar seryjny".</p>';
+  }
+  if (rows.length === 0) {
+    return filterBar + '<p style="color:var(--color-text-secondary);font-size:14px;">Brak pomiarów w wybranym zakresie dat.</p>';
   }
 
   // Wykrywanie duplikatów (ten sam okres, typ, wartość i jednostka)
@@ -344,7 +370,7 @@ function _rdTableHtml(obj) {
       </tr>${meta}`;
   }).join('');
 
-  return dupBar + `
+  return filterBar + dupBar + `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;overflow:auto;">
       <table style="width:100%;border-collapse:collapse;min-width:640px;">
         <thead><tr>${(() => {
@@ -361,7 +387,7 @@ function _rdTableHtml(obj) {
         <tbody>${body}</tbody>
       </table>
     </div>
-    <p style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Pomiarów: ${rows.length}</p>
+    <p style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Pomiarów: ${rows.length}${rows.length !== all.length ? ' (z ' + all.length + ' ogółem)' : ''}</p>
     ${_rdEscoSummaryHtml(all)}`;
 }
 
