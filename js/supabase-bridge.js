@@ -1,5 +1,8 @@
 // WaterAI Energy Control
-// Fabryka mostków Supabase v1.0.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// Fabryka mostków Supabase v1.1.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// v1.1.0 (2026-07-11): (a) _persist zserializowany kolejką — równoległe saveAll
+// wyścigały się i podwójnie insertowały te same rekordy; (b) load() wykrywa
+// w bazie wiersze-duplikaty (ten sam data.id), pomija je i kasuje z tabeli.
 //
 // Każdy moduł danych dostaje z makeStore() ten sam, przetestowany rdzeń:
 //   • load()   — po zalogowaniu: zaciąga wiersze tabeli do pamięci podręcznej (jedyne await),
@@ -58,12 +61,21 @@ const WaterAIBridge = {
           return;
         }
         this._rowIds = {}; this._snap = {};
-        this._cache = (data || []).map(r => {
+        this._cache = [];
+        const dupRowIds = [];
+        (data || []).forEach(r => {
           const obj = r.data || {};
-          this._rowIds[String(obj.id)] = r.id;
-          this._snap[String(obj.id)] = JSON.stringify(obj);
-          return obj;
+          const key = String(obj.id);
+          if (this._rowIds[key]) { dupRowIds.push(r.id); return; }   // duplikat z wyścigu zapisów
+          this._rowIds[key] = r.id;
+          this._snap[key] = JSON.stringify(obj);
+          this._cache.push(obj);
         });
+        if (dupRowIds.length) {
+          console.warn('[' + this.table + '] Usuwam ' + dupRowIds.length + ' zduplikowanych wierszy z bazy (ten sam data.id).');
+          const { error: delErr } = await sb.from(this.table).delete().in('id', dupRowIds);
+          if (delErr) console.warn('[' + this.table + '] Nie udało się skasować duplikatów:', delErr.message);
+        }
 
         // 3. Migracja jednorazowa — pytanie PRZED lustrem. TYLKO dla admina:
         // rola client/salesRep widzi baze przycieta przez RLS, wiec "pusto w bazie"
@@ -99,7 +111,23 @@ const WaterAIBridge = {
         this._persist();
       },
 
-      async _persist() {
+      // Serializacja zapisu: kolejne saveAll tylko oznacza „jest nowy stan";
+      // pętla insert/update/delete nigdy nie biegnie równolegle sama ze sobą.
+      _persist() {
+        this._dirty = true;
+        if (this._persisting) return this._persisting;
+        const runner = (async () => {
+          while (this._dirty) {
+            this._dirty = false;
+            await this._persistOnce();
+          }
+          this._persisting = null;
+        })();
+        this._persisting = runner;
+        return runner;
+      },
+
+      async _persistOnce() {
         const sb = this._sb();
         if (!sb) return;
         const seen = {};
