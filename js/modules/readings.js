@@ -880,8 +880,8 @@ function _rdSerialFormHtml(obj) {
       <b style="font-size:15px;">Wpis seryjny — wklej listę miesięcy</b>
       <button class="small-button" onclick="_rdCancel()">✕ Zamknij</button>
     </div>
-    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;">Format: <code>MM/RR – wartość</code> (jeden wiersz = jeden miesiąc, myślnik dowolny, spacje w liczbach dozwolone). Koszty można uzupełnić później, edytując pojedyncze wpisy.</p>
-    <textarea id="rd-serial-text" style="${inp}height:110px;font-family:monospace;font-size:12px;" placeholder="02/25 – 2 887&#10;03/25 – 1 962&#10;04/25 – 1 596"></textarea>
+    <p style="font-size:13px;color:var(--color-text-secondary);margin:0 0 10px;"><b>Wskazania licznika (kumulaty):</b> <code>DD.MM.RRRR – wartość</code> — dowolne daty (miesięczne lub dobowe), zużycie liczone jako różnica wskazań. <b>Zużycie miesięczne:</b> <code>MM/RR – wartość</code>. Tolerowane: przecinek PL, jednostka (kWh/GJ…), wiodący „+”, kumulata w nawiasie.</p>
+    <textarea id="rd-serial-text" style="${inp}height:110px;font-family:monospace;font-size:12px;" placeholder="22.04.2026 – 11076,9&#10;23.04.2026 – 11185,447&#10;24.04.2026 – 11247,834"></textarea>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:10px 0;">
       <div><label style="${lbl}">Źródło dla wszystkich</label>
         <select id="rd-serial-source" style="${inp}">${Object.keys(RD_SOURCES).map(k => `<option value="${k}" ${(isClientRole ? 'CLIENT' : 'CLIENT') === k ? 'selected' : ''}>${RD_SOURCES[k].label}</option>`).join('')}</select></div>
@@ -896,31 +896,82 @@ function _rdSerialFormHtml(obj) {
 }
 
 function _rdParseSerial() {
-  const text = document.getElementById('rd-serial-text').value;
   const unit = document.getElementById('rd-serial-unit').value;
-  const vtype = 'CONSUMPTION';
+  const source = document.getElementById('rd-serial-source').value;
+  const text = document.getElementById('rd-serial-text').value;
   const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
   const existing = ReadingsModule.findByObject(_rdObjectId);
   const seen = {};
   const rows = [];
 
+  function cleanNum(s) {
+    if (s == null) return NaN;
+    s = String(s).replace(/kwh|mwh|gj|gcal|m3|m\u00b3/ig, '').replace(/\+/g, '')
+                 .replace(/\s/g, '').replace(',', '.').replace(/[^0-9.\-]/g, '');
+    return s === '' ? NaN : parseFloat(s);
+  }
+  // Dla wskazań: kumulata w nawiasie jest właściwym odczytem; inaczej liczba przed nawiasem.
+  function parseVal(raw, preferParen) {
+    const pm = raw.match(/\(([^)]*)\)/);
+    const inner = pm ? cleanNum(pm[1]) : NaN;
+    const outer = cleanNum(raw.replace(/\([^)]*\)/, ''));
+    if (preferParen && !isNaN(inner)) return inner;
+    if (!isNaN(outer)) return outer;
+    return inner;
+  }
+  function validDate(d, m, y) {
+    if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1) return false;
+    return d <= new Date(y, m, 0).getDate();
+  }
+
   lines.forEach(line => {
-    const m = line.match(/^(\d{1,2})\s*[\/.\-]\s*(\d{2,4})\s*[–—\-:]\s*([\d\s.,]+)$/);
-    if (!m) { rows.push({ raw: line, ok: false, msg: 'nierozpoznany format' }); return; }
-    const month = Number(m[1]);
-    let year = Number(m[2]);
-    if (year < 100) year += 2000;
-    const value = parseFloat(m[3].replace(/\s/g, '').replace(',', '.'));
-    if (month < 1 || month > 12) { rows.push({ raw: line, ok: false, msg: 'miesiąc poza zakresem 1–12' }); return; }
-    if (isNaN(value)) { rows.push({ raw: line, ok: false, msg: 'nie umiem odczytać wartości' }); return; }
-    const key = year + '-' + String(month).padStart(2, '0');
-    const b = _rdMonthBounds(year, month);
-    let msg = 'OK', ok = true;
-    if (seen[key]) { ok = false; msg = 'duplikat ' + String(month).padStart(2, '0') + '/' + String(year).slice(-2) + ' na liście'; }
-    else if (existing.some(x => x.periodFrom === b.from && x.periodTo === b.to && x.valueType === vtype)) { ok = false; msg = 'ten miesiąc już jest w bazie'; }
-    seen[key] = true;
-    rows.push({ raw: line, ok, msg, year, month, value, from: b.from, to: b.to });
+    // 1) WSKAZANIE LICZNIKA — DD.MM.RRRR – wartość (kumulata)
+    let m = line.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})(?!\d)\s*[\u2013\u2014:\-]?\s*(.+)$/);
+    if (m) {
+      let d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
+      if (y < 100) y += 2000;
+      if (!validDate(d, mo, y)) { rows.push({ raw: line, ok: false, msg: 'błędna data' }); return; }
+      const value = parseVal(m[4], true);
+      if (isNaN(value)) { rows.push({ raw: line, ok: false, msg: 'nie umiem odczytać wartości' }); return; }
+      const iso = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      let ok = true, msg = 'OK';
+      const key = 'R|' + iso;
+      if (seen[key]) { ok = false; msg = 'duplikat daty na liście'; }
+      else if (existing.some(x => x.valueType === 'READING' && x.dataSource === source && x.unit === unit && String(x.readingDate || '').slice(0, 10) === iso)) { ok = false; msg = 'wskazanie z tej daty już jest w bazie'; }
+      seen[key] = true;
+      rows.push({ raw: line, ok, msg, kind: 'READING', iso, value, from: iso, to: iso });
+      return;
+    }
+    // 2) ZUŻYCIE MIESIĘCZNE — MM/RR – wartość
+    m = line.match(/^(\d{1,2})\s*[\/.\-]\s*(\d{2,4})\s*[\u2013\u2014:\-]\s*(.+)$/);
+    if (m) {
+      const month = Number(m[1]);
+      let year = Number(m[2]); if (year < 100) year += 2000;
+      const value = parseVal(m[3], false);
+      if (month < 1 || month > 12) { rows.push({ raw: line, ok: false, msg: 'miesiąc poza zakresem 1–12' }); return; }
+      if (isNaN(value)) { rows.push({ raw: line, ok: false, msg: 'nie umiem odczytać wartości' }); return; }
+      const b = _rdMonthBounds(year, month);
+      const key = 'C|' + year + '-' + String(month).padStart(2, '0');
+      let ok = true, msg = 'OK';
+      if (seen[key]) { ok = false; msg = 'duplikat ' + String(month).padStart(2, '0') + '/' + String(year).slice(-2) + ' na liście'; }
+      else if (existing.some(x => x.periodFrom === b.from && x.periodTo === b.to && x.valueType === 'CONSUMPTION')) { ok = false; msg = 'ten miesiąc już jest w bazie'; }
+      seen[key] = true;
+      rows.push({ raw: line, ok, msg, kind: 'CONSUMPTION', from: b.from, to: b.to, value });
+      return;
+    }
+    rows.push({ raw: line, ok: false, msg: 'nierozpoznany format' });
   });
+
+  // 3) KONTROLA MONOTONICZNOŚCI wskazań (kumulaty nie mogą maleć w serii źródło+jednostka)
+  const series = existing.filter(x => x.valueType === 'READING' && x.dataSource === source && x.unit === unit)
+    .map(x => ({ iso: String(x.readingDate || '').slice(0, 10), value: Number(x.value || 0), old: true }))
+    .concat(rows.filter(r => r.ok && r.kind === 'READING').map(r => ({ iso: r.iso, value: r.value, old: false })))
+    .sort((a, b) => a.iso.localeCompare(b.iso));
+  for (let i = 1; i < series.length; i++) {
+    if (series[i].value < series[i - 1].value) {
+      rows.forEach(r => { if (r.ok && r.kind === 'READING' && r.iso === series[i].iso) { r.ok = false; r.msg = 'wskazanie spada względem wcześniejszego — inny licznik lub błędna data?'; } });
+    }
+  }
 
   window._rdSerialRows = rows;
   const okCount = rows.filter(r => r.ok).length;
@@ -935,20 +986,20 @@ function _rdParseSerial() {
   box.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="color:var(--color-text-secondary);text-align:left;">
-        <th style="padding:5px 8px;font-weight:600;font-size:11px;border-bottom:2px solid var(--color-border-tertiary);">Okres</th>
+        <th style="padding:5px 8px;font-weight:600;font-size:11px;border-bottom:2px solid var(--color-border-tertiary);">Data / okres</th>
         <th style="padding:5px 8px;font-weight:600;font-size:11px;text-align:right;border-bottom:2px solid var(--color-border-tertiary);">Wartość (${_rdEsc(_rdUnit(unit))})</th>
         <th style="padding:5px 8px;font-weight:600;font-size:11px;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
       </tr></thead>
       <tbody>${rows.map(r => `
         <tr>
-          <td style="padding:5px 8px;border-bottom:1px solid var(--color-border-tertiary);">${r.from ? _rdDatePL(r.from) + ' – ' + _rdDatePL(r.to) : _rdEsc(r.raw)}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid var(--color-border-tertiary);">${r.kind === 'READING' ? _rdDatePL(r.iso) + ' <span style="color:var(--color-text-secondary);font-size:11px;">· wskazanie</span>' : (r.from ? _rdDatePL(r.from) + ' – ' + _rdDatePL(r.to) : _rdEsc(r.raw))}</td>
           <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--color-border-tertiary);">${r.value != null ? _rdNum(r.value) : '—'}</td>
           <td style="padding:5px 8px;border-bottom:1px solid var(--color-border-tertiary);">${badge(r.ok, r.msg)}</td>
         </tr>`).join('')}</tbody>
     </table>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
       <span style="font-size:13px;color:var(--color-text-secondary);">Rozpoznano ${rows.length} wierszy · ${okCount} OK · ${rows.length - okCount} pominiętych</span>
-      ${okCount ? `<button class="primary-button" style="font-size:13px;" onclick="_rdSaveSerial()">Zapisz ${okCount} pomiarów</button>` : ''}
+      ${okCount ? `<button class="primary-button" style="font-size:13px;" onclick="_rdSaveSerial()">Zapisz ${okCount} pozycji</button>` : ''}
     </div>
     <p style="font-size:12px;color:var(--color-text-secondary);margin-top:6px;">Zapisane zostaną tylko wiersze ze statusem OK. Wiersze z ostrzeżeniem popraw na liście i kliknij podgląd ponownie.</p>`;
 }
@@ -961,13 +1012,11 @@ function _rdSaveSerial() {
   const obj = ObjectsModule.find(_rdObjectId);
   const source = g('rd-serial-source').value;
   const unit = g('rd-serial-unit').value;
-  const vtype = 'CONSUMPTION';
   const performed = g('rd-serial-performed').value.trim();
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
 
-  // Jeden zbiorczy saveAll: wywoływanie add() w pętli uruchamiało nakładające się
-  // synchronizacje z bazą i powielało wiersze (bug 2026-07-06).
+  // Jeden zbiorczy saveAll (add() w pętli powielał wiersze — bug 2026-07-06).
   let idBase = Date.now();
   const items = ReadingsModule.getAll();
   rows.forEach(r => {
@@ -976,11 +1025,11 @@ function _rdSaveSerial() {
       createdAt: now,
       clientId: _rdClientId,
       objectId: _rdObjectId,
-      readingDate: today,
+      readingDate: r.kind === 'READING' ? r.iso : today,
       periodFrom: r.from,
       periodTo: r.to,
       dataSource: source,
-      valueType: vtype,
+      valueType: r.kind,
       value: r.value,
       unit: unit,
       currency: (obj && obj.currency) || 'PLN',
@@ -994,7 +1043,7 @@ function _rdSaveSerial() {
     }));
   });
   ReadingsModule.saveAll(items);
-  alert('Zapisano ' + rows.length + ' pomiarów.');
+  alert('Zapisano ' + rows.length + ' pozycji.');
   _rdCancel();
 }
 
