@@ -738,7 +738,9 @@
         documents: ["🗂️", "Dokumenty", "Faktury klienta, umowy, dokumentacja, zdjęcia."],
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."],
-        instructions: ["📖", "Instrukcja", "Jak działa system i co robi każda rola."]
+        instructions: ["📖", "Instrukcja", "Jak działa system i co robi każda rola."],
+        visibility: ["👁️", "Widoczność", "Udostępnianie dokumentów wybranym użytkownikom."],
+        simulation: ["💡", "Symulacje", "Wieloletnia prognoza oszczędności i rozliczeń ESCO."]
       },
       en: {
         clients: ["👥", "Clients", "Client database and invoice data."],
@@ -758,7 +760,9 @@
         documents: ["🗂️", "Documents", "Client invoices, contracts, documentation, photos."],
         users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."],
-        instructions: ["📖", "Instructions", "How the system works and what each role does."]
+        instructions: ["📖", "Instructions", "How the system works and what each role does."],
+        visibility: ["👁️", "Visibility", "Share documents with selected users."],
+        simulation: ["💡", "Simulations", "Multi-year savings and ESCO settlement forecast."]
       },
       de: {
         clients: ["👥", "Kunden", "Kundendatenbank und Rechnungsdaten."],
@@ -778,7 +782,9 @@
         documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."],
-        instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."]
+        instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."],
+        visibility: ["👁️", "Sichtbarkeit", "Dokumente für ausgewählte Benutzer freigeben."],
+        simulation: ["💡", "Simulationen", "Mehrjährige Einspar- und ESCO-Abrechnungsprognose."]
       },
       cs: {
         clients: ["👥", "Klienti", "Databáze klientů a fakturační údaje."],
@@ -798,7 +804,9 @@
         documents: ["🗂️", "Dokumenty", "Faktury klientů, smlouvy, dokumentace, fotografie."],
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
         settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."],
-        instructions: ["📖", "Návod", "Jak systém funguje a co dělá každá role."]
+        instructions: ["📖", "Návod", "Jak systém funguje a co dělá každá role."],
+        visibility: ["👁️", "Viditelnost", "Sdílení dokumentů vybraným uživatelům."],
+        simulation: ["💡", "Simulace", "Víceletá prognóza úspor a ESCO vyúčtování."]
       },
       sk: {
         clients: ["👥", "Klienti", "Databáza klientov a fakturačné údaje."],
@@ -818,14 +826,16 @@
         documents: ["🗂️", "Dokumenty", "Faktúry klientov, zmluvy, dokumentácia, fotografie."],
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
         settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."],
-        instructions: ["📖", "Návod", "Ako systém funguje a čo robí každá rola."]
+        instructions: ["📖", "Návod", "Ako systém funguje a čo robí každá rola."],
+        visibility: ["👁️", "Viditeľnosť", "Zdieľanie dokumentov vybraným používateľom."],
+        simulation: ["💡", "Simulácie", "Viacročná prognóza úspor a ESCO vyúčtovania."]
       }
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "users", "settings", "instructions"],
-      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports", "instructions"],
-      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "instructions"],
+      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "simulation", "visibility", "users", "settings", "instructions"],
+      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports", "visibility", "instructions"],
+      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "simulation", "visibility", "instructions"],
       salesRepresentative:["calendar", "clients", "objects", "readings", "reports", "instructions"],
       client:             ["myObjects", "myReadings", "myMeasurements", "myReports", "instructions"]
     };
@@ -991,6 +1001,8 @@
       if (window.DocFoldersModule && window.DocFoldersModule.load) await window.DocFoldersModule.load();
       if (window.DocumentsModule && window.DocumentsModule.load) await window.DocumentsModule.load();
       if (window.CalendarModule && window.CalendarModule.load) await window.CalendarModule.load();
+      if (window.SharesModule && window.SharesModule.load) await window.SharesModule.load();
+      if (window.SimulationsModule && window.SimulationsModule.load) await window.SimulationsModule.load();
       // Jednorazowa migracja plików base64 → bucket Storage (w tle, tylko role wewnętrzne).
       if (window.DocumentsModule && window.DocumentsModule.migrateFilesToStorage) window.DocumentsModule.migrateFilesToStorage();
 
@@ -1363,6 +1375,8 @@
 <script src="js/modules/app-v2.js?v=1783380012"></script>
 <script src="js/modules/i18n-domain.js?v=8"></script>
 <script src="js/modules/readings.js?v=1783380007"></script>
+<script src="js/modules/shares.js?v=1783822000"></script>
+<script src="js/modules/simulations.js?v=1783822000"></script>
 <script src="js/modules/backup.js?v=1783817784"></script>
 <script src="js/modules/instructions.js?v=1783821768"></script>
 </body>
