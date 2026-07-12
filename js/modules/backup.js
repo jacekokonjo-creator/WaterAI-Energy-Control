@@ -3,10 +3,10 @@
 // Kopia zapasowa / przywracanie WSZYSTKICH danych WaterAI (klucze localStorage
 // z prefiksem "waterai_"). Eksport-import do pliku JSON.
 //
-// Po co: dane żyją tylko w localStorage przeglądarki — brak serwera i kopii.
-// Ten moduł daje (a) backup na wypadek utraty danych, (b) przenoszenie danych
-// między komputerami/przeglądarkami. Operuje na localStorage celowo bezpośrednio
-// (to z natury operacja na całym magazynie, ponad pojedynczymi modułami).
+// Po co: dane domenowe żyją we wspólnej bazie (Supabase); localStorage trzyma
+// lokalną kopię (lustro) do pracy offline. Ten moduł eksportuje/importuje tę
+// lokalną kopię (wszystkie klucze "waterai_"). Operuje na localStorage celowo
+// bezpośrednio (to z natury operacja na całym magazynie, ponad pojedynczymi modułami).
 // ─────────────────────────────────────────────────────────────────────────────
 const BackupModule = {
   PREFIX: 'waterai_',
@@ -131,11 +131,13 @@ const BackupModule = {
       <div style="background:var(--color-background-secondary);border:1px solid var(--color-border-tertiary);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
         <div style="font-size:15px;font-weight:600;color:#0C447C;margin-bottom:4px;">💾 Kopia zapasowa danych</div>
         <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.55;">
-          Wszystkie dane (klienci, obiekty, pomiary, analizy, regresja, faktury, dokumenty, raporty ESCO…) są zapisane
-          <strong>tylko w tej przeglądarce, na tym komputerze</strong> — nie ma serwera ani automatycznej kopii.
-          Zrób kopię do pliku JSON, aby <strong>zabezpieczyć dane</strong> i <strong>przenieść je na inny komputer</strong>.
+          Dane (klienci, obiekty, pomiary, analizy, regresja, faktury, raporty ESCO…) są zapisywane we
+          <strong>wspólnej bazie w chmurze (Supabase)</strong> — po zalogowaniu widać je na każdym komputerze.
+          Ta przeglądarka trzyma dodatkowo <strong>lokalną kopię (lustro)</strong>, dzięki której aplikacja działa też przy słabym połączeniu.
+          Ten eksport zapisuje tę <strong>lokalną kopię</strong> do pliku JSON — jako dodatkowe zabezpieczenie i do szybkiego przeniesienia stanu.
+          Uwaga: udostępnienia (widoczność) oraz pliki (dokumenty, załączniki) żyją tylko w bazie/Storage i <strong>nie wchodzą</strong> do tego pliku.
         </div>
-        <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:8px;">W tej przeglądarce: <strong>${count}</strong> zestawów danych · ok. <strong>${sizeTxt}</strong></div>
+        <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:8px;">Lokalna kopia w tej przeglądarce: <strong>${count}</strong> zestawów danych · ok. <strong>${sizeTxt}</strong></div>
       </div>
 
       <div style="border:1px solid var(--color-border-tertiary);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
