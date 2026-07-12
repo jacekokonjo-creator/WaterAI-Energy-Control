@@ -74,9 +74,9 @@ window.SharesModule = SharesModule;
 const _shTypes = [
   { key: 'base_period', icon: '📊', label: 'Okresy bazowe' },
   { key: 'analysis',    icon: '📐', label: 'Analizy' },
-  { key: 'esco_report', icon: '📈', label: 'Raporty ESCO' },
-  { key: 'invoice',     icon: '🧾', label: 'Faktury' },
-  { key: 'simulation',  icon: '💡', label: 'Symulacje' }
+  { key: 'esco_report', icon: '📈', label: 'Raporty ESCO' }
+  // Faktury i Symulacje wrócą tu dopiero, gdy dostaną realne reguły has_share w RLS
+  // (dziś RLS honoruje udostępnienia tylko dla base_period / analysis / esco_report).
 ];
 
 function _shObjName(objectId) {
