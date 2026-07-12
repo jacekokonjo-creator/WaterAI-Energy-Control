@@ -72,11 +72,11 @@ window.SharesModule = SharesModule;
 // ── 2. ŹRÓDŁA DOKUMENTÓW (typ zasobu → lista + uuid z mostka) ────────────────
 
 const _shTypes = [
-  { key: 'base_period', icon: '📊', label: 'Okresy bazowe' },
+  { key: 'measurement', icon: '📊', label: 'Okresy bazowe' },   // Protokoły TYM (MeasurementsModule) — has_share('measurement')
   { key: 'analysis',    icon: '📐', label: 'Analizy' },
-  { key: 'esco_report', icon: '📈', label: 'Raporty ESCO' }
-  // Faktury i Symulacje wrócą tu dopiero, gdy dostaną realne reguły has_share w RLS
-  // (dziś RLS honoruje udostępnienia tylko dla base_period / analysis / esco_report).
+  { key: 'esco_report', icon: '📈', label: 'Raporty ESCO' },
+  { key: 'invoice',     icon: '🧾', label: 'Faktury' },
+  { key: 'simulation',  icon: '💡', label: 'Symulacje' }
 ];
 
 function _shObjName(objectId) {
@@ -99,6 +99,12 @@ function _shListResources(typeKey) {
     name: nameFn(it), sub: subFn(it), clientId: clientFn(it)
   }));
 
+  if (typeKey === 'measurement' && window.MeasurementsModule) {
+    return pick(window.MeasurementsModule, MeasurementsModule.getAll(),
+      it => it.protocolNumber || ('Protokół TYM #' + it.id),
+      it => (it.protocolDate || '') + ' · ' + _shObjName(it.objectId),
+      it => _shClientOfObject(it.objectId));
+  }
   if (typeKey === 'base_period' && window._basePeriodsStore && window.BasePeriodModule) {
     return pick(window._basePeriodsStore, BasePeriodModule.getAll(),
       it => it.protocolNumber || ('Okres bazowy #' + it.id),
@@ -134,7 +140,7 @@ function _shListResources(typeKey) {
 
 // ── 3. WIDOK ──────────────────────────────────────────────────────────────────
 
-let _shType = 'esco_report';
+let _shType = 'measurement';
 let _shClientFilter = '';
 
 function renderVisibilityModule() {
