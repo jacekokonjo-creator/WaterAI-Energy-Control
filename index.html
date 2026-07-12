@@ -737,7 +737,8 @@
         analyses: ["📐", "Analizy", "TYM, regresja, obłożenie, powierzchnia i inne."],
         documents: ["🗂️", "Dokumenty", "Faktury klienta, umowy, dokumentacja, zdjęcia."],
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
-        settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."]
+        settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."],
+        instructions: ["📖", "Instrukcja", "Jak działa system i co robi każda rola."]
       },
       en: {
         clients: ["👥", "Clients", "Client database and invoice data."],
@@ -756,7 +757,8 @@
         analyses: ["📐", "Analyses", "TYM, regression, occupancy, area and more."],
         documents: ["🗂️", "Documents", "Client invoices, contracts, documentation, photos."],
         users: ["🔐", "Users and roles", "Account and access management."],
-        settings: ["⚙️", "Settings", "Language, roles and system configuration."]
+        settings: ["⚙️", "Settings", "Language, roles and system configuration."],
+        instructions: ["📖", "Instructions", "How the system works and what each role does."]
       },
       de: {
         clients: ["👥", "Kunden", "Kundendatenbank und Rechnungsdaten."],
@@ -775,7 +777,8 @@
         analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
         documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
-        settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."]
+        settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."],
+        instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."]
       },
       cs: {
         clients: ["👥", "Klienti", "Databáze klientů a fakturační údaje."],
@@ -794,7 +797,8 @@
         analyses: ["📐", "Analýzy", "TYM, regrese, obsazenost, plocha a další."],
         documents: ["🗂️", "Dokumenty", "Faktury klientů, smlouvy, dokumentace, fotografie."],
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
-        settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."]
+        settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."],
+        instructions: ["📖", "Návod", "Jak systém funguje a co dělá každá role."]
       },
       sk: {
         clients: ["👥", "Klienti", "Databáza klientov a fakturačné údaje."],
@@ -813,16 +817,17 @@
         analyses: ["📐", "Analýzy", "TYM, regresia, obsadenosť, plocha a ďalšie."],
         documents: ["🗂️", "Dokumenty", "Faktúry klientov, zmluvy, dokumentácia, fotografie."],
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
-        settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."]
+        settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."],
+        instructions: ["📖", "Návod", "Ako systém funguje a čo robí každá rola."]
       }
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "users", "settings"],
-      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports"],
-      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports"],
-      salesRepresentative:["calendar", "clients", "objects", "readings", "reports"],
-      client:             ["myObjects", "myReadings", "myMeasurements", "myReports"]
+      admin:              ["calendar", "clients", "objects", "readings", "measurements", "analyses", "reports", "invoicing", "users", "settings", "instructions"],
+      backOffice:         ["calendar", "clients", "objects", "readings", "invoicing", "reports", "instructions"],
+      energyAnalyst:      ["calendar", "objects", "readings", "measurements", "analyses", "reports", "instructions"],
+      salesRepresentative:["calendar", "clients", "objects", "readings", "reports", "instructions"],
+      client:             ["myObjects", "myReadings", "myMeasurements", "myReports", "instructions"]
     };
 
     const taskRoles = ["BACK_OFFICE", "ENERGY_ANALYST", "CLIENT"];
@@ -1359,6 +1364,7 @@
 <script src="js/modules/i18n-domain.js?v=8"></script>
 <script src="js/modules/readings.js?v=1783380007"></script>
 <script src="js/modules/backup.js?v=1783817784"></script>
+<script src="js/modules/instructions.js?v=1783821768"></script>
 </body>
 </html>
 
