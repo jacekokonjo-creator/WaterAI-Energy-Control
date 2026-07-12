@@ -1225,7 +1225,7 @@ function _analStepsBar() {
 // ── KROK 1: wybór typu + „+ Nowa analiza" + lista istniejących ──────────────────
 function _analTypeSelect() {
   const cards = Object.entries(AnalysesModule.TYPES).map(([k, t]) => {
-    const ready = (k === 'TYM' || k === 'REGRESSION' || k === 'VOLUME'); // gotowe metody
+    const ready = (k === 'TYM' || k === 'REGRESSION'); // gotowe metody
     return `<div class="anw-type ${ANAL.type === k ? 'sel' : ''}" onclick="analSelectType('${k}')">
       ${ANAL.type === k ? '<span class="chk">✓</span>' : ''}
       <span class="badge ${ready ? 'ready' : 'soon'}">${ready ? 'GOTOWE' : 'WKRÓTCE'}</span>
@@ -1422,10 +1422,6 @@ function _analWizard() {
     body = ANAL.basePeriod
       ? _analTYMSheet()
       : `<div class="reminder-card"><strong>Wybierz okres bazowy</strong><div class="reminder-meta">Standardowy sezon ogrzewczy oraz dane okresu PRZED instalacją zostaną wczytane z wybranego protokołu bazowego. Możesz też wybrać „✏️ Ręczne wprowadzenie".</div></div>`;
-  } else if (ANAL.type === 'VOLUME') {
-    body = ANAL.basePeriod
-      ? _analVOLUMESheet()
-      : `<div class="reminder-card"><strong>Wybierz okres bazowy</strong><div class="reminder-meta">Dla korekty intensywności okres PRZED instalacją oraz zakres dat zostaną wczytane z wybranego protokołu bazowego. Możesz też wybrać „✏️ Ręczne wprowadzenie".</div></div>`;
   } else if (ANAL.type === 'REGRESSION') {
     body = ANAL.basePeriod
       ? _analRegSheet()
@@ -1437,7 +1433,7 @@ function _analWizard() {
         <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
   }
 
-  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'VOLUME' || ANAL.type === 'REGRESSION')) ? `
+  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'REGRESSION')) ? `
     ${ANAL.type === 'VOLUME' ? `<div class="anw-muted" style="margin:14px 0 6px;">Wsk = I·z₀ · φ = ΣWsk_ref / ΣWsk_rzecz · Qs = Q·φ (zużycie sprowadzone do referencyjnej intensywności)</div>` : ''}
     <div class="anw-act" style="justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
       <div class="anw-f" style="min-width:240px;max-width:360px;flex:1;">
@@ -5026,7 +5022,7 @@ function renderBasePeriodTab(type, meta) {
 // Routing: wszystkie typy poza TYM/Regresją dostają uniwersalny przepływ okresów bazowych.
 function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
   const meta = { icon, title, description, bgLight, bgBorder, textColor };
-  if (['volume', 'occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
+  if (['occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
   return `
   <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
     <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
