@@ -73,7 +73,7 @@ const InstructionsModule = {
         'Zarządza udostępnianiem (moduł Widoczność). Konfiguruje system (język, ustawienia, kopie zapasowe).') +
       this._role_block('Back Office',
         'Obsługa operacyjno-rozliczeniowa. Pełny dostęp do klientów, obiektów, pomiarów, raportów i faktur; ' +
-        'wystawia faktury. Może usuwać rekordy. Zarządza udostępnianiem (nadaje W/E dokumentów). ' +
+        'wystawia faktury i tworzy symulacje. Może usuwać rekordy. Zarządza udostępnianiem (nadaje W/E dokumentów). ' +
         'Nie zakłada kont użytkowników.') +
       this._role_block('Energy Analyst',
         'Rdzeń merytoryczny. Pełny dostęp do danych energetycznych: klienci, obiekty, pomiary, okresy bazowe; ' +
