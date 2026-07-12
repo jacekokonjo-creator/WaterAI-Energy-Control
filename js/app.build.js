@@ -2851,7 +2851,7 @@ function renderMeasurementsModule() {
         ['regression','📈','Regresja liniowa','Porównanie techniczne PRZED/PO wg równań y = ax + b.',true],
         ['occupancy','🏨','Korekta obłożenia','Normalizacja zużycia względem obłożenia obiektu.',false],
         ['area','📐','Korekta powierzchni','Wskaźniki zużycia na m² powierzchni ogrzewanej.',false],
-        ['volume','⚙️','Korekta intensywności','Normalizacja względem wolumenu / intensywności pracy.',true],
+        ['volume','⚙️','Korekta intensywności','Normalizacja względem wolumenu / intensywności pracy.',false],
         ['schedule','🕐','Korekta harmonogramu','Uwzględnienie harmonogramu pracy obiektu.',false],
         ['custom','🔬','Metoda niestandardowa','Dowolny model definiowany przez analityka.',false]
       ];
