@@ -54,7 +54,7 @@ const InstructionsModule = {
       this._p('Kto co widzi, wynika z dwóch niezależnych rzeczy:') +
       this._list([
         '<strong>Rola</strong> — stała; określa, co dana osoba w ogóle może robić (np. wpisywać pomiary, wystawiać faktury, zarządzać kontami).',
-        '<strong>Udostępnienie</strong> — nadawane osobno dla pojedynczego dokumentu; daje konkretnej osobie prawo <strong>Widzi (W)</strong> lub <strong>Edytuje (E)</strong> na czymś, czego z samej roli by nie zobaczyła. To narzędzie do celowego pokazywania wybranych dokumentów Klientowi i Sales Repowi.'
+        '<strong>Udostępnienie</strong> — nadawane osobno dla pojedynczego dokumentu; daje konkretnej osobie prawo <strong>Widzi (W)</strong> lub <strong>Edytuje (E)</strong> na czymś, czego z samej roli by nie zobaczyła. To narzędzie do celowego pokazywania wybranych dokumentów Klientowi i Sales Repowi. Udostępniać można: Okresy bazowe (Protokoły TYM), Analizy, Raporty ESCO, Faktury i Symulacje.'
       ])
     );
 
