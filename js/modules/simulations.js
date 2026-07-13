@@ -1,5 +1,10 @@
 // WaterAI Energy Control
-// Simulations Module v1.1.0 — „Symulacja oszczędności" (prognoza wieloletnia).
+// Simulations Module v1.2.0 — zakładka „Oferta" (dawniej „Symulacja oszczędności").
+// v1.2 (2026-07-13): rebranding UI/dokumentu na „Ofertę"; kafelek pod „Obiekty";
+//   prawo tworzenia/edycji także dla salesRepresentative (_simCanWrite); usuwanie
+//   pozostaje wewnętrzne (_simIsStaff). Klucz modułu i tabela nadal 'simulation(s)'.
+//   UWAGA: zapis oferty przez Sales Repa wymaga jeszcze reguły RLS INSERT (osobny SQL).
+// v1.1.0 — „Symulacja oszczędności" (prognoza wieloletnia).
 //
 // v1.1 (2026-07-07): wydruk przebudowany na pełny dokument w stylistyce raportów
 // ESCO — okładka (osobna strona), podsumowanie wykonawcze, statyczna sekcja
@@ -29,7 +34,7 @@ const _simulationsStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
   ? WaterAIBridge.makeStore({
       table: 'simulations',
       storageKey: 'waterai_simulations_v1',
-      label: 'symulacji',
+      label: 'oferty',
       fk:  { column: 'client_id', prop: 'clientId', module: () => window.ClientsModule },
       fk2: { column: 'object_id', prop: 'objectId', module: () => window.ObjectsModule }
     })
@@ -229,6 +234,8 @@ function _simCli(id) { return window.ClientsModule ? ClientsModule.find(id) : nu
 function _simCliName(id) { const c = _simCli(id); return c ? c.name : '—'; }
 function _simObjName(id) { const o = (id && window.ObjectsModule) ? ObjectsModule.find(id) : null; return o ? o.name : '—'; }
 function _simIsStaff() { return typeof currentRole === 'undefined' || ['admin', 'backOffice', 'energyAnalyst'].includes(currentRole); }
+// Kto może TWORZYĆ/EDYTOWAĆ oferty: personel wewnętrzny + Sales Representative.
+function _simCanWrite() { return _simIsStaff() || currentRole === 'salesRepresentative'; }
 function _simYearsTxt(y) { return y === 1 ? '1 roku' : (y + ' latach'); }
 function _simUserName() {
   const p = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile : null;
@@ -268,9 +275,9 @@ function simSuggestNumber(clientId, objectId) {
   const cn = (clientId && window.ClientsModule && typeof ClientsModule.getNumber === 'function') ? ClientsModule.getNumber(clientId) : null;
   const on = (objectId && window.ObjectsModule && typeof ObjectsModule.getNumber === 'function') ? ObjectsModule.getNumber(objectId) : null;
   const seq = String(SimulationsModule.getAll().filter(s => Number(s.clientId) === Number(clientId)).length + 1).padStart(3, '0');
-  if (cn && on) return `SYM/${year}/${cn}/${on}/${seq}`;
-  if (cn) return `SYM/${year}/${cn}/${seq}`;
-  return `SYM/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${seq}`;
+  if (cn && on) return `OF/${year}/${cn}/${on}/${seq}`;
+  if (cn) return `OF/${year}/${cn}/${seq}`;
+  return `OF/${year}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${seq}`;
 }
 window.simSuggestNumber = simSuggestNumber;
 
@@ -507,6 +514,7 @@ function renderSimulationsModule() {
 
   const sims = SimulationsModule.getAll().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const staff = _simIsStaff();
+  const canWrite = _simCanWrite();
 
   const rows = sims.map(sim => {
     const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
@@ -518,7 +526,7 @@ function renderSimulationsModule() {
       `<span style="font-size:11px;font-weight:600;color:${_simColor(i)};margin-right:8px;">${escapeHtml(sc.label)}: ${_simFmt(sc.savingsPct, 1)}%</span>`).join('');
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:10px 12px;font-size:13px;">
-        <div style="font-weight:500;">${escapeHtml(sim.name || ('Symulacja #' + sim.id))}</div>
+        <div style="font-weight:500;">${escapeHtml(sim.name || ('Oferta #' + sim.id))}</div>
         <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.simNumber || '—')} · ${escapeHtml(_simCliName(sim.clientId))} · ${escapeHtml(_simObjName(sim.objectId))}</div>
       </td>
       <td style="padding:10px 12px;">${scen}</td>
@@ -527,8 +535,8 @@ function renderSimulationsModule() {
       <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</td>
       <td style="padding:10px 12px;white-space:nowrap;text-align:right;">
         <button class="small-button" onclick="simView(${sim.id})" title="Podgląd / druk">👁</button>
-        ${staff ? `<button class="small-button" onclick="simEdit(${sim.id})" title="Edytuj">✏️</button>
-        <button class="small-button" onclick="simDelete(${sim.id})" title="Usuń">🗑</button>` : ''}
+        ${canWrite ? `<button class="small-button" onclick="simEdit(${sim.id})" title="Edytuj">✏️</button>` : ''}
+        ${staff ? `<button class="small-button" onclick="simDelete(${sim.id})" title="Usuń">🗑</button>` : ''}
       </td></tr>`;
   }).join('');
 
@@ -536,14 +544,14 @@ function renderSimulationsModule() {
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
       <p style="font-size:13px;color:var(--color-text-secondary);margin:0;">
         Wieloletnia prognoza oszczędności dla klienta i obiektu — payback, zysk netto, ROI i porównanie scenariuszy.</p>
-      ${staff ? `<button class="primary-button" onclick="simEdit(null)" style="font-size:13px;padding:10px 20px;">＋ Nowa symulacja</button>` : ''}
+      ${canWrite ? `<button class="primary-button" onclick="simEdit(null)" style="font-size:13px;padding:10px 20px;">＋ Nowa oferta</button>` : ''}
     </div>
     ${sims.length === 0
-      ? `<div class="reminder-card"><strong>Brak symulacji.</strong>${staff ? ' Kliknij „Nowa symulacja”, aby utworzyć pierwszą.' : ''}</div>`
+      ? `<div class="reminder-card"><strong>Brak ofert.</strong>${canWrite ? ' Kliknij „Nowa oferta”, aby utworzyć pierwszą.' : ''}</div>`
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:var(--color-background-secondary);">
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Symulacja</th>
+              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Oferta</th>
               <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Scenariusze</th>
               <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:center;border-bottom:2px solid var(--color-border-tertiary);">Payback</th>
               <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:center;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
@@ -557,7 +565,7 @@ window.renderSimulationsModule = renderSimulationsModule;
 function simDelete(id) {
   const sim = SimulationsModule.find(id);
   if (!sim) return;
-  if (!confirm('Usunąć symulację „' + (sim.name || ('#' + id)) + '”?')) return;
+  if (!confirm('Usunąć ofertę „' + (sim.name || ('#' + id)) + '”?')) return;
   SimulationsModule.remove(id);
   renderSimulationsModule();
 }
@@ -582,19 +590,19 @@ function simEdit(id) {
 
   container.innerHTML = SIM_STYLE + `
     <div class="sim-noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="small-button" onclick="renderSimulationsModule()">← Lista symulacji</button>
+      <button class="small-button" onclick="renderSimulationsModule()">← Lista ofert</button>
       <div style="display:flex;gap:8px;">
         <button class="primary-button" onclick="simSave()" style="font-size:13px;padding:9px 18px;">💾 Zapisz</button>
       </div>
     </div>
     <div class="sim-grid">
       <div class="sim-panel">
-        <h4>Parametry symulacji</h4>
-        <div class="sim-field"><label>Nazwa symulacji</label>
+        <h4>Parametry oferty</h4>
+        <div class="sim-field"><label>Nazwa oferty</label>
           <input id="sim-name" value="${escapeHtml(_simDraft.name || '')}" placeholder="np. Modernizacja węzła — wariant 2026" oninput="_simRecalc()"></div>
         <div class="sim-g2">
-          <div class="sim-field"><label>Numer symulacji</label>
-            <input id="sim-number" value="${escapeHtml(_simDraft.simNumber || '')}" placeholder="SYM/rok/klient/obiekt/nr" oninput="_simRecalc()"></div>
+          <div class="sim-field"><label>Numer oferty</label>
+            <input id="sim-number" value="${escapeHtml(_simDraft.simNumber || '')}" placeholder="OF/rok/klient/obiekt/nr" oninput="_simRecalc()"></div>
           <div class="sim-field"><label>Sporządził</label>
             <select id="sim-prepared" onchange="_simRecalc()">${_simPreparedOptions(_simDraft.preparedBy || '')}</select></div>
         </div>
@@ -856,9 +864,9 @@ function _simRecalc(skipForm) {
 window._simRecalc = _simRecalc;
 
 function simSave() {
-  if (!_simDraft.clientId) { alert('Wybierz klienta symulacji.'); return; }
+  if (!_simDraft.clientId) { alert('Wybierz klienta oferty.'); return; }
   if (!(_simDraft.heatingCost > 0)) { alert('Podaj roczny koszt ogrzewania (> 0).'); return; }
-  if (!_simDraft.name) _simDraft.name = 'Symulacja — ' + _simCliName(_simDraft.clientId);
+  if (!_simDraft.name) _simDraft.name = 'Oferta — ' + _simCliName(_simDraft.clientId);
   if (!_simDraft.simNumber) _simDraft.simNumber = simSuggestNumber(_simDraft.clientId, _simDraft.objectId || null);
   if (_simEditId) SimulationsModule.update(_simEditId, _simDraft);
   else SimulationsModule.add(_simDraft);
@@ -947,7 +955,7 @@ function _simSection(no, title, inner) {
 // Sekcja 2 — statyczny opis metod pomiaru i rozliczania (zawsze ten sam).
 function _simMethodsHtml() {
   return `
-    <p class="sim-desc">Symulacja pokazuje potencjał finansowy wdrożenia. Rzeczywiste oszczędności — po uruchomieniu systemu — są mierzone i rozliczane według jednej z poniższych metod, uzgodnionej w umowie ESCO, a wynik każdorazowo weryfikowany niezależnym dowodem technicznym (regresja liniowa). Dokładnie w ten sposób powstają cykliczne raporty rozliczeniowe ESCO, które klient otrzymuje po każdym zamkniętym okresie.</p>
+    <p class="sim-desc">Oferta pokazuje potencjał finansowy wdrożenia. Rzeczywiste oszczędności — po uruchomieniu systemu — są mierzone i rozliczane według jednej z poniższych metod, uzgodnionej w umowie ESCO, a wynik każdorazowo weryfikowany niezależnym dowodem technicznym (regresja liniowa). Dokładnie w ten sposób powstają cykliczne raporty rozliczeniowe ESCO, które klient otrzymuje po każdym zamkniętym okresie.</p>
 
     <div class="sim-method">
       <h5>Korekta TYM — stopniodni <span class="tag">metoda domyślna</span></h5>
@@ -1068,7 +1076,7 @@ function _simMechanismHtml(sim, results) {
     <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. ${variantTxt}</p>
     <p class="sim-desc">Poza wskazanym wyżej rozliczeniem oszczędności klient nie ponosi żadnych dodatkowych kosztów: brak opłat za serwis, utrzymanie, konserwację, aktualizacje oprogramowania czy wsparcie techniczne. W całym okresie współpracy WaterAI na bieżąco monitoruje instalację oraz wprowadza korekty nastaw, aktualizacje i optymalizacje sterowania — ponieważ nasze wynagrodzenie zależy wprost od uzyskanego wyniku, utrzymanie i poprawa efektu leżą w naszym wspólnym interesie.</p>
     <div class="sim-steps">
-      <div class="sim-step"><div class="no">1</div><div class="t">Audyt i symulacja</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
+      <div class="sim-step"><div class="no">1</div><div class="t">Audyt i oferta</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
       <div class="sim-step"><div class="no">2</div><div class="t">Umowa ESCO</div><div class="d">Ustalenie metody rozliczeniowej, udziałów i okresu bazowego.</div></div>
       <div class="sim-step"><div class="no">3</div><div class="t">Montaż i okres bazowy</div><div class="d">Instalacja systemu, rejestracja charakterystyki odniesienia.</div></div>
       <div class="sim-step"><div class="no">4</div><div class="t">Aktywacja optymalizacji</div><div class="d">Uruchomienie sterowania WaterAI, ciągły pomiar co 10 minut.</div></div>
@@ -1117,11 +1125,11 @@ function _simDocHtml(sim) {
     <div class="sim-cover">
       <div class="sim-cover-head">
         <img src="logo-waterai.png" alt="WaterAI" class="sim-cover-logo" />
-        <div class="sim-cover-num"><div class="sim-cover-num-lbl">Nr symulacji</div>
+        <div class="sim-cover-num"><div class="sim-cover-num-lbl">Nr oferty</div>
           <div class="sim-cover-num-val">${escapeHtml(sim.simNumber || '—')}</div></div>
       </div>
-      <div><span class="sim-cover-kicker">Symulacja oszczędności · Prognoza ESCO</span></div>
-      <h1>Symulacja oszczędności energii</h1>
+      <div><span class="sim-cover-kicker">Oferta oszczędności · Prognoza ESCO</span></div>
+      <h1>Oferta oszczędności energii</h1>
       <div class="sim-cover-sub">Wieloletnia prognoza efektu wdrożenia systemu WaterAI — potencjał finansowy, scenariusze oraz metodyka pomiaru i rozliczania oszczędności w modelu ESCO</div>
       <div class="sim-cover-meta">
         <div class="sim-cm-card"><div class="sim-cm-lbl">Dla kogo</div>
@@ -1161,7 +1169,7 @@ function _simDocHtml(sim) {
       ${setl.feeLabel !== '—' ? `<tr><td>${setl.feeLabel}</td><td>${_simFmt(inv)} ${cur}</td></tr>` : `<tr><td>Opłata wstępna</td><td>brak</td></tr>`}
       <tr><td>Udział klienta w oszczędnościach</td><td>${_simFmt(sim.clientSharePct, 1)}%</td></tr>
       ${stType === 'DEPOSIT' ? `<tr><td>Rata zwrotu kaucji</td><td>${_simFmt(sim.paybackReturnPct, 1)}% oszczędności / rok</td></tr>` : ''}
-      <tr><td>Horyzont symulacji</td><td>${sim.years} lat</td></tr>
+      <tr><td>Horyzont prognozy</td><td>${sim.years} lat</td></tr>
       <tr><td>Waluta</td><td>${cur}</td></tr>
     </tbody></table>
     <div style="height:12px;"></div>
@@ -1188,7 +1196,7 @@ function _simDocHtml(sim) {
   return cover
     + _simSection(1, 'Podsumowanie wykonawcze', _simExecSummary(sim, results))
     + _simSection(2, 'Jak zmierzymy i udowodnimy oszczędności', _simMethodsHtml())
-    + _simSection(3, 'Założenia symulacji i scenariusze', s3)
+    + _simSection(3, 'Założenia oferty i scenariusze', s3)
     + _simSection(4, 'Wyniki scenariuszy', s4)
     + _simSection(5, 'Porównanie scenariuszy', _simComparisonHtml(sim, results))
     + _simSection(6, 'Mechanizm rozliczenia ESCO i dalsze kroki', _simMechanismHtml(sim, results))
@@ -1202,7 +1210,7 @@ function simView(id) {
 
   container.innerHTML = SIM_STYLE + `
     <div class="sim-noprint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="small-button" onclick="renderSimulationsModule()">← Lista symulacji</button>
+      <button class="small-button" onclick="renderSimulationsModule()">← Lista ofert</button>
       <div style="display:flex;gap:8px;">
         ${_simIsStaff() ? `<button class="small-button" onclick="simEdit(${sim.id})">✏️ Edytuj</button>` : ''}
         <button class="primary-button" onclick="simPrintPDF()" style="font-size:13px;padding:9px 18px;">🖨 Drukuj / PDF</button>
