@@ -732,6 +732,7 @@
         pdf: ["📄", "Import PDF", "Analiza dokumentów i faktur PDF."],
         reports: ["📈", "Raporty ESCO", "Oszczędności, rozliczenia i raporty."],
         myReports: ["📈", "Moje raporty", "Raporty oszczędności dostępne dla klienta."],
+        myInvoices: ["🧾", "Moje faktury", "Faktury udostępnione Ci przez zespół WaterAI."],
         calendar: ["📅", "Kalendarz / Przypomnienia", "Zadania cykliczne dla obiektów i ról."],
         invoicing: ["🧾", "Faktury", "Wystawione faktury, należności i rozliczenia."],
         analyses: ["📐", "Analizy", "TYM, regresja, obłożenie, powierzchnia i inne."],
@@ -754,6 +755,7 @@
         pdf: ["📄", "PDF import", "Analyze PDF documents and invoices."],
         reports: ["📈", "ESCO reports", "Savings, settlements and reports."],
         myReports: ["📈", "My reports", "Savings reports available for the client."],
+        myInvoices: ["🧾", "My invoices", "Invoices shared with you by the WaterAI team."],
         calendar: ["📅", "Calendar / Reminders", "Recurring tasks for buildings and roles."],
         invoicing: ["🧾", "Invoicing", "Savings summary and invoice basis."],
         analyses: ["📐", "Analyses", "TYM, regression, occupancy, area and more."],
@@ -776,6 +778,7 @@
         pdf: ["📄", "PDF-Import", "Analyse von PDF-Dokumenten und Rechnungen."],
         reports: ["📈", "ESCO-Berichte", "Einsparungen, Abrechnungen und Berichte."],
         myReports: ["📈", "Meine Berichte", "Für den Kunden verfügbare Einsparberichte."],
+        myInvoices: ["🧾", "Meine Rechnungen", "Von WaterAI für Sie freigegebene Rechnungen."],
         calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
         invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
         analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
@@ -798,6 +801,7 @@
         pdf: ["📄", "Import PDF", "Analýza PDF dokumentů a faktur."],
         reports: ["📈", "ESCO reporty", "Úspory, vyúčtování a reporty."],
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
+        myInvoices: ["🧾", "Moje faktury", "Faktury sdílené s vámi týmem WaterAI."],
         calendar: ["📅", "Kalendář / Připomínky", "Opakované úkoly pro objekty a role."],
         invoicing: ["🧾", "Fakturace", "Souhrn úspor a podklad pro fakturu."],
         analyses: ["📐", "Analýzy", "TYM, regrese, obsazenost, plocha a další."],
@@ -820,6 +824,7 @@
         pdf: ["📄", "Import PDF", "Analýza PDF dokumentov a faktúr."],
         reports: ["📈", "ESCO reporty", "Úspory, vyúčtovania a reporty."],
         myReports: ["📈", "Moje reporty", "Reporty úspor dostupné klientovi."],
+        myInvoices: ["🧾", "Moje faktúry", "Faktúry zdieľané s vami tímom WaterAI."],
         calendar: ["📅", "Kalendár / Pripomienky", "Opakované úlohy pre objekty a role."],
         invoicing: ["🧾", "Fakturácia", "Súhrn úspor a podklad pre faktúru."],
         analyses: ["📐", "Analýzy", "TYM, regresia, obsadenosť, plocha a ďalšie."],
@@ -834,10 +839,10 @@
 
     const roleModules = {
       admin:              ["calendar", "clients", "objects", "simulation", "readings", "measurements", "analyses", "reports", "invoicing", "visibility", "users", "settings", "instructions"],
-      backOffice:         ["calendar", "clients", "objects", "simulation", "readings", "invoicing", "reports", "visibility", "instructions"],
+      backOffice:         ["calendar", "clients", "objects", "simulation", "readings", "invoicing", "reports", "visibility", "users", "instructions"],
       energyAnalyst:      ["calendar", "objects", "simulation", "readings", "measurements", "analyses", "reports", "visibility", "instructions"],
       salesRepresentative:["calendar", "clients", "objects", "simulation", "readings", "reports", "instructions"],
-      client:             ["myObjects", "myReadings", "myMeasurements", "myReports", "instructions"]
+      client:             ["myObjects", "myReadings", "myMeasurements", "myReports", "myInvoices", "instructions"]
     };
 
     const taskRoles = ["BACK_OFFICE", "ENERGY_ANALYST", "CLIENT"];
@@ -1119,6 +1124,10 @@
     document.getElementById("module-description").textContent = "";
     renderClientView("reports", previewClientId);
   }
+  else if (moduleName === "myInvoices") {
+    document.getElementById("module-description").textContent = "";
+    renderClientView("invoices", previewClientId);
+  }
   else {
     document.getElementById("module-description").textContent = t("moduleDefault");
     document.getElementById("module-content").innerHTML = "";
@@ -1234,6 +1243,44 @@
                 <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
                 <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:right;">Oszczędność</th>
                 <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Raport</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`}`;
+      } else if (section === "invoices") {
+        const invoices = (typeof InvoicingModule !== "undefined") ? InvoicingModule.findByClient(clientId) : [];
+        const stFor = (inv) => (InvoicingModule.STATUSES && InvoicingModule.STATUSES[inv.status]) || { label: inv.status || '—', color: 'var(--color-text-secondary)', bg: 'var(--color-background-secondary)' };
+        const fmtAmt = (v, cur) => (Number(v) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (cur || 'PLN');
+        const rows = invoices.map(inv => {
+          const obj = objects.find(o => Number(o.id) === Number(inv.objectId));
+          const st = stFor(inv);
+          return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+            <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber||'—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(inv.issueDate||'—')}</td>
+            <td style="padding:9px 12px;font-size:13px;">${escapeHtml(inv.dueDate||'—')}</td>
+            <td style="padding:9px 12px;font-size:13px;text-align:right;font-weight:600;">${fmtAmt(inv.grossAmount, inv.currency)}</td>
+            <td style="padding:9px 12px;text-align:center;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};">${escapeHtml(st.label)}</span></td>
+          </tr>`;
+        }).join('');
+        container.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:22px;">🧾</span>
+            <div>
+              <h3 style="margin:0;font-size:16px;">Moje faktury</h3>
+              <p style="margin:2px 0 0;font-size:12px;color:var(--color-text-secondary);">${escapeHtml(client.name)} · faktury udostępnione przez zespół WaterAI</p>
+            </div>
+          </div>
+          ${invoices.length === 0 ? '<div class="reminder-card"><strong>Brak udostępnionych faktur</strong><br><span style="font-size:12px;color:var(--color-text-secondary);">Gdy zespół WaterAI udostępni Ci fakturę, pojawi się tutaj.</span></div>' : `
+          <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:var(--color-background-secondary);">
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Numer</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Obiekt</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Wystawiona</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:left;">Termin</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:right;">Kwota brutto</th>
+                <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:center;">Status</th>
               </tr></thead>
               <tbody>${rows}</tbody>
             </table>
@@ -1371,7 +1418,7 @@
 <script src="js/modules/invoicing.js?v=1782600100"></script>
 <script src="js/modules/billing-entities.js?v=1782600100"></script>
 <script src="js/modules/calendar.js?v=1783380012"></script>
-<script src="js/modules/users.js?v=1783367000"></script>
+<script src="js/modules/users.js?v=1784700000"></script>
 <script src="js/app.build.js?v=1784000000"></script>
 <script src="js/modules/app-v2.js?v=1784000000"></script>
 <script src="js/modules/i18n-domain.js?v=8"></script>

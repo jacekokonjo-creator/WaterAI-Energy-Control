@@ -159,6 +159,12 @@ function _usrEsc(v) { return (typeof escapeHtml === 'function') ? escapeHtml(v =
 function _usrIsAdmin() {
   return (typeof realRole !== 'undefined' && realRole === 'admin');
 }
+// Zarządzanie kontami: administrator + Back Office. Back Office NIE może jednak
+// tworzyć ani modyfikować kont z rolą 'admin' (blokada eskalacji uprawnień) —
+// egzekwowane tu w UI oraz w RLS (migration_005).
+function _usrCanManage() {
+  return _usrIsAdmin() || (typeof realRole !== 'undefined' && realRole === 'backOffice');
+}
 
 function renderUsersModule() {
   const container = document.getElementById('module-content');
@@ -168,6 +174,7 @@ function renderUsersModule() {
   const allUsers = UsersModule.getAll();
   const clients = (typeof ClientsModule !== 'undefined') ? ClientsModule.getAll() : [];
   const isAdmin = _usrIsAdmin();
+  const canManage = _usrCanManage();
   const myId = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile.id : null;
 
   const filtered = usersActiveRole === 'all' ? allUsers : allUsers.filter(u => u.role === usersActiveRole);
@@ -210,7 +217,7 @@ function renderUsersModule() {
 
   const infoBar = `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:10px 14px;margin-bottom:16px;background:var(--color-background-secondary);font-size:12px;color:var(--color-text-secondary);">
-      🔒 Zalogować się mogą <b>wyłącznie</b> konta utworzone tutaj przez administratora. Konto założone poza aplikacją (bez profilu) jest blokowane przy wejściu.
+      🔒 Zalogować się mogą <b>wyłącznie</b> konta utworzone tutaj przez administratora lub Back Office. Konto założone poza aplikacją (bez profilu) jest blokowane przy wejściu.
       ${sb ? '' : '<br><b style="color:#c00;">Brak połączenia z bazą — zarządzanie kontami jest niedostępne.</b>'}
     </div>`;
 
@@ -219,7 +226,7 @@ function renderUsersModule() {
 
   const editUser = editingUserId ? UsersModule.find(editingUserId) : null;
 
-  const formHtml = (showUserForm && isAdmin && sb) ? `
+  const formHtml = (showUserForm && canManage && sb) ? `
     <div style="border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;margin-bottom:20px;background:var(--color-background-primary);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <b style="font-size:15px;">${editUser ? 'Edytuj użytkownika' : 'Nowe konto użytkownika'}</b>
@@ -234,7 +241,7 @@ function renderUsersModule() {
           <input id="usr-password" type="text" placeholder="użytkownik może je potem zmienić" style="${inp}"></div>`}
         <div><label style="${lbl}">Rola</label>
           <select id="usr-role" style="${inp}" onchange="document.getElementById('usr-client-field').style.display=this.value==='client'?'':'none';">
-            ${Object.entries(UsersModule.ROLES).map(([k, r]) => `<option value="${k}" ${(editUser ? editUser.role : 'client') === k ? 'selected' : ''}>${r.icon} ${r.label}</option>`).join('')}
+            ${Object.entries(UsersModule.ROLES).filter(([k]) => isAdmin || k !== 'admin').map(([k, r]) => `<option value="${k}" ${(editUser ? editUser.role : 'client') === k ? 'selected' : ''}>${r.icon} ${r.label}</option>`).join('')}
           </select></div>
         <div id="usr-client-field" style="${(editUser ? editUser.role : 'client') === 'client' ? '' : 'display:none;'}">
           <label style="${lbl}">Klient (dla roli Client)</label>
@@ -263,7 +270,7 @@ function renderUsersModule() {
       <td style="${td}"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span></td>
       <td style="${td}">${u.role === 'client' ? _usrEsc(clientName) : '—'}</td>
       <td style="${td}white-space:nowrap;text-align:right;">
-        ${isAdmin && sb ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
+        ${(canManage && sb && (u.role !== 'admin' || isAdmin)) ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
         <button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="_usrSendReset('${_usrEsc(u.email)}')">Reset hasła</button>
         ${isMe ? '' : `<button class="small-button" style="font-size:12px;padding:4px 10px;color:#c00;border-color:#c00;" onclick="_usrRemove('${u.id}')">Zablokuj</button>`}` : ''}
       </td>
@@ -278,7 +285,7 @@ function renderUsersModule() {
       <input id="usr-search-input" type="text" placeholder="Szukaj po nazwisku lub e-mailu…" value="${_usrEsc(window._usrSearch || '')}"
         style="flex:1;box-sizing:border-box;padding:8px 12px;border:1px solid var(--color-border-tertiary);border-radius:8px;font-size:13px;"
         oninput="window._usrSearch=this.value;renderUsersModule();document.getElementById('usr-search-input').focus();">
-      ${isAdmin && sb && !showUserForm ? '<button class="primary-button" style="font-size:13px;padding:8px 18px;white-space:nowrap;" onclick="showUserForm=true;editingUserId=null;renderUsersModule();">+ Dodaj użytkownika</button>' : ''}
+      ${canManage && sb && !showUserForm ? '<button class="primary-button" style="font-size:13px;padding:8px 18px;white-space:nowrap;" onclick="showUserForm=true;editingUserId=null;renderUsersModule();">+ Dodaj użytkownika</button>' : ''}
     </div>
     ${formHtml}
     ${display.length ? `
