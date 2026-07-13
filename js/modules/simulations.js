@@ -57,7 +57,7 @@ const SimulationsModule = {
     ACCEPTED:  { label: 'Zaakceptowana',  color: '#27500A', bg: '#EAF3DE' }
   },
 
-  // Warianty rozliczenia — kaucja zwrotna / opłata niezwrotna / bez opłat.
+  // Warianty rozliczenia — kaucja zwrotna / opłata wdrożeniowa / bez opłat.
   SETTLEMENTS: {
     DEPOSIT: {
       label: 'Kaucja zwrotna',
@@ -66,7 +66,7 @@ const SimulationsModule = {
       desc: 'Klient wpłaca zwrotną kaucję i do czasu jej zwrotu otrzymuje podwyższony udział w oszczędnościach; po zwrocie obowiązuje udział docelowy.'
     },
     FEE: {
-      label: 'Opłata niezwrotna',
+      label: 'Opłata wdrożeniowa',
       short: 'opłata za wdrożenie',
       feeLabel: 'Opłata za wdrożenie',
       desc: 'Klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.'
@@ -122,7 +122,7 @@ window.SimulationsModule = SimulationsModule;
 //   'DEPOSIT' — kaucja zwrotna: 75/25 → 50/50 do czasu zwrotu kaucji, potem stały
 //               udział. ODWZOROWANIE 1:1 arkusza ZYSK (Kalkulacja.xlsx),
 //               ZWERYFIKOWANE LICZBOWO — NIE ZMIENIAĆ tej gałęzi bez ponownej weryfikacji.
-//   'FEE'     — opłata niezwrotna z góry: klient płaci jednorazowo (p.investment),
+//   'FEE'     — opłata wdrożeniowa z góry: klient płaci jednorazowo (p.investment),
 //               opłata jest kosztem policzonym OSOBNO (nie odrabia się z oszczędności),
 //               klient dostaje stały % (clientSharePct) od roku 1, bez raty zwrotu (M=0).
 //   'FREE'    — klient nic nie płaci: FEE z opłatą 0 (stały % od roku 1).
@@ -170,7 +170,7 @@ function _simEngineDeposit(p, savingsPct) {
   return { rows, kpi };
 }
 
-// Gałąź opłaty niezwrotnej (FEE) i „za darmo" (FREE = fee 0).
+// Gałąź opłaty wdrożeniowej (FEE) i „za darmo" (FREE = fee 0).
 // Klient dostaje stały % oszczędności od roku 1; opłata to koszt początkowy,
 // od którego liczymy skumulowany wynik (I = wpływy narastająco − opłata).
 function _simEngineFee(p, savingsPct) {
@@ -1070,7 +1070,7 @@ function _simMechanismHtml(sim, results) {
       ? `W wariancie „kaucja zwrotna” klient wpłaca zwrotną kaucję ${_simFmt(inv)} ${cur}. Do czasu jej zwrotu otrzymuje podwyższony udział: swój stały ${_simFmt(k, 1)}% oszczędności powiększony o ratę zwrotu ${_simFmt(l, 1)}% (łącznie efektywnie ${_simFmt(Math.min(100, k + l), 1)}%), aż kaucja zostanie zwrócona w całości. Po zwrocie obowiązuje docelowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`
       : `W wariancie „kaucja zwrotna” klient otrzymuje stały udział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% od pierwszego roku.`;
   } else if (stType === 'FEE') {
-    variantTxt = `W wariancie „opłata niezwrotna” klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Opłata jest kosztem początkowym — łączny wynik klienta liczony jest po jej odjęciu; zwraca się w momencie, gdy skumulowany udział w oszczędnościach ją pokryje.`;
+    variantTxt = `W wariancie „opłata wdrożeniowa” klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Opłata jest kosztem początkowym — łączny wynik klienta liczony jest po jej odjęciu; zwraca się w momencie, gdy skumulowany udział w oszczędnościach ją pokryje.`;
   } else { // FREE
     variantTxt = `W wariancie „bez opłat” klient nie ponosi żadnej opłaty wstępnej i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Całość jego wpływów stanowi czysty zysk.`;
   }
