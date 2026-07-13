@@ -449,6 +449,8 @@ const SIM_STYLE = `<style>
   .sim-cover-kpi .k { font-size:11px; color:var(--color-text-secondary); margin-top:6px; line-height:1.3; }
   .sim-cover-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:22px; padding-top:14px;
     border-top:1px solid #e6edf5; font-size:11px; color:var(--color-text-tertiary); }
+  .sim-doc-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:20px; padding-top:14px;
+    border-top:1px solid #e6edf5; font-size:11px; color:var(--color-text-tertiary); flex-wrap:wrap; }
   .sim-cover-photos { display:grid; gap:12px; margin-top:20px; }
   .sim-cover-photo { border:1px solid #e6edf5; border-radius:12px; overflow:hidden; background:#f4f7fa; }
   .sim-cover-photo img { width:100%; height:200px; object-fit:cover; display:block;
@@ -501,6 +503,7 @@ const SIM_STYLE = `<style>
     .sim-desc { orphans:3; widows:3; }
     .sim-kpis, table.sim-t, table.sim-params, .sim-formula, .sim-method, .sim-scen-chip, .sim-steps,
     canvas.sim-cv, canvas.sim-cv-bar { break-inside:avoid; page-break-inside:avoid; }
+    .sim-doc-foot { break-before:avoid; page-break-before:avoid; break-inside:avoid; page-break-inside:avoid; }
     @page { margin: 12mm; }
   }
 </style>`;
@@ -1155,10 +1158,6 @@ function _simDocHtml(sim) {
         <div class="sim-cover-kpis">${coverKpis}</div>
       </div>
       ${photosHtml}
-      <div class="sim-cover-foot">
-        <div>System <strong>WaterAI Energy Control</strong> · Utworzono: ${created} · Wydruk z dnia: ${today}</div>
-        <div>control.waterai.cloud</div>
-      </div>
     </div>`;
 
   const s3 = `
@@ -1200,7 +1199,11 @@ function _simDocHtml(sim) {
     + _simSection(4, 'Wyniki scenariuszy', s4)
     + _simSection(5, 'Porównanie scenariuszy', _simComparisonHtml(sim, results))
     + _simSection(6, 'Mechanizm rozliczenia ESCO i dalsze kroki', _simMechanismHtml(sim, results))
-    + _simSection(7, 'Zastrzeżenia', s7);
+    + _simSection(7, 'Zastrzeżenia', s7)
+    + `<div class="sim-doc-foot">
+        <div>System <strong>WaterAI Energy Control</strong> · Utworzono: ${created} · Wydruk z dnia: ${today}</div>
+        <div>control.waterai.cloud</div>
+      </div>`;
 }
 
 function simView(id) {
