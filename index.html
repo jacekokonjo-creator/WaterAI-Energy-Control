@@ -460,6 +460,8 @@
     <button onclick="setLanguage('de')" id="lang-de">DE</button>
     <button onclick="setLanguage('cs')" id="lang-cs">CZ</button>
     <button onclick="setLanguage('sk')" id="lang-sk">SK</button>
+    <button onclick="setLanguage('es')" id="lang-es">ES</button>
+    <button onclick="setLanguage('at')" id="lang-at">AT</button>
   </div>
 
   <main id="login-screen" class="screen active">
@@ -716,6 +718,78 @@
         quarterly: "Štvrťročne",
         halfYear: "Polročne",
         yearly: "Ročne"
+      },
+      es: {
+        appTitle: "Energy Control",
+        appSubtitle: "Sistema de medición y liquidación de ahorros de energía",
+        emailLabel: "Usuario / correo",
+        passwordLabel: "Contraseña",
+        loginButton: "Iniciar sesión",
+        logoutButton: "Cerrar sesión",
+        changePasswordButton: "Cambiar contraseña",
+        dashboardTitle: "Panel principal",
+        dashboardDesc: "Elige el módulo con el que quieres trabajar.",
+        roleModeTitle: "Modo de prueba de rol",
+        roleModeNote: "Este es un modo de prueba. En producción, el rol se cargará automáticamente desde Supabase tras iniciar sesión.",
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Este módulo se desarrollará en la siguiente etapa.",
+        calendarIntro: "Los recordatorios se asignan individualmente a un edificio y un rol.",
+        objectName: "Nombre del edificio",
+        taskType: "Tipo de tarea",
+        responsibleRole: "Rol responsable",
+        cycle: "Ciclo",
+        firstReminder: "Primer recordatorio",
+        addReminder: "Añadir recordatorio",
+        noReminders: "Sin recordatorios.",
+        taskRequestInvoice: "Solicitar factura de energía al cliente",
+        taskEnterInvoice: "Introducir factura de energía del cliente",
+        taskEnterInvoiceData: "Introducir datos de la factura del cliente",
+        taskCheckInvoice: "Comprobar factura",
+        taskCheckCalculations: "Comprobar cálculos",
+        monthly: "Mensual",
+        twoMonths: "Cada 2 meses",
+        quarterly: "Trimestral",
+        halfYear: "Cada medio año",
+        yearly: "Anual"
+      },
+      at: {
+        appTitle: "Energy Control",
+        appSubtitle: "System zur Messung und Abrechnung von Energieeinsparungen",
+        emailLabel: "Login / E-Mail",
+        passwordLabel: "Passwort",
+        loginButton: "Anmelden",
+        logoutButton: "Abmelden",
+        changePasswordButton: "Passwort ändern",
+        dashboardTitle: "Hauptpanel",
+        dashboardDesc: "Wählen Sie das Modul aus, mit dem Sie arbeiten möchten.",
+        roleModeTitle: "Testmodus der Rolle",
+        roleModeNote: "Dies ist ein Testmodus. Später wird die Rolle nach dem Login automatisch aus Supabase geladen.",
+        roleSuperAdmin: "Super Admin",
+        roleBackOffice: "Back Office",
+        roleEnergyAnalyst: "Energy Analyst",
+        roleClient: "Client",
+        moduleDefault: "Dieses Modul wird in der nächsten Phase entwickelt.",
+        calendarIntro: "Erinnerungen werden individuell einem Objekt und einer Rolle zugeordnet.",
+        objectName: "Objektname",
+        taskType: "Aufgabentyp",
+        responsibleRole: "Verantwortliche Rolle",
+        cycle: "Zyklus",
+        firstReminder: "Erste Erinnerung",
+        addReminder: "Erinnerung hinzufügen",
+        noReminders: "Keine Erinnerungen.",
+        taskRequestInvoice: "Energie-Rechnung vom Kunden anfordern",
+        taskEnterInvoice: "Energie-Rechnung vom Kunden eingeben",
+        taskEnterInvoiceData: "Daten aus Kundenrechnung eingeben",
+        taskCheckInvoice: "Rechnung prüfen",
+        taskCheckCalculations: "Berechnungen prüfen",
+        monthly: "Monatlich",
+        twoMonths: "Alle 2 Monate",
+        quarterly: "Quartalsweise",
+        halfYear: "Halbjährlich",
+        yearly: "Jährlich"
       }
     };
 
@@ -834,6 +908,52 @@
         instructions: ["📖", "Návod", "Ako systém funguje a čo robí každá rola."],
         visibility: ["👁️", "Viditeľnosť", "Zdieľanie dokumentov vybraným používateľom."],
         simulation: ["📋", "Ponuka", "Ponuka úspor pre klienta — viacročná prognóza a ESCO vyúčtovanie."]
+      },
+      es: {
+        clients: ["👥", "Clientes", "Base de datos de clientes y datos de facturación."],
+        objects: ["🏢", "Edificios", "Edificios, fuentes de calor y horarios."],
+        myObjects: ["🏢", "Mis edificios", "Edificios asignados a la cuenta del cliente."],
+        readings: ["📟", "Lecturas", "Lecturas de contadores y consumo por edificio."],
+        myReadings: ["📟", "Mis lecturas", "Lecturas y consumo de tus edificios."],
+        measurements: ["📊", "Mediciones", "Consumo de energía, costes, HDD y grados-día."],
+        myMeasurements: ["📊", "Mis mediciones", "Datos energéticos de tus edificios."],
+        excel: ["📁", "Importar Excel", "Importar datos desde hojas de cálculo."],
+        pdf: ["📄", "Importar PDF", "Analizar documentos y facturas PDF."],
+        reports: ["📈", "Informes ESCO", "Ahorros, liquidaciones e informes."],
+        myReports: ["📈", "Mis informes", "Informes de ahorro disponibles para el cliente."],
+        myInvoices: ["🧾", "Mis facturas", "Facturas compartidas contigo por el equipo de WaterAI."],
+        calendar: ["📅", "Calendario / Recordatorios", "Tareas recurrentes para edificios y roles."],
+        invoicing: ["🧾", "Facturación", "Resumen de ahorros y base de facturación."],
+        analyses: ["📐", "Análisis", "TYM, regresión, ocupación, superficie y más."],
+        documents: ["🗂️", "Documentos", "Facturas de clientes, contratos, documentación, fotos."],
+        users: ["🔐", "Usuarios y roles", "Gestión de cuentas y accesos."],
+        settings: ["⚙️", "Ajustes", "Idioma, roles y configuración del sistema."],
+        instructions: ["📖", "Instrucciones", "Cómo funciona el sistema y qué hace cada rol."],
+        visibility: ["👁️", "Visibilidad", "Compartir documentos con usuarios seleccionados."],
+        simulation: ["📋", "Oferta", "Oferta de ahorro para el cliente: previsión plurianual y liquidación ESCO."]
+      },
+      at: {
+        clients: ["👥", "Kunden", "Kundendatenbank und Rechnungsdaten."],
+        objects: ["🏢", "Objekte", "Gebäude, Wärmequellen und Zeitpläne."],
+        myObjects: ["🏢", "Meine Objekte", "Objekte, die dem Kundenkonto zugeordnet sind."],
+        readings: ["📟", "Ablesungen", "Zählerstände und Verbrauch je Objekt."],
+        myReadings: ["📟", "Meine Ablesungen", "Ablesungen und Verbrauch Ihrer Objekte."],
+        measurements: ["📊", "Messungen", "Energieverbrauch, Kosten, HDD und Gradtage."],
+        myMeasurements: ["📊", "Meine Messungen", "Energiedaten Ihrer Objekte."],
+        excel: ["📁", "Excel-Import", "Import von Daten aus Tabellen."],
+        pdf: ["📄", "PDF-Import", "Analyse von PDF-Dokumenten und Rechnungen."],
+        reports: ["📈", "ESCO-Berichte", "Einsparungen, Abrechnungen und Berichte."],
+        myReports: ["📈", "Meine Berichte", "Für den Kunden verfügbare Einsparberichte."],
+        myInvoices: ["🧾", "Meine Rechnungen", "Von WaterAI für Sie freigegebene Rechnungen."],
+        calendar: ["📅", "Kalender / Erinnerungen", "Wiederkehrende Aufgaben für Objekte und Rollen."],
+        invoicing: ["🧾", "Fakturierung", "Zusammenfassung der Einsparungen und Rechnungsgrundlage."],
+        analyses: ["📐", "Analysen", "TYM, Regression, Auslastung, Fläche und mehr."],
+        documents: ["🗂️", "Dokumente", "Kundenrechnungen, Verträge, Dokumentation, Fotos."],
+        users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
+        settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."],
+        instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."],
+        visibility: ["👁️", "Sichtbarkeit", "Dokumente für ausgewählte Benutzer freigeben."],
+        simulation: ["📋", "Angebot", "Einsparangebot für den Kunden — mehrjährige Prognose und ESCO-Abrechnung."]
       }
     };
 
@@ -1419,7 +1539,7 @@
 <script src="js/modules/billing-entities.js?v=1782600100"></script>
 <script src="js/modules/calendar.js?v=1783380012"></script>
 <script src="js/modules/users.js?v=1784700000"></script>
-<script src="js/app.build.js?v=1784000000"></script>
+<script src="js/app.build.js?v=1784800000"></script>
 <script src="js/modules/app-v2.js?v=1784000000"></script>
 <script src="js/modules/i18n-domain.js?v=8"></script>
 <script src="js/modules/readings.js?v=1784200000"></script>

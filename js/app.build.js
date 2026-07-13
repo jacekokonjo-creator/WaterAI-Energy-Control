@@ -457,6 +457,8 @@ function renderClientsList() {
                       <option value="cs">Czeski</option>
                       <option value="sk">Słowacki</option>
                       <option value="de">Niemiecki</option>
+                      <option value="es">Hiszpański</option>
+                      <option value="at">Austriacki</option>
                     </select>
                   </div>
                 </div>
