@@ -472,10 +472,10 @@
       <p class="subtitle" data-i18n="appSubtitle">System pomiaru i rozliczania oszczędności energii</p>
 
       <label for="email" data-i18n="emailLabel">Login / e-mail</label>
-      <input id="email" type="email" placeholder="np. admin@waterai.pl" />
+      <input id="email" type="email" data-i18n-ph="emailPh" placeholder="np. admin@waterai.pl" />
 
       <label for="password" data-i18n="passwordLabel">Hasło</label>
-      <input id="password" type="password" placeholder="Wpisz hasło" />
+      <input id="password" type="password" data-i18n-ph="passwordPh" placeholder="Wpisz hasło" />
 
       <button class="primary-button" onclick="login()" data-i18n="loginButton">Zaloguj</button>
 
@@ -544,6 +544,8 @@
         appSubtitle: "System pomiaru i rozliczania oszczędności energii",
         emailLabel: "Login / e-mail",
         passwordLabel: "Hasło",
+        emailPh: "np. admin@waterai.pl",
+        passwordPh: "Wpisz hasło",
         loginButton: "Zaloguj",
         logoutButton: "Wyloguj",
         changePasswordButton: "Zmień hasło",
@@ -580,6 +582,8 @@
         appSubtitle: "Energy savings measurement and settlement system",
         emailLabel: "Login / e-mail",
         passwordLabel: "Password",
+        emailPh: "e.g. admin@waterai.com",
+        passwordPh: "Enter password",
         loginButton: "Login",
         logoutButton: "Logout",
         changePasswordButton: "Change password",
@@ -616,6 +620,8 @@
         appSubtitle: "System zur Messung und Abrechnung von Energieeinsparungen",
         emailLabel: "Login / E-Mail",
         passwordLabel: "Passwort",
+        emailPh: "z. B. admin@waterai.com",
+        passwordPh: "Passwort eingeben",
         loginButton: "Einloggen",
         logoutButton: "Ausloggen",
         changePasswordButton: "Passwort ändern",
@@ -652,6 +658,8 @@
         appSubtitle: "Systém měření a vyúčtování úspor energie",
         emailLabel: "Login / e-mail",
         passwordLabel: "Heslo",
+        emailPh: "např. admin@waterai.com",
+        passwordPh: "Zadejte heslo",
         loginButton: "Přihlásit se",
         logoutButton: "Odhlásit se",
         changePasswordButton: "Změnit heslo",
@@ -688,6 +696,8 @@
         appSubtitle: "Systém merania a vyúčtovania úspor energie",
         emailLabel: "Login / e-mail",
         passwordLabel: "Heslo",
+        emailPh: "napr. admin@waterai.com",
+        passwordPh: "Zadajte heslo",
         loginButton: "Prihlásiť sa",
         logoutButton: "Odhlásiť sa",
         changePasswordButton: "Zmeniť heslo",
@@ -724,6 +734,8 @@
         appSubtitle: "Sistema de medición y liquidación de ahorros de energía",
         emailLabel: "Usuario / correo",
         passwordLabel: "Contraseña",
+        emailPh: "p. ej. admin@waterai.com",
+        passwordPh: "Introduzca la contraseña",
         loginButton: "Iniciar sesión",
         logoutButton: "Cerrar sesión",
         changePasswordButton: "Cambiar contraseña",
@@ -760,6 +772,8 @@
         appSubtitle: "System zur Messung und Abrechnung von Energieeinsparungen",
         emailLabel: "Login / E-Mail",
         passwordLabel: "Passwort",
+        emailPh: "z. B. admin@waterai.com",
+        passwordPh: "Passwort eingeben",
         loginButton: "Anmelden",
         logoutButton: "Abmelden",
         changePasswordButton: "Passwort ändern",
@@ -989,6 +1003,11 @@
       document.querySelectorAll("[data-i18n]").forEach((element) => {
         const key = element.getAttribute("data-i18n");
         element.textContent = t(key);
+      });
+
+      document.querySelectorAll("[data-i18n-ph]").forEach((element) => {
+        const key = element.getAttribute("data-i18n-ph");
+        element.setAttribute("placeholder", t(key));
       });
 
       document.querySelectorAll(".language-switcher button").forEach((button) => button.classList.remove("active"));
