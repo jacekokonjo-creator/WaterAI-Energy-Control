@@ -8,6 +8,7 @@
 
 function fmtDate(d) {
   if (!d) return '—';
+  if (typeof _waDate === 'function') return _waDate(d);
   const parts = String(d).split('-');
   if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
   return d;
@@ -976,8 +977,30 @@ function saveCalendarEvent() {
 
 const _escA = (typeof escapeHtml === 'function') ? escapeHtml : (v => String(v == null ? '' : v));
 const _fmtDateA = (typeof fmtDate === 'function') ? fmtDate : (d => d || '—');
+function _waLocale() {
+  var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
+  var l;
+  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
+  catch (e) { l = 'pl'; }
+  return m[l] || 'pl-PL';
+}
+
+function _waDate(iso) {
+  if (!iso) return '—';
+  var s = String(iso).slice(0, 10);
+  var p = s.split('-');
+  if (p.length !== 3) return iso;
+  var loc = _waLocale();
+  if (loc === 'pl-PL') return p[2] + '.' + p[1] + '.' + p[0];
+  try {
+    var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    if (isNaN(dt.getTime())) return p[2] + '.' + p[1] + '.' + p[0];
+    return dt.toLocaleDateString(loc, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
+  } catch (e) { return p[2] + '.' + p[1] + '.' + p[0]; }
+}
+
 function _fmtA(n, d = 2) {
-  return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('pl-PL', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(_waLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
 const ANAL_TI = 20; // projektowa temperatura wewnętrzna [°C]
