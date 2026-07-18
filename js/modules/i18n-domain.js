@@ -5285,6 +5285,7 @@
   // ═══ Placeholdery pól (moduły) · auto-blok ═══
   Object.assign(DICT.sk, {
   "cena": "cena",
+  "Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji": "Prihlasovacie meno (e-mail v Auth) nie je možné zmeniť z aplikácie",
   "opcjonalne uwagi": "voliteľné poznámky",
   "opcjonalny opis": "voliteľný popis",
   "np. 0,54": "napr. 0,54",
@@ -5299,6 +5300,7 @@
   });
   Object.assign(DICT.en, {
   "cena": "price",
+  "Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji": "You cannot change the login (Auth e-mail) from within the application",
   "opcjonalne uwagi": "optional notes",
   "opcjonalny opis": "optional description",
   "np. 0,54": "e.g. 0.54",
@@ -5313,6 +5315,7 @@
   });
   Object.assign(DICT.de, {
   "cena": "Preis",
+  "Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji": "Den Login (Auth-E-Mail) können Sie nicht innerhalb der Anwendung ändern",
   "opcjonalne uwagi": "optionale Anmerkungen",
   "opcjonalny opis": "optionale Beschreibung",
   "np. 0,54": "z. B. 0,54",
@@ -5327,6 +5330,7 @@
   });
   Object.assign(DICT.cs, {
   "cena": "cena",
+  "Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji": "Přihlašovací jméno (e-mail v Auth) nelze změnit z aplikace",
   "opcjonalne uwagi": "volitelné poznámky",
   "opcjonalny opis": "volitelný popis",
   "np. 0,54": "např. 0,54",
@@ -5341,6 +5345,7 @@
   });
   Object.assign(DICT.es, {
   "cena": "precio",
+  "Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji": "El usuario de acceso (correo de Auth) no se puede cambiar desde la aplicación",
   "opcjonalne uwagi": "notas opcionales",
   "opcjonalny opis": "descripción opcional",
   "np. 0,54": "p. ej. 0,54",
