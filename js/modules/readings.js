@@ -153,11 +153,34 @@ function _rdUnit(u) { return RD_UNIT_LABELS[u] || u || ''; }
 function _rdProfile() { return (window.WaterAISupabase && WaterAISupabase.profile) || null; }
 function _rdIsInternal() { return typeof currentRole !== 'undefined' && currentRole !== 'client'; }
 function _rdEsc(v) { return (typeof escapeHtml === 'function') ? escapeHtml(v == null ? '' : String(v)) : String(v == null ? '' : v); }
+function _waLocale() {
+  var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
+  var l;
+  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
+  catch (e) { l = 'pl'; }
+  return m[l] || 'pl-PL';
+}
+
+function _waDate(iso) {
+  if (!iso) return '—';
+  var s = String(iso).slice(0, 10);
+  var p = s.split('-');
+  if (p.length !== 3) return iso;
+  var loc = _waLocale();
+  if (loc === 'pl-PL') return p[2] + '.' + p[1] + '.' + p[0];
+  try {
+    var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    if (isNaN(dt.getTime())) return p[2] + '.' + p[1] + '.' + p[0];
+    return dt.toLocaleDateString(loc, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
+  } catch (e) { return p[2] + '.' + p[1] + '.' + p[0]; }
+}
+
 function _rdNum(v, dec) {
   if (v == null || v === '' || isNaN(Number(v))) return '—';
-  return Number(v).toLocaleString('pl-PL', { minimumFractionDigits: dec == null ? 0 : dec, maximumFractionDigits: dec == null ? 3 : dec });
+  return Number(v).toLocaleString(_waLocale(), { minimumFractionDigits: dec == null ? 0 : dec, maximumFractionDigits: dec == null ? 3 : dec });
 }
 function _rdDatePL(iso) {
+  if (typeof _waDate === 'function') return _waDate(iso);
   if (!iso) return '—';
   const p = String(iso).slice(0, 10).split('-');
   return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : iso;
