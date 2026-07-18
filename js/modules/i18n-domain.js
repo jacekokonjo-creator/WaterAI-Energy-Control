@@ -5282,6 +5282,78 @@
   "konta utworzone tutaj przez administratora lub Back Office. Konto założone poza aplikacją (bez profilu) jest blokowane przy wejściu.": "las cuentas creadas aquí por un administrador o Back Office. Una cuenta creada fuera de la aplicación (sin perfil) se bloquea al entrar.",
   });
 
+  // ═══ Placeholdery pól (moduły) · auto-blok ═══
+  Object.assign(DICT.sk, {
+  "cena": "cena",
+  "opcjonalne uwagi": "voliteľné poznámky",
+  "opcjonalny opis": "voliteľný popis",
+  "np. 0,54": "napr. 0,54",
+  "np. 20": "napr. 20",
+  "np. 17 314,00": "napr. 17 314,00",
+  "np. 034015/2025": "napr. 034015/2025",
+  "np. Jan Kowalski": "napr. Ján Novák",
+  "np. LPEC / Veolia / Energie2": "napr. LPEC / Veolia / Energie2",
+  "np. Termin odczytu — Hotel Centrum": "napr. Termín odpočtu — Hotel Centrum",
+  "np. p. Novák — konserwator": "napr. p. Novák — údržbár",
+  "np. §5 ust. 2 umowy ESCO nr 12/2025": "napr. §5 ods. 2 zmluvy ESCO č. 12/2025",
+  });
+  Object.assign(DICT.en, {
+  "cena": "price",
+  "opcjonalne uwagi": "optional notes",
+  "opcjonalny opis": "optional description",
+  "np. 0,54": "e.g. 0.54",
+  "np. 20": "e.g. 20",
+  "np. 17 314,00": "e.g. 17,314.00",
+  "np. 034015/2025": "e.g. 034015/2025",
+  "np. Jan Kowalski": "e.g. John Smith",
+  "np. LPEC / Veolia / Energie2": "e.g. LPEC / Veolia / Energie2",
+  "np. Termin odczytu — Hotel Centrum": "e.g. Reading date — Hotel Centrum",
+  "np. p. Novák — konserwator": "e.g. Mr Novák — maintenance technician",
+  "np. §5 ust. 2 umowy ESCO nr 12/2025": "e.g. §5(2) of ESCO contract no. 12/2025",
+  });
+  Object.assign(DICT.de, {
+  "cena": "Preis",
+  "opcjonalne uwagi": "optionale Anmerkungen",
+  "opcjonalny opis": "optionale Beschreibung",
+  "np. 0,54": "z. B. 0,54",
+  "np. 20": "z. B. 20",
+  "np. 17 314,00": "z. B. 17.314,00",
+  "np. 034015/2025": "z. B. 034015/2025",
+  "np. Jan Kowalski": "z. B. Max Mustermann",
+  "np. LPEC / Veolia / Energie2": "z. B. LPEC / Veolia / Energie2",
+  "np. Termin odczytu — Hotel Centrum": "z. B. Ablesetermin — Hotel Centrum",
+  "np. p. Novák — konserwator": "z. B. Herr Novák — Wartungstechniker",
+  "np. §5 ust. 2 umowy ESCO nr 12/2025": "z. B. §5 Abs. 2 des ESCO-Vertrags Nr. 12/2025",
+  });
+  Object.assign(DICT.cs, {
+  "cena": "cena",
+  "opcjonalne uwagi": "volitelné poznámky",
+  "opcjonalny opis": "volitelný popis",
+  "np. 0,54": "např. 0,54",
+  "np. 20": "např. 20",
+  "np. 17 314,00": "např. 17 314,00",
+  "np. 034015/2025": "např. 034015/2025",
+  "np. Jan Kowalski": "např. Jan Novák",
+  "np. LPEC / Veolia / Energie2": "např. LPEC / Veolia / Energie2",
+  "np. Termin odczytu — Hotel Centrum": "např. Termín odečtu — Hotel Centrum",
+  "np. p. Novák — konserwator": "např. p. Novák — údržbář",
+  "np. §5 ust. 2 umowy ESCO nr 12/2025": "např. §5 odst. 2 smlouvy ESCO č. 12/2025",
+  });
+  Object.assign(DICT.es, {
+  "cena": "precio",
+  "opcjonalne uwagi": "notas opcionales",
+  "opcjonalny opis": "descripción opcional",
+  "np. 0,54": "p. ej. 0,54",
+  "np. 20": "p. ej. 20",
+  "np. 17 314,00": "p. ej. 17 314,00",
+  "np. 034015/2025": "p. ej. 034015/2025",
+  "np. Jan Kowalski": "p. ej. Juan Pérez",
+  "np. LPEC / Veolia / Energie2": "p. ej. LPEC / Veolia / Energie2",
+  "np. Termin odczytu — Hotel Centrum": "p. ej. Fecha de lectura — Hotel Centrum",
+  "np. p. Novák — konserwator": "p. ej. Sr. Novák — técnico de mantenimiento",
+  "np. §5 ust. 2 umowy ESCO nr 12/2025": "p. ej. §5 ap. 2 del contrato ESCO n.º 12/2025",
+  });
+
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
   const LETTER = /[A-Za-zÀ-žĄąĆćĘęŁłŃńÓóŚśŹźŻż0-9]/;
