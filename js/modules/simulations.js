@@ -225,11 +225,33 @@ function _simColor(i) {
   return `hsl(${hue}, 55%, 34%)`;
 }
 
+function _waLocale() {
+  var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
+  var l;
+  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
+  catch (e) { l = 'pl'; }
+  return m[l] || 'pl-PL';
+}
+
+function _waDate(iso) {
+  if (!iso) return '—';
+  var s = String(iso).slice(0, 10);
+  var p = s.split('-');
+  if (p.length !== 3) return iso;
+  var loc = _waLocale();
+  if (loc === 'pl-PL') return p[2] + '.' + p[1] + '.' + p[0];
+  try {
+    var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    if (isNaN(dt.getTime())) return p[2] + '.' + p[1] + '.' + p[0];
+    return dt.toLocaleDateString(loc, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
+  } catch (e) { return p[2] + '.' + p[1] + '.' + p[0]; }
+}
+
 function _simFmt(v, d) {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  return Number(v).toLocaleString('pl-PL', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+  return Number(v).toLocaleString(_waLocale(), { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
 }
-function _simPct(v, d) { return (v === null || v === undefined) ? '—' : (v * 100).toLocaleString('pl-PL', { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
+function _simPct(v, d) { return (v === null || v === undefined) ? '—' : (v * 100).toLocaleString(_waLocale(), { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
 function _simCli(id) { return window.ClientsModule ? ClientsModule.find(id) : null; }
 function _simCliName(id) { const c = _simCli(id); return c ? c.name : '—'; }
 function _simObjName(id) { const o = (id && window.ObjectsModule) ? ObjectsModule.find(id) : null; return o ? o.name : '—'; }
@@ -1098,7 +1120,7 @@ function _simDocHtml(sim) {
   const bs = results.find(r => r.base) || results[0];
   const c = _simCli(sim.clientId);
   const addr = _simCliAddr(c);
-  const today = new Date().toLocaleDateString('pl-PL');
+  const today = new Date().toLocaleDateString(_waLocale());
   const created = sim.createdAt ? sim.createdAt.slice(0, 10) : '—';
 
   // Hero + kafle okładki. payback ma sens tylko gdy jest opłata/kaucja (inv>0).
