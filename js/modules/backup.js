@@ -8,6 +8,14 @@
 // lokalną kopię (wszystkie klucze "waterai_"). Operuje na localStorage celowo
 // bezpośrednio (to z natury operacja na całym magazynie, ponad pojedynczymi modułami).
 // ─────────────────────────────────────────────────────────────────────────────
+function _waLocale() {
+  var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
+  var l;
+  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
+  catch (e) { l = 'pl'; }
+  return m[l] || 'pl-PL';
+}
+
 const BackupModule = {
   PREFIX: 'waterai_',
   APP_VERSION: 'v0.7.0',
@@ -94,7 +102,7 @@ const BackupModule = {
       catch (e) { alert('Import nieudany: ' + e.message); return; }
 
       const n = Object.keys(res.clean).length;
-      const when = res.meta && res.meta.exportedAt ? new Date(res.meta.exportedAt).toLocaleString('pl-PL') : 'nieznana data';
+      const when = res.meta && res.meta.exportedAt ? new Date(res.meta.exportedAt).toLocaleString(_waLocale()) : 'nieznana data';
       const modeTxt = mode === 'merge'
         ? 'DOŁĄCZ — wspólne klucze nadpisane, pozostałe Twoje dane zostają.'
         : 'ZASTĄP — wszystkie obecne dane WaterAI zostaną usunięte i zastąpione z pliku.';
