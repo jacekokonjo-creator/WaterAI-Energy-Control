@@ -5547,6 +5547,10 @@
   "Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).": "1. rok je obdobím overenia — klient dostáva plný podiel na úsporách a neplatí žiadny poplatok. V 2. roku prevádzky sa poplatok za službu spláca z úspor (klient naň môže vyčleniť až 100 % úspor až do úplného splatenia), potom sa vracia štandardné rozdelenie. V súlade so zmluvou WaterAI (body 5.3–5.5).",
   "Sugerowana opłata za usługę (edytowalna):": "Odporúčaný poplatok za službu (upraviteľný):",
   ". Spłacana z oszczędności w 2. roku eksploatacji.": ". Splácaný z úspor v 2. roku prevádzky.",
+  "Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.": "Všetky sumy uvedené v tejto ponuke sú sumy bez DPH. K poplatku za službu bude pripočítaná DPH podľa sadzby platnej v deň vystavenia faktúry.",
+  "W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział": "Vo variante „zavádzací poplatok v 2. roku“ je prvý rok prevádzky obdobím overenia: klient dostáva plný podiel",
+  "w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę": "na úsporách a neplatí žiadny poplatok. Po preukázaní reálnych úspor sa v druhom roku prevádzky spláca poplatok za službu",
+  "z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział": "z dosiahnutých úspor — klient na to môže vyčleniť až 100 % úspor až do úplného splatenia, potom sa automaticky vracia štandardné rozdelenie",
   });
   Object.assign(DICT.en, {
   "Opłata wdrożeniowa w 2. roku": "Implementation fee in year 2",
@@ -5554,6 +5558,10 @@
   "Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).": "Year 1 is a verification period — the client receives the full share of the savings and pays no fee. In the 2nd year of operation the service fee is repaid out of the savings (the client may allocate up to 100% of the savings to it until it is fully repaid), after which the standard split resumes. In line with the WaterAI contract (sec. 5.3–5.5).",
   "Sugerowana opłata za usługę (edytowalna):": "Suggested service fee (editable):",
   ". Spłacana z oszczędności w 2. roku eksploatacji.": ". Repaid out of the savings in the 2nd year of operation.",
+  "Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.": "All amounts stated in this offer are net amounts. VAT at the rate in force on the invoice issue date will be added to the service fee.",
+  "W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział": "In the “implementation fee in year 2” variant, the first year of operation is a verification period: the client receives the full share",
+  "w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę": "in the savings and pays no fee. After real savings have been demonstrated, in the second year of operation the service fee is repaid",
+  "z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział": "out of the savings achieved — the client may allocate up to 100% of the savings to this until it is fully repaid, after which the standard split automatically resumes",
   });
   Object.assign(DICT.de, {
   "Opłata wdrożeniowa w 2. roku": "Einführungsgebühr im 2. Jahr",
@@ -5561,6 +5569,10 @@
   "Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).": "Das 1. Jahr ist ein Prüfzeitraum — der Kunde erhält den vollen Anteil an den Einsparungen und zahlt keine Gebühr. Im 2. Betriebsjahr wird die Servicegebühr aus den Einsparungen zurückgezahlt (der Kunde kann dafür bis zu 100 % der Einsparungen verwenden, bis sie vollständig getilgt ist), danach gilt wieder die Standardaufteilung. Gemäß dem WaterAI-Vertrag (Pkt. 5.3–5.5).",
   "Sugerowana opłata za usługę (edytowalna):": "Vorgeschlagene Servicegebühr (bearbeitbar):",
   ". Spłacana z oszczędności w 2. roku eksploatacji.": ". Rückzahlung aus den Einsparungen im 2. Betriebsjahr.",
+  "Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.": "Alle in diesem Angebot genannten Beträge sind Nettobeträge. Auf die Servicegebühr wird die zum Zeitpunkt der Rechnungsstellung geltende Umsatzsteuer aufgeschlagen.",
+  "W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział": "In der Variante „Einführungsgebühr im 2. Jahr“ ist das erste Betriebsjahr ein Prüfzeitraum: der Kunde erhält den vollen Anteil",
+  "w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę": "an den Einsparungen und zahlt keine Gebühr. Nach dem Nachweis realer Einsparungen wird im zweiten Betriebsjahr die Servicegebühr zurückgezahlt",
+  "z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział": "aus den erzielten Einsparungen — der Kunde kann dafür bis zu 100 % der Einsparungen verwenden, bis sie vollständig getilgt ist, danach gilt automatisch wieder die Standardaufteilung",
   });
   Object.assign(DICT.cs, {
   "Opłata wdrożeniowa w 2. roku": "Zaváděcí poplatek ve 2. roce",
@@ -5568,6 +5580,10 @@
   "Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).": "1. rok je obdobím ověření — klient dostává plný podíl na úsporách a neplatí žádný poplatek. Ve 2. roce provozu se poplatek za službu splácí z úspor (klient na něj může vyčlenit až 100 % úspor až do úplného splacení), poté se vrací standardní rozdělení. V souladu se smlouvou WaterAI (body 5.3–5.5).",
   "Sugerowana opłata za usługę (edytowalna):": "Doporučený poplatek za službu (upravitelný):",
   ". Spłacana z oszczędności w 2. roku eksploatacji.": ". Splácený z úspor ve 2. roce provozu.",
+  "Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.": "Všechny částky uvedené v této nabídce jsou částky bez DPH. K poplatku za službu bude připočtena DPH podle sazby platné v den vystavení faktury.",
+  "W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział": "Ve variantě „zaváděcí poplatek ve 2. roce“ je první rok provozu obdobím ověření: klient dostává plný podíl",
+  "w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę": "na úsporách a neplatí žádný poplatek. Po prokázání reálných úspor se ve druhém roce provozu splácí poplatek za službu",
+  "z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział": "z dosažených úspor — klient na to může vyčlenit až 100 % úspor až do úplného splacení, poté se automaticky vrací standardní rozdělení",
   });
   Object.assign(DICT.es, {
   "Opłata wdrożeniowa w 2. roku": "Tarifa de implantación en el 2.º año",
@@ -5575,6 +5591,10 @@
   "Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).": "El 1.er año es un periodo de verificación: el cliente recibe la totalidad de la participación en los ahorros y no paga ninguna tarifa. En el 2.º año de explotación, la tarifa del servicio se amortiza con los ahorros (el cliente puede destinar hasta el 100 % de los ahorros a ello hasta su amortización total), tras lo cual se restablece el reparto estándar. Conforme al contrato WaterAI (ap. 5.3–5.5).",
   "Sugerowana opłata za usługę (edytowalna):": "Tarifa de servicio sugerida (editable):",
   ". Spłacana z oszczędności w 2. roku eksploatacji.": ". Amortizada con los ahorros en el 2.º año de explotación.",
+  "Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.": "Todos los importes indicados en esta oferta son importes netos. A la tarifa del servicio se le añadirá el IVA al tipo vigente en la fecha de emisión de la factura.",
+  "W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział": "En la variante «tarifa de implantación en el 2.º año», el primer año de explotación es un periodo de verificación: el cliente recibe la totalidad de la participación",
+  "w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę": "en los ahorros y no paga ninguna tarifa. Tras haberse demostrado ahorros reales, en el segundo año de explotación se amortiza la tarifa del servicio",
+  "z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział": "con los ahorros obtenidos: el cliente puede destinar hasta el 100% de los ahorros a ello hasta su amortización total, tras lo cual se restablece automáticamente el reparto estándar",
   });
 
 
