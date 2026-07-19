@@ -5451,6 +5451,78 @@
   "Data raportu": "Fecha del informe",
   });
 
+  // ═══ Przyciski z emoji (naprawa exact-match) · auto-blok ═══
+  Object.assign(DICT.sk, {
+  "🖨️ Drukuj / PDF": "🖨️ Tlač / PDF",
+  "📄 Wydruk pełny (pokaż załączniki)": "📄 Úplná tlač (zobraziť prílohy)",
+  "💾 Kopia zapasowa danych": "💾 Záloha údajov",
+  "📥 Kopiuj dane z okresu bazowego": "📥 Kopírovať údaje zo základného obdobia",
+  "🔒 Poufne — przeznaczone dla klienta": "🔒 Dôverné — určené pre klienta",
+  "🔒 z okresu bazowego · tylko odczyt": "🔒 zo základného obdobia · iba na čítanie",
+  "✓ OK": "✓ OK",
+  "← Lista": "← Zoznam",
+  "← Lista analiz": "← Zoznam analýz",
+  "← Lista faktur": "← Zoznam faktúr",
+  "← Poprzedni": "← Predchádzajúci",
+  "← Typ analizy": "← Typ analýzy",
+  });
+  Object.assign(DICT.en, {
+  "🖨️ Drukuj / PDF": "🖨️ Print / PDF",
+  "📄 Wydruk pełny (pokaż załączniki)": "📄 Full printout (show attachments)",
+  "💾 Kopia zapasowa danych": "💾 Data backup",
+  "📥 Kopiuj dane z okresu bazowego": "📥 Copy data from the baseline period",
+  "🔒 Poufne — przeznaczone dla klienta": "🔒 Confidential — intended for the client",
+  "🔒 z okresu bazowego · tylko odczyt": "🔒 from the baseline period · read-only",
+  "✓ OK": "✓ OK",
+  "← Lista": "← List",
+  "← Lista analiz": "← Analyses list",
+  "← Lista faktur": "← Invoice list",
+  "← Poprzedni": "← Previous",
+  "← Typ analizy": "← Analysis type",
+  });
+  Object.assign(DICT.de, {
+  "🖨️ Drukuj / PDF": "🖨️ Drucken / PDF",
+  "📄 Wydruk pełny (pokaż załączniki)": "📄 Vollständiger Ausdruck (Anhänge anzeigen)",
+  "💾 Kopia zapasowa danych": "💾 Datensicherung",
+  "📥 Kopiuj dane z okresu bazowego": "📥 Daten aus der Basisperiode kopieren",
+  "🔒 Poufne — przeznaczone dla klienta": "🔒 Vertraulich — für den Kunden bestimmt",
+  "🔒 z okresu bazowego · tylko odczyt": "🔒 aus der Basisperiode · schreibgeschützt",
+  "✓ OK": "✓ OK",
+  "← Lista": "← Liste",
+  "← Lista analiz": "← Analysenliste",
+  "← Lista faktur": "← Rechnungsliste",
+  "← Poprzedni": "← Zurück",
+  "← Typ analizy": "← Analysetyp",
+  });
+  Object.assign(DICT.cs, {
+  "🖨️ Drukuj / PDF": "🖨️ Tisk / PDF",
+  "📄 Wydruk pełny (pokaż załączniki)": "📄 Úplný tisk (zobrazit přílohy)",
+  "💾 Kopia zapasowa danych": "💾 Záloha dat",
+  "📥 Kopiuj dane z okresu bazowego": "📥 Kopírovat data ze základního období",
+  "🔒 Poufne — przeznaczone dla klienta": "🔒 Důvěrné — určeno pro klienta",
+  "🔒 z okresu bazowego · tylko odczyt": "🔒 ze základního období · pouze pro čtení",
+  "✓ OK": "✓ OK",
+  "← Lista": "← Seznam",
+  "← Lista analiz": "← Seznam analýz",
+  "← Lista faktur": "← Seznam faktur",
+  "← Poprzedni": "← Předchozí",
+  "← Typ analizy": "← Typ analýzy",
+  });
+  Object.assign(DICT.es, {
+  "🖨️ Drukuj / PDF": "🖨️ Imprimir / PDF",
+  "📄 Wydruk pełny (pokaż załączniki)": "📄 Impresión completa (mostrar adjuntos)",
+  "💾 Kopia zapasowa danych": "💾 Copia de seguridad de datos",
+  "📥 Kopiuj dane z okresu bazowego": "📥 Copiar datos del periodo de referencia",
+  "🔒 Poufne — przeznaczone dla klienta": "🔒 Confidencial — destinado al cliente",
+  "🔒 z okresu bazowego · tylko odczyt": "🔒 del periodo de referencia · solo lectura",
+  "✓ OK": "✓ OK",
+  "← Lista": "← Lista",
+  "← Lista analiz": "← Lista de análisis",
+  "← Lista faktur": "← Lista de facturas",
+  "← Poprzedni": "← Anterior",
+  "← Typ analizy": "← Tipo de análisis",
+  });
+
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
   const LETTER = /[A-Za-zÀ-žĄąĆćĘęŁłŃńÓóŚśŹźŻż0-9]/;
