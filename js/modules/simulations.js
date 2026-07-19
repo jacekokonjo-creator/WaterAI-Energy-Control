@@ -71,6 +71,12 @@ const SimulationsModule = {
       feeLabel: 'Opłata za wdrożenie',
       desc: 'Klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie i od pierwszego roku otrzymuje ustalony udział w oszczędnościach.'
     },
+    FEE_Y2: {
+      label: 'Opłata wdrożeniowa w 2. roku',
+      short: 'opłata wdrożeniowa w 2. roku',
+      feeLabel: 'Opłata za usługę (spłacana w 2. roku)',
+      desc: 'Rok 1 to okres weryfikacji — klient otrzymuje pełny udział w oszczędnościach i nie płaci opłaty. W 2. roku eksploatacji opłata za usługę jest spłacana z oszczędności (klient może przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty), po czym wraca standardowy podział. Zgodne z umową WaterAI (pkt 5.3–5.5).'
+    },
     FREE: {
       label: 'Bez opłat',
       short: 'bez opłat',
@@ -209,8 +215,64 @@ function _simEngineFee(p, savingsPct) {
   return { rows, kpi };
 }
 
+// Gałąź „opłata wdrożeniowa w 2. roku" (FEE_Y2) — model umowny (pkt 5.3–5.5):
+//   Rok 1  — okres weryfikacji: klient dostaje pełny udział (K), opłata NIE jest spłacana.
+//   Rok 2  — spłata Opłaty za Usługę z oszczędności: klient może przeznaczyć do 100%
+//            oszczędności (K + reszta z udziału WaterAI) aż do pełnej spłaty opłaty;
+//            po spłacie w tym samym roku wraca standardowy udział K.
+//   Rok 3+ — standardowy udział K.
+// I (zysk klienta narastająco) = wpływy klienta narastająco − opłata już spłacona.
+function _simEngineFeeY2(p, savingsPct) {
+  const years = Math.max(1, Math.min(30, Number(p.years) || 10));
+  const fee = Number(p.investment) || 0;   // Opłata za Usługę (spłacana w 2. roku)
+  const g = (Number(p.priceGrowthPct) || 0) / 100;
+  const s = (Number(savingsPct) || 0) / 100;
+  const kShare = (Number(p.clientSharePct) || 0) / 100;
+
+  const rows = [];
+  let E = Number(p.heatingCost) || 0;
+  let H = 0, paidFee = 0, paybackYear = null;
+
+  for (let y = 1; y <= years; y++) {
+    if (y > 1) E = E * (1 + g);
+    const F = E * s;                 // generowane roczne oszczędności
+    const K = F * kShare;            // standardowy udział klienta
+    let G;                           // wpływy klienta w tym roku
+    let M = 0;                       // rata spłaty opłaty potrącona z oszczędności
+    // Spłata rusza od 2. roku i trwa (z podwyższonego udziału — do 100% oszczędności),
+    // aż opłata zostanie w pełni pokryta. W roku 1 klient ma pełny udział bez spłaty.
+    if (y >= 2 && fee > 0 && paidFee < fee) {
+      M = Math.min(F, fee - paidFee);   // cały roczny wolumen oszczędności do wysokości reszty opłaty
+      if (M < 0) M = 0;
+      paidFee += M;
+      const rest = F - M;               // reszta oszczędności powyżej spłaty
+      G = rest * kShare;                // wraca do klienta wg standardowego udziału
+    } else {
+      G = K;
+    }
+    H += G;
+    // Zysk klienta narastająco = wpływy klienta − opłata już spłacona (potrącana w 2. roku).
+    const Inet = H - paidFee;
+    const roi = fee > 0 ? Inet / fee : 0;
+    if (paybackYear === null && Inet >= 0 && y >= 2) paybackYear = y;
+    rows.push({ year: y, E, F, K, M, G, H, I: Inet, roi });
+  }
+
+  const last = rows[rows.length - 1];
+  const kpi = {
+    paybackYear,
+    totalInflows: last.H,
+    totalSavings: rows.reduce((a, r) => a + r.F, 0),
+    netProfit: last.I,
+    roi: last.roi,
+    cagr: (fee > 0 && last.I > 0) ? Math.pow((last.I + fee) / fee, 1 / years) - 1 : null
+  };
+  return { rows, kpi };
+}
+
 function simCalcScenario(p, savingsPct) {
   const t = p.settlementType || 'DEPOSIT';
+  if (t === 'FEE_Y2') return _simEngineFeeY2(p, savingsPct);
   return (t === 'FEE' || t === 'FREE') ? _simEngineFee(p, savingsPct) : _simEngineDeposit(p, savingsPct);
 }
 window.simCalcScenario = simCalcScenario;
@@ -225,33 +287,11 @@ function _simColor(i) {
   return `hsl(${hue}, 55%, 34%)`;
 }
 
-function _waLocale() {
-  var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
-  var l;
-  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
-  catch (e) { l = 'pl'; }
-  return m[l] || 'pl-PL';
-}
-
-function _waDate(iso) {
-  if (!iso) return '—';
-  var s = String(iso).slice(0, 10);
-  var p = s.split('-');
-  if (p.length !== 3) return iso;
-  var loc = _waLocale();
-  if (loc === 'pl-PL') return p[2] + '.' + p[1] + '.' + p[0];
-  try {
-    var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
-    if (isNaN(dt.getTime())) return p[2] + '.' + p[1] + '.' + p[0];
-    return dt.toLocaleDateString(loc, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
-  } catch (e) { return p[2] + '.' + p[1] + '.' + p[0]; }
-}
-
 function _simFmt(v, d) {
   if (v === null || v === undefined || isNaN(v)) return '—';
-  return Number(v).toLocaleString(_waLocale(), { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+  return Number(v).toLocaleString('pl-PL', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
 }
-function _simPct(v, d) { return (v === null || v === undefined) ? '—' : (v * 100).toLocaleString(_waLocale(), { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
+function _simPct(v, d) { return (v === null || v === undefined) ? '—' : (v * 100).toLocaleString('pl-PL', { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) + '%'; }
 function _simCli(id) { return window.ClientsModule ? ClientsModule.find(id) : null; }
 function _simCliName(id) { const c = _simCli(id); return c ? c.name : '—'; }
 function _simObjName(id) { const o = (id && window.ObjectsModule) ? ObjectsModule.find(id) : null; return o ? o.name : '—'; }
@@ -650,9 +690,11 @@ function simEdit(id) {
         <div class="sim-g2">
           <div class="sim-field" id="sim-fee-wrap" style="${(_simDraft.settlementType === 'FREE') ? 'display:none;' : ''}">
             <label id="sim-fee-label">${SimulationsModule.SETTLEMENTS[_simDraft.settlementType || 'DEPOSIT'].feeLabel}</label>
-            <input id="sim-investment" type="number" step="0.01" min="0" value="${_simDraft.investment}" oninput="_simRecalc()"></div>
+            <input id="sim-investment" type="number" step="0.01" min="0" value="${_simDraft.investment}" oninput="_simRecalc()">
+            <p id="sim-fee-hint" style="font-size:11px;color:var(--color-text-secondary);margin:4px 0 0;${(_simDraft.settlementType || 'DEPOSIT') === 'FEE_Y2' ? '' : 'display:none;'}">
+              Sugerowana opłata za usługę (edytowalna): ${_simFmt(_simSuggestedFee(_simDraft.currency || 'PLN'))} ${_simDraft.currency || 'PLN'}. Spłacana z oszczędności w 2. roku eksploatacji.</p></div>
           <div class="sim-field"><label>Waluta</label>
-            <select id="sim-currency" onchange="_simRecalc()">
+            <select id="sim-currency" onchange="_simCurrencyChanged()">
               ${['PLN', 'EUR', 'CZK'].map(c => `<option ${_simDraft.currency === c ? 'selected' : ''}>${c}</option>`).join('')}
             </select></div>
         </div>
@@ -838,6 +880,41 @@ function simRerenderScenarioInputs() {
   if (box) box.innerHTML = _simScenarioInputs();
 }
 
+// Sugerowana Opłata za Usługę dla wariantu FEE_Y2, zależna od waluty.
+// Bazowo 24 990 PLN / 5 000 EUR (zgodnie z umową i ustaleniem); pozostałe waluty
+// przeliczane z EUR wg orientacyjnego, edytowalnego kursu. Wartość jest tylko
+// SUGESTIĄ — użytkownik może ją nadpisać w polu kwoty.
+const _SIM_FEE_SUGGEST = { PLN: 24990, EUR: 5000, CZK: 125000 };
+function _simSuggestedFee(currency) {
+  return _SIM_FEE_SUGGEST[currency] != null ? _SIM_FEE_SUGGEST[currency] : _SIM_FEE_SUGGEST.PLN;
+}
+
+// Zmiana waluty: w wariancie „opłata w 2. roku" dostosuj sugerowaną kwotę,
+// o ile użytkownik nie wpisał własnej (pole równe poprzedniej sugestii lub 0).
+function _simCurrencyChanged() {
+  const curSel = document.getElementById('sim-currency');
+  const inv = document.getElementById('sim-investment');
+  const prevCur = _simDraft.currency || 'PLN';
+  const newCur = curSel ? curSel.value : prevCur;
+  if ((_simDraft.settlementType === 'FEE_Y2') && inv) {
+    const cur = Number(inv.value) || 0;
+    // Nadpisz tylko, gdy pole ma wciąż sugerowaną wartość dla starej waluty (albo 0) —
+    // czyli gdy użytkownik jej ręcznie nie zmienił.
+    if (cur === 0 || cur === _simSuggestedFee(prevCur)) {
+      inv.value = _simSuggestedFee(newCur);
+    }
+  }
+  _simDraft.currency = newCur;
+  // odśwież podpowiedź pod polem
+  const feeHint = document.getElementById('sim-fee-hint');
+  if (feeHint && _simDraft.settlementType === 'FEE_Y2') {
+    feeHint.innerHTML = 'Sugerowana opłata za usługę (edytowalna): ' +
+      _simFmt(_simSuggestedFee(newCur)) + ' ' + newCur + '. Spłacana z oszczędności w 2. roku eksploatacji.';
+  }
+  _simRecalc();
+}
+window._simCurrencyChanged = _simCurrencyChanged;
+
 function _simSettlementChanged() {
   const sel = document.getElementById('sim-settlement');
   if (!sel) return;
@@ -855,6 +932,16 @@ function _simSettlementChanged() {
   if (lWrap) lWrap.style.display = (t === 'DEPOSIT') ? '' : 'none';
   if (lHint) lHint.style.display = (t === 'DEPOSIT') ? '' : 'none';
   if (t === 'FREE') { const inv = document.getElementById('sim-investment'); if (inv) inv.value = 0; }
+  // Wariant „opłata w 2. roku": podpowiedz kwotę wg waluty, jeśli pole jest puste/zerowe.
+  if (t === 'FEE_Y2') {
+    const inv = document.getElementById('sim-investment');
+    if (inv && (!Number(inv.value) || Number(inv.value) === 0)) {
+      inv.value = _simSuggestedFee(_simDraft.currency || 'PLN');
+    }
+  }
+  // Podpowiedź pod polem kwoty (widoczna tylko dla FEE_Y2).
+  const feeHint = document.getElementById('sim-fee-hint');
+  if (feeHint) feeHint.style.display = (t === 'FEE_Y2') ? '' : 'none';
   _simRecalc();
 }
 window._simSettlementChanged = _simSettlementChanged;
@@ -1120,7 +1207,7 @@ function _simDocHtml(sim) {
   const bs = results.find(r => r.base) || results[0];
   const c = _simCli(sim.clientId);
   const addr = _simCliAddr(c);
-  const today = new Date().toLocaleDateString(_waLocale());
+  const today = new Date().toLocaleDateString('pl-PL');
   const created = sim.createdAt ? sim.createdAt.slice(0, 10) : '—';
 
   // Hero + kafle okładki. payback ma sens tylko gdy jest opłata/kaucja (inv>0).
