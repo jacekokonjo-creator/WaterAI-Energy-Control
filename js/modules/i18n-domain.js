@@ -5523,6 +5523,23 @@
   "← Typ analizy": "← Tipo de análisis",
   });
 
+  // ═══ Wariant przycisku druku z Oferty (emoji bez FE0F) · auto-blok ═══
+  Object.assign(DICT.sk, {
+  "🖨 Drukuj / PDF": "🖨 Tlač / PDF",
+  });
+  Object.assign(DICT.en, {
+  "🖨 Drukuj / PDF": "🖨 Print / PDF",
+  });
+  Object.assign(DICT.de, {
+  "🖨 Drukuj / PDF": "🖨 Drucken / PDF",
+  });
+  Object.assign(DICT.cs, {
+  "🖨 Drukuj / PDF": "🖨 Tisk / PDF",
+  });
+  Object.assign(DICT.es, {
+  "🖨 Drukuj / PDF": "🖨 Imprimir / PDF",
+  });
+
 
   // ── SILNIK ──────────────────────────────────────────────────────────────
   const LETTER = /[A-Za-zÀ-žĄąĆćĘęŁłŃńÓóŚśŹźŻż0-9]/;
