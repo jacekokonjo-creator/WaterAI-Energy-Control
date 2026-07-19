@@ -1180,12 +1180,15 @@ function _simMechanismHtml(sim, results) {
       : `W wariancie „kaucja zwrotna” klient otrzymuje stały udział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}% od pierwszego roku.`;
   } else if (stType === 'FEE') {
     variantTxt = `W wariancie „opłata wdrożeniowa” klient wnosi jednorazową, bezzwrotną opłatę za wdrożenie ${_simFmt(inv)} ${cur} i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Opłata jest kosztem początkowym — łączny wynik klienta liczony jest po jej odjęciu; zwraca się w momencie, gdy skumulowany udział w oszczędnościach ją pokryje.`;
+  } else if (stType === 'FEE_Y2') {
+    variantTxt = `W wariancie „opłata wdrożeniowa w 2. roku” pierwszy rok eksploatacji jest okresem weryfikacji: klient otrzymuje pełny udział ${_simFmt(k, 1)}% w oszczędnościach i nie ponosi opłaty. Po wykazaniu realnych oszczędności, w drugim roku eksploatacji następuje spłata opłaty za usługę ${_simFmt(inv)} ${cur} z osiąganych oszczędności — klient może przeznaczyć na ten cel do 100% oszczędności aż do pełnej spłaty, po czym automatycznie wraca standardowy podział ${_simFmt(k, 1)}% / ${_simFmt(100 - k, 1)}%.`;
   } else { // FREE
     variantTxt = `W wariancie „bez opłat” klient nie ponosi żadnej opłaty wstępnej i od pierwszego roku otrzymuje ustalony udział ${_simFmt(k, 1)}% w oszczędnościach. Całość jego wpływów stanowi czysty zysk.`;
   }
 
   return `
     <p class="sim-desc">Model ESCO oznacza, że wynagrodzenie WaterAI pochodzi wyłącznie z realnie osiągniętych i udowodnionych oszczędności — bez oszczędności nie ma opłat. ${variantTxt}</p>
+    ${stType !== 'FREE' ? `<p class="sim-desc" style="font-size:11px;color:var(--color-text-secondary);">Wszystkie kwoty podane w niniejszej ofercie są kwotami netto. Do opłaty za usługę zostanie doliczony podatek VAT według stawki obowiązującej w dniu wystawienia faktury.</p>` : ''}
     <p class="sim-desc">Poza wskazanym wyżej rozliczeniem oszczędności klient nie ponosi żadnych dodatkowych kosztów: brak opłat za serwis, utrzymanie, konserwację, aktualizacje oprogramowania czy wsparcie techniczne. W całym okresie współpracy WaterAI na bieżąco monitoruje instalację oraz wprowadza korekty nastaw, aktualizacje i optymalizacje sterowania — ponieważ nasze wynagrodzenie zależy wprost od uzyskanego wyniku, utrzymanie i poprawa efektu leżą w naszym wspólnym interesie.</p>
     <div class="sim-steps">
       <div class="sim-step"><div class="no">1</div><div class="t">Audyt i oferta</div><div class="d">Analiza obiektu i kosztów, prognoza potencjału — niniejszy dokument.</div></div>
