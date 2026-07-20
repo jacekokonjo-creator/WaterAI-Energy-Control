@@ -194,6 +194,13 @@ function viewClient(id) {
   const client = ClientsModule.find(id);
   if (!client) return;
 
+  // Język główny klienta steruje całym interfejsem: wejście w kartę klienta
+  // przełącza aplikację na jego język (jeśli ustawiony i inny niż bieżący).
+  if (client.language && typeof setLanguage === "function") {
+    let curLang; try { curLang = currentLanguage; } catch (e) { curLang = null; }
+    if (client.language !== curLang) setLanguage(client.language);
+  }
+
   const countryLabel = { PL:"Polska", CZ:"Czechy", SK:"Słowacja", DE:"Niemcy", EN:"Inny" };
   const modelLabel = { ESCO:"ESCO", FLAT:"Abonament", PROJECT:"Projekt" };
 
