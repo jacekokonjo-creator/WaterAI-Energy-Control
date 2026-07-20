@@ -651,6 +651,19 @@ function simEdit(id) {
     _simDraft.scenarios[0].base = true;
   }
 
+  // Oferta poza Polską: tylko „Bez opłat" i „Opłata w 2. roku". Jeśli bieżący
+  // wariant nie jest dozwolony dla tego kraju, ustaw pierwszy dozwolony (Bez opłat),
+  // żeby stan zgadzał się z zawartością listy.
+  const _allowedSetl = _simAllowedSettlements();
+  if (!_allowedSetl.includes(_simDraft.settlementType || 'DEPOSIT')) {
+    _simDraft.settlementType = _allowedSetl[0];
+  }
+  // Dla NOWEJ oferty zagranicznej podpowiedz walutę kraju, jeśli pozostała domyślna PLN
+  // (Czechy → CZK, pozostałe kraje → EUR). Zapisanych ofert nie ruszamy.
+  if (!id && _simCurrentLang() !== 'pl' && (_simDraft.currency || 'PLN') === 'PLN') {
+    _simDraft.currency = (_simCurrentLang() === 'cs') ? 'CZK' : 'EUR';
+  }
+
   const clients = window.ClientsModule ? ClientsModule.getAll() : [];
 
   container.innerHTML = SIM_STYLE + `
@@ -681,7 +694,7 @@ function simEdit(id) {
 
         <div class="sim-field"><label>Wariant rozliczenia</label>
           <select id="sim-settlement" onchange="_simSettlementChanged()">
-            ${Object.keys(SimulationsModule.SETTLEMENTS).map(k =>
+            ${_simAllowedSettlements().map(k =>
               `<option value="${k}" ${(_simDraft.settlementType || 'DEPOSIT') === k ? 'selected' : ''}>${SimulationsModule.SETTLEMENTS[k].label}</option>`).join('')}
           </select></div>
         <p id="sim-settlement-desc" style="font-size:11px;color:var(--color-text-secondary);margin:-4px 0 12px;">
@@ -880,11 +893,25 @@ function simRerenderScenarioInputs() {
   if (box) box.innerHTML = _simScenarioInputs();
 }
 
+// Bieżący język UI (= kraj oferty). Poza aplikacją może być niedostępny — wtedy 'pl'.
+function _simCurrentLang() {
+  try { return (typeof currentLanguage !== 'undefined') ? currentLanguage : (window.currentLanguage || 'pl'); }
+  catch (e) { return 'pl'; }
+}
+
+// Warianty rozliczenia dostępne w Ofercie zależnie od kraju.
+// Polska (język pl): pełny zestaw. Pozostałe kraje: tylko „Bez opłat" i „Opłata
+// wdrożeniowa w 2. roku" (kolejność jak w wymaganiu: najpierw bez opłaty).
+function _simAllowedSettlements() {
+  return (_simCurrentLang() === 'pl')
+    ? ['DEPOSIT', 'FEE', 'FEE_Y2', 'FREE']
+    : ['FREE', 'FEE_Y2'];
+}
+
 // Sugerowana Opłata za Usługę dla wariantu FEE_Y2, zależna od waluty.
-// Bazowo 24 990 PLN / 5 000 EUR (zgodnie z umową i ustaleniem); pozostałe waluty
-// przeliczane z EUR wg orientacyjnego, edytowalnego kursu. Wartość jest tylko
-// SUGESTIĄ — użytkownik może ją nadpisać w polu kwoty.
-const _SIM_FEE_SUGGEST = { PLN: 24990, EUR: 5000, CZK: 125000 };
+// Polska (PLN): 24 990. Kraje zagraniczne: 6 900 EUR / 169 000 CZK (Czechy).
+// Wartość jest tylko SUGESTIĄ — użytkownik może ją nadpisać w polu kwoty.
+const _SIM_FEE_SUGGEST = { PLN: 24990, EUR: 6900, CZK: 169000 };
 function _simSuggestedFee(currency) {
   return _SIM_FEE_SUGGEST[currency] != null ? _SIM_FEE_SUGGEST[currency] : _SIM_FEE_SUGGEST.PLN;
 }
