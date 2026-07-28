@@ -1,5 +1,8 @@
 // WaterAI Energy Control
-// Fabryka mostków Supabase v1.2.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// Fabryka mostków Supabase v1.3.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// v1.3.0 (2026-07-28): auto-odzysk (krok 3b) obejmuje salesRepresentative — od
+// migracji 006 handlowiec ma własne oferty, więc jego lokalne rekordy trzeba
+// wypchnąć do bazy, a nie nadpisać lustrem.
 // v1.2.0 (2026-07-11): (a) _persist zserializowany kolejką — równoległe saveAll
 // wyścigały się i podwójnie insertowały te same rekordy; (b) load() wykrywa
 // w bazie wiersze-duplikaty (ten sam data.id), pomija je i kasuje z tabeli.
@@ -97,8 +100,15 @@ const WaterAIBridge = {
 
         // 3b. Auto-odzysk: rekordy z lokalnego lustra, których nie ma w bazie
         // (np. zapis przy wygasłej sesji — insert odbił się o 401, a lustro zdążyło).
-        // Tylko role widzące pełną bazę (RLS); dla client/salesRep „brak w bazie" nic nie znaczy.
-        if (_prof && ['admin', 'backOffice', 'energyAnalyst'].indexOf(_prof.role) >= 0 && localBefore.length) {
+        // Role widzące własne rekordy w całości. Dla `client` pominięte: jego widok
+        // jest przycięty modelem udostępnień, więc „brak w bazie" nic nie znaczy.
+        // salesRepresentative dołączony od migracji 006 — od niej ma własne oferty
+        // (created_by = on), więc bez tego odzysku oferty zapisane lokalnie przed
+        // migracją zostałyby bezpowrotnie nadpisane przez _mirror() w kroku 4.
+        // Kompromis: gdyby cudzy rekord trafił do lustra przez udostępnienie, a potem
+        // udostępnienie cofnięto, odzysk wstawi go jako własny (duplikat u autora).
+        // Rzadkie i odwracalne — w przeciwieństwie do cichej utraty danych.
+        if (_prof && ['admin', 'backOffice', 'energyAnalyst', 'salesRepresentative'].indexOf(_prof.role) >= 0 && localBefore.length) {
           const known = new Set(this._cache.map(o => String(o.id)));
           const lost = localBefore.filter(o => o && o.id != null && !known.has(String(o.id)));
           if (lost.length) {
