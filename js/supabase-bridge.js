@@ -1,5 +1,10 @@
 // WaterAI Energy Control
-// Fabryka mostków Supabase v1.3.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// Fabryka mostków Supabase v1.4.0 — WSPÓLNY wzorzec sync→async dla modułów danych.
+// v1.4.0 (2026-08-03): usuwanie przestaje milczeć. PostgREST na DELETE odrzucony
+// przez RLS zwraca sukces i ZERO skasowanych wierszy — kod uznawał to za udane,
+// kasował mapowanie id i szedł dalej, więc rekordy wracały po odświeżeniu.
+// Teraz DELETE ma .select('id'): brak zwróconych wierszy = odmowa, mapowanie
+// zostaje (żeby ponowić), użytkownik dostaje jeden zbiorczy komunikat.
 // v1.3.0 (2026-07-28): auto-odzysk (krok 3b) obejmuje salesRepresentative — od
 // migracji 006 handlowiec ma własne oferty, więc jego lokalne rekordy trzeba
 // wypchnąć do bazy, a nie nadpisać lustrem.
@@ -76,7 +81,12 @@ const WaterAIBridge = {
         });
         if (dupRowIds.length) {
           console.warn('[' + this.table + '] Usuwam ' + dupRowIds.length + ' zduplikowanych wierszy z bazy (ten sam data.id).');
-          const { error: delErr } = await sb.from(this.table).delete().in('id', dupRowIds);
+          const { data: delRows, error: delErr } = await sb.from(this.table).delete().in('id', dupRowIds).select('id');
+          if (!delErr && (!delRows || delRows.length < dupRowIds.length)) {
+            console.warn('[' + this.table + '] Baza odrzuciła usunięcie ' +
+              (dupRowIds.length - ((delRows && delRows.length) || 0)) + ' z ' + dupRowIds.length +
+              ' wierszy-duplikatów (uprawnienia RLS).');
+          }
           if (delErr) console.warn('[' + this.table + '] Nie udało się skasować duplikatów:', delErr.message);
         }
 
@@ -182,12 +192,26 @@ const WaterAIBridge = {
               this._snap[key] = json;
             }
           }
+          const refused = [];
           for (const key of Object.keys(this._rowIds)) {
             if (!seen[key]) {
-              const { error } = await sb.from(this.table).delete().eq('id', this._rowIds[key]);
+              const { data: gone, error } = await sb.from(this.table).delete().eq('id', this._rowIds[key]).select('id');
               if (error) throw error;
+              if (!gone || !gone.length) {
+                // Baza nie skasowała wiersza (RLS). Mapowanie ZOSTAJE — inaczej
+                // przy kolejnym zapisie rekord wróciłby jako nowy insert (duplikat).
+                refused.push(key);
+                continue;
+              }
               delete this._rowIds[key]; delete this._snap[key];
             }
+          }
+          if (refused.length) {
+            console.warn('[' + this.table + '] Baza odrzuciła usunięcie ' + refused.length +
+              ' rekord(ów) — brak uprawnień w RLS. Klucze:', refused.join(', '));
+            alert('Baza odrzuciła usunięcie ' + refused.length + ' rekord(ów) (' + cfg.label + ').\n' +
+                  'Twoja rola nie ma prawa kasować tych wpisów, więc po odświeżeniu wrócą.\n' +
+                  'Szczegóły w konsoli przeglądarki (F12).');
           }
           if (skipped.length) {
             console.warn('[' + this.table + '] Pominięto (brak rodzica w bazie):', skipped.join(', '));
