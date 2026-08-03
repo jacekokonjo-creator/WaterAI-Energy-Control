@@ -614,7 +614,7 @@ function _rdGasCalc() {
 function _rdGasApply() {
   const m3 = parseFloat((document.getElementById('rd-gas-m3') || {}).value);
   const f = parseFloat((document.getElementById('rd-gas-factor') || {}).value);
-  if (isNaN(m3) || isNaN(f) || m3 <= 0 || f <= 0) { alert('Podaj zużycie z licznika [m³] i współczynnik [kWh/m³].'); return; }
+  if (isNaN(m3) || isNaN(f) || m3 <= 0 || f <= 0) { _rdInfo('Podaj zużycie z licznika [m³] i współczynnik [kWh/m³].'); return; }
   const energy = Math.round(m3 * f);
   let touched = 0;
   _rdItems.forEach(it => {
@@ -625,7 +625,7 @@ function _rdGasApply() {
       touched++;
     }
   });
-  if (!touched) { alert('Brak pozycji z jednostką kWh — najpierw dodaj pozycje, potem wstaw ilość.'); return; }
+  if (!touched) { _rdInfo('Brak pozycji z jednostką kWh — najpierw dodaj pozycje, potem wstaw ilość.'); return; }
   _rdRenderItems();
 }
 
@@ -768,9 +768,9 @@ async function _rdUploadPending(objectId, readingId) {
 
 async function _rdOpenAttachment(path) {
   const sb = _rdSb();
-  if (!sb) { alert('Podgląd załączników wymaga połączenia z bazą (Supabase).'); return; }
+  if (!sb) { _rdInfo('Podgląd załączników wymaga połączenia z bazą (Supabase).'); return; }
   const { data, error } = await sb.storage.from(RD_BUCKET).createSignedUrl(path, 600);
-  if (error || !data || !data.signedUrl) { alert('Nie udało się otworzyć pliku: ' + (error ? error.message : 'brak adresu')); return; }
+  if (error || !data || !data.signedUrl) { _rdInfo('Nie udało się otworzyć pliku: ' + (error ? error.message : 'brak adresu')); return; }
   window.open(data.signedUrl, '_blank');
 }
 
@@ -785,8 +785,8 @@ async function _rdSaveSingle() {
   const readingDate = g('rd-date').value;
   const periodFrom = g('rd-from').value;
   const periodTo = g('rd-to').value;
-  if (!readingDate || !periodFrom || !periodTo) { alert('Uzupełnij datę odczytu oraz okres od–do.'); return; }
-  if (periodTo < periodFrom) { alert('„Okres do" jest wcześniejszy niż „okres od".'); return; }
+  if (!readingDate || !periodFrom || !periodTo) { _rdInfo('Uzupełnij datę odczytu oraz okres od–do.'); return; }
+  if (periodTo < periodFrom) { _rdInfo('„Okres do" jest wcześniejszy niż „okres od".'); return; }
 
   const p = _rdProfile();
   const cleanItems = _rdItems
@@ -806,7 +806,7 @@ async function _rdSaveSingle() {
   if (!cons && !isNaN(gasM3) && !isNaN(gasFactor) && gasM3 > 0 && gasFactor > 0) {
     cons = Math.round(gasM3 * gasFactor); consUnit = 'kWh';
   }
-  if (!cons) { alert('Dodaj przynajmniej jedną pozycję zmienną (Z) z ilością w jednostce energii lub paliwa (kWh, MWh, GJ, m³, t) — z niej liczone jest zużycie.'); return; }
+  if (!cons) { _rdInfo('Dodaj przynajmniej jedną pozycję zmienną (Z) z ilością w jednostce energii lub paliwa (kWh, MWh, GJ, m³, t) — z niej liczone jest zużycie.'); return; }
 
   let sum = 0, varSum = 0;
   cleanItems.forEach(it => { const v = Number(it.value || 0); sum += v; if (it.costType !== 'FIXED') varSum += v; });
@@ -846,7 +846,7 @@ async function _rdSaveSingle() {
     const uploaded = await _rdUploadPending(_rdObjectId, recId);
     attachments = attachments.concat(uploaded);
   } catch (e) {
-    alert('Nie udało się wgrać załącznika: ' + (e.message || e) + '\nPomiar zostanie zapisany bez tego pliku.');
+    _rdInfo('Nie udało się wgrać załącznika: ' + (e.message || e) + '\nPomiar zostanie zapisany bez tego pliku.');
   }
   rec.attachments = attachments;
 
@@ -871,18 +871,20 @@ function _rdEdit(id) {
   renderReadingsModule(_rdLockClientId);
 }
 
-function _rdWipeObject() {
+async function _rdWipeObject() {
   const obj = ObjectsModule.find(_rdObjectId);
   const mine = ReadingsModule.findByObject(_rdObjectId);
-  if (!mine.length) { alert('Ten obiekt nie ma pomiarów.'); return; }
-  if (!confirm('Usunąć WSZYSTKIE pomiary obiektu „' + (obj ? obj.name : '') + '" (' + mine.length + ' szt.)?')) return;
-  if (!confirm('Na pewno? To skasuje ' + mine.length + ' pomiarów również ze wspólnej bazy. Operacji nie można cofnąć.')) return;
+  if (!mine.length) { _rdInfo('Ten obiekt nie ma pomiarów.'); return; }
+  if (!await _rdAsk('Usunąć WSZYSTKIE pomiary obiektu „' + (obj ? obj.name : '') + '" (' + mine.length + ' szt.)?',
+                    'Dalej')) return;
+  if (!await _rdAsk('Na pewno? To skasuje ' + mine.length + ' pomiarów również ze wspólnej bazy.\n' +
+                    'Operacji nie można cofnąć.', 'Usuń ' + mine.length + ' pomiarów')) return;
   const keep = ReadingsModule.getAll().filter(r => String(r.objectId) !== String(_rdObjectId));
   ReadingsModule.saveAll(keep);
   renderReadingsModule(_rdLockClientId);
 }
 
-function _rdDedupe() {
+async function _rdDedupe() {
   const all = ReadingsModule.getAll();
   const seen = {};
   const keep = [];
@@ -892,20 +894,66 @@ function _rdDedupe() {
     if (seen[key]) { removed++; return; }
     seen[key] = true; keep.push(r);
   });
-  if (!removed) { alert('Nie znaleziono duplikatów.'); return; }
-  if (!confirm('Znaleziono ' + removed + ' zduplikowanych pomiarów (ten sam obiekt, okres i wartość — we wszystkich obiektach). Zostawić po jednym i usunąć resztę?')) return;
+  if (!removed) { _rdInfo('Nie znaleziono duplikatów.'); return; }
+  if (!await _rdAsk('Znaleziono ' + removed + ' zduplikowanych pomiarów (ten sam obiekt, okres i wartość — we wszystkich obiektach).\n' +
+                    'Zostawić po jednym i usunąć resztę? Operacji nie można cofnąć.')) return;
   ReadingsModule.saveAll(keep);
-  alert('Usunięto ' + removed + ' duplikatów. Pozostało ' + keep.length + ' pomiarów.');
+  await _rdInfo('Usunięto ' + removed + ' duplikatów. Pozostało ' + keep.length + ' pomiarów.');
   renderReadingsModule(_rdLockClientId);
 }
 
-function _rdDelete(id) {
+async function _rdDelete(id) {
   const r = ReadingsModule.find(id);
   if (!r) return;
-  if (!confirm('Usunąć pomiar z okresu ' + _rdDatePL(r.periodFrom) + ' – ' + _rdDatePL(r.periodTo) + '?')) return;
+  if (!await _rdAsk('Usunąć pomiar z okresu ' + _rdDatePL(r.periodFrom) + ' – ' + _rdDatePL(r.periodTo) + '?\n' +
+                    'Wartość: ' + _rdNum(r.value) + ' ' + _rdUnit(r.unit) + '. Operacji nie można cofnąć.')) return;
   ReadingsModule.remove(id);
   renderReadingsModule(_rdLockClientId);
 }
+
+// ── 6b. WLASNE POTWIERDZENIA ────────────────────────────────────────────────
+// Natywne confirm()/alert() przegladarka pozwala wylaczyc jednym ptaszkiem
+// („nie pokazuj wiecej tych komunikatow"). Od tej chwili confirm() zwraca
+// false BEZ pytania — i kasowanie po cichu przestaje dzialac (incydent
+// 2026-08-03). Wlasne okno nie da sie w ten sposob uciszyc.
+function _rdDialog(message, okLabel, danger, infoOnly) {
+  return new Promise(function (resolve) {
+    const prev = document.getElementById('rd-ask');
+    if (prev) prev.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'rd-ask';
+    wrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;' +
+      'background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+    wrap.innerHTML =
+      '<div role="dialog" aria-modal="true" style="background:var(--color-background-primary);' +
+      'border:1px solid var(--color-border-tertiary);border-radius:12px;max-width:480px;width:100%;' +
+      'padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25);">' +
+      '<p id="rd-ask-msg" style="font-size:14px;line-height:1.6;margin:0 0 18px;white-space:pre-line;"></p>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+      (infoOnly ? '' : '<button class="small-button" id="rd-ask-no">Anuluj</button>') +
+      '<button class="primary-button" id="rd-ask-yes"></button>' +
+      '</div></div>';
+    document.body.appendChild(wrap);
+    wrap.querySelector('#rd-ask-msg').textContent = message;
+    const yes = wrap.querySelector('#rd-ask-yes');
+    yes.textContent = okLabel || 'OK';
+    if (danger) yes.style.cssText = 'background:#A32D2D;border-color:#A32D2D;color:#fff;';
+    function close(v) {
+      document.removeEventListener('keydown', onKey);
+      wrap.remove();
+      resolve(v);
+    }
+    function onKey(e) { if (e.key === 'Escape') close(false); }
+    yes.onclick = function () { close(true); };
+    const no = wrap.querySelector('#rd-ask-no');
+    if (no) no.onclick = function () { close(false); };
+    wrap.onclick = function (e) { if (e.target === wrap) close(false); };
+    document.addEventListener('keydown', onKey);
+    (no || yes).focus();
+  });
+}
+function _rdAsk(message, okLabel) { return _rdDialog(message, okLabel || 'Usun', true, false); }
+function _rdInfo(message) { return _rdDialog(message, 'OK', false, true); }
 
 // ── 7. WPIS SERYJNY ──────────────────────────────────────────────────────────
 
@@ -1082,7 +1130,7 @@ function _rdSaveSerial() {
     }));
   });
   ReadingsModule.saveAll(items);
-  alert('Zapisano ' + rows.length + ' pozycji.');
+  _rdInfo('Zapisano ' + rows.length + ' pozycji.');
   _rdCancel();
 }
 
