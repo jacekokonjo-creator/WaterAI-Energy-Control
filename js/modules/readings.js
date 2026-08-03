@@ -254,8 +254,18 @@ function renderReadingsModule(lockClientId) {
   if (_rdMode === 'single') formHtml = _rdSingleFormHtml(obj);
   if (_rdMode === 'serial') formHtml = _rdSerialFormHtml(obj);
 
-  container.innerHTML = selector + infoBar + formHtml + _rdTableHtml(obj);
+  // Edycja istniejacego pomiaru rozwija sie w wierszu POD klikniętym pomiarem
+  // (dotad formularz ladowal zawsze na gorze listy). Nowy wpis i seryjny —
+  // nadal u gory, bo tam sa przyciski, ktore je otwieraja.
+  window._rdInlineForm = (_rdMode === 'single' && _rdEditingId) ? formHtml : '';
+  window._rdInlineUsed = false;
+  const tableHtml = _rdTableHtml(obj);
+  container.innerHTML = selector + infoBar + (window._rdInlineUsed ? '' : formHtml) + tableHtml;
   if (_rdMode === 'single') { _rdRenderItems(); _rdRenderFileChips(); _rdGasCalc(); }
+  if (window._rdInlineUsed) {
+    const anchor = document.getElementById('rd-inline-anchor');
+    if (anchor && anchor.scrollIntoView) anchor.scrollIntoView({ block: 'nearest' });
+  }
 }
 
 function _rdSelectClient(v) {
@@ -378,8 +388,14 @@ function _rdTableHtml(obj) {
       ? `<tr><td colspan="7" style="padding:0 10px 8px;font-size:12px;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-tertiary);">${metaBits.join(' · ')}${attHtml ? '<br>' + attHtml : ''}</td></tr>`
       : '';
     const gross = r.costGross != null ? r.costGross : (r.costNet != null && r.vatRate != null ? r.costNet * (1 + r.vatRate / 100) : null);
+    const isEditing = !!window._rdInlineForm && Number(r.id) === Number(_rdEditingId);
+    let inlineRow = '';
+    if (isEditing) {
+      window._rdInlineUsed = true;
+      inlineRow = `<tr><td colspan="7" style="padding:0 10px 4px;"><div id="rd-inline-anchor">${window._rdInlineForm}</div></td></tr>`;
+    }
     return `
-      <tr>
+      <tr${isEditing ? ' style="background:var(--color-background-secondary);"' : ''}>
         <td style="${td}color:var(--color-text-secondary);">${lpOf[r.id]}</td>
         <td style="${td}">${_rdDatePL(r.readingDate)}<div style="font-size:11px;color:var(--color-text-secondary);">${_rdDatePL(r.periodFrom)} – ${_rdDatePL(r.periodTo)}</div></td>
         <td style="${td}"><span style="background:${src.bg};color:${src.fg};border-radius:10px;padding:2px 8px;font-size:12px;white-space:nowrap;">${src.icon} ${src.label}</span></td>
@@ -390,7 +406,7 @@ function _rdTableHtml(obj) {
           ${canEdit ? `<button class="small-button" style="font-size:12px;padding:4px 8px;" onclick="_rdEdit(${r.id})">✏️</button>
           <button class="small-button" style="font-size:12px;padding:4px 8px;" onclick="_rdDelete(${r.id})">🗑️</button>` : ''}
         </td>
-      </tr>${meta}`;
+      </tr>${meta}${inlineRow}`;
   }).join('');
 
   return filterBar + dupBar + `
