@@ -10,6 +10,9 @@
 --   • Wszystkie polityki porównujące app_role() = '...' przeniesione na
 --     has_role() / has_any_role() — bez tego wielorolowość NIE działa.
 --   • 'client' jest wyłączna: nie łączy się z rolami wewnętrznymi.
+--   • HIERARCHIA: admin ⇒ backOffice ⇒ energyAnalyst (+ admin ⇒ salesRepresentative).
+--     Back Office zyskuje przez to zapis analiz, okresów bazowych, raportów ESCO,
+--     flagę `verified` na pomiarach oraz zarządzanie udostępnieniami.
 --
 -- Idempotentne. Uruchomienie: Supabase → SQL Editor → wklej całość → Run.
 -- Wymaga: schema.sql, migration_003, migration_005, migration_006.
@@ -76,9 +79,25 @@ create trigger trg_sync_profile_roles before insert or update on profiles
   for each row execute function sync_profile_roles();
 
 -- ── 4. FUNKCJE POMOCNICZE ─────────────────────────────────────────────────
+-- Hierarchia ról: admin obejmuje wszystkie, Back Office obejmuje analityka.
+-- Role NADANE zostają w profiles.roles bez zmian (ślad audytowy);
+-- rozwinięcie liczone jest dopiero przy sprawdzaniu uprawnień.
+create or replace function expand_roles(rs text[]) returns text[]
+language sql immutable as $fn$
+  select array(select distinct r from unnest(
+      coalesce(rs, '{}'::text[])
+   || case when 'admin'      = any(coalesce(rs, '{}'::text[]))
+           then array['backOffice','energyAnalyst','salesRepresentative'] else '{}'::text[] end
+   || case when 'backOffice' = any(coalesce(rs, '{}'::text[]))
+           then array['energyAnalyst'] else '{}'::text[] end
+  ) as r)
+$fn$;
+
+-- UWAGA: zwraca role ROZWINIĘTE (z hierarchią). Do odczytu ról nadanych
+-- używać wprost profiles.roles — np. w blokadzie eskalacji niżej.
 create or replace function app_roles() returns text[]
 language sql stable security definer set search_path = public as
-$$ select coalesce(roles, array[]::text[]) from profiles where id = auth.uid() $$;
+$$ select expand_roles((select roles from profiles where id = auth.uid())) $$;
 
 create or replace function has_role(r text) returns boolean
 language sql stable as
