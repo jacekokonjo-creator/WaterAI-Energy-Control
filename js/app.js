@@ -1247,9 +1247,9 @@ function renderObjectsModule() {
                 <label>Energy Analyst</label>
                 <select name="energyAnalystOwner">
                   <option value="">— wybierz —</option>
-                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByRole('energyAnalyst') : [])
+                  ${(typeof UsersModule !== 'undefined' ? UsersModule.findByEffectiveRole('energyAnalyst') : [])
                     .map(u => `<option value="${escapeHtml(u.firstName + ' ' + u.lastName)}">${escapeHtml(u.firstName + ' ' + u.lastName)}</option>`).join('')}
-                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.energyAnalystOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByRole('energyAnalyst').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
+                  ${editingObjectId && (() => { const o = ObjectsModule.find(editingObjectId); const v = o && o.energyAnalystOwner; const exists = v && (typeof UsersModule !== 'undefined') && UsersModule.findByEffectiveRole('energyAnalyst').some(u => u.firstName + ' ' + u.lastName === v); return (v && !exists) ? `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>` : ''; })()}
                 </select>
               </div>
             </div>
@@ -3005,7 +3005,7 @@ function renderMeasurementsModule() {
             <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
               onchange="(function(s){var w=document.getElementById('preparedBy_wrap');if(s.value==='__other__'){w.style.display='flex';s.removeAttribute('name');document.getElementById('preparedBy_inp').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').focus();}else{w.style.display='none';s.setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');}})(this)">
               <option value="">— wybierz analityka —</option>
-              ${(window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []).map(u => {
+              ${(window.UsersModule ? UsersModule.findByEffectiveRole('energyAnalyst') : []).map(u => {
                 const n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
                 const sel = n === (selectedObject.energyAnalystOwner||'') ? 'selected' : '';
                 return '<option value="'+n+'" '+sel+'>'+n+'</option>';
