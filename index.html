@@ -500,7 +500,7 @@
         <p class="dashboard-desc" data-i18n="dashboardDesc">Wybierz moduł, z którym chcesz pracować.</p>
 
         <div class="role-box" id="role-test-panel" style="display:none;">
-          <div class="role-title">🔑 Tryb testowy roli <span style="font-size:10px;opacity:0.7;">(tylko Admin)</span></div>
+          <div class="role-title">🔑 Tryb testowy roli <span style="font-size:10px;opacity:0.7;">(podgląd wg roli)</span></div>
           <div class="role-switcher">
             <button id="role-admin" class="active" onclick="setRole('admin')">Admin</button>
             <button id="role-backOffice" onclick="setRole('backOffice')" data-i18n="roleBackOffice">Back Office</button>
@@ -983,8 +983,21 @@
     const storageKey = "waterai_reminders_v1";
 
     let currentLanguage = "pl";
-    let currentRole = "admin";
-    let realRole = "admin";        // faktyczna rola zalogowanego (docelowo z Supabase)
+    let currentRole = "admin";     // rola AKTYWNA w widoku (przełącznik) — steruje TYLKO wyglądem
+    let realRole = "admin";        // rola główna konta = assignedRoles[0] (zgodność wstecz)
+    let assignedRoles = ["admin"]; // role NADANE w profiles.roles
+    let realRoles = ["admin"];     // role EFEKTYWNE (po hierarchii) — źródło uprawnień w UI
+
+    // Odpowiednik SQL expand_roles() z migracji 007. Musi pozostać zgodny!
+    // admin ⇒ backOffice ⇒ energyAnalyst; admin ⇒ salesRepresentative.
+    function expandRoles(rs) {
+      const out = new Set(rs || []);
+      if (out.has("admin")) { out.add("backOffice"); out.add("energyAnalyst"); out.add("salesRepresentative"); }
+      if (out.has("backOffice")) { out.add("energyAnalyst"); }
+      return Array.from(out);
+    }
+    function hasRole(r) { return realRoles.includes(r); }
+    function hasAnyRole() { return Array.prototype.some.call(arguments, r => realRoles.includes(r)); }
     let previewClientId = null;
     let reminders = JSON.parse(localStorage.getItem(storageKey) || "[]");
 
@@ -1059,9 +1072,17 @@
       const modules = roleModules[currentRole];
       const tilesContainer = document.getElementById("tiles");
 
-      // Show role test panel only for admin
+      // Przełącznik widoku: admin (podgląd wszystkich ról) lub konto z wieloma rolami.
+      // UWAGA: przełącznik zmienia WYŁĄCZNIE wygląd — uprawnienia egzekwuje RLS.
       const rolePanel = document.getElementById("role-test-panel");
-      if (rolePanel) rolePanel.style.display = realRole === "admin" ? "block" : "none";
+      if (rolePanel) {
+        const isAdminAcct = assignedRoles.includes("admin");
+        rolePanel.style.display = (isAdminAcct || realRoles.length > 1) ? "block" : "none";
+        ["admin","backOffice","energyAnalyst","salesRepresentative","client"].forEach(r => {
+          const b = document.getElementById("role-" + r);
+          if (b) b.style.display = (isAdminAcct || realRoles.includes(r)) ? "" : "none";
+        });
+      }
 
       tilesContainer.innerHTML = "";
 
@@ -1119,13 +1140,18 @@
         return;
       }
 
-      realRole = profile.role;      // faktyczna rola z Supabase (patrz changelog 2026-06-24a)
-      currentRole = profile.role;
+      // migracja 007: profiles.roles (tablica). Fallback na profile.role dla starej bazy.
+      assignedRoles = (Array.isArray(profile.roles) && profile.roles.length)
+        ? profile.roles : [profile.role || "client"];
+      realRoles = expandRoles(assignedRoles);
+      realRole = assignedRoles[0];  // rola główna (patrz changelog 2026-06-24a)
+      currentRole = assignedRoles[0];
 
       const cuEl = document.getElementById("current-user");
       if (cuEl) {
-        const roleLabel = (window.UsersModule && UsersModule.ROLES && UsersModule.ROLES[profile.role])
-          ? UsersModule.ROLES[profile.role].label : (profile.role || "");
+        const roleLabel = assignedRoles.map(r =>
+          (window.UsersModule && UsersModule.ROLES && UsersModule.ROLES[r])
+            ? UsersModule.ROLES[r].label : r).join(" + ");
         cuEl.textContent = "\uD83D\uDC64 " + (profile.full_name || profile.email || "") +
           (profile.email && profile.full_name ? " (" + profile.email + ")" : "") + " \u00B7 " + roleLabel;
       }
