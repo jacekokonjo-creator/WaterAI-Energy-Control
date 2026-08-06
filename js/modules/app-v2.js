@@ -3101,7 +3101,7 @@ function escoSuggestNumber(clientId, objectId){
 }
 
 function escoAnalystOptions(selectedName){
-  const analysts=(typeof UsersModule!=='undefined')?UsersModule.findByRole('energyAnalyst'):[];
+  const analysts=(typeof UsersModule!=='undefined')?UsersModule.findByEffectiveRole('energyAnalyst'):[];
   const opts=analysts.map(u=>{
     const n=(u.firstName+' '+u.lastName).trim();
     return `<option value="${escapeHtml(n)}" ${selectedName===n?'selected':''}>${escapeHtml(n)}</option>`;
