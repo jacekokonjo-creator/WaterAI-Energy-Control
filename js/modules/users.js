@@ -30,12 +30,15 @@ const UsersModule = {
     const lastName = parts.join(' ');
     const legacyClientId = (p.client_id && typeof ClientsModule !== 'undefined' && ClientsModule.legacyIdForRow)
       ? ClientsModule.legacyIdForRow(p.client_id) : null;
+    const roles = (Array.isArray(p.roles) && p.roles.length) ? p.roles : [p.role || 'client'];
     return {
       id: p.id,                       // uuid z auth.users
+      roles,                          // role NADANE (migracja 007)
+      effectiveRoles: UsersModule.expandRoles(roles),  // po hierarchii
       firstName, lastName,
       fullName: p.full_name || '',
       email: (p.data && p.data.email) || '',
-      role: p.role || 'client',
+      role: roles[0],                 // rola główna — zgodność wstecz
       clientId: legacyClientId,
       clientRowId: p.client_id || null,
       status: 'ACTIVE',
@@ -50,7 +53,7 @@ const UsersModule = {
       return;
     }
     const { data, error } = await sb.from('profiles')
-      .select('id, full_name, role, client_id, data, created_at')
+      .select('id, full_name, role, roles, client_id, data, created_at')
       .order('created_at');
     if (error) {
       console.warn('[users] Nie udało się pobrać profili:', error.message);
@@ -65,8 +68,23 @@ const UsersModule = {
     return JSON.parse(JSON.stringify(this._cache));
   },
 
+  // Hierarchia ról — odpowiednik SQL expand_roles() z migracji 007.
+  // admin ⇒ backOffice ⇒ energyAnalyst; admin ⇒ salesRepresentative.
+  expandRoles(rs) {
+    const out = new Set(rs || []);
+    if (out.has('admin')) { out.add('backOffice'); out.add('energyAnalyst'); out.add('salesRepresentative'); }
+    if (out.has('backOffice')) { out.add('energyAnalyst'); }
+    return Array.from(out);
+  },
+
+  // Konto z rolą NADANĄ wśród wielu też ma się znaleźć w wyniku.
   findByRole(role) {
-    return this.getAll().filter(u => u.role === role);
+    return this.getAll().filter(u => (u.roles || [u.role]).includes(role));
+  },
+
+  // Uprawnienie wynikające z hierarchii (np. backOffice ma prawa analityka).
+  findByEffectiveRole(role) {
+    return this.getAll().filter(u => (u.effectiveRoles || []).includes(role));
   },
 
   find(id) {
@@ -104,8 +122,9 @@ const UsersModule = {
       throw new Error('Ten adres e-mail jest już zarejestrowany.');
     }
 
-    const row = { id: user.id, full_name: opts.fullName, role: opts.role, data: { email: opts.email } };
-    if (opts.role === 'client' && opts.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds) {
+    const roles = Array.isArray(opts.roles) && opts.roles.length ? opts.roles : [opts.role || 'client'];
+    const row = { id: user.id, full_name: opts.fullName, roles, role: roles[0], data: { email: opts.email } };
+    if (roles.includes('client') && opts.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds) {
       row.client_id = ClientsModule._rowIds[String(opts.clientLegacyId)] || null;
     }
     const { error: e2 } = await sb.from('profiles').upsert(row, { onConflict: 'id' });
@@ -123,12 +142,14 @@ const UsersModule = {
     const current = this.find(id);
     const row = {};
     if (patch.fullName != null) row.full_name = patch.fullName;
-    if (patch.role != null) row.role = patch.role;
-    if (patch.role === 'client') {
-      row.client_id = (patch.clientLegacyId && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds)
+    const roles = Array.isArray(patch.roles) && patch.roles.length
+      ? patch.roles : (patch.role != null ? [patch.role] : null);
+    if (roles) {
+      row.roles = roles;
+      row.role  = roles[0];
+      row.client_id = (roles.includes('client') && patch.clientLegacyId
+        && typeof ClientsModule !== 'undefined' && ClientsModule._rowIds)
         ? (ClientsModule._rowIds[String(patch.clientLegacyId)] || null) : null;
-    } else if (patch.role != null) {
-      row.client_id = null;
     }
     row.data = { email: patch.email != null ? patch.email : (current ? current.email : '') };
     const { error } = await sb.from('profiles').update(row).eq('id', id);
@@ -157,13 +178,16 @@ let editingUserId = null;
 
 function _usrEsc(v) { return (typeof escapeHtml === 'function') ? escapeHtml(v == null ? '' : String(v)) : String(v == null ? '' : v); }
 function _usrIsAdmin() {
-  return (typeof realRole !== 'undefined' && realRole === 'admin');
+  return (typeof realRoles !== 'undefined') ? realRoles.includes('admin')
+       : (typeof realRole !== 'undefined' && realRole === 'admin');
 }
 // Zarządzanie kontami: administrator + Back Office. Back Office NIE może jednak
 // tworzyć ani modyfikować kont z rolą 'admin' (blokada eskalacji uprawnień) —
 // egzekwowane tu w UI oraz w RLS (migration_005).
 function _usrCanManage() {
-  return _usrIsAdmin() || (typeof realRole !== 'undefined' && realRole === 'backOffice');
+  return _usrIsAdmin() || ((typeof realRoles !== 'undefined')
+    ? realRoles.includes('backOffice')
+    : (typeof realRole !== 'undefined' && realRole === 'backOffice'));
 }
 
 function renderUsersModule() {
@@ -177,26 +201,27 @@ function renderUsersModule() {
   const canManage = _usrCanManage();
   const myId = (window.WaterAISupabase && WaterAISupabase.profile) ? WaterAISupabase.profile.id : null;
 
-  const filtered = usersActiveRole === 'all' ? allUsers : allUsers.filter(u => u.role === usersActiveRole);
+  const _rolesOf = u => (u.roles && u.roles.length) ? u.roles : [u.role];
+  const filtered = usersActiveRole === 'all' ? allUsers : allUsers.filter(u => _rolesOf(u).includes(usersActiveRole));
   const q = (window._usrSearch || '').toLowerCase();
   const display = filtered.filter(u => !q ||
     (u.firstName + ' ' + u.lastName).toLowerCase().includes(q) ||
     (u.email || '').toLowerCase().includes(q));
 
   const sort = window._usrSort || 'name_asc';
-  const clientNameOf = u => (u.role === 'client' && u.clientId && typeof ClientsModule !== 'undefined')
+  const clientNameOf = u => (_rolesOf(u).includes('client') && u.clientId && typeof ClientsModule !== 'undefined')
     ? (((ClientsModule.find(u.clientId) || {}).name) || '') : '';
   const sortVal = (u, col) =>
     col === 'name' ? (u.firstName + ' ' + u.lastName).trim().toLowerCase()
     : col === 'email' ? (u.email || '').toLowerCase()
-    : col === 'role' ? (u.role || '')
+    : col === 'role' ? _rolesOf(u).join(',')
     : clientNameOf(u).toLowerCase();
   const sortCol = sort.replace(/_(asc|desc)$/, '');
   const sortDir = sort.endsWith('_desc') ? -1 : 1;
   display.sort((a, b) => sortVal(a, sortCol).localeCompare(sortVal(b, sortCol), 'pl') * sortDir);
 
   const roleCounts = {};
-  Object.keys(UsersModule.ROLES).forEach(r => { roleCounts[r] = allUsers.filter(u => u.role === r).length; });
+  Object.keys(UsersModule.ROLES).forEach(r => { roleCounts[r] = allUsers.filter(u => _rolesOf(u).includes(r)).length; });
 
   const roleTabs = `
     <div class="meas-tabs" style="margin-bottom:16px;">
@@ -239,11 +264,18 @@ function renderUsersModule() {
           <input id="usr-email" type="email" value="${_usrEsc(editUser ? editUser.email : '')}" placeholder="${editUser && !editUser.email ? 'uzupełnij e-mail (login) tego konta' : 'np. j.okon@waterai.cloud'}" style="${inp}" ${editUser && editUser.email ? 'disabled title="Loginu (e-mail w Auth) nie zmienisz z poziomu aplikacji"' : ''}></div>
         ${editUser ? '' : `<div><label style="${lbl}">Hasło startowe (min. 6 znaków)</label>
           <input id="usr-password" type="text" placeholder="użytkownik może je potem zmienić" style="${inp}"></div>`}
-        <div><label style="${lbl}">Rola</label>
-          <select id="usr-role" style="${inp}" onchange="document.getElementById('usr-client-field').style.display=this.value==='client'?'':'none';">
-            ${Object.entries(UsersModule.ROLES).filter(([k]) => isAdmin || k !== 'admin').map(([k, r]) => `<option value="${k}" ${(editUser ? editUser.role : 'client') === k ? 'selected' : ''}>${r.icon} ${r.label}</option>`).join('')}
-          </select></div>
-        <div id="usr-client-field" style="${(editUser ? editUser.role : 'client') === 'client' ? '' : 'display:none;'}">
+        <div><label style="${lbl}">Role <span style="font-weight:400;color:var(--color-text-secondary);">(można zaznaczyć kilka)</span></label>
+          <div id="usr-roles" style="${inp}padding:8px 10px;display:flex;flex-direction:column;gap:6px;">
+            ${Object.entries(UsersModule.ROLES).filter(([k]) => isAdmin || k !== 'admin').map(([k, r]) => `
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" class="usr-role-cb" value="${k}"
+                  ${(editUser ? (editUser.roles || [editUser.role]) : ['client']).includes(k) ? 'checked' : ''}
+                  onchange="_usrRolesChanged()">
+                <span style="font-weight:600;padding:2px 9px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span>
+              </label>`).join('')}
+          </div>
+          <p id="usr-roles-hint" style="font-size:11px;color:var(--color-text-secondary);margin:6px 0 0;"></p></div>
+        <div id="usr-client-field" style="${(editUser ? (editUser.roles || [editUser.role]) : ['client']).includes('client') ? '' : 'display:none;'}">
           <label style="${lbl}">Klient (dla roli Client)</label>
           <select id="usr-client" style="${inp}">
             <option value="">— wybierz klienta —</option>
@@ -261,16 +293,22 @@ function renderUsersModule() {
   const td = 'padding:10px 12px;border-bottom:1px solid var(--color-border-tertiary);font-size:13px;vertical-align:middle;';
 
   const rows = display.map(u => {
-    const r = UsersModule.ROLES[u.role] || UsersModule.ROLES.client;
+    const uRoles = (u.roles && u.roles.length) ? u.roles : [u.role];
+    const badges = uRoles.map(k => {
+      const rr = UsersModule.ROLES[k] || UsersModule.ROLES.client;
+      return `<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${rr.bg};color:${rr.color};white-space:nowrap;">${rr.icon} ${rr.label}</span>`;
+    }).join(' ');
+    // role dziedziczone z hierarchii — pokazane osobno, bo nie są nadane wprost
+    const inherited = (u.effectiveRoles || []).filter(k => !uRoles.includes(k));
     const clientName = u.clientId && typeof ClientsModule !== 'undefined' ? ((ClientsModule.find(u.clientId) || {}).name || '—') : '—';
     const isMe = myId && String(u.id) === String(myId);
     return `<tr>
       <td style="${td}"><b>${_usrEsc((u.firstName + ' ' + u.lastName).trim() || '—')}</b>${isMe ? ' <span style="font-size:11px;color:var(--color-text-secondary);">(to Ty)</span>' : ''}</td>
       <td style="${td}">${_usrEsc(u.email || '—')}</td>
-      <td style="${td}"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${r.bg};color:${r.color};">${r.icon} ${r.label}</span></td>
-      <td style="${td}">${u.role === 'client' ? _usrEsc(clientName) : '—'}</td>
+      <td style="${td}"><div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>${inherited.length ? `<div style="font-size:10px;color:var(--color-text-secondary);margin-top:3px;" title="Wynika z hierarchii ról, nie nadane wprost">+ dziedziczone: ${inherited.map(k => (UsersModule.ROLES[k] || {}).label || k).join(', ')}</div>` : ''}</td>
+      <td style="${td}">${uRoles.includes('client') ? _usrEsc(clientName) : '—'}</td>
       <td style="${td}white-space:nowrap;text-align:right;">
-        ${(canManage && sb && (u.role !== 'admin' || isAdmin)) ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
+        ${(canManage && sb && (!uRoles.includes('admin') || isAdmin)) ? `<button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="editingUserId='${u.id}';showUserForm=true;renderUsersModule();">Edytuj</button>
         <button class="small-button" style="font-size:12px;padding:4px 10px;" onclick="_usrSendReset('${_usrEsc(u.email)}')">Reset hasła</button>
         ${isMe ? '' : `<button class="small-button" style="font-size:12px;padding:4px 10px;color:#c00;border-color:#c00;" onclick="_usrRemove('${u.id}')">Zablokuj</button>`}` : ''}
       </td>
@@ -305,14 +343,46 @@ function renderUsersModule() {
   `;
 }
 
+// Zaznaczone role z checkboxów formularza.
+function _usrSelectedRoles() {
+  return Array.from(document.querySelectorAll('.usr-role-cb'))
+    .filter(cb => cb.checked).map(cb => cb.value);
+}
+
+// Reakcja na zmianę zaznaczenia: pole klienta + podpowiedź o rolach dziedziczonych.
+function _usrRolesChanged() {
+  const roles = _usrSelectedRoles();
+  const cf = document.getElementById('usr-client-field');
+  if (cf) cf.style.display = roles.includes('client') ? '' : 'none';
+
+  const hint = document.getElementById('usr-roles-hint');
+  if (!hint) return;
+  if (roles.includes('client') && roles.length > 1) {
+    hint.style.color = '#c00';
+    hint.textContent = 'Rola Client jest wyłączna — nie łączy się z rolami wewnętrznymi.';
+    return;
+  }
+  hint.style.color = 'var(--color-text-secondary)';
+  const inherited = UsersModule.expandRoles(roles).filter(r => !roles.includes(r));
+  hint.textContent = inherited.length
+    ? 'Dodatkowo z hierarchii ról: ' + inherited.map(r => (UsersModule.ROLES[r] || {}).label || r).join(', ')
+    : '';
+}
+window._usrSelectedRoles = _usrSelectedRoles;
+window._usrRolesChanged  = _usrRolesChanged;
+
 async function _usrSave() {
   const g = id => document.getElementById(id);
   const fullName = g('usr-fullname').value.trim();
-  const role = g('usr-role').value;
-  const clientLegacyId = role === 'client' ? (g('usr-client').value || null) : null;
+  const roles = _usrSelectedRoles();
+  const clientLegacyId = roles.includes('client') ? (g('usr-client').value || null) : null;
 
   if (!fullName) { alert('Podaj imię i nazwisko.'); return; }
-  if (role === 'client' && !clientLegacyId) { alert('Dla roli Client wybierz klienta.'); return; }
+  if (!roles.length) { alert('Zaznacz co najmniej jedną rolę.'); return; }
+  if (roles.includes('client') && roles.length > 1) {
+    alert('Rola Client jest wyłączna — konto klienta widzi wyłącznie własne dane i nie łączy się z rolami wewnętrznymi.'); return;
+  }
+  if (roles.includes('client') && !clientLegacyId) { alert('Dla roli Client wybierz klienta.'); return; }
 
   const btn = g('usr-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie…'; }
@@ -320,7 +390,7 @@ async function _usrSave() {
   try {
     if (editingUserId) {
       const emailEl = g('usr-email');
-      const patch = { fullName, role, clientLegacyId };
+      const patch = { fullName, roles, clientLegacyId };
       if (emailEl && !emailEl.disabled && emailEl.value.trim()) patch.email = emailEl.value.trim();
       await UsersModule.updateProfile(editingUserId, patch);
     } else {
@@ -328,7 +398,7 @@ async function _usrSave() {
       const password = g('usr-password').value;
       if (!email || email.indexOf('@') < 1) { throw new Error('Podaj poprawny adres e-mail.'); }
       if (!password || password.length < 6) { throw new Error('Hasło startowe musi mieć min. 6 znaków.'); }
-      await UsersModule.createAccount({ fullName, email, password, role, clientLegacyId });
+      await UsersModule.createAccount({ fullName, email, password, roles, clientLegacyId });
       alert('Konto utworzone: ' + email + '\nPrzekaż użytkownikowi login i hasło startowe.');
     }
     showUserForm = false; editingUserId = null;
