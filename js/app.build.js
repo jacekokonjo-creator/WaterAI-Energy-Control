@@ -658,11 +658,13 @@ function openObjectProtocols(objectId) {
 }
 
 
-// Lista użytkowników do wyboru jako opiekun: dana rola + admini (admin może pełnić każdą funkcję).
+// Lista użytkowników do wyboru jako opiekun: wszyscy z daną rolą EFEKTYWNĄ.
 function usersForOwnerSelect(role) {
   if (typeof UsersModule === 'undefined') return [];
   const seen = {};
-  return UsersModule.findByRole(role).concat(UsersModule.findByRole('admin')).filter(u => {
+  // migracja 007: rola EFEKTYWNA — obejmuje hierarchię (admin ⇒ wszystko,
+  // backOffice ⇒ energyAnalyst), więc admina nie trzeba doklejać ręcznie.
+  return UsersModule.findByEffectiveRole(role).filter(u => {
     const k = u.firstName + ' ' + u.lastName;
     if (seen[k]) return false; seen[k] = true; return true;
   });
@@ -3083,7 +3085,7 @@ function renderMeasurementsModule() {
             <select name="preparedBy" id="preparedBy_sel" style="width:100%;box-sizing:border-box;"
               onchange="(function(s){var w=document.getElementById('preparedBy_wrap');if(s.value==='__other__'){w.style.display='flex';s.removeAttribute('name');document.getElementById('preparedBy_inp').setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').focus();}else{w.style.display='none';s.setAttribute('name','preparedBy');document.getElementById('preparedBy_inp').removeAttribute('name');}})(this)">
               <option value="">— wybierz analityka —</option>
-              ${(window.UsersModule ? UsersModule.findByRole('energyAnalyst') : []).map(u => {
+              ${(window.UsersModule ? UsersModule.findByEffectiveRole('energyAnalyst') : []).map(u => {
                 const n = ((u.firstName||'')+' '+(u.lastName||'')).trim();
                 const sel = n === (selectedObject.energyAnalystOwner||'') ? 'selected' : '';
                 return '<option value="'+n+'" '+sel+'>'+n+'</option>';
