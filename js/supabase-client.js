@@ -43,7 +43,7 @@ const WaterAISupabase = {
     const { data: u } = await this.client.auth.getUser();
     if (!u || !u.user) throw new Error('Brak zalogowanego użytkownika.');
     const { data, error } = await this.client
-      .from('profiles').select('id, full_name, role, client_id')
+      .from('profiles').select('id, full_name, role, roles, client_id')
       .eq('id', u.user.id).single();
     if (error) throw error;
     this.profile = data;
