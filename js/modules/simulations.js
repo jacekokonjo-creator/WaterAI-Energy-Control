@@ -99,10 +99,17 @@ const SimulationsModule = {
     photos: []
   },
 
+  // Trwały numer porządkowy: nadawany raz, przy powstaniu oferty, i już się nie zmienia
+  // (usunięcie innej oferty nie przenumerowuje pozostałych).
+  nextSeq() {
+    return this.getAll().reduce((m, s) => Math.max(m, Number(s.seq) || 0), 0) + 1;
+  },
+
   add(sim) {
     const items = this.getAll();
     const rec = { ...JSON.parse(JSON.stringify(this.DEFAULTS)), ...sim,
-      id: Date.now(), createdAt: new Date().toISOString(), status: sim.status || 'DRAFT' };
+      id: Date.now(), createdAt: new Date().toISOString(), status: sim.status || 'DRAFT',
+      seq: this.nextSeq() };
     items.push(rec);
     this.saveAll(items);
     return rec;
@@ -609,8 +616,14 @@ function renderSimulationsModule() {
     return Math.floor((Date.now() - new Date(sim.createdAt).getTime()) / 86400000);
   };
 
+  // Numery zastępcze dla ofert sprzed wprowadzenia `seq` — wg kolejności powstawania.
+  const _byBirth = [...allSims].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  const _fallbackNo = {};
+  _byBirth.forEach((sim, i) => { _fallbackNo[String(sim.id)] = i + 1; });
+
   const enriched = allSims.map(sim => ({
     sim,
+    no: Number(sim.seq) || _fallbackNo[String(sim.id)] || null,
     cliNo: _simCliNo(sim.clientId), objNo: _simObjNo(sim.objectId),
     cliName: _simCliName(sim.clientId), objName: _simObjName(sim.objectId),
     rep: _simRep(sim.objectId), inv: Number(sim.investment) || 0,
@@ -628,6 +641,8 @@ function renderSimulationsModule() {
       .join(' ').toLowerCase().includes(q));
 
   rowsData.sort((a, b) => {
+    if (sortBy === 'no_asc')     return (a.no || 0) - (b.no || 0);
+    if (sortBy === 'no_desc')    return (b.no || 0) - (a.no || 0);
     if (sortBy === 'num_asc')    return (a.sim.simNumber || '').localeCompare(b.sim.simNumber || '');
     if (sortBy === 'num_desc')   return (b.sim.simNumber || '').localeCompare(a.sim.simNumber || '');
     if (sortBy === 'cli_asc')    return a.cliName.localeCompare(b.cliName);
@@ -661,7 +676,7 @@ function renderSimulationsModule() {
     const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
     const stale = (sim.status === 'PRESENTED' && e.days != null && e.days > 21);
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);">${i + 1}</td>
+      <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);">${e.no || '—'}</td>
       <td style="padding:9px 6px;font-size:12px;font-family:monospace;">${escapeHtml(sim.simNumber || '—')}
         <div style="font-family:inherit;font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.name || '')}</div></td>
       <td style="padding:9px 6px;font-size:12px;">
@@ -712,8 +727,7 @@ function renderSimulationsModule() {
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:var(--color-background-secondary);">
-              <th style="padding:8px 6px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">#</th>
-              ${th('num', 'Nr oferty')}${th('cli', 'Klient')}${th('obj', 'Obiekt')}${th('rep', 'Sales Rep')}${th('val', 'Wartość', 'right')}${th('status', 'Status', 'center')}${th('date', 'Data')}
+              ${th('no', '#')}${th('num', 'Nr oferty')}${th('cli', 'Klient')}${th('obj', 'Obiekt')}${th('rep', 'Sales Rep')}${th('val', 'Wartość', 'right')}${th('status', 'Status', 'center')}${th('date', 'Data')}
               <th style="border-bottom:2px solid var(--color-border-tertiary);"></th>
             </tr></thead>
             <tbody>${rows || `<tr><td colspan="9" style="padding:20px;text-align:center;font-size:13px;color:var(--color-text-secondary);">Brak wyników.</td></tr>`}</tbody>
