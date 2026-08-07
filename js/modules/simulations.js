@@ -601,15 +601,19 @@ function renderSimulationsModule() {
   const _simCliNo = id => (id && window.ClientsModule && ClientsModule.getNumber) ? ClientsModule.getNumber(id) : null;
   const _simObjNo = id => (id && window.ObjectsModule && ObjectsModule.getNumber) ? ObjectsModule.getNumber(id) : null;
 
-  // Rok 1, scenariusz bazowy: K = udział klienta w oszczędnościach (to, co realnie
-  // dostaje klient), F = oszczędności wygenerowane łącznie. Na liście pokazujemy K.
+  // Rok 1, scenariusz bazowy. F = oszczędności wygenerowane łącznie, G = wpływy
+  // klienta (udział + ewentualna rata zwrotu kaucji), więc NASZ przychód = F − G.
+  // Uwaga: to PRZYCHÓD, nie zysk — model nie zna naszych kosztów wdrożenia
+  // (pole „inwestycja" to kwota płacona przez klienta, nie nasz wydatek).
   const _simYearly = sim => {
     const scs = sim.scenarios || [];
     const base = scs.find(sc => sc.base) || scs[0];
     if (!base) return null;
     try {
       const r = simCalcScenario(sim, base.savingsPct);
-      return (r && r.rows && r.rows[0]) ? r.rows[0].K : null;
+      const row = (r && r.rows && r.rows[0]) ? r.rows[0] : null;
+      if (!row) return null;
+      return { us: row.F - row.G, client: row.G };
     } catch (e) { return null; }
   };
   const _simDays = sim => {
@@ -668,7 +672,7 @@ function renderSimulationsModule() {
     const m = {};
     list.forEach(e => {
       const c = e.sim.currency || 'PLN';
-      m[c] = (m[c] || 0) + (Number(e.yearly) || 0);
+      m[c] = (m[c] || 0) + ((e.yearly && Number(e.yearly.us)) || 0);
     });
     return m;
   };
@@ -706,7 +710,8 @@ function renderSimulationsModule() {
       <td style="padding:9px 6px;font-size:12px;text-align:right;white-space:nowrap;">
         <div>${e.inv ? _simFmt(e.inv, 0) + ' ' + escapeHtml(sim.currency || 'PLN') : (e.settl === 'FREE' ? 'bez opłat' : '—')}</div>
         <div style="font-size:10px;color:var(--color-text-secondary);">${escapeHtml(e.settlLabel)}</div>
-        <div style="font-size:11px;color:#27500A;">${e.yearly ? 'klient +' + _simFmt(e.yearly, 0) + ' / rok' : '—'}</div></td>
+        <div style="font-size:11px;font-weight:600;color:#27500A;">${e.yearly ? 'my +' + _simFmt(e.yearly.us, 0) + ' / rok' : '—'}</div>
+        <div style="font-size:10px;color:var(--color-text-secondary);">${e.yearly ? 'klient +' + _simFmt(e.yearly.client, 0) : ''}</div></td>
       <td style="padding:9px 6px;text-align:center;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};white-space:nowrap;">${st.label}</span></td>
       <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap;">
         <div>${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</div>
@@ -727,7 +732,7 @@ function renderSimulationsModule() {
   container.innerHTML = SIM_STYLE + `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <p style="font-size:13px;color:var(--color-text-secondary);margin:0;">
-        ${enriched.length} ofert · roczny udział klienta — w toku (${openList.length}): ${openTxt} · zaakceptowane (${accepted.length}): ${accTxt}</p>
+        ${enriched.length} ofert · nasz przychód roczny — w toku (${openList.length}): ${openTxt} · zaakceptowane (${accepted.length}): ${accTxt}</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input id="sim-search-input" type="search" placeholder="Szukaj po nr, kliencie, obiekcie..." value="${escapeHtml(window._simSearch || '')}"
           oninput="window._simSearch=this.value;renderSimulationsModule();setTimeout(()=>{const s=document.getElementById('sim-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
