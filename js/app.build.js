@@ -906,6 +906,16 @@ function viewObject(id) {
   `;
 }
 
+function scrollToObjectForm() {
+  requestAnimationFrame(() => {
+    const el = document.getElementById("objects-form-view");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const first = el.querySelector("select[name='clientId'], input[name='name']");
+    if (first) setTimeout(() => first.focus({ preventScroll: true }), 350);
+  });
+}
+
 function editObject(id) {
   const object = ObjectsModule.find(id);
   if (!object) return;
@@ -982,7 +992,7 @@ function editObject(id) {
   if (form.paymentDays) form.paymentDays.value = object.paymentDays || 14;
   if (form.invoiceEmail) form.invoiceEmail.value = object.invoiceEmail || "";
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  scrollToObjectForm();
 }
 
 function deleteObject(id) {
@@ -1191,7 +1201,7 @@ function renderObjectsModule() {
         <input id="obj-search-input" type="search" placeholder="Szukaj po nazwie, kliencie, typie..." value="${escapeHtml(window._objSearch||'')}"
           oninput="window._objSearch=this.value;renderObjectsModule();setTimeout(()=>{const s=document.getElementById('obj-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
           style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:260px;" />
-        ${!showObjectForm ? '<button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();" style="font-size:13px;padding:8px 18px;white-space:nowrap;">+ Dodaj obiekt</button>' : ''}
+        ${!showObjectForm ? '<button class="primary-button" onclick="showObjectForm=true;editingObjectId=null;renderObjectsModule();scrollToObjectForm();" style="font-size:13px;padding:8px 18px;white-space:nowrap;">+ Dodaj obiekt</button>' : ''}
       </div>
     </div>
     <div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;margin-bottom:24px;">
