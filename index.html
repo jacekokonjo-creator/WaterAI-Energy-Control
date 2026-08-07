@@ -500,6 +500,8 @@
         <h2 class="dashboard-title" data-i18n="dashboardTitle">Panel główny</h2>
         <p class="dashboard-desc" data-i18n="dashboardDesc">Wybierz moduł, z którym chcesz pracować.</p>
 
+        <div id="role-preview-banner" style="display:none;"></div>
+
         <div class="role-box" id="role-test-panel" style="display:none;">
           <div class="role-title">🔑 Tryb testowy roli <span style="font-size:10px;opacity:0.7;">(podgląd wg roli)</span></div>
           <div class="role-switcher">
@@ -829,6 +831,7 @@
         users: ["🔐", "Użytkownicy i role", "Zarządzanie kontami i dostępem."],
         settings: ["⚙️", "Ustawienia", "Język, role i konfiguracja systemu."],
         instructions: ["📖", "Instrukcja", "Jak działa system i co robi każda rola."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Widoczność", "Udostępnianie dokumentów wybranym użytkownikom."],
         simulation: ["📋", "Oferta", "Oferta oszczędności dla klienta — wieloletnia prognoza i rozliczenie ESCO."]
       },
@@ -852,6 +855,7 @@
         users: ["🔐", "Users and roles", "Account and access management."],
         settings: ["⚙️", "Settings", "Language, roles and system configuration."],
         instructions: ["📖", "Instructions", "How the system works and what each role does."],
+        rolePreview: ["👁️", "Role preview", "See the app through the eyes of a role or a specific user."],
         visibility: ["👁️", "Visibility", "Share documents with selected users."],
         simulation: ["📋", "Offer", "Savings offer for the client — multi-year forecast and ESCO settlement."]
       },
@@ -875,6 +879,7 @@
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."],
         instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Sichtbarkeit", "Dokumente für ausgewählte Benutzer freigeben."],
         simulation: ["📋", "Angebot", "Einsparangebot für den Kunden — mehrjährige Prognose und ESCO-Abrechnung."]
       },
@@ -898,6 +903,7 @@
         users: ["🔐", "Uživatelé a role", "Správa účtů a přístupů."],
         settings: ["⚙️", "Nastavení", "Jazyk, role a konfigurace systému."],
         instructions: ["📖", "Návod", "Jak systém funguje a co dělá každá role."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Viditelnost", "Sdílení dokumentů vybraným uživatelům."],
         simulation: ["📋", "Nabídka", "Nabídka úspor pro klienta — víceletá prognóza a ESCO vyúčtování."]
       },
@@ -921,6 +927,7 @@
         users: ["🔐", "Používatelia a roly", "Správa účtov a prístupov."],
         settings: ["⚙️", "Nastavenia", "Jazyk, roly a konfigurácia systému."],
         instructions: ["📖", "Návod", "Ako systém funguje a čo robí každá rola."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Viditeľnosť", "Zdieľanie dokumentov vybraným používateľom."],
         simulation: ["📋", "Ponuka", "Ponuka úspor pre klienta — viacročná prognóza a ESCO vyúčtovanie."]
       },
@@ -944,6 +951,7 @@
         users: ["🔐", "Usuarios y roles", "Gestión de cuentas y accesos."],
         settings: ["⚙️", "Ajustes", "Idioma, roles y configuración del sistema."],
         instructions: ["📖", "Instrucciones", "Cómo funciona el sistema y qué hace cada rol."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Visibilidad", "Compartir documentos con usuarios seleccionados."],
         simulation: ["📋", "Oferta", "Oferta de ahorro para el cliente: previsión plurianual y liquidación ESCO."]
       },
@@ -967,13 +975,14 @@
         users: ["🔐", "Benutzer und Rollen", "Verwaltung von Konten und Zugriff."],
         settings: ["⚙️", "Einstellungen", "Sprache, Rollen und Systemkonfiguration."],
         instructions: ["📖", "Anleitung", "Wie das System funktioniert und was jede Rolle tut."],
+        rolePreview: ["👁️", "Podgląd ról", "Zobacz aplikację oczami wybranej roli lub konkretnego użytkownika."],
         visibility: ["👁️", "Sichtbarkeit", "Dokumente für ausgewählte Benutzer freigeben."],
         simulation: ["📋", "Angebot", "Einsparangebot für den Kunden — mehrjährige Prognose und ESCO-Abrechnung."]
       }
     };
 
     const roleModules = {
-      admin:              ["calendar", "clients", "objects", "simulation", "readings", "measurements", "analyses", "reports", "invoicing", "visibility", "users", "settings", "instructions"],
+      admin:              ["calendar", "clients", "objects", "simulation", "readings", "measurements", "analyses", "reports", "invoicing", "visibility", "users", "settings", "instructions", "rolePreview"],
       backOffice:         ["calendar", "clients", "objects", "simulation", "readings", "invoicing", "reports", "visibility", "users", "instructions"],
       energyAnalyst:      ["calendar", "objects", "simulation", "readings", "measurements", "analyses", "reports", "visibility", "instructions"],
       salesRepresentative:["calendar", "clients", "objects", "simulation", "readings", "reports", "instructions"],
@@ -1078,12 +1087,16 @@
       const rolePanel = document.getElementById("role-test-panel");
       if (rolePanel) {
         const isAdminAcct = assignedRoles.includes("admin");
-        rolePanel.style.display = (isAdminAcct || realRoles.length > 1) ? "block" : "none";
+        // Admin ma teraz osobną zakładkę „Podgląd ról"; pasek u góry zostaje tylko
+        // dla kont z wieloma rolami, które nie są adminem.
+        rolePanel.style.display = (!isAdminAcct && realRoles.length > 1) ? "block" : "none";
         ["admin","backOffice","energyAnalyst","salesRepresentative","client"].forEach(r => {
           const b = document.getElementById("role-" + r);
           if (b) b.style.display = (isAdminAcct || realRoles.includes(r)) ? "" : "none";
         });
       }
+
+      if (window.RolePreviewModule) { try { RolePreviewModule.renderBanner(); } catch (e) {} }
 
       tilesContainer.innerHTML = "";
 
@@ -1593,6 +1606,7 @@
 <script src="js/modules/simulations.js?v=1786132038"></script>
 <script src="js/modules/backup.js?v=1783817784"></script>
 <script src="js/modules/instructions.js?v=1783823412"></script>
+<script src="js/modules/role-preview.js?v=1786132339"></script>
 </body>
 </html>
 
