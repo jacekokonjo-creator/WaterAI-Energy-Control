@@ -33,7 +33,7 @@ const ObjectsModule = {
       clientId: Number(object.clientId),
       name: object.name || '',
       objectType: object.objectType || 'HOTEL',
-      status: object.status || 'IMPLEMENTATION',
+      status: object.status || 'OFFER',
 
       country: object.country || 'PL',
       postalCode: object.postalCode || '',

@@ -894,7 +894,7 @@ function editObject(id) {
   form.clientId.value = object.clientId || "";
   form.name.value = object.name || "";
   form.objectType.value = object.objectType || "HOTEL";
-  form.status.value = object.status || "IMPLEMENTATION";
+  form.status.value = object.status || "OFFER";
 
   form.country.value = object.country || "PL";
   form.postalCode.value = object.postalCode || "";
