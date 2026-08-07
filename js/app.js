@@ -541,8 +541,8 @@ function openClientObjects(clientId) {
     COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
     OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
   };
-  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
-  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
+  const objStatusLabel = { OFFER:"Oferta", IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { OFFER:"#6B3FA0", IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
   const tableRows = objects.length === 0
     ? `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-secondary);font-size:13px;">
@@ -756,8 +756,8 @@ function viewObject(id) {
     COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
     OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
   };
-  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
-  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
+  const objStatusLabel = { OFFER:"Oferta", IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { OFFER:"#6B3FA0", IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
   const heatLabel = { NONE:"Brak", GAS:"Gaz", COAL:"Węgiel", OIL:"Olej", ELECTRIC:"Elektryczne", HEAT_PUMP:"Pompa ciepła", DISTRICT:"Ciepło sieciowe", OTHER:"Inne" };
   const readingLabel = { INVOICE:"Faktura", METER:"Licznik", SUBSTATION:"Węzeł cieplny" };
 
@@ -1067,8 +1067,8 @@ function renderObjectsModule() {
     COOPERATIVE:"Spółdzielnia", INDUSTRY:"Zakład przemysłowy",
     OFFICE_BUILDING:"Biurowiec", HOSPITAL:"Szpital", OTHER:"Inne"
   };
-  const objStatusLabel = { IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
-  const objStatusColor = { IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
+  const objStatusLabel = { OFFER:"Oferta", IMPLEMENTATION:"Wdrożenie", ACTIVE:"Aktywny", PAUSED:"Wstrzymany", FINISHED:"Zakończony" };
+  const objStatusColor = { OFFER:"#6B3FA0", IMPLEMENTATION:"#185FA5", ACTIVE:"#27500A", PAUSED:"#7A4A00", FINISHED:"#666" };
 
   const qObj = (window._objSearch || '').toLowerCase();
   const sortObj = window._objSort || 'name_asc';
@@ -1217,6 +1217,7 @@ function renderObjectsModule() {
               <div class="obj-field">
                 <label>Status obiektu</label>
                 <select name="status">
+                  <option value="OFFER">Oferta</option>
                   <option value="IMPLEMENTATION">Wdrożenie</option>
                   <option value="ACTIVE">Aktywny</option>
                   <option value="PAUSED">Wstrzymany</option>
