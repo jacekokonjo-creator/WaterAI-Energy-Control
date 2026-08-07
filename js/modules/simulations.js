@@ -601,14 +601,15 @@ function renderSimulationsModule() {
   const _simCliNo = id => (id && window.ClientsModule && ClientsModule.getNumber) ? ClientsModule.getNumber(id) : null;
   const _simObjNo = id => (id && window.ObjectsModule && ObjectsModule.getNumber) ? ObjectsModule.getNumber(id) : null;
 
-  // Wartość: inwestycja/opłata + generowane oszczędności roczne (rok 1, scenariusz bazowy).
+  // Rok 1, scenariusz bazowy: K = udział klienta w oszczędnościach (to, co realnie
+  // dostaje klient), F = oszczędności wygenerowane łącznie. Na liście pokazujemy K.
   const _simYearly = sim => {
     const scs = sim.scenarios || [];
     const base = scs.find(sc => sc.base) || scs[0];
     if (!base) return null;
     try {
       const r = simCalcScenario(sim, base.savingsPct);
-      return (r && r.rows && r.rows[0]) ? r.rows[0].F : null;
+      return (r && r.rows && r.rows[0]) ? r.rows[0].K : null;
     } catch (e) { return null; }
   };
   const _simDays = sim => {
@@ -627,6 +628,8 @@ function renderSimulationsModule() {
     cliNo: _simCliNo(sim.clientId), objNo: _simObjNo(sim.objectId),
     cliName: _simCliName(sim.clientId), objName: _simObjName(sim.objectId),
     rep: _simRep(sim.objectId), inv: Number(sim.investment) || 0,
+    settl: sim.settlementType || 'DEPOSIT',
+    settlLabel: (SimulationsModule.SETTLEMENTS[sim.settlementType || 'DEPOSIT'] || {}).feeLabel || '',
     yearly: _simYearly(sim), days: _simDays(sim)
   }));
 
@@ -658,11 +661,25 @@ function renderSimulationsModule() {
     return (b.sim.createdAt || '').localeCompare(a.sim.createdAt || '');
   });
 
-  const cur = (allSims[0] && allSims[0].currency) || 'PLN';
-  const openSum = enriched.filter(e => ['DRAFT', 'PRESENTED'].includes(e.sim.status || 'DRAFT'))
-                          .reduce((a, e) => a + e.inv, 0);
+  // Podsumowanie: sumujemy ROCZNY UDZIAŁ KLIENTA, osobno dla każdej waluty.
+  // Kursów walut aplikacja nie zna, więc nic nie przelicza — kwoty w różnych
+  // walutach NIGDY nie trafiają do jednej sumy.
+  const _sumByCur = list => {
+    const m = {};
+    list.forEach(e => {
+      const c = e.sim.currency || 'PLN';
+      m[c] = (m[c] || 0) + (Number(e.yearly) || 0);
+    });
+    return m;
+  };
+  const _fmtCur = m => {
+    const ks = Object.keys(m).filter(k => m[k]);
+    return ks.length ? ks.map(k => _simFmt(m[k], 0) + ' ' + k).join(' + ') : '0';
+  };
+  const openList = enriched.filter(e => ['DRAFT', 'PRESENTED'].includes(e.sim.status || 'DRAFT'));
   const accepted = enriched.filter(e => e.sim.status === 'ACCEPTED');
-  const accSum = accepted.reduce((a, e) => a + e.inv, 0);
+  const openTxt = _fmtCur(_sumByCur(openList));
+  const accTxt  = _fmtCur(_sumByCur(accepted));
 
   const th = (col, label, align) => {
     const next = sortBy === col + '_asc' ? col + '_desc' : col + '_asc';
@@ -687,8 +704,9 @@ function renderSimulationsModule() {
         <div>${escapeHtml(e.objName)}</div></td>
       <td style="padding:9px 6px;font-size:12px;">${escapeHtml(e.rep || '—')}</td>
       <td style="padding:9px 6px;font-size:12px;text-align:right;white-space:nowrap;">
-        <div>${e.inv ? _simFmt(e.inv, 0) + ' ' + escapeHtml(sim.currency || cur) : '—'}</div>
-        <div style="font-size:11px;color:#27500A;">${e.yearly ? '+' + _simFmt(e.yearly, 0) + ' / rok' : '—'}</div></td>
+        <div>${e.inv ? _simFmt(e.inv, 0) + ' ' + escapeHtml(sim.currency || 'PLN') : (e.settl === 'FREE' ? 'bez opłat' : '—')}</div>
+        <div style="font-size:10px;color:var(--color-text-secondary);">${escapeHtml(e.settlLabel)}</div>
+        <div style="font-size:11px;color:#27500A;">${e.yearly ? 'klient +' + _simFmt(e.yearly, 0) + ' / rok' : '—'}</div></td>
       <td style="padding:9px 6px;text-align:center;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};white-space:nowrap;">${st.label}</span></td>
       <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap;">
         <div>${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</div>
@@ -709,7 +727,7 @@ function renderSimulationsModule() {
   container.innerHTML = SIM_STYLE + `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <p style="font-size:13px;color:var(--color-text-secondary);margin:0;">
-        ${enriched.length} ofert · w toku ${_simFmt(openSum, 0)} ${escapeHtml(cur)} · zaakceptowane ${accepted.length} (${_simFmt(accSum, 0)} ${escapeHtml(cur)})</p>
+        ${enriched.length} ofert · roczny udział klienta — w toku (${openList.length}): ${openTxt} · zaakceptowane (${accepted.length}): ${accTxt}</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input id="sim-search-input" type="search" placeholder="Szukaj po nr, kliencie, obiekcie..." value="${escapeHtml(window._simSearch || '')}"
           oninput="window._simSearch=this.value;renderSimulationsModule();setTimeout(()=>{const s=document.getElementById('sim-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
@@ -727,7 +745,7 @@ function renderSimulationsModule() {
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:var(--color-background-secondary);">
-              ${th('no', '#')}${th('num', 'Nr oferty')}${th('cli', 'Klient')}${th('obj', 'Obiekt')}${th('rep', 'Sales Rep')}${th('val', 'Wartość', 'right')}${th('status', 'Status', 'center')}${th('date', 'Data')}
+              ${th('no', '#')}${th('num', 'Nr oferty')}${th('cli', 'Klient')}${th('obj', 'Obiekt')}${th('rep', 'Sales Rep')}${th('val', 'Kwoty', 'right')}${th('status', 'Status', 'center')}${th('date', 'Data')}
               <th style="border-bottom:2px solid var(--color-border-tertiary);"></th>
             </tr></thead>
             <tbody>${rows || `<tr><td colspan="9" style="padding:20px;text-align:center;font-size:13px;color:var(--color-text-secondary);">Brak wyników.</td></tr>`}</tbody>
