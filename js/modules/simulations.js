@@ -54,7 +54,8 @@ const SimulationsModule = {
   STATUSES: {
     DRAFT:     { label: 'Robocza',        color: '#7A4A00', bg: '#FEF3DC' },
     PRESENTED: { label: 'Zaprezentowana', color: '#0C447C', bg: '#E6F1FB' },
-    ACCEPTED:  { label: 'Zaakceptowana',  color: '#27500A', bg: '#EAF3DE' }
+    ACCEPTED:  { label: 'Zaakceptowana',  color: '#27500A', bg: '#EAF3DE' },
+    REJECTED:  { label: 'Odrzucona',      color: '#791F1F', bg: '#FCEBEB' }
   },
 
   // Warianty rozliczenia — kaucja zwrotna / opłata wdrożeniowa / bez opłat.
@@ -577,52 +578,146 @@ function renderSimulationsModule() {
   if (!container) return;
   _simDraft = null; _simEditId = null;
 
-  const sims = SimulationsModule.getAll().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const staff = _simIsStaff();
   const canWrite = _simCanWrite();
+  const allSims = SimulationsModule.getAll();
 
-  const rows = sims.map(sim => {
+  const q        = (window._simSearch || '').toLowerCase();
+  const fStatus  = window._simStatusFilter || 'ALL';
+  const sortBy   = window._simSort || 'date_desc';
+
+  // Sales Rep bierzemy z OBIEKTU (pole opiekuna), nie z pola „Sporządził".
+  const _simRep = id => {
+    const o = (id && window.ObjectsModule) ? ObjectsModule.find(id) : null;
+    return (o && o.salesRepresentative) ? o.salesRepresentative : '';
+  };
+  const _simCliNo = id => (id && window.ClientsModule && ClientsModule.getNumber) ? ClientsModule.getNumber(id) : null;
+  const _simObjNo = id => (id && window.ObjectsModule && ObjectsModule.getNumber) ? ObjectsModule.getNumber(id) : null;
+
+  // Wartość: inwestycja/opłata + generowane oszczędności roczne (rok 1, scenariusz bazowy).
+  const _simYearly = sim => {
+    const scs = sim.scenarios || [];
+    const base = scs.find(sc => sc.base) || scs[0];
+    if (!base) return null;
+    try {
+      const r = simCalcScenario(sim, base.savingsPct);
+      return (r && r.rows && r.rows[0]) ? r.rows[0].F : null;
+    } catch (e) { return null; }
+  };
+  const _simDays = sim => {
+    if (!sim.createdAt) return null;
+    return Math.floor((Date.now() - new Date(sim.createdAt).getTime()) / 86400000);
+  };
+
+  const enriched = allSims.map(sim => ({
+    sim,
+    cliNo: _simCliNo(sim.clientId), objNo: _simObjNo(sim.objectId),
+    cliName: _simCliName(sim.clientId), objName: _simObjName(sim.objectId),
+    rep: _simRep(sim.objectId), inv: Number(sim.investment) || 0,
+    yearly: _simYearly(sim), days: _simDays(sim)
+  }));
+
+  const counts = { ALL: enriched.length };
+  Object.keys(SimulationsModule.STATUSES).forEach(k => { counts[k] = 0; });
+  enriched.forEach(e => { const k = e.sim.status || 'DRAFT'; if (counts[k] != null) counts[k]++; });
+
+  let rowsData = enriched.filter(e => fStatus === 'ALL' || (e.sim.status || 'DRAFT') === fStatus);
+  if (q) rowsData = rowsData.filter(e =>
+    [(e.sim.simNumber || ''), (e.sim.name || ''), e.cliName, e.objName, e.rep,
+     'K-' + (e.cliNo || ''), 'OB-' + (e.objNo || '')]
+      .join(' ').toLowerCase().includes(q));
+
+  rowsData.sort((a, b) => {
+    if (sortBy === 'num_asc')    return (a.sim.simNumber || '').localeCompare(b.sim.simNumber || '');
+    if (sortBy === 'num_desc')   return (b.sim.simNumber || '').localeCompare(a.sim.simNumber || '');
+    if (sortBy === 'cli_asc')    return a.cliName.localeCompare(b.cliName);
+    if (sortBy === 'cli_desc')   return b.cliName.localeCompare(a.cliName);
+    if (sortBy === 'obj_asc')    return a.objName.localeCompare(b.objName);
+    if (sortBy === 'obj_desc')   return b.objName.localeCompare(a.objName);
+    if (sortBy === 'rep_asc')    return (a.rep || '').localeCompare(b.rep || '');
+    if (sortBy === 'rep_desc')   return (b.rep || '').localeCompare(a.rep || '');
+    if (sortBy === 'val_asc')    return a.inv - b.inv;
+    if (sortBy === 'val_desc')   return b.inv - a.inv;
+    if (sortBy === 'status_asc') return (a.sim.status || '').localeCompare(b.sim.status || '');
+    if (sortBy === 'date_asc')   return (a.sim.createdAt || '').localeCompare(b.sim.createdAt || '');
+    return (b.sim.createdAt || '').localeCompare(a.sim.createdAt || '');
+  });
+
+  const cur = (allSims[0] && allSims[0].currency) || 'PLN';
+  const openSum = enriched.filter(e => ['DRAFT', 'PRESENTED'].includes(e.sim.status || 'DRAFT'))
+                          .reduce((a, e) => a + e.inv, 0);
+  const accepted = enriched.filter(e => e.sim.status === 'ACCEPTED');
+  const accSum = accepted.reduce((a, e) => a + e.inv, 0);
+
+  const th = (col, label, align) => {
+    const next = sortBy === col + '_asc' ? col + '_desc' : col + '_asc';
+    const arrow = sortBy === col + '_asc' ? ' ↑' : sortBy === col + '_desc' ? ' ↓' : '';
+    return `<th style="padding:8px 6px;font-size:11px;font-weight:600;text-align:${align || 'left'};border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+      onclick="window._simSort='${next}';renderSimulationsModule();">${label}${arrow}</th>`;
+  };
+
+  const rows = rowsData.map((e, i) => {
+    const sim = e.sim;
     const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
-    const inv = Number(sim.investment) || 0;
-    const best = inv > 0
-      ? ((sim.scenarios || []).map(sc => simCalcScenario(sim, sc.savingsPct).kpi.paybackYear).filter(x => x).sort((a, b) => a - b)[0] || null)
-      : null;
-    const scen = (sim.scenarios || []).map((sc, i) =>
-      `<span style="font-size:11px;font-weight:600;color:${_simColor(i)};margin-right:8px;">${escapeHtml(sc.label)}: ${_simFmt(sc.savingsPct, 1)}%</span>`).join('');
+    const stale = (sim.status === 'PRESENTED' && e.days != null && e.days > 21);
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:10px 12px;font-size:13px;">
-        <div style="font-weight:500;">${escapeHtml(sim.name || ('Oferta #' + sim.id))}</div>
-        <div style="font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.simNumber || '—')} · ${escapeHtml(_simCliName(sim.clientId))} · ${escapeHtml(_simObjName(sim.objectId))}</div>
-      </td>
-      <td style="padding:10px 12px;">${scen}</td>
-      <td style="padding:10px 12px;font-size:13px;text-align:center;">${best ? ('rok ' + best) : '—'}</td>
-      <td style="padding:10px 12px;text-align:center;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};">${st.label}</span></td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--color-text-secondary);">${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</td>
-      <td style="padding:10px 12px;white-space:nowrap;text-align:right;">
+      <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);">${i + 1}</td>
+      <td style="padding:9px 6px;font-size:12px;font-family:monospace;">${escapeHtml(sim.simNumber || '—')}
+        <div style="font-family:inherit;font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.name || '')}</div></td>
+      <td style="padding:9px 6px;font-size:12px;">
+        <div style="font-family:monospace;color:var(--color-text-secondary);">${e.cliNo ? 'K-' + String(e.cliNo).padStart(3, '0') : '—'}</div>
+        <div>${escapeHtml(e.cliName)}</div></td>
+      <td style="padding:9px 6px;font-size:12px;">
+        <div style="font-family:monospace;color:var(--color-text-secondary);">${e.objNo ? 'OB-' + String(e.objNo).padStart(3, '0') : '—'}</div>
+        <div>${escapeHtml(e.objName)}</div></td>
+      <td style="padding:9px 6px;font-size:12px;">${escapeHtml(e.rep || '—')}</td>
+      <td style="padding:9px 6px;font-size:12px;text-align:right;white-space:nowrap;">
+        <div>${e.inv ? _simFmt(e.inv, 0) + ' ' + escapeHtml(sim.currency || cur) : '—'}</div>
+        <div style="font-size:11px;color:#27500A;">${e.yearly ? '+' + _simFmt(e.yearly, 0) + ' / rok' : '—'}</div></td>
+      <td style="padding:9px 6px;text-align:center;"><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;background:${st.bg};color:${st.color};white-space:nowrap;">${st.label}</span></td>
+      <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);white-space:nowrap;">
+        <div>${sim.createdAt ? sim.createdAt.slice(0, 10) : '—'}</div>
+        <div style="font-size:11px;color:${stale ? '#A32D2D' : 'var(--color-text-secondary)'};">${e.days != null ? e.days + ' dni' : ''}</div></td>
+      <td style="padding:9px 6px;white-space:nowrap;text-align:right;">
         <button class="small-button" onclick="simView(${sim.id})" title="Podgląd / druk">👁</button>
         ${canWrite ? `<button class="small-button" onclick="simEdit(${sim.id})" title="Edytuj">✏️</button>` : ''}
         ${staff ? `<button class="small-button" onclick="simDelete(${sim.id})" title="Usuń">🗑</button>` : ''}
       </td></tr>`;
   }).join('');
 
+  const chip = (key, label) => {
+    const on = fStatus === key;
+    return `<button class="small-button" onclick="window._simStatusFilter='${key}';renderSimulationsModule();"
+      style="font-size:12px;${on ? 'background:#0C447C;color:#fff;border-color:#0C447C;' : ''}">${label} ${counts[key] || 0}</button>`;
+  };
+
   container.innerHTML = SIM_STYLE + `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <p style="font-size:13px;color:var(--color-text-secondary);margin:0;">
-        Wieloletnia prognoza oszczędności dla klienta i obiektu — payback, zysk netto, ROI i porównanie scenariuszy.</p>
-      ${canWrite ? `<button class="primary-button" onclick="simEdit(null)" style="font-size:13px;padding:10px 20px;">＋ Nowa oferta</button>` : ''}
+        ${enriched.length} ofert · w toku ${_simFmt(openSum, 0)} ${escapeHtml(cur)} · zaakceptowane ${accepted.length} (${_simFmt(accSum, 0)} ${escapeHtml(cur)})</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="sim-search-input" type="search" placeholder="Szukaj po nr, kliencie, obiekcie..." value="${escapeHtml(window._simSearch || '')}"
+          oninput="window._simSearch=this.value;renderSimulationsModule();setTimeout(()=>{const s=document.getElementById('sim-search-input');if(s){s.focus();s.setSelectionRange(s.value.length,s.value.length);}},0);"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:240px;" />
+        ${canWrite ? `<button class="primary-button" onclick="simEdit(null)" style="font-size:13px;padding:8px 18px;white-space:nowrap;">＋ Nowa oferta</button>` : ''}
+      </div>
     </div>
-    ${sims.length === 0
+
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+      ${chip('ALL', 'Wszystkie')}${chip('DRAFT', 'Robocze')}${chip('PRESENTED', 'Zaprezentowane')}${chip('ACCEPTED', 'Zaakceptowane')}${chip('REJECTED', 'Odrzucone')}
+    </div>
+
+    ${allSims.length === 0
       ? `<div class="reminder-card"><strong>Brak ofert.</strong>${canWrite ? ' Kliknij „Nowa oferta”, aby utworzyć pierwszą.' : ''}</div>`
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:var(--color-background-secondary);">
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Oferta</th>
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Scenariusze</th>
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:center;border-bottom:2px solid var(--color-border-tertiary);">Payback</th>
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:center;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">Utworzono</th>
+              <th style="padding:8px 6px;font-size:11px;font-weight:600;text-align:left;border-bottom:2px solid var(--color-border-tertiary);">#</th>
+              ${th('num', 'Nr oferty')}${th('cli', 'Klient')}${th('obj', 'Obiekt')}${th('rep', 'Sales Rep')}${th('val', 'Wartość', 'right')}${th('status', 'Status', 'center')}${th('date', 'Data')}
               <th style="border-bottom:2px solid var(--color-border-tertiary);"></th>
-            </tr></thead><tbody>${rows}</tbody></table></div>`}
+            </tr></thead>
+            <tbody>${rows || `<tr><td colspan="9" style="padding:20px;text-align:center;font-size:13px;color:var(--color-text-secondary);">Brak wyników.</td></tr>`}</tbody>
+          </table></div>`}
   `;
 }
 window.renderSimulationsModule = renderSimulationsModule;

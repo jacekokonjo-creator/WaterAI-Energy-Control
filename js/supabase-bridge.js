@@ -37,8 +37,28 @@ const WaterAIBridge = {
       _snap: {},     // String(legacy id) -> JSON (wykrywanie zmian)
 
       _sb() { return (window.WaterAISupabase && WaterAISupabase.client) || null; },
-      _local() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
-      _mirror() { try { localStorage.setItem(this.storageKey, JSON.stringify(this._cache)); } catch (e) {} },
+
+      // Lustro jest PER UŻYTKOWNIK. Wspólny klucz na przeglądarkę powodował, że po
+      // sesji admina na tym samym komputerze kolejna rola (np. salesRepresentative)
+      // widziała w lustrze cudze rekordy, a auto-odzysk (krok 3b) brał je za „utracone
+      // przy wygasłej sesji" i doklejał jako własne — przeciek danych i zawyżone kwoty.
+      _uid() {
+        const p = (window.WaterAISupabase && WaterAISupabase.profile) || null;
+        return (p && (p.id || p.user_id)) ? String(p.id || p.user_id) : null;
+      },
+      _key() { const u = this._uid(); return u ? (this.storageKey + '__' + u) : this.storageKey; },
+      _local() {
+        const k = this._key();
+        let raw = localStorage.getItem(k);
+        // Jednorazowe przejęcie starego, wspólnego klucza — TYLKO dla admina. Dla
+        // pozostałych ról stary klucz jest ignorowany (to on był źródłem przecieku).
+        if (raw === null && k !== this.storageKey) {
+          const prof = (window.WaterAISupabase && WaterAISupabase.profile) || null;
+          if (prof && prof.role === 'admin') raw = localStorage.getItem(this.storageKey);
+        }
+        try { return JSON.parse(raw || '[]'); } catch (e) { return []; }
+      },
+      _mirror() { try { localStorage.setItem(this._key(), JSON.stringify(this._cache)); } catch (e) {} },
 
       _fkRow(f, obj) {
         if (!f) return null;
