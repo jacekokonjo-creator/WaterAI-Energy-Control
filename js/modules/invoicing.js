@@ -1,5 +1,10 @@
 // WaterAI Energy Control
-// Invoicing Module v2.0.0 — faktury na wspólnym mostku Supabase (tabela `invoices`).
+// Invoicing Module v2.1.0 — faktury na wspólnym mostku Supabase (tabela `invoices`).
+// v2.1.0 (2026-08-08): faktura może wskazywać PODSTAWĘ — analizę albo raport ESCO
+// (`sourceType` + `sourceId`). Zapisujemy też migawkę wskaźników z chwili wystawienia
+// (okres, oszczędność energii/kosztu, udział ESCO), żeby późniejsza zmiana analizy
+// nie zmieniała treści już wystawionej faktury. Cały rekord idzie do kolumny `data`
+// (jsonb), więc nowe pola NIE wymagają migracji SQL.
 // v1 trzymał faktury wyłącznie w localStorage; v2 przechodzi na WaterAIBridge
 // (wzorzec jak AnalysesModule/ReadingsModule): load() po zalogowaniu, getAll/saveAll
 // synchronicznie na cache, zapis do bazy w tle, lustro localStorage bez zmian.
@@ -31,6 +36,12 @@ const InvoicingModule = {
     CORRECTION:       { label: 'Korekta',              icon: '✏️' },
     ADVANCE:          { label: 'Faktura zaliczkowa',   icon: '💰' },
     ESCO_SETTLEMENT:  { label: 'Rozliczenie ESCO',     icon: '⚡' }
+  },
+
+  // Podstawa faktury — z czego wzięły się podpowiedziane kwoty.
+  SOURCE_TYPES: {
+    ANALYSIS:    { label: 'Analiza',     icon: '📊' },
+    ESCO_REPORT: { label: 'Raport ESCO', icon: '⚡' }
   },
 
   STATUSES: {
@@ -65,10 +76,19 @@ const InvoicingModule = {
       grossAmount: Number(grossAmount.toFixed(2)),
       currency: inv.currency || 'PLN',
 
+      // Podstawa faktury: 'ANALYSIS' | 'ESCO_REPORT' | null.
+      // sourceId celowo bez rzutowania — analizy mają id liczbowe, raporty ESCO tekstowe ('esco_…').
+      sourceType: inv.sourceType || null,
+      sourceId: (inv.sourceId === '' || inv.sourceId == null) ? null : inv.sourceId,
+      sourceNumber: inv.sourceNumber || '',
+      periodFrom: inv.periodFrom || '',
+      periodTo: inv.periodTo || '',
+
       protocolIds: inv.protocolIds || [],
       savedEnergy: Number(inv.savedEnergy || 0),
       savedMoney: Number(inv.savedMoney || 0),
       escoShare: Number(inv.escoShare || 50),
+      energyUnit: inv.energyUnit || '',
 
       status: inv.status || 'DRAFT',
       paidAmount: Number(inv.paidAmount || 0),
@@ -101,6 +121,13 @@ const InvoicingModule = {
     return this.getAll()
       .filter(i => Number(i.clientId) === Number(clientId))
       .sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+  },
+
+  // Faktury wystawione już z tej samej podstawy — ostrzeżenie przed podwójnym fakturowaniem.
+  findBySource(sourceType, sourceId) {
+    if (!sourceType || sourceId == null || sourceId === '') return [];
+    return this.getAll().filter(i =>
+      i.sourceType === sourceType && String(i.sourceId) === String(sourceId));
   },
 
   update(id, data) {
