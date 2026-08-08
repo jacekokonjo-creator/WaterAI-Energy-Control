@@ -457,6 +457,7 @@ function renderInvoicingModule() {
       <td style="padding:9px 12px;white-space:nowrap;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="small-button" onclick="viewInvoice(${inv.id})" class="icon-btn" title="Podgląd">👁</button>
+          <button class="small-button" onclick="printInvoiceDoc(${inv.id})" class="icon-btn" title="Drukuj / PDF">🖨</button>
           <button class="small-button" onclick="editInvoice(${inv.id})" class="icon-btn" title="Edytuj">✏️</button>
           <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
         </div>
@@ -904,6 +905,7 @@ function viewInvoice(id) {
       </div>
       <div style="display:flex;gap:8px;margin-top:20px;">
         ${inv.status !== 'PAID' ? `<button class="primary-button" style="background:#27500A;border-color:#27500A;" onclick="markInvoicePaid(${inv.id})">✓ Oznacz jako opłaconą</button>` : ''}
+        <button class="small-button" onclick="printInvoiceDoc(${inv.id})" title="Drukuj / PDF">🖨 Drukuj</button>
         <button class="small-button" onclick="editInvoice(${inv.id})" class="icon-btn" title="Edytuj">✏️</button>
       </div>
     </div>`;
@@ -973,6 +975,268 @@ function saveInvoiceEdit(id) {
 function markInvoicePaid(id) {
   InvoicingModule.updateStatus(id, 'PAID', InvoicingModule.find(id)?.grossAmount || 0);
   renderInvoicingModule();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WYDRUK FAKTURY
+// ═══════════════════════════════════════════════════════════════════════════════
+// Dokument do druku / PDF (Ctrl+P → „Zapisz jako PDF"). Styl własny, scope #fv-doc,
+// żeby wydruk nie zależał od stylów raportów analiz (ANAL_STYLE).
+
+const FV_STYLE = `<style>
+  #fv-doc{background:#fff;color:#16212b;font-size:12.5px;line-height:1.45;border:1px solid #dbe5f0;border-radius:14px;padding:28px 32px;max-width:900px;margin:0 auto;}
+  #fv-doc .fv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:2px solid #0C447C;padding-bottom:14px;}
+  #fv-doc .fv-logo{height:46px;width:auto;object-fit:contain;}
+  #fv-doc .fv-title{text-align:right;}
+  #fv-doc .fv-title h1{margin:0;font-size:24px;font-weight:800;color:#0C447C;letter-spacing:.4px;}
+  #fv-doc .fv-title .num{font-size:15px;font-weight:700;color:#633806;font-variant-numeric:tabular-nums;margin-top:2px;}
+  #fv-doc .fv-dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 18px;}
+  #fv-doc .fv-dates div span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#5b6670;}
+  #fv-doc .fv-dates div strong{font-size:13px;font-variant-numeric:tabular-nums;}
+  #fv-doc .fv-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+  #fv-doc .fv-party{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;background:#fafcfe;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #fv-doc .fv-party .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
+  #fv-doc .fv-party .nm{font-size:14px;font-weight:700;color:#0f2f4f;}
+  #fv-doc .fv-party .ln{color:#42505c;}
+  #fv-doc table.fv-t{width:100%;border-collapse:collapse;margin-bottom:14px;}
+  #fv-doc table.fv-t th{background:#EEF4FB;color:#0C447C;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px;border:1px solid #d6e4f3;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #fv-doc table.fv-t td{padding:8px;border:1px solid #e6edf5;vertical-align:top;font-variant-numeric:tabular-nums;}
+  #fv-doc table.fv-t td.r,#fv-doc table.fv-t th.r{text-align:right;white-space:nowrap;}
+  #fv-doc table.fv-t tfoot td{font-weight:700;background:#f6f9fc;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #fv-doc .fv-total{display:flex;justify-content:space-between;align-items:center;gap:16px;background:linear-gradient(135deg,#0C447C,#1a6bb5);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #fv-doc .fv-total .k{font-size:12px;text-transform:uppercase;letter-spacing:.8px;opacity:.92;}
+  #fv-doc .fv-total .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;}
+  #fv-doc .fv-words{font-size:12px;color:#42505c;margin-bottom:16px;}
+  #fv-doc .fv-box{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+  #fv-doc .fv-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
+  #fv-doc .fv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+  #fv-doc .fv-grid span{display:block;font-size:10px;color:#5b6670;}
+  #fv-doc .fv-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:38px 4px 6px;}
+  #fv-doc .fv-sign-box{padding-top:42px;}
+  #fv-doc .fv-sign-line{border-top:1px solid #16212b;}
+  #fv-doc .fv-sign-cap{font-size:10.5px;color:#5b6670;margin-top:6px;}
+  #fv-doc .fv-foot{margin-top:18px;padding-top:10px;border-top:1px solid #e6edf5;font-size:10.5px;color:#79858f;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  @media(max-width:680px){#fv-doc{padding:18px;}#fv-doc .fv-parties{grid-template-columns:1fr;}#fv-doc .fv-sign{grid-template-columns:1fr;gap:10px;}}
+  @media print{
+    body *{visibility:hidden !important;}
+    #fv-doc,#fv-doc *{visibility:visible !important;}
+    #fv-doc{position:absolute;left:0;top:0;width:100%;max-width:none;margin:0;padding:0;border:none;border-radius:0;box-shadow:none;}
+    .fv-noprint{display:none !important;}
+    #fv-doc .fv-party,#fv-doc table.fv-t,#fv-doc .fv-total,#fv-doc .fv-box,#fv-doc .fv-sign{break-inside:avoid;page-break-inside:avoid;}
+    @page{margin:14mm;}
+  }
+</style>`;
+
+// Kwota słownie (PL). Dla walut innych niż PLN — liczebnik + kod waluty.
+function _fvPlural(n, one, few, many) {
+  n = Math.abs(Math.floor(n));
+  if (n === 1) return one;
+  const l = n % 10, ll = n % 100;
+  return (l >= 2 && l <= 4 && !(ll >= 12 && ll <= 14)) ? few : many;
+}
+
+function _fvWords(n) {
+  const j = ['', 'jeden', 'dwa', 'trzy', 'cztery', 'pięć', 'sześć', 'siedem', 'osiem', 'dziewięć', 'dziesięć',
+             'jedenaście', 'dwanaście', 'trzynaście', 'czternaście', 'piętnaście', 'szesnaście', 'siedemnaście', 'osiemnaście', 'dziewiętnaście'];
+  const d = ['', '', 'dwadzieścia', 'trzydzieści', 'czterdzieści', 'pięćdziesiąt', 'sześćdziesiąt', 'siedemdziesiąt', 'osiemdziesiąt', 'dziewięćdziesiąt'];
+  const s = ['', 'sto', 'dwieście', 'trzysta', 'czterysta', 'pięćset', 'sześćset', 'siedemset', 'osiemset', 'dziewięćset'];
+  const grp = [null, ['tysiąc', 'tysiące', 'tysięcy'], ['milion', 'miliony', 'milionów'], ['miliard', 'miliardy', 'miliardów']];
+
+  n = Math.floor(Math.abs(Number(n) || 0));
+  if (n === 0) return 'zero';
+  const out = [];
+  let g = 0;
+  while (n > 0 && g < 4) {
+    const part = n % 1000;
+    n = Math.floor(n / 1000);
+    if (part > 0) {
+      const w = [];
+      const h = Math.floor(part / 100), rest = part % 100, t = Math.floor(rest / 10), u = rest % 10;
+      if (h) w.push(s[h]);
+      // „tysiąc”, nie „jeden tysiąc”
+      if (!(g > 0 && part === 1)) {
+        if (rest > 0 && rest < 20) w.push(j[rest]);
+        else { if (t) w.push(d[t]); if (u) w.push(j[u]); }
+      }
+      if (g > 0) w.push(_fvPlural(part, grp[g][0], grp[g][1], grp[g][2]));
+      out.unshift(w.filter(Boolean).join(' '));
+    }
+    g++;
+  }
+  return out.join(' ').trim();
+}
+
+function _fvSlownie(v, cur) {
+  const total = Math.round(Math.abs(Number(v) || 0) * 100);
+  const int = Math.floor(total / 100), gr = total % 100;
+  const grStr = String(gr).padStart(2, '0');
+  if ((cur || 'PLN') === 'PLN') {
+    return _fvWords(int) + ' ' + _fvPlural(int, 'złoty', 'złote', 'złotych') + ' ' + grStr + '/100 ' + _fvPlural(gr, 'grosz', 'grosze', 'groszy');
+  }
+  return _fvWords(int) + ' ' + grStr + '/100 ' + (cur || '');
+}
+
+// Sprzedawca: podmiot z faktury, a gdy nie wskazany — domyślny podmiot rozliczeniowy.
+function _fvIssuer(inv) {
+  if (typeof BillingEntitiesModule === 'undefined') return null;
+  return (inv.issuerId ? BillingEntitiesModule.find(inv.issuerId) : null) || BillingEntitiesModule.getDefault() || null;
+}
+
+function printInvoiceDoc(id) {
+  const inv = InvoicingModule.find(id);
+  if (!inv) return;
+  const container = document.getElementById('module-content');
+  if (!container) return;
+
+  const client = ClientsModule.find(inv.clientId);
+  const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+  const iss = _fvIssuer(inv);
+  const cur = inv.currency || 'PLN';
+  const typeLabel = ((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Faktura').toUpperCase();
+  const m = (v) => _invNum(v) + ' ' + cur;
+  const e = (v) => escapeHtml(String(v == null ? '' : v));
+
+  // Data sprzedaży = koniec okresu z podstawy, a gdy go nie ma — data wystawienia.
+  const saleDate = inv.periodTo || inv.issueDate;
+
+  const issuerLines = iss ? [
+    iss.addressLine, iss.postalCity,
+    ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).name || iss.country),
+    iss.taxNo ? ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).taxNoLabel || 'NIP') + ': ' + iss.taxNo : '',
+    iss.vatId ? ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).vatIdLabel || 'VAT') + ': ' + iss.vatId : '',
+    iss.email, iss.phone
+  ].filter(Boolean) : [];
+
+  const clientLines = client ? [
+    _escoClientAddr(client),
+    client.vatId ? 'NIP: ' + client.vatId : '',
+    client.regon ? 'REGON: ' + client.regon : ''
+  ].filter(Boolean) : [];
+
+  const itemName = inv.sourceType
+    ? ((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || '') + ' ' + (inv.sourceNumber || '') +
+      ([inv.periodFrom, inv.periodTo].filter(Boolean).length ? ' — okres ' + [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ') : '')
+    : ((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Usługa') + (obj ? ' — ' + obj.name : '');
+
+  const missing = [];
+  if (!iss) missing.push('brak zdefiniowanego podmiotu wystawiającego (Sprzedawca)');
+  else if (!iss.taxNo && !iss.vatId) missing.push('podmiot wystawiający nie ma uzupełnionego numeru podatkowego');
+  if (!client) missing.push('brak danych nabywcy');
+
+  container.innerHTML = FV_STYLE + `
+    <div class="fv-noprint" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+      <button class="small-button" onclick="viewInvoice(${inv.id})">← Podgląd faktury</button>
+      <button class="small-button" onclick="renderInvoicingModule()">Lista faktur</button>
+      <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="window.print()">🖨 Drukuj / zapisz PDF</button>
+      <span style="font-size:11px;color:var(--color-text-secondary);">W oknie drukowania wybierz „Zapisz jako PDF", żeby dostać plik.</span>
+    </div>
+    ${missing.length ? `<div class="fv-noprint reminder-card" style="border-color:#F4D4A0;background:#FEF9EF;margin-bottom:14px;"><strong>Dokument niepełny</strong><div class="reminder-meta">${escapeHtml(missing.join('; '))}. Uzupełnij dane przed wysłaniem faktury do klienta.</div></div>` : ''}
+
+    <div id="fv-doc">
+      <div class="fv-head">
+        <div>
+          <img src="logo-waterai.png" alt="WaterAI" class="fv-logo" onerror="this.style.display='none'" />
+          <div style="font-size:11px;color:#5b6670;margin-top:4px;">WaterAI Energy Control</div>
+        </div>
+        <div class="fv-title">
+          <h1>${e(typeLabel)}</h1>
+          <div class="num">${e(inv.invoiceNumber || '—')}</div>
+        </div>
+      </div>
+
+      <div class="fv-dates">
+        <div><span>Data wystawienia</span><strong>${fmtDate(inv.issueDate)}</strong></div>
+        <div><span>Data sprzedaży</span><strong>${fmtDate(saleDate)}</strong></div>
+        <div><span>Termin płatności</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+        <div><span>Sposób zapłaty</span><strong>Przelew</strong></div>
+      </div>
+
+      <div class="fv-parties">
+        <div class="fv-party">
+          <div class="lbl">Sprzedawca</div>
+          <div class="nm">${e(iss ? iss.name : '—')}</div>
+          ${issuerLines.map(l => `<div class="ln">${e(l)}</div>`).join('')}
+        </div>
+        <div class="fv-party">
+          <div class="lbl">Nabywca</div>
+          <div class="nm">${e(client ? client.name : '—')}</div>
+          ${clientLines.map(l => `<div class="ln">${e(l)}</div>`).join('')}
+          ${obj ? `<div class="ln" style="margin-top:6px;font-size:11px;">Obiekt: ${e(obj.name)}</div>` : ''}
+        </div>
+      </div>
+
+      <table class="fv-t">
+        <thead><tr>
+          <th style="width:26px;">Lp.</th>
+          <th>Nazwa usługi</th>
+          <th class="r">Ilość</th>
+          <th class="r">Cena netto</th>
+          <th class="r">Wartość netto</th>
+          <th class="r">VAT</th>
+          <th class="r">Kwota VAT</th>
+          <th class="r">Wartość brutto</th>
+        </tr></thead>
+        <tbody><tr>
+          <td>1</td>
+          <td>${e(itemName)}</td>
+          <td class="r">1 usł.</td>
+          <td class="r">${m(inv.netAmount)}</td>
+          <td class="r">${m(inv.netAmount)}</td>
+          <td class="r">${e(inv.vatRate)}%</td>
+          <td class="r">${m(inv.vatAmount)}</td>
+          <td class="r">${m(inv.grossAmount)}</td>
+        </tr></tbody>
+        <tfoot><tr>
+          <td colspan="4" class="r">Razem</td>
+          <td class="r">${m(inv.netAmount)}</td>
+          <td class="r">${e(inv.vatRate)}%</td>
+          <td class="r">${m(inv.vatAmount)}</td>
+          <td class="r">${m(inv.grossAmount)}</td>
+        </tr></tfoot>
+      </table>
+
+      <div class="fv-total">
+        <div class="k">Do zapłaty</div>
+        <div class="v">${m(inv.grossAmount)}</div>
+      </div>
+      <div class="fv-words">Słownie: ${e(_fvSlownie(inv.grossAmount, cur))}</div>
+
+      ${(iss && (iss.iban || iss.bankName)) ? `
+      <div class="fv-box">
+        <div class="lbl">Płatność</div>
+        <div class="fv-grid">
+          ${iss.bankName ? `<div><span>Bank</span><strong>${e(iss.bankName)}</strong></div>` : ''}
+          ${iss.iban ? `<div style="grid-column:span 2;"><span>Numer konta / IBAN</span><strong>${e(iss.iban)}</strong></div>` : ''}
+          ${iss.swift ? `<div><span>SWIFT / BIC</span><strong>${e(iss.swift)}</strong></div>` : ''}
+          <div><span>Termin</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+          <div><span>Tytułem</span><strong>${e(inv.invoiceNumber || '')}</strong></div>
+        </div>
+      </div>` : ''}
+
+      ${inv.sourceType ? `
+      <div class="fv-box">
+        <div class="lbl">Podstawa rozliczenia</div>
+        <div class="fv-grid">
+          <div><span>${e((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || 'Podstawa')}</span><strong>${e(inv.sourceNumber || ('#' + inv.sourceId))}</strong></div>
+          ${[inv.periodFrom, inv.periodTo].filter(Boolean).length ? `<div><span>Okres</span><strong>${e([inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – '))}</strong></div>` : ''}
+          ${inv.savedEnergy ? `<div><span>Oszczędność energii</span><strong>${_invNum(inv.savedEnergy)} ${e(inv.energyUnit || '')}</strong></div>` : ''}
+          ${inv.savedMoney ? `<div><span>Oszczędność kosztu</span><strong>${_invNum(inv.savedMoney)} ${e(cur)}</strong></div>` : ''}
+          ${inv.escoShare != null ? `<div><span>Udział WaterAI/ESCO</span><strong>${_invNum(inv.escoShare, 1)}%</strong></div>` : ''}
+        </div>
+      </div>` : ''}
+
+      ${inv.notes ? `<div class="fv-box"><div class="lbl">Uwagi</div><div>${e(inv.notes)}</div></div>` : ''}
+
+      <div class="fv-sign">
+        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">Osoba upoważniona do wystawienia</div></div>
+        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">Osoba upoważniona do odbioru</div></div>
+      </div>
+
+      <div class="fv-foot">
+        <div>${e(iss && iss.footerNote ? iss.footerNote : '')}</div>
+        <div>Wygenerowano w WaterAI Energy Control — ${fmtDate(new Date().toISOString().slice(0, 10))}</div>
+      </div>
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
