@@ -440,6 +440,13 @@ function renderInvoicingModule() {
 
   const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
+  const entities = (typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.getAll() : [];
+  const defEntity = (typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.getDefault() : null;
+  const issuerOptions = `<option value="">— nie wskazano —</option>` + entities.map(en => {
+    const c = (BillingEntitiesModule.COUNTRIES[en.country] || {});
+    return `<option value="${en.id}"${defEntity && Number(defEntity.id) === Number(en.id) ? ' selected' : ''}>${c.flag || ''} ${escapeHtml(en.name || '(bez nazwy)')}${en.isDefault ? ' ⭐' : ''}</option>`;
+  }).join('');
+
   const invoiceRows = invoices.map(inv => {
     const client = ClientsModule.find(inv.clientId);
     const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
@@ -449,6 +456,12 @@ function renderInvoicingModule() {
         inv.sourceType ? `<div style="font-size:11px;font-weight:400;color:var(--color-text-secondary);white-space:nowrap;">${(InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).icon || '📎'} ${escapeHtml(inv.sourceNumber || ('#' + inv.sourceId))}</div>` : ''
       }</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
+      <td style="padding:9px 12px;font-size:12px;white-space:nowrap;">${(() => {
+        const en = (inv.issuerId && typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.find(inv.issuerId) : null;
+        if (!en) return '<span style="color:var(--color-text-tertiary);">—</span>';
+        const c = (BillingEntitiesModule.COUNTRIES[en.country] || {});
+        return (c.flag || '') + ' ' + escapeHtml(en.name || '');
+      })()}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${typeInfo.icon} ${typeInfo.label}</td>
       <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.issueDate)}</td>
@@ -491,6 +504,7 @@ function renderInvoicingModule() {
         <button class="small-button" onclick="document.getElementById('inv-form-area').style.display='none'">✕</button>
       </div>
       <div class="calendar-form">
+        <div style="grid-column:1/-1;"><label>Podmiot wystawiający (sprzedawca)</label><select id="inv-issuer" onchange="applyInvIssuer()">${issuerOptions}</select></div>
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
         <div><label>Obiekt (opcjonalnie)</label><select id="inv-object" onchange="updateInvSources()"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
         <div style="grid-column:1/-1;">
@@ -503,8 +517,8 @@ function renderInvoicingModule() {
         <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
         <div><label>Termin płatności</label><input id="inv-due-date" type="date" /></div>
         <div><label>Kwota netto</label><input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" /></div>
-        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="8">8%</option><option value="0">0%</option></select></div>
-        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option></select></div>
+        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="21">21%</option><option value="20">20%</option><option value="19">19%</option><option value="8">8%</option><option value="0">0%</option></select></div>
+        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="GBP">GBP</option></select></div>
         <div><label>Status</label><select id="inv-status">${Object.entries(InvoicingModule.STATUSES).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
         <div style="grid-column:1/-1;"><label>Uwagi</label><input id="inv-notes" placeholder="opcjonalne uwagi" /></div>
         <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveInvoice()" style="width:auto;padding:10px 24px;margin:0;">Zapisz fakturę</button></div>
@@ -517,6 +531,7 @@ function renderInvoicingModule() {
         <input type="search" placeholder="Szukaj faktury..." value="${escapeHtml(q)}"
           oninput="window._invSearch=this.value;renderInvoicingModule();"
           style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <button class="small-button" style="font-size:13px;padding:8px 14px;white-space:nowrap;" onclick="renderBillingEntities()" title="Firmy wystawiające faktury">⚙ Podmioty${entities.length ? ' (' + entities.length + ')' : ''}</button>
         <button class="primary-button" style="font-size:13px;padding:8px 16px;white-space:nowrap;" onclick="document.getElementById('inv-form-area').style.display='block'">+ Nowa faktura</button>
       </div>
     </div>
@@ -528,6 +543,7 @@ function renderInvoicingModule() {
             <thead><tr style="background:var(--color-background-secondary);">
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
               ${thS('client','Klient')}
+              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Podmiot</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ faktury</th>
               ${thS('date','Data wyst.')}
@@ -820,6 +836,7 @@ function saveInvoice() {
   InvoicingModule.add(Object.assign(_invSourcePayload(), {
     clientId,
     objectId,
+    issuerId: (document.getElementById('inv-issuer') || {}).value || null,
     invoiceNumber: numberEl.value.trim() || undefined,
     invoiceType: document.getElementById('inv-type').value,
     issueDate: document.getElementById('inv-issue-date').value,
@@ -876,6 +893,15 @@ function viewInvoice(id) {
         <span style="font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:${s.bg};color:${s.color};">${s.label}</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+        ${(() => {
+          const en = _fvIssuer(inv);
+          if (!en) return `<div style="grid-column:1/-1;font-size:12px;color:#7A4A00;background:#FEF9EF;border:1px solid #F4D4A0;border-radius:8px;padding:8px 12px;">⚠ Nie wskazano podmiotu wystawiającego — wydruk nie będzie miał bloku „Sprzedawca". Uzupełnij w <b>⚙ Podmioty</b>.</div>`;
+          const c = BillingEntitiesModule.COUNTRIES[en.country] || {};
+          const det = [en.addressLine, en.postalCity, en.taxNo ? ((c.taxNoLabel || 'NIP') + ': ' + en.taxNo) : '', en.iban ? ('IBAN: ' + en.iban) : ''].filter(Boolean);
+          return `<div style="grid-column:1/-1;"><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Sprzedawca${inv.issuerId ? '' : ' (domyślny)'}</span>
+            <strong>${c.flag || ''} ${escapeHtml(en.name || '—')}</strong>
+            ${det.length ? `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">${det.map(x => escapeHtml(x)).join(' · ')}</div>` : ''}</div>`;
+        })()}
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Klient</span><strong>${escapeHtml((client && client.name) || '—')}</strong></div>
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Obiekt</span><strong>${escapeHtml((obj && obj.name) || '—')}</strong></div>
         <div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Data wystawienia</span><strong>${fmtDate(inv.issueDate)}</strong></div>
@@ -923,6 +949,8 @@ function editInvoice(id) {
     const btn = form.querySelector('button[onclick="saveInvoice()"]');
     if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveInvoiceEdit(${id})`); }
     window._invEditId = id;
+    const issSel = document.getElementById('inv-issuer');
+    if (issSel) issSel.value = inv.issuerId || '';
     document.getElementById('inv-client').value = inv.clientId || '';
     updateInvObjects(inv.clientId);
     setTimeout(() => {
@@ -958,6 +986,7 @@ function saveInvoiceEdit(id) {
   const vatRate = Number(document.getElementById('inv-vat').value || 23);
   const vatAmount = net * vatRate / 100;
   InvoicingModule.update(id, Object.assign(_invSourcePayload(), {
+    issuerId: (document.getElementById('inv-issuer') || {}).value || null,
     clientId: document.getElementById('inv-client').value,
     objectId: document.getElementById('inv-object').value || null,
     invoiceNumber: document.getElementById('inv-number').value.trim(),
@@ -975,6 +1004,160 @@ function saveInvoiceEdit(id) {
 function markInvoicePaid(id) {
   InvoicingModule.updateStatus(id, 'PAID', InvoicingModule.find(id)?.grossAmount || 0);
   renderInvoicingModule();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PODMIOTY WYSTAWIAJĄCE FAKTURY (sprzedawcy)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Wybór sprzedawcy podpowiada jego walutę i stawkę VAT — jak każda sugestia, do nadpisania.
+function applyInvIssuer() {
+  const sel = document.getElementById('inv-issuer');
+  if (!sel || typeof BillingEntitiesModule === 'undefined') return;
+  const en = sel.value ? BillingEntitiesModule.find(sel.value) : null;
+  if (!en) return;
+  const c = BillingEntitiesModule.COUNTRIES[en.country] || {};
+  _invSuggest(document.getElementById('inv-currency'), en.defaultCurrency || c.currency || 'PLN');
+  const vat = (en.defaultVatRate != null && en.defaultVatRate !== '') ? en.defaultVatRate : c.vat;
+  if (vat != null) _invSuggest(document.getElementById('inv-vat'), String(vat));
+}
+
+function _beCountryOptions(sel) {
+  return Object.entries(BillingEntitiesModule.COUNTRIES).map(([k, c]) =>
+    `<option value="${k}"${k === sel ? ' selected' : ''}>${c.flag} ${escapeHtml(c.name)}</option>`).join('');
+}
+
+function renderBillingEntities() {
+  const container = document.getElementById('module-content');
+  if (!container || typeof BillingEntitiesModule === 'undefined') return;
+  const all = BillingEntitiesModule.getAll();
+  const editId = window._beEditId || null;
+  const en = editId ? (BillingEntitiesModule.find(editId) || {}) : {};
+  const cc = BillingEntitiesModule.COUNTRIES[en.country || 'PL'] || BillingEntitiesModule.COUNTRIES.PL;
+
+  const cards = all.map(x => {
+    const c = BillingEntitiesModule.COUNTRIES[x.country] || {};
+    const lines = [x.addressLine, x.postalCity,
+      x.taxNo ? ((c.taxNoLabel || 'NIP') + ': ' + x.taxNo) : '',
+      x.vatId ? ((c.vatIdLabel || 'VAT') + ': ' + x.vatId) : '',
+      x.iban ? ('IBAN: ' + x.iban) : ''].filter(Boolean);
+    return `<div style="border:1px solid var(--color-border-tertiary);border-radius:12px;padding:14px 16px;${x.isDefault ? 'border-color:#C0DD97;background:#FBFDF7;' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;">${c.flag || ''} ${escapeHtml(x.name || '(bez nazwy)')} ${x.isDefault ? '<span style="font-size:11px;font-weight:600;color:#27500A;">⭐ domyślny</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${escapeHtml(c.name || x.country || '')} · ${escapeHtml(x.defaultCurrency || '')} · VAT ${escapeHtml(String(x.defaultVatRate != null ? x.defaultVatRate : ''))}%</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${x.isDefault ? '' : `<button class="small-button" onclick="beSetDefault(${x.id})" title="Ustaw jako domyślny">⭐</button>`}
+          <button class="small-button" onclick="beEdit(${x.id})" title="Edytuj">✏️</button>
+          <button class="small-button icon-btn-del" onclick="beRemove(${x.id})" title="Usuń">🗑</button>
+        </div>
+      </div>
+      ${lines.length ? `<div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;line-height:1.5;">${lines.map(l => escapeHtml(l)).join('<br>')}</div>`
+        : `<div style="font-size:12px;color:#7A4A00;margin-top:8px;">⚠ Brak danych rejestrowych — faktura wydrukowana z tym podmiotem będzie niepełna.</div>`}
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+      <button class="small-button" onclick="window._beEditId=null;renderInvoicingModule();">← Lista faktur</button>
+      <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="beNew()">+ Dodaj podmiot</button>
+      ${all.length === 0 ? `<button class="small-button" onclick="beSeed()">Utwórz 6 podmiotów startowych (PL/SK/CZ/DE/AT/UK)</button>` : ''}
+    </div>
+
+    <div class="reminder-card" style="margin-bottom:16px;">
+      <strong>Podmioty wystawiające faktury</strong>
+      <div class="reminder-meta">Firmy, w imieniu których wystawiacie FV. Dane stąd trafiają w blok „Sprzedawca" na wydruku faktury. Lista jest wspólna dla całego zespołu — zapisywać mogą Administrator i Back Office.</div>
+    </div>
+
+    <div id="be-form" style="display:${editId || window._beNew ? 'block' : 'none'};border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h4 style="margin:0;font-size:15px;color:#0C447C;">${editId ? 'Edytuj podmiot' : 'Nowy podmiot'}</h4>
+        <button class="small-button" onclick="window._beEditId=null;window._beNew=false;renderBillingEntities();">✕</button>
+      </div>
+      <div class="calendar-form">
+        <div><label>Kraj</label><select id="be-country" onchange="beCountryChanged()">${_beCountryOptions(en.country || 'PL')}</select></div>
+        <div style="grid-column:span 2;"><label>Nazwa firmy</label><input id="be-name" value="${escapeHtml(en.name || '')}" placeholder="np. WaterAI Polska Sp. z o.o." /></div>
+        <div><label id="be-taxno-lbl">${escapeHtml(cc.taxNoLabel || 'NIP')}</label><input id="be-taxno" value="${escapeHtml(en.taxNo || '')}" /></div>
+        <div><label id="be-vatid-lbl">${escapeHtml(cc.vatIdLabel || 'VAT')}</label><input id="be-vatid" value="${escapeHtml(en.vatId || '')}" /></div>
+        <div style="grid-column:span 2;"><label>Ulica i numer</label><input id="be-address" value="${escapeHtml(en.addressLine || '')}" placeholder="ul. Przykładowa 12/3" /></div>
+        <div><label>Kod pocztowy i miasto</label><input id="be-postalcity" value="${escapeHtml(en.postalCity || '')}" placeholder="20-001 Lublin" /></div>
+        <div><label>E-mail</label><input id="be-email" value="${escapeHtml(en.email || '')}" /></div>
+        <div><label>Telefon</label><input id="be-phone" value="${escapeHtml(en.phone || '')}" /></div>
+        <div><label>Bank</label><input id="be-bank" value="${escapeHtml(en.bankName || '')}" /></div>
+        <div style="grid-column:span 2;"><label>Numer konta / IBAN</label><input id="be-iban" value="${escapeHtml(en.iban || '')}" /></div>
+        <div><label>SWIFT / BIC</label><input id="be-swift" value="${escapeHtml(en.swift || '')}" /></div>
+        <div><label>Waluta domyślna</label><input id="be-currency" value="${escapeHtml(en.defaultCurrency || cc.currency || 'PLN')}" /></div>
+        <div><label>Domyślny VAT (%)</label><input id="be-vat" type="number" step="0.1" min="0" max="100" value="${escapeHtml(String(en.defaultVatRate != null ? en.defaultVatRate : cc.vat))}" /></div>
+        <div><label>Prefiks numeru FV</label><input id="be-prefix" value="${escapeHtml(en.numberPrefix || '')}" placeholder="FV-PL" /></div>
+        <div style="grid-column:1/-1;"><label>Stopka na fakturze</label><input id="be-footer" value="${escapeHtml(en.footerNote || '')}" placeholder="np. Sąd Rejonowy…, KRS…, kapitał zakładowy…" /></div>
+        <div style="grid-column:1/-1;"><label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" id="be-default" ${en.isDefault ? 'checked' : ''} style="width:auto;margin:0;" /> Podmiot domyślny (podpowiadany przy nowej fakturze)</label></div>
+        <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="beSave()" style="width:auto;padding:10px 24px;margin:0;">${editId ? 'Zapisz zmiany' : 'Dodaj podmiot'}</button></div>
+      </div>
+    </div>
+
+    ${all.length === 0
+      ? `<div class="reminder-card"><strong>Brak podmiotów</strong><div class="reminder-meta">Dodaj firmę, w imieniu której wystawiacie faktury — bez tego wydruk FV nie ma bloku „Sprzedawca".</div></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">${cards}</div>`}
+  `;
+}
+
+function beCountryChanged() {
+  const code = document.getElementById('be-country').value;
+  const c = BillingEntitiesModule.COUNTRIES[code] || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.textContent = v; };
+  set('be-taxno-lbl', c.taxNoLabel || 'NIP');
+  set('be-vatid-lbl', c.vatIdLabel || 'VAT');
+  // Waluta i VAT tylko gdy użytkownik ich jeszcze nie zmienił świadomie — pola zostają edytowalne.
+  const cur = document.getElementById('be-currency'), vat = document.getElementById('be-vat');
+  if (cur && !cur.dataset.beTouched) cur.value = c.currency || 'PLN';
+  if (vat && !vat.dataset.beTouched) vat.value = c.vat != null ? c.vat : '';
+  [cur, vat].forEach(el => { if (el && !el._beHook) { el._beHook = true; el.addEventListener('input', () => { el.dataset.beTouched = '1'; }); } });
+}
+
+function beNew() { window._beEditId = null; window._beNew = true; renderBillingEntities(); }
+function beEdit(id) { window._beEditId = id; window._beNew = false; renderBillingEntities(); }
+
+function beSeed() {
+  if (!confirm('Utworzyć 6 podmiotów startowych (po jednym na kraj)?\n\nNazwy będą placeholderami, a dane rejestrowe (NIP, adres, konto) trzeba uzupełnić ręcznie.')) return;
+  BillingEntitiesModule.seedDefaults();
+  renderBillingEntities();
+}
+
+function beSetDefault(id) {
+  BillingEntitiesModule.update(id, { isDefault: true });
+  renderBillingEntities();
+}
+
+function beRemove(id) {
+  const used = InvoicingModule.getAll().filter(i => Number(i.issuerId) === Number(id));
+  if (used.length && !confirm('Ten podmiot jest przypisany do ' + used.length + ' faktur(y).\nPo usunięciu ich wydruk straci blok „Sprzedawca". Usunąć mimo to?')) return;
+  if (!used.length && !confirm('Usunąć podmiot?')) return;
+  BillingEntitiesModule.remove(id);
+  window._beEditId = null;
+  renderBillingEntities();
+}
+
+function beSave() {
+  const val = id => (document.getElementById(id) || {}).value || '';
+  const name = val('be-name').trim();
+  if (!name) { alert('Podaj nazwę firmy.'); return; }
+  const data = {
+    name,
+    country: val('be-country'),
+    taxNo: val('be-taxno'), vatId: val('be-vatid'),
+    addressLine: val('be-address'), postalCity: val('be-postalcity'),
+    email: val('be-email'), phone: val('be-phone'),
+    bankName: val('be-bank'), iban: val('be-iban'), swift: val('be-swift'),
+    defaultCurrency: val('be-currency').trim().toUpperCase(),
+    defaultVatRate: val('be-vat'),
+    numberPrefix: val('be-prefix'), footerNote: val('be-footer'),
+    isDefault: !!(document.getElementById('be-default') || {}).checked
+  };
+  if (window._beEditId) BillingEntitiesModule.update(window._beEditId, data);
+  else BillingEntitiesModule.add(data);
+  window._beEditId = null; window._beNew = false;
+  renderBillingEntities();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
