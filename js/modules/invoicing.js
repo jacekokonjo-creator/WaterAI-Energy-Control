@@ -100,13 +100,27 @@ const InvoicingModule = {
     this.saveAll(items);
   },
 
-  generateNumber() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const all = this.getAll().filter(i => i.invoiceNumber.startsWith(`FV/${year}/`));
-    const num = String(all.length + 1).padStart(3, '0');
-    return `FV/${year}/${month}/${num}`;
+  // Numer FV: <prefiks>/<rok>/<miesiąc>/<kolejny>, np. FV/2026/08/001.
+  // Kolejny = największy dotąd użyty W TEJ SERII (prefiks+rok+miesiąc) + 1, a nie „ilość + 1":
+  // dzięki temu usunięcie faktury nie powoduje powtórzenia numeru.
+  // Prefiks bierze się z podmiotu wystawiającego (numberPrefix), domyślnie 'FV'.
+  generateNumber(opts) {
+    const o = opts || {};
+    const d = o.date ? new Date(o.date) : new Date();
+    const base = isNaN(d.getTime()) ? new Date() : d;
+    const year = base.getFullYear();
+    const month = String(base.getMonth() + 1).padStart(2, '0');
+    const prefix = String(o.prefix || 'FV').trim() || 'FV';
+    const head = `${prefix}/${year}/${month}/`;
+
+    let max = 0;
+    this.getAll().forEach(i => {
+      const n = String(i.invoiceNumber || '');
+      if (n.indexOf(head) !== 0) return;
+      const seq = parseInt(n.slice(head.length), 10);
+      if (!isNaN(seq) && seq > max) max = seq;
+    });
+    return head + String(max + 1).padStart(3, '0');
   },
 
   remove(id) {
