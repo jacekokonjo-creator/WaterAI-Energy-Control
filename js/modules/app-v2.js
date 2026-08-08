@@ -513,9 +513,9 @@ function renderInvoicingModule() {
           <div id="inv-source-hint" style="display:none;margin-top:8px;"></div>
         </div>
         <div><label>Typ faktury</label><select id="inv-type">${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
-        <div><label>Numer faktury</label><input id="inv-number" placeholder="FV/2026/001" /></div>
-        <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
-        <div><label>Termin płatności</label><input id="inv-due-date" type="date" /></div>
+        <div><label>Numer faktury</label><input id="inv-number" placeholder="FV/2026/08/001" /></div>
+        <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" onchange="invRefreshDefaults()" /></div>
+        <div><label>Termin płatności <span id="inv-due-hint" style="font-weight:400;color:var(--color-text-secondary);font-size:11px;"></span></label><input id="inv-due-date" type="date" /></div>
         <div><label>Kwota netto</label><input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" /></div>
         <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="21">21%</option><option value="20">20%</option><option value="19">19%</option><option value="8">8%</option><option value="0">0%</option></select></div>
         <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="GBP">GBP</option></select></div>
@@ -561,9 +561,11 @@ function renderInvoicingModule() {
   window._invEditId = null;
   window._invSrc = null;
   updateInvSources();
+  invRefreshDefaults();
 }
 
 function updateInvObjects(clientId) {
+  invRefreshDefaults();          // termin płatności zależy od kartoteki klienta
   const sel = document.getElementById('inv-object');
   if (!sel) return;
   const objects = ObjectsModule.findByClient(clientId);
@@ -967,7 +969,10 @@ function editInvoice(id) {
         }
       }
     }, 50);
-    document.getElementById('inv-number').value = inv.invoiceNumber || '';
+    const numEl = document.getElementById('inv-number'), dueEl = document.getElementById('inv-due-date');
+    // Wartości z zapisanej faktury nie są już sugestią — chronimy je przed przeliczeniem.
+    [numEl, dueEl].forEach(el => { if (el) { el.dataset.invTouched = '1'; el.style.background = ''; el.style.borderColor = ''; delete el.dataset.invSug; } });
+    numEl.value = inv.invoiceNumber || '';
     document.getElementById('inv-type').value = inv.invoiceType || 'INVOICE';
     document.getElementById('inv-issue-date').value = inv.issueDate || '';
     document.getElementById('inv-due-date').value = inv.dueDate || '';
@@ -1006,6 +1011,44 @@ function markInvoicePaid(id) {
   renderInvoicingModule();
 }
 
+// Numer faktury i termin płatności jako podpowiedzi — przeliczane przy każdej zmianie
+// sprzedawcy, klienta albo daty wystawienia. Ręcznie zmienione pole zostaje nietknięte.
+function invRefreshDefaults() {
+  const issSel = document.getElementById('inv-issuer');
+  const numEl = document.getElementById('inv-number');
+  const issueEl = document.getElementById('inv-issue-date');
+  const dueEl = document.getElementById('inv-due-date');
+  const hint = document.getElementById('inv-due-hint');
+  const issueDate = (issueEl && issueEl.value) || new Date().toISOString().slice(0, 10);
+
+  // ── numer: kolejny wolny w serii danego podmiotu i miesiąca ──
+  if (numEl) {
+    const en = (issSel && issSel.value && typeof BillingEntitiesModule !== 'undefined')
+      ? BillingEntitiesModule.find(issSel.value) : null;
+    _invSuggest(numEl, InvoicingModule.generateNumber({
+      prefix: (en && en.numberPrefix) || 'FV',
+      date: issueDate
+    }));
+  }
+
+  // ── termin płatności: data wystawienia + „ile dni" z kartoteki klienta ──
+  const clSel = document.getElementById('inv-client');
+  const cl = (clSel && clSel.value) ? ClientsModule.find(clSel.value) : null;
+  const days = (cl && cl.paymentDays != null && cl.paymentDays !== '') ? Number(cl.paymentDays) : null;
+
+  if (hint) hint.textContent = (days != null)
+    ? `— klient: ${days} dni`
+    : (cl ? '— klient nie ma ustawionej liczby dni' : '');
+
+  if (dueEl && days != null && !isNaN(days)) {
+    const d = new Date(issueDate + 'T00:00:00');
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + days);
+      _invSuggest(dueEl, d.toISOString().slice(0, 10));
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PODMIOTY WYSTAWIAJĄCE FAKTURY (sprzedawcy)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1020,6 +1063,7 @@ function applyInvIssuer() {
   _invSuggest(document.getElementById('inv-currency'), en.defaultCurrency || c.currency || 'PLN');
   const vat = (en.defaultVatRate != null && en.defaultVatRate !== '') ? en.defaultVatRate : c.vat;
   if (vat != null) _invSuggest(document.getElementById('inv-vat'), String(vat));
+  invRefreshDefaults();          // prefiks numeru zależy od podmiotu
 }
 
 function _beCountryOptions(sel) {
@@ -1167,45 +1211,50 @@ function beSave() {
 // żeby wydruk nie zależał od stylów raportów analiz (ANAL_STYLE).
 
 const FV_STYLE = `<style>
-  #fv-doc{background:#fff;color:#16212b;font-size:12.5px;line-height:1.45;border:1px solid #dbe5f0;border-radius:14px;padding:28px 32px;max-width:900px;margin:0 auto;}
-  #fv-doc .fv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:2px solid #0C447C;padding-bottom:14px;}
-  #fv-doc .fv-logo{height:46px;width:auto;object-fit:contain;}
-  #fv-doc .fv-title{text-align:right;}
-  #fv-doc .fv-title h1{margin:0;font-size:24px;font-weight:800;color:#0C447C;letter-spacing:.4px;}
-  #fv-doc .fv-title .num{font-size:15px;font-weight:700;color:#633806;font-variant-numeric:tabular-nums;margin-top:2px;}
-  #fv-doc .fv-dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 18px;}
-  #fv-doc .fv-dates div span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#5b6670;}
-  #fv-doc .fv-dates div strong{font-size:13px;font-variant-numeric:tabular-nums;}
-  #fv-doc .fv-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
-  #fv-doc .fv-party{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;background:#fafcfe;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  #fv-doc .fv-party .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
-  #fv-doc .fv-party .nm{font-size:14px;font-weight:700;color:#0f2f4f;}
-  #fv-doc .fv-party .ln{color:#42505c;}
-  #fv-doc table.fv-t{width:100%;border-collapse:collapse;margin-bottom:14px;}
-  #fv-doc table.fv-t th{background:#EEF4FB;color:#0C447C;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px;border:1px solid #d6e4f3;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  #fv-doc table.fv-t td{padding:8px;border:1px solid #e6edf5;vertical-align:top;font-variant-numeric:tabular-nums;}
-  #fv-doc table.fv-t td.r,#fv-doc table.fv-t th.r{text-align:right;white-space:nowrap;}
-  #fv-doc table.fv-t tfoot td{font-weight:700;background:#f6f9fc;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  #fv-doc .fv-total{display:flex;justify-content:space-between;align-items:center;gap:16px;background:linear-gradient(135deg,#0C447C,#1a6bb5);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  #fv-doc .fv-total .k{font-size:12px;text-transform:uppercase;letter-spacing:.8px;opacity:.92;}
-  #fv-doc .fv-total .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;}
-  #fv-doc .fv-words{font-size:12px;color:#42505c;margin-bottom:16px;}
-  #fv-doc .fv-box{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
-  #fv-doc .fv-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
-  #fv-doc .fv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
-  #fv-doc .fv-grid span{display:block;font-size:10px;color:#5b6670;}
-  #fv-doc .fv-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:38px 4px 6px;}
-  #fv-doc .fv-sign-box{padding-top:42px;}
-  #fv-doc .fv-sign-line{border-top:1px solid #16212b;}
-  #fv-doc .fv-sign-cap{font-size:10.5px;color:#5b6670;margin-top:6px;}
-  #fv-doc .fv-foot{margin-top:18px;padding-top:10px;border-top:1px solid #e6edf5;font-size:10.5px;color:#79858f;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-  @media(max-width:680px){#fv-doc{padding:18px;}#fv-doc .fv-parties{grid-template-columns:1fr;}#fv-doc .fv-sign{grid-template-columns:1fr;gap:10px;}}
+  .fv-doc{background:#fff;color:#16212b;font-size:12.5px;line-height:1.45;border:1px solid #dbe5f0;border-radius:14px;padding:28px 32px;max-width:900px;margin:0 auto;}
+  .fv-doc .fv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:2px solid #0C447C;padding-bottom:14px;}
+  .fv-doc .fv-logo{height:46px;width:auto;object-fit:contain;}
+  .fv-doc .fv-title{text-align:right;}
+  .fv-doc .fv-title h1{margin:0;font-size:24px;font-weight:800;color:#0C447C;letter-spacing:.4px;}
+  .fv-doc .fv-title .num{font-size:15px;font-weight:700;color:#633806;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .fv-doc .fv-dates{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 18px;}
+  .fv-doc .fv-dates div span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:#5b6670;}
+  .fv-doc .fv-dates div strong{font-size:13px;font-variant-numeric:tabular-nums;}
+  .fv-doc .fv-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+  .fv-doc .fv-party{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;background:#fafcfe;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .fv-doc .fv-party .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
+  .fv-doc .fv-party .nm{font-size:14px;font-weight:700;color:#0f2f4f;}
+  .fv-doc .fv-party .ln{color:#42505c;}
+  .fv-doc table.fv-t{width:100%;border-collapse:collapse;margin-bottom:14px;}
+  .fv-doc table.fv-t th{background:#EEF4FB;color:#0C447C;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px;border:1px solid #d6e4f3;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .fv-doc table.fv-t td{padding:8px;border:1px solid #e6edf5;vertical-align:top;font-variant-numeric:tabular-nums;}
+  .fv-doc table.fv-t td.r,.fv-doc table.fv-t th.r{text-align:right;white-space:nowrap;}
+  .fv-doc table.fv-t tfoot td{font-weight:700;background:#f6f9fc;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .fv-doc .fv-total{display:flex;justify-content:space-between;align-items:center;gap:16px;background:linear-gradient(135deg,#0C447C,#1a6bb5);color:#fff;border-radius:12px;padding:14px 20px;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .fv-doc .fv-total .k{font-size:12px;text-transform:uppercase;letter-spacing:.8px;opacity:.92;}
+  .fv-doc .fv-total .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .fv-doc .fv-words{font-size:12px;color:#42505c;margin-bottom:16px;}
+  .fv-doc .fv-box{border:1px solid #e6edf5;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+  .fv-doc .fv-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#1a6bb5;font-weight:700;margin-bottom:6px;}
+  .fv-doc .fv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+  .fv-doc .fv-grid span{display:block;font-size:10px;color:#5b6670;}
+  .fv-doc .fv-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:38px 4px 6px;}
+  .fv-doc .fv-sign-box{padding-top:42px;}
+  .fv-doc .fv-sign-line{border-top:1px solid #16212b;}
+  .fv-doc .fv-sign-cap{font-size:10.5px;color:#5b6670;margin-top:6px;}
+  .fv-doc .fv-foot{margin-top:18px;padding-top:10px;border-top:1px solid #e6edf5;font-size:10.5px;color:#79858f;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  @media(max-width:680px){.fv-doc{padding:18px;}.fv-doc .fv-parties{grid-template-columns:1fr;}.fv-doc .fv-sign{grid-template-columns:1fr;gap:10px;}}
   @media print{
-    body *{visibility:hidden !important;}
-    #fv-doc,#fv-doc *{visibility:visible !important;}
-    #fv-doc{position:absolute;left:0;top:0;width:100%;max-width:none;margin:0;padding:0;border:none;border-radius:0;box-shadow:none;}
+    /* Ukrywamy rodzeństwo przez display:none, nie visibility — visibility zostawia
+       pustą przestrzeń po wysokiej stronie aplikacji, co dawało puste strony wydruku. */
+    html,body{height:auto !important;min-height:0 !important;overflow:visible !important;background:#fff !important;}
+    body.fv-printing > *{display:none !important;}
+    body.fv-printing > #fv-print-root{display:block !important;}
+    #fv-print-root{margin:0;padding:0;}
     .fv-noprint{display:none !important;}
-    #fv-doc .fv-party,#fv-doc table.fv-t,#fv-doc .fv-total,#fv-doc .fv-box,#fv-doc .fv-sign{break-inside:avoid;page-break-inside:avoid;}
+    .fv-doc{border:none !important;border-radius:0 !important;padding:0 !important;max-width:none !important;box-shadow:none !important;margin:0 !important;}
+    .fv-doc .fv-party,.fv-doc table.fv-t,.fv-doc .fv-total,.fv-doc .fv-box,.fv-doc .fv-sign{break-inside:avoid;page-break-inside:avoid;}
+    .fv-doc > *:last-child{page-break-after:avoid;break-after:avoid;}
     @page{margin:14mm;}
   }
 </style>`;
@@ -1265,6 +1314,42 @@ function _fvIssuer(inv) {
   return (inv.issuerId ? BillingEntitiesModule.find(inv.issuerId) : null) || BillingEntitiesModule.getDefault() || null;
 }
 
+// Druk: kopia dokumentu ląduje jako bezpośrednie dziecko <body>, a reszta strony
+// znika przez display:none. Bez tego wysoki układ aplikacji zostawał w przepływie
+// i drukarka dokładała puste strony.
+function _fvPrepare() {
+  if (document.getElementById('fv-print-root')) return true;
+  const doc = document.getElementById('fv-doc');
+  if (!doc) return false;
+  const root = document.createElement('div');
+  root.id = 'fv-print-root';
+  const clone = doc.cloneNode(true);
+  clone.removeAttribute('id');          // id zostaje przy oryginale
+  root.appendChild(clone);
+  document.body.appendChild(root);
+  document.body.classList.add('fv-printing');
+  return true;
+}
+
+function _fvCleanup() {
+  const root = document.getElementById('fv-print-root');
+  if (root) root.remove();
+  document.body.classList.remove('fv-printing');
+}
+
+function fvPrint() {
+  _fvPrepare();
+  window.print();
+  setTimeout(_fvCleanup, 300);   // afterprint i tak posprząta — to zabezpieczenie
+}
+
+// Ctrl+P z pominięciem przycisku też ma działać.
+if (!window._fvPrintHooked) {
+  window._fvPrintHooked = true;
+  window.addEventListener('beforeprint', () => { if (document.getElementById('fv-doc')) _fvPrepare(); });
+  window.addEventListener('afterprint', _fvCleanup);
+}
+
 function printInvoiceDoc(id) {
   const inv = InvoicingModule.find(id);
   if (!inv) return;
@@ -1310,12 +1395,12 @@ function printInvoiceDoc(id) {
     <div class="fv-noprint" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
       <button class="small-button" onclick="viewInvoice(${inv.id})">← Podgląd faktury</button>
       <button class="small-button" onclick="renderInvoicingModule()">Lista faktur</button>
-      <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="window.print()">🖨 Drukuj / zapisz PDF</button>
+      <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="fvPrint()">🖨 Drukuj / zapisz PDF</button>
       <span style="font-size:11px;color:var(--color-text-secondary);">W oknie drukowania wybierz „Zapisz jako PDF", żeby dostać plik.</span>
     </div>
     ${missing.length ? `<div class="fv-noprint reminder-card" style="border-color:#F4D4A0;background:#FEF9EF;margin-bottom:14px;"><strong>Dokument niepełny</strong><div class="reminder-meta">${escapeHtml(missing.join('; '))}. Uzupełnij dane przed wysłaniem faktury do klienta.</div></div>` : ''}
 
-    <div id="fv-doc">
+    <div id="fv-doc" class="fv-doc">
       <div class="fv-head">
         <div>
           <img src="logo-waterai.png" alt="WaterAI" class="fv-logo" onerror="this.style.display='none'" />
