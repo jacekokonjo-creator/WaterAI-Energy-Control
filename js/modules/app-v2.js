@@ -445,7 +445,9 @@ function renderInvoicingModule() {
     const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
     const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber || '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber || '—')}${
+        inv.sourceType ? `<div style="font-size:11px;font-weight:400;color:var(--color-text-secondary);white-space:nowrap;">${(InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).icon || '📎'} ${escapeHtml(inv.sourceNumber || ('#' + inv.sourceId))}</div>` : ''
+      }</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
       <td style="padding:9px 12px;font-size:13px;">${typeInfo.icon} ${typeInfo.label}</td>
@@ -489,7 +491,12 @@ function renderInvoicingModule() {
       </div>
       <div class="calendar-form">
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
-        <div><label>Obiekt (opcjonalnie)</label><select id="inv-object"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
+        <div><label>Obiekt (opcjonalnie)</label><select id="inv-object" onchange="updateInvSources()"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
+        <div style="grid-column:1/-1;">
+          <label>Podstawa faktury — analiza / raport ESCO (opcjonalnie)</label>
+          <select id="inv-source" onchange="applyInvSource()"><option value="">— brak (faktura ręczna) —</option></select>
+          <div id="inv-source-hint" style="display:none;margin-top:8px;"></div>
+        </div>
         <div><label>Typ faktury</label><select id="inv-type">${Object.entries(InvoicingModule.TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}</select></div>
         <div><label>Numer faktury</label><input id="inv-number" placeholder="FV/2026/001" /></div>
         <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
@@ -532,6 +539,11 @@ function renderInvoicingModule() {
         </div>`
     }
   `;
+
+  // Formularz jest odtwarzany przy każdym renderze — lista podstaw też.
+  window._invEditId = null;
+  window._invSrc = null;
+  updateInvSources();
 }
 
 function updateInvObjects(clientId) {
@@ -540,6 +552,257 @@ function updateInvObjects(clientId) {
   const objects = ObjectsModule.findByClient(clientId);
   sel.innerHTML = `<option value="">— ogólnie —</option>` +
     objects.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+  updateInvSources();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PODSTAWA FAKTURY — analiza albo raport ESCO jako źródło podpowiedzi
+// ═══════════════════════════════════════════════════════════════════════════════
+// Zasada: wszystko, co tu wyliczone, trafia do formularza jako SUGESTIA (żółte tło).
+// Każde pole zostaje w pełni edytowalne, a ręczna zmiana wygrywa — pole dotknięte
+// przez użytkownika nie jest już nadpisywane przy kolejnej zmianie podstawy.
+
+function _invNum(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d == null ? 2 : d) : Number(v).toFixed(d == null ? 2 : d); }
+
+// Wskaźniki analizy — ta sama ścieżka co w raportach ESCO (_escoFreshRes):
+// regresja korzysta z zapisanych results, pozostałe typy przeliczają się na żywo
+// z inputParams, więc zmiana metodyki działa też dla analiz zapisanych wcześniej.
+function _invAnalMetrics(a) {
+  if (!a) return null;
+  const ip = a.inputParams || {};
+  const r = (typeof _escoFreshRes === 'function') ? (_escoFreshRes(a) || {}) : (a.results || {});
+  const share = (r.escoShare != null && r.escoShare !== '') ? Number(r.escoShare)
+              : (ip.escoShare != null && ip.escoShare !== '') ? Number(ip.escoShare) : null;
+  let esco = (r.escoAmount != null) ? Number(r.escoAmount) : null;
+  if (esco == null && r.savedMoney != null && share != null) esco = Number(r.savedMoney) * share / 100;
+  const per = (typeof _escoAnalPeriod === 'function') ? _escoAnalPeriod(a) : { from: '', to: '' };
+  return {
+    savedEnergy: r.savedEnergy != null ? Number(r.savedEnergy) : null,
+    savedMoney:  r.savedMoney  != null ? Number(r.savedMoney)  : null,
+    escoShare: share,
+    escoAmount: esco,
+    currency: ip.currency || 'PLN',
+    energyUnit: (typeof _normUnitA === 'function') ? _normUnitA(ip.energyUnit || '') : (ip.energyUnit || ''),
+    periodFrom: per.from || '',
+    periodTo: per.to || ''
+  };
+}
+
+// Wskaźniki raportu ESCO. Kwota udziału = suma udziałów z analiz raportu (tak samo
+// liczy to podgląd raportu), a dla raportu ZAMROŻONEGO bierzemy analizy z migawki,
+// żeby faktura zgadzała się co do grosza z podpisanym dokumentem.
+function _invEscoMetrics(rep) {
+  if (!rep) return null;
+  const res = rep.results || {};
+  const fz = (rep.frozen && Array.isArray(rep.frozen.analyses))
+    ? new Map(rep.frozen.analyses.map(a => [Number(a.id), a])) : null;
+  const find = id => fz ? (fz.get(Number(id)) || null) : AnalysesModule.find(id);
+  const anals = (rep.analysisIds || []).map(find).filter(Boolean);
+
+  let esco = null, money = null, energy = null;
+  const shares = [];
+  anals.forEach(a => {
+    const m = _invAnalMetrics(a); if (!m) return;
+    if (m.escoAmount != null) esco = (esco || 0) + m.escoAmount;
+    if (m.savedMoney != null) money = (money || 0) + m.savedMoney;
+    if (m.savedEnergy != null) energy = (energy || 0) + m.savedEnergy;
+    if (m.escoShare != null) shares.push(Number(m.escoShare));
+  });
+  const uniq = [...new Set(shares)];
+  const per = (typeof _escoRepPeriod === 'function') ? _escoRepPeriod(rep)
+            : { from: rep.periodFrom || '', to: rep.periodTo || '' };
+
+  return {
+    savedEnergy: (res.savedEnergyTotal != null && res.savedEnergyTotal !== 0) ? Number(res.savedEnergyTotal) : energy,
+    savedMoney:  money != null ? money : (res.savedMoneyTotal != null ? Number(res.savedMoneyTotal) : null),
+    escoShare: uniq.length === 1 ? uniq[0] : null,   // różne udziały w analizach → nie zgaduj
+    escoAmount: esco,
+    currency: res.currency || 'PLN',
+    energyUnit: (typeof _normUnitA === 'function') ? _normUnitA(res.energyUnit || '') : (res.energyUnit || ''),
+    periodFrom: per.from || '',
+    periodTo: per.to || ''
+  };
+}
+
+// Wartość listy: "ANALYSIS:<id>" albo "ESCO:<id>" → komplet danych do podpowiedzi.
+function invSourceMetrics(val) {
+  if (!val) return null;
+  const i = String(val).indexOf(':');
+  if (i < 0) return null;
+  const kind = String(val).slice(0, i), id = String(val).slice(i + 1);
+
+  if (kind === 'ANALYSIS') {
+    const a = (typeof AnalysesModule !== 'undefined') ? AnalysesModule.find(id) : null;
+    if (!a) return null;
+    const type = (AnalysesModule.TYPES[a.analysisType] || {});
+    return Object.assign(_invAnalMetrics(a), {
+      sourceType: 'ANALYSIS', sourceId: Number(a.id),
+      clientId: a.clientId, objectId: a.objectId,
+      number: (AnalysesModule.getNumber ? AnalysesModule.getNumber(a.id) : null) || ('#' + a.id),
+      title: a.name || type.label || 'Analiza'
+    });
+  }
+  if (kind === 'ESCO') {
+    const rep = (typeof EscoReportsModule !== 'undefined')
+      ? EscoReportsModule.getAll().find(r => String(r.id) === id) : null;
+    if (!rep) return null;
+    return Object.assign(_invEscoMetrics(rep), {
+      sourceType: 'ESCO_REPORT', sourceId: rep.id,
+      clientId: rep.clientId, objectId: rep.objectId,
+      number: rep.reportNumber || ('#' + rep.id),
+      title: 'Raport ESCO' + (rep.frozen ? ' (zamrożony)' : '')
+    });
+  }
+  return null;
+}
+
+// Lista podstaw dla wybranego klienta (i obiektu, jeśli wskazany).
+function updateInvSources() {
+  const sel = document.getElementById('inv-source');
+  if (!sel) return;
+  const clientId = (document.getElementById('inv-client') || {}).value || '';
+  const objectId = (document.getElementById('inv-object') || {}).value || '';
+  const keep = sel.value;
+
+  const match = x => String(x.clientId) === String(clientId) &&
+                     (!objectId || String(x.objectId) === String(objectId));
+
+  const reports = ((typeof EscoReportsModule !== 'undefined') ? EscoReportsModule.getAll() : [])
+    .filter(match)
+    .sort((a, b) => String(b.reportDate || '').localeCompare(String(a.reportDate || '')));
+  const analyses = ((typeof AnalysesModule !== 'undefined') ? AnalysesModule.getAll() : [])
+    .filter(match)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+
+  const per = (f, t) => [f, t].filter(Boolean).map(d => fmtDate(d)).join(' – ');
+
+  const repOpts = reports.map(r =>
+    `<option value="ESCO:${escapeHtml(String(r.id))}">⚡ ${escapeHtml(r.reportNumber || ('Raport ' + r.id))}${per(r.periodFrom, r.periodTo) ? ' · ' + per(r.periodFrom, r.periodTo) : ''}</option>`
+  ).join('');
+
+  const anOpts = analyses.map(a => {
+    const t = (AnalysesModule.TYPES[a.analysisType] || {});
+    const n = (AnalysesModule.getNumber ? AnalysesModule.getNumber(a.id) : null) || ('#' + a.id);
+    return `<option value="ANALYSIS:${a.id}">${t.icon || '📊'} ${escapeHtml(n)} · ${escapeHtml(a.name || t.label || '')}</option>`;
+  }).join('');
+
+  sel.innerHTML = `<option value="">— brak (faktura ręczna) —</option>` +
+    (repOpts ? `<optgroup label="Raporty ESCO">${repOpts}</optgroup>` : '') +
+    (anOpts ? `<optgroup label="Analizy">${anOpts}</optgroup>` : '');
+
+  if (keep && sel.querySelector(`option[value="${keep}"]`)) {
+    sel.value = keep;
+  } else if (keep) {                     // podstawa wypadła z listy po zmianie klienta/obiektu
+    sel.value = '';
+    window._invSrc = null;
+    _invRenderSourceHint(null);
+  }
+}
+
+// Wpisanie sugestii do pola. Pole dotknięte ręcznie zostaje nietknięte.
+function _invSuggest(el, value) {
+  if (!el || value == null || value === '') return;
+  if (el.dataset.invTouched === '1') return;
+  const v = String(value);
+  if (el.tagName === 'SELECT' && !el.querySelector(`option[value="${v}"]`)) {
+    el.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`);
+  }
+  el.value = v;
+  el.dataset.invSug = '1';
+  el.style.background = '#FEF3DC';
+  el.style.borderColor = '#F4D4A0';
+  if (!el._invHooked) {
+    el._invHooked = true;
+    ['input', 'change'].forEach(ev => el.addEventListener(ev, () => {
+      el.dataset.invTouched = '1';
+      delete el.dataset.invSug;
+      el.style.background = '';
+      el.style.borderColor = '';
+    }));
+  }
+}
+
+function _invNoteFrom(m) {
+  const per = [m.periodFrom, m.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ');
+  let s = (m.sourceType === 'ESCO_REPORT' ? 'Rozliczenie ESCO na podstawie raportu ' : 'Rozliczenie na podstawie analizy ') + (m.number || '');
+  if (per) s += ' za okres ' + per;
+  const det = [];
+  if (m.savedEnergy != null) det.push('oszczędność energii ' + _invNum(m.savedEnergy) + (m.energyUnit ? ' ' + m.energyUnit : ''));
+  if (m.savedMoney != null) det.push('oszczędność kosztu ' + _invNum(m.savedMoney) + (m.currency ? ' ' + m.currency : ''));
+  if (m.escoShare != null) det.push('udział WaterAI/ESCO ' + _invNum(m.escoShare, 1) + '%');
+  return s + (det.length ? '. ' + det.join(', ') : '') + '.';
+}
+
+// Panel „skąd się wzięły te liczby" pod listą podstaw.
+function _invRenderSourceHint(m) {
+  const box = document.getElementById('inv-source-hint');
+  if (!box) return;
+  if (!m) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const per = [m.periodFrom, m.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ') || '—';
+  const cell = (k, v) => `<div><span style="display:block;font-size:10px;color:var(--color-text-secondary);">${k}</span><strong style="font-size:13px;">${v}</strong></div>`;
+
+  const dup = (InvoicingModule.findBySource ? InvoicingModule.findBySource(m.sourceType, m.sourceId) : [])
+    .filter(i => String(i.id) !== String(window._invEditId || ''));
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="border:1px solid #F4D4A0;background:#FEF9EF;border-radius:10px;padding:12px 14px;">
+      <div style="font-size:11px;font-weight:600;color:#7A4A00;margin-bottom:8px;">
+        PODPOWIEDŹ Z: ${escapeHtml((InvoicingModule.SOURCE_TYPES[m.sourceType] || {}).label || '')} ${escapeHtml(m.number || '')} — ${escapeHtml(m.title || '')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+        ${cell('Okres', escapeHtml(per))}
+        ${cell('Oszczędność energii', m.savedEnergy != null ? _invNum(m.savedEnergy) + ' ' + escapeHtml(m.energyUnit || '') : '—')}
+        ${cell('Oszczędność kosztu', m.savedMoney != null ? _invNum(m.savedMoney) + ' ' + escapeHtml(m.currency || '') : '—')}
+        ${cell('Udział WaterAI/ESCO', m.escoShare != null ? _invNum(m.escoShare, 1) + '%' : '—')}
+        ${cell('Sugerowane netto', m.escoAmount != null ? '<span style="color:#7A4A00;">' + _invNum(m.escoAmount) + ' ' + escapeHtml(m.currency || '') + '</span>' : '—')}
+      </div>
+      <div style="font-size:11px;color:var(--color-text-secondary);margin-top:8px;">
+        Pola na żółtym tle są podpowiedziami — możesz je swobodnie nadpisać, zapisana zostanie Twoja wartość.
+      </div>
+      ${m.escoAmount == null ? `<div style="font-size:12px;color:#7A4A00;margin-top:6px;">⚠ Ta podstawa nie ma policzonej kwoty udziału ESCO${m.escoShare == null && m.sourceType === 'ESCO_REPORT' ? ' (analizy w raporcie mają różne udziały)' : ''} — wpisz kwotę netto ręcznie.</div>` : ''}
+      ${dup.length ? `<div style="font-size:12px;color:#c00;margin-top:6px;">⚠ Z tej podstawy wystawiono już ${dup.length === 1 ? 'fakturę' : 'faktury'}: ${dup.map(i => escapeHtml(i.invoiceNumber || ('#' + i.id))).join(', ')}.</div>` : ''}
+    </div>`;
+}
+
+// Zmiana podstawy → przelicz i wstaw sugestie.
+function applyInvSource() {
+  const sel = document.getElementById('inv-source');
+  if (!sel) return;
+  const m = invSourceMetrics(sel.value);
+  window._invSrc = m;
+  _invRenderSourceHint(m);
+  if (!m) return;
+
+  // Obiekt podpowiadamy tylko wtedy, gdy naprawdę jest na liście (obiekt mógł zostać usunięty).
+  const objSel = document.getElementById('inv-object');
+  if (objSel && !objSel.value && m.objectId && objSel.querySelector(`option[value="${m.objectId}"]`)) {
+    _invSuggest(objSel, m.objectId);
+  }
+
+  if (m.escoAmount != null) _invSuggest(document.getElementById('inv-net'), m.escoAmount.toFixed(2));
+  _invSuggest(document.getElementById('inv-currency'), m.currency);
+  _invSuggest(document.getElementById('inv-type'), 'ESCO_SETTLEMENT');
+  _invSuggest(document.getElementById('inv-notes'), _invNoteFrom(m));
+}
+
+// Migawka podstawy do zapisu na fakturze (liczona zawsze na moment zapisu).
+function _invSourcePayload() {
+  const sel = document.getElementById('inv-source');
+  const m = invSourceMetrics(sel ? sel.value : '');
+  if (!m) return { sourceType: null, sourceId: null, sourceNumber: '', periodFrom: '', periodTo: '', energyUnit: '' };
+  return {
+    sourceType: m.sourceType,
+    sourceId: m.sourceId,
+    sourceNumber: m.number || '',
+    periodFrom: m.periodFrom || '',
+    periodTo: m.periodTo || '',
+    energyUnit: m.energyUnit || '',
+    savedEnergy: m.savedEnergy != null ? m.savedEnergy : 0,
+    savedMoney: m.savedMoney != null ? m.savedMoney : 0,
+    escoShare: m.escoShare != null ? m.escoShare : 50
+  };
 }
 
 function saveInvoice() {
@@ -553,7 +816,7 @@ function saveInvoice() {
   const dueDate = document.getElementById('inv-due-date').value;
   const objectId = document.getElementById('inv-object').value || null;
 
-  InvoicingModule.add({
+  InvoicingModule.add(Object.assign(_invSourcePayload(), {
     clientId,
     objectId,
     invoiceNumber: numberEl.value.trim() || undefined,
@@ -565,7 +828,7 @@ function saveInvoice() {
     currency: document.getElementById('inv-currency').value,
     status: document.getElementById('inv-status').value,
     notes: document.getElementById('inv-notes').value.trim()
-  });
+  }));
 
   // Sync: create PAYMENT_DUE calendar event for the invoice due date
   if (dueDate) {
@@ -622,6 +885,21 @@ function viewInvoice(id) {
           <span style="color:var(--color-text-secondary);font-size:11px;display:block;">Brutto</span>
           <strong style="font-size:18px;">${fmtMoney(inv.grossAmount, inv.currency)}</strong>
         </div>
+        ${inv.sourceType ? (() => {
+          const st = InvoicingModule.SOURCE_TYPES[inv.sourceType] || { label: inv.sourceType, icon: '📎' };
+          const per = [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ');
+          const row = (k, v) => `<div><span style="color:var(--color-text-secondary);font-size:11px;display:block;">${k}</span><strong>${v}</strong></div>`;
+          return `<div style="grid-column:1/-1;border-top:1px solid var(--color-border-tertiary);padding-top:12px;margin-top:4px;">
+            <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;">PODSTAWA FAKTURY</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+              ${row(st.icon + ' ' + st.label, escapeHtml(inv.sourceNumber || ('#' + inv.sourceId)))}
+              ${per ? row('Okres', escapeHtml(per)) : ''}
+              ${inv.savedEnergy ? row('Oszczędność energii', _invNum(inv.savedEnergy) + ' ' + escapeHtml(inv.energyUnit || '')) : ''}
+              ${inv.savedMoney ? row('Oszczędność kosztu', _invNum(inv.savedMoney) + ' ' + escapeHtml(inv.currency || '')) : ''}
+              ${inv.escoShare != null ? row('Udział WaterAI/ESCO', _invNum(inv.escoShare, 1) + '%') : ''}
+            </div>
+          </div>`;
+        })() : ''}
         ${inv.notes ? `<div style="grid-column:1/-1;"><span style="color:var(--color-text-secondary);font-size:11px;display:block;">Uwagi</span>${escapeHtml(inv.notes)}</div>` : ''}
       </div>
       <div style="display:flex;gap:8px;margin-top:20px;">
@@ -642,9 +920,23 @@ function editInvoice(id) {
     form.querySelector('h4').textContent = 'Edytuj fakturę';
     const btn = form.querySelector('button[onclick="saveInvoice()"]');
     if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveInvoiceEdit(${id})`); }
+    window._invEditId = id;
     document.getElementById('inv-client').value = inv.clientId || '';
     updateInvObjects(inv.clientId);
-    setTimeout(() => { if (document.getElementById('inv-object')) document.getElementById('inv-object').value = inv.objectId || ''; }, 50);
+    setTimeout(() => {
+      if (document.getElementById('inv-object')) document.getElementById('inv-object').value = inv.objectId || '';
+      // Podstawa: odtwórz wybór bez nadpisywania zapisanych kwot (to już nie jest sugestia).
+      const srcSel = document.getElementById('inv-source');
+      if (srcSel && inv.sourceType) {
+        const val = (inv.sourceType === 'ESCO_REPORT' ? 'ESCO:' : 'ANALYSIS:') + inv.sourceId;
+        updateInvSources();
+        if (srcSel.querySelector(`option[value="${val}"]`)) {
+          srcSel.value = val;
+          window._invSrc = invSourceMetrics(val);
+          _invRenderSourceHint(window._invSrc);
+        }
+      }
+    }, 50);
     document.getElementById('inv-number').value = inv.invoiceNumber || '';
     document.getElementById('inv-type').value = inv.invoiceType || 'INVOICE';
     document.getElementById('inv-issue-date').value = inv.issueDate || '';
@@ -663,7 +955,7 @@ function saveInvoiceEdit(id) {
   if (!net) { alert('Podaj kwotę netto.'); return; }
   const vatRate = Number(document.getElementById('inv-vat').value || 23);
   const vatAmount = net * vatRate / 100;
-  InvoicingModule.update(id, {
+  InvoicingModule.update(id, Object.assign(_invSourcePayload(), {
     clientId: document.getElementById('inv-client').value,
     objectId: document.getElementById('inv-object').value || null,
     invoiceNumber: document.getElementById('inv-number').value.trim(),
@@ -674,7 +966,7 @@ function saveInvoiceEdit(id) {
     currency: document.getElementById('inv-currency').value,
     status: document.getElementById('inv-status').value,
     notes: document.getElementById('inv-notes').value.trim()
-  });
+  }));
   renderInvoicingModule();
 }
 
