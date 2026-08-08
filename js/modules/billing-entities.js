@@ -1,9 +1,30 @@
 // WaterAI Energy Control
-// Billing Entities Module v1.0.0
-// Podmioty (firmy) wystawiające faktury — kilka spółek w różnych krajach.
+// Billing Entities Module v2.0.0 — podmioty (firmy) wystawiające faktury.
+// v2.0.0 (2026-08-08): przejście na wspólny mostek Supabase (tabela `billing_entities`,
+// polityka RLS `p_be_int` — czytają role wewnętrzne, zapisuje admin i Back Office).
+// Tabela istnieje od schema.sql, więc ta zmiana NIE wymaga uruchamiania SQL-a.
+// Dane sprzedawcy (NIP, adres, konto) były dotąd per przeglądarka — teraz są wspólne,
+// więc faktura wydrukowana na dowolnym komputerze ma komplet danych.
 // Dostęp do danych zawsze przez ten moduł (nie bezpośrednio do localStorage).
 
+// TRYB AWARYJNY: bez WaterAIBridge moduł działa po staremu na localStorage.
+const _billingStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
+  ? WaterAIBridge.makeStore({
+      table: 'billing_entities',
+      storageKey: 'waterai_billing_entities_v1',
+      label: 'podmiotów wystawiających'
+    })
+  : (console.warn('[billing-entities] Brak WaterAIBridge — tryb lokalny.'), {
+      storageKey: 'waterai_billing_entities_v1',
+      async load() {},
+      getAll() { return JSON.parse(localStorage.getItem(this.storageKey) || '[]'); },
+      saveAll(items) { localStorage.setItem(this.storageKey, JSON.stringify(items)); },
+      legacyIdForRow() { return null; }
+    });
+
 const BillingEntitiesModule = {
+  ..._billingStore,
+
   storageKey: 'waterai_billing_entities_v1',
 
   // Domyślne ustawienia per kraj. To TYLKO wartości startowe — wszystko edytowalne.
@@ -15,14 +36,6 @@ const BillingEntitiesModule = {
     DE: { name: 'Niemcy',      flag: '🇩🇪', currency: 'EUR', vat: 19, taxNoLabel: 'Steuernummer',   vatIdLabel: 'USt-IdNr (DE…)' },
     AT: { name: 'Austria',     flag: '🇦🇹', currency: 'EUR', vat: 20, taxNoLabel: 'Firmenbuchnr.',  vatIdLabel: 'UID (ATU…)' },
     GB: { name: 'Anglia (UK)', flag: '🇬🇧', currency: 'GBP', vat: 20, taxNoLabel: 'Company No.',    vatIdLabel: 'VAT Reg. No. (GB…)' }
-  },
-
-  getAll() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-
-  saveAll(items) {
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
   },
 
   add(e) {
