@@ -101,25 +101,75 @@ const BillingEntitiesModule = {
 
   // Tworzy 6 podmiotów startowych (po jednym na kraj) — TYLKO gdy lista jest pusta.
   // Dane rejestrowe (NIP/IČO, adres, konto) celowo puste — do uzupełnienia w panelu.
-  seedDefaults() {
-    if (this.getAll().length) return;
-    const order = ['PL', 'SK', 'CZ', 'DE', 'AT', 'GB'];
+  // Trzy spółki WaterAI — dane rejestrowe przekazane 2026-08-08.
+  // Idempotentne: pomija spółki, które już są na liście (dopasowanie po nazwie).
+  // numberPrefix celowo pusty → wszystkie używają formatu FV/rok/miesiąc/nr.
+  // Ustaw prefiks (np. FV-SK), jeśli któraś spółka ma mieć własną serię numerów.
+  WATERAI_COMPANIES: [
+    {
+      name: 'Water AI P.S.A.',
+      country: 'PL',
+      addressLine: 'ul. Szczęsna 26',
+      postalCity: '02-454 Warszawa',
+      taxNo: '5213935935',
+      vatId: 'PL5213935935',
+      defaultCurrency: 'PLN',
+      defaultVatRate: 23,
+      footerNote: 'REGON: 38964342300000, KRS: 0000913254',
+      isDefault: true
+    },
+    {
+      name: 'Water AI s.r.o. (SK)',
+      country: 'SK',
+      addressLine: 'ul. Zamocka 22',
+      postalCity: '811-01 Bratislava',
+      taxNo: '57018804 (IČO), 2122537890 (DIČ)',
+      vatId: '',
+      bankName: 'Československá obchodná banka, a.s., Michalská 18, 815 63 Bratislava',
+      iban: 'SK57 7500 0000 0040 3516 7204',
+      swift: 'CEKOSKBX',
+      defaultCurrency: 'EUR',
+      defaultVatRate: 23,
+      footerNote: 'Obchodný register Okresného súdu Bratislava I, oddiel: Sro, vložka č.: 188857/B'
+    },
+    {
+      name: 'Water AI s.r.o. (CZ)',
+      country: 'CZ',
+      addressLine: 'ul. Ovocný trh 1096/1',
+      postalCity: '110 00 Praha 1',
+      taxNo: '19226799',
+      vatId: '',
+      bankName: 'MONETA Money Bank, Netroufalky 770/16, Brno',
+      iban: 'CZ46 0600 0000 0002 7591 7918',
+      swift: 'AGBACZPP',
+      defaultCurrency: 'CZK',
+      defaultVatRate: 21,
+      footerNote: 'Zapsáno v obchodním rejstříku pod spis. zn. C 383346 vedená u Městského soudu v Praze · č. účtu CZK: 275917918/0600'
+    }
+  ],
+
+  // Zwraca liczbę faktycznie dodanych spółek (pominięte = już były).
+  seedWaterAI() {
+    const existing = this.getAll();
+    const has = name => existing.some(e => String(e.name || '').trim().toLowerCase() === name.trim().toLowerCase());
     const now = new Date().toISOString();
-    const seed = order.map((code, i) => {
-      const c = this.COUNTRIES[code];
-      const n = this._normalize({
-        name: `WaterAI ${c.name}`,
-        country: code,
-        defaultCurrency: c.currency,
-        defaultVatRate: c.vat,
-        numberPrefix: `FV-${code}`,
-        isDefault: code === 'PL'
-      });
+    const anyDefault = existing.some(e => e.isDefault);
+
+    let added = 0;
+    this.WATERAI_COMPANIES.forEach((c, i) => {
+      if (has(c.name)) return;
+      const n = this._normalize(Object.assign({}, c, {
+        // Nie odbieramy gwiazdki podmiotowi, który już jest domyślny.
+        isDefault: c.isDefault && !anyDefault
+      }));
       n.id = Date.now() + i;
       n.createdAt = now;
-      return n;
+      existing.push(n);
+      added++;
     });
-    this.saveAll(seed);
+
+    if (added) this.saveAll(existing);
+    return added;
   }
 };
 
