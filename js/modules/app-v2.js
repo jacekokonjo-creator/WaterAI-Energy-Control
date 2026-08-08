@@ -1106,7 +1106,7 @@ function renderBillingEntities() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
       <button class="small-button" onclick="window._beEditId=null;renderInvoicingModule();">← Lista faktur</button>
       <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="beNew()">+ Dodaj podmiot</button>
-      ${all.length === 0 ? `<button class="small-button" onclick="beSeed()">Utwórz 6 podmiotów startowych (PL/SK/CZ/DE/AT/UK)</button>` : ''}
+      <button class="small-button" onclick="beSeed()" title="Wstawia gotowe dane rejestrowe trzech spółek WaterAI">🏢 Dodaj spółki WaterAI (PL / SK / CZ)</button>
     </div>
 
     <div class="reminder-card" style="margin-bottom:16px;">
@@ -1163,9 +1163,13 @@ function beNew() { window._beEditId = null; window._beNew = true; renderBillingE
 function beEdit(id) { window._beEditId = id; window._beNew = false; renderBillingEntities(); }
 
 function beSeed() {
-  if (!confirm('Utworzyć 6 podmiotów startowych (po jednym na kraj)?\n\nNazwy będą placeholderami, a dane rejestrowe (NIP, adres, konto) trzeba uzupełnić ręcznie.')) return;
-  BillingEntitiesModule.seedDefaults();
+  const names = BillingEntitiesModule.WATERAI_COMPANIES.map(c => '· ' + c.name).join('\n');
+  if (!confirm('Dodać spółki WaterAI z danymi rejestrowymi?\n\n' + names +
+               '\n\nSpółki już obecne na liście zostaną pominięte.')) return;
+  const added = BillingEntitiesModule.seedWaterAI();
   renderBillingEntities();
+  alert(added ? ('Dodano: ' + added + '. Sprawdź dane przed pierwszą fakturą.')
+              : 'Nic nie dodano — te spółki są już na liście.');
 }
 
 function beSetDefault(id) {
