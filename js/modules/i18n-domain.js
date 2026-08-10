@@ -5667,6 +5667,11 @@
       acceptNode: function (n) {
         const p = n.parentNode && n.parentNode.nodeName;
         if (p === 'SCRIPT' || p === 'STYLE') return NodeFilter.FILTER_REJECT;
+        // Poddrzewo z data-i18n-skip tłumaczy się samo, we własnym języku — używa tego
+        // wydruk faktury, który idzie w języku spółki wystawiającej, a nie interfejsu.
+        for (let el = n.parentNode; el && el.nodeType === 1; el = el.parentElement) {
+          if (el.hasAttribute && el.hasAttribute('data-i18n-skip')) return NodeFilter.FILTER_REJECT;
+        }
         return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       }
     });
@@ -5677,6 +5682,7 @@
     }
     if (root.querySelectorAll) {
       root.querySelectorAll('[placeholder],[title],input[type=button],input[type=submit]').forEach(el => {
+        if (el.closest && el.closest('[data-i18n-skip]')) return;
         ATTRS.forEach(a => {
           const v = el.getAttribute && el.getAttribute(a);
           if (v) { const t = translateString(v); if (t !== v) el.setAttribute(a, t); }
