@@ -505,7 +505,11 @@ function renderInvoicingModule() {
       <div class="calendar-form">
         <div style="grid-column:1/-1;"><label>Podmiot wystawiający (sprzedawca)</label><select id="inv-issuer" onchange="applyInvIssuer()">${issuerOptions}</select>${
           entities.length < BillingEntitiesModule.GROUP_COMPANIES.length
-            ? `<div style="font-size:11px;color:#7A4A00;margin-top:4px;">Na liście ${entities.length} z ${BillingEntitiesModule.GROUP_COMPANIES.length} spółek grupy — uzupełnij w <b>⚙ Podmioty</b>.</div>` : ''
+            ? `<div style="font-size:11px;color:#7A4A00;margin-top:4px;">Na liście ${entities.length} z ${BillingEntitiesModule.GROUP_COMPANIES.length} spółek grupy — brakuje: ${
+                BillingEntitiesModule.GROUP_COMPANIES
+                  .filter(g => !entities.some(e => String(e.name || '').trim().toLowerCase() === g.name.trim().toLowerCase()))
+                  .map(g => escapeHtml(g.name)).join(', ')
+              }. <button class="small-button" style="font-size:11px;padding:3px 8px;margin-left:4px;" onclick="beSeed('invoices')">🏢 Dodaj brakujące</button></div>` : ''
         }</div>
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
         <div><label>Obiekt (opcjonalnie)</label><select id="inv-object" onchange="updateInvSources()"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
@@ -1195,7 +1199,10 @@ function beCountryChanged() {
 function beNew() { window._beEditId = null; window._beNew = true; renderBillingEntities(); }
 function beEdit(id) { window._beEditId = id; window._beNew = false; renderBillingEntities(); }
 
-function beSeed() {
+// backTo: 'invoices' — wywołanie z formularza faktury; po zasianiu wracamy tam,
+// żeby lista „Podmiot wystawiający" odświeżyła się bez opuszczania faktury.
+function beSeed(backTo) {
+  const _rerender = () => (backTo === 'invoices' ? renderInvoicingModule() : renderBillingEntities());
   const all = BillingEntitiesModule.GROUP_COMPANIES;
   const before = BillingEntitiesModule.getAll().map(e => String(e.name || '').trim().toLowerCase());
   const brakuje = all.filter(c => before.indexOf(c.name.trim().toLowerCase()) < 0);
@@ -1204,7 +1211,7 @@ function beSeed() {
   if (!confirm('Dodać brakujące spółki grupy?\n\n' + brakuje.map(c => '· ' + c.name).join('\n'))) return;
 
   BillingEntitiesModule.seedCompanies();
-  renderBillingEntities();
+  _rerender();
 
   // Weryfikacja PO zapisie — nie ufamy licznikowi, sprawdzamy stan faktyczny.
   const po = BillingEntitiesModule.getAll().map(e => String(e.name || '').trim().toLowerCase());
