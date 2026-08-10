@@ -108,6 +108,7 @@
       ['f', 'miliarda', 'miliardy', 'miliárd']],
     skipOne: true,
     glue: '',            // dvadsaťjeden — bez spacji wewnątrz grupy setek
+    thousandWord: 'tisíc',
     // W liczebnikach złożonych słowacki nie odmienia „dva" wg rodzaju
     // („dvadsaťdva eur", nie „dvadsaťdve eur") — zgoda tylko przy czystym 1 i 2.
     compoundAgrees: false,
@@ -285,6 +286,44 @@
     return s;
   }
 
+  // ── Słowacki: sklejanie liczebnika w jedno słowo do miliona ──
+  // Pravidlá slovenského pravopisu każą pisać liczebnik łącznie:
+  // „tisícdva", „dvetisíc", „dvestotridsaťštyritisícpäťstošesťdesiatsedem".
+  // Miliony i miliardy zostają osobno i odmieniają się jak rzeczowniki.
+  // W formie sklejonej „tisíc" nie przybiera liczby mnogiej: dvetisíc, päťtisíc.
+  // Rodzaj wpływa na liczebnik TYLKO gdy liczba to czyste 1 albo 2. W złożeniach
+  // słowacki trzyma formę męską: „dvetisíc" (2 tisíc), ale „dvadsaťdvatisíc" (22).
+  function skGender(n, gender) { return (n === 1 || n === 2) ? (gender || 'm') : 'm'; }
+
+  function wordsSk(n, gender) {
+    if (n === 0) return SK.zero;
+    const mld = Math.floor(n / 1e9), mln = Math.floor((n % 1e9) / 1e6), low = n % 1e6;
+    const out = [];
+    if (mld) {
+      const g = SK.groups[3];
+      out.push(mld === 1 ? g[1]
+        : skBelowMillion(mld, skGender(mld, g[0])) + ' ' + slavPluralStrict(mld, g[1], g[2], g[3]));
+    }
+    if (mln) {
+      const g = SK.groups[2];
+      out.push(mln === 1 ? g[1]
+        : skBelowMillion(mln, skGender(mln, g[0])) + ' ' + slavPluralStrict(mln, g[1], g[2], g[3]));
+    }
+    if (low) out.push(skBelowMillion(low, skGender(low, gender)));
+    return out.join(' ').trim();
+  }
+
+  function skBelowMillion(n, gender) {
+    const th = Math.floor(n / 1000), rest = n % 1000;
+    let s = '';
+    // „tisíc", nie „jedentisíc"; wyżej liczebnik przykleja się wprost.
+    // tisíc jest rodzaju męskiego, ale skodyfikowana forma to „dvetisíc" —
+    // stąd rodzaj nijaki wyłącznie dla czystej dwójki.
+    if (th) s += (th === 1 ? '' : words3(SK, th, th === 2 ? 'n' : 'm', false)) + SK.thousandWord;
+    if (rest) s += words3(SK, rest, gender, false);
+    return s;
+  }
+
   // ── Hiszpański ──
   // `gHund` uzgadnia setki z liczonym rzeczownikiem (doscientas coronas),
   // `gUnit` — samo „uno" (un euro / una corona). Rozdzielone, bo w tysiącach
@@ -386,6 +425,7 @@
     if (!isFinite(n) || n > 999999999999) return String(n);
     if (l === 'de') return wordsDe(n, gender);
     if (l === 'es') return wordsEs(n, gender);
+    if (l === 'sk') return wordsSk(n, gender);
     if (l === 'en') return wordsSlavEn(EN, n, '');
     return wordsSlavEn(SLAV[l] || PL, n, gender);
   }

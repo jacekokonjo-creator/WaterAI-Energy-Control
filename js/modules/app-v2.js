@@ -6,16 +6,26 @@
 // POMOCNICZE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function fmtDate(d) {
+// `lang` podaje się tam, gdzie format ma iść za JĘZYKIEM DOKUMENTU, a nie
+// interfejsu — czyli na wydruku faktury. Bez tego słowacka faktura oglądana
+// w polskim interfejsie dostawała polski format daty i separator dziesiętny.
+function fmtDate(d, lang) {
   if (!d) return '—';
-  if (typeof _waDate === 'function') return _waDate(d);
+  if (typeof _waDate === 'function') return _waDate(d, lang);
   const parts = String(d).split('-');
   if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
   return d;
 }
 
-function fmtMoney(v, cur) {
-  return Number(v || 0).toFixed(2) + ' ' + (cur || 'PLN');
+// Separator dziesiętny wg języka: „0,00 PLN" po polsku, „0.00 PLN" po angielsku.
+// Wcześniej toFixed(2) dawał kropkę we wszystkich językach.
+function fmtMoney(v, cur, lang) {
+  const n = Number(v || 0);
+  let s;
+  try {
+    s = n.toLocaleString(_waLocale(lang), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch (e) { s = n.toFixed(2); }
+  return s + ' ' + (cur || 'PLN');
 }
 
 function statusBadge(label, color, bg) {
@@ -641,7 +651,7 @@ function updateInvObjects(clientId) {
 // Każde pole zostaje w pełni edytowalne, a ręczna zmiana wygrywa — pole dotknięte
 // przez użytkownika nie jest już nadpisywane przy kolejnej zmianie podstawy.
 
-function _invNum(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d == null ? 2 : d) : Number(v).toFixed(d == null ? 2 : d); }
+function _invNum(v, d, lang) { return (typeof _fmtA === 'function') ? _fmtA(v, d == null ? 2 : d, lang) : Number(v).toFixed(d == null ? 2 : d); }
 
 // Wskaźniki analizy — ta sama ścieżka co w raportach ESCO (_escoFreshRes):
 // regresja korzysta z zapisanych results, pozostałe typy przeliczają się na żywo
@@ -1557,7 +1567,8 @@ function printInvoiceDoc(id) {
   const dl = _fvDocLang(iss);                       // język dokumentu = język spółki
   const t = (x) => _fvT(x, dl);
   const typeLabel = t((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Faktura').toUpperCase();
-  const m = (v) => _invNum(v) + ' ' + cur;
+  const m = (v) => _invNum(v, 2, dl) + ' ' + cur;      // liczby w języku dokumentu
+  const fd = (d) => fmtDate(d, dl);                    // daty również
   const e = (v) => escapeHtml(String(v == null ? '' : v));
 
   // Data sprzedaży = koniec okresu z podstawy, a gdy go nie ma — data wystawienia.
@@ -1579,7 +1590,7 @@ function printInvoiceDoc(id) {
 
   const itemName = inv.sourceType
     ? t((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || '') + ' ' + (inv.sourceNumber || '') +
-      ([inv.periodFrom, inv.periodTo].filter(Boolean).length ? ' — ' + t('okres') + ' ' + [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ') : '')
+      ([inv.periodFrom, inv.periodTo].filter(Boolean).length ? ' — ' + t('okres') + ' ' + [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fd(d)).join(' – ') : '')
     : t((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Usługa') + (obj ? ' — ' + obj.name : '');
 
   const missing = [];
@@ -1609,9 +1620,9 @@ function printInvoiceDoc(id) {
       </div>
 
       <div class="fv-dates">
-        <div><span>${t('Data wystawienia')}</span><strong>${fmtDate(inv.issueDate)}</strong></div>
-        <div><span>${t('Data sprzedaży')}</span><strong>${fmtDate(saleDate)}</strong></div>
-        <div><span>${t('Termin płatności')}</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+        <div><span>${t('Data wystawienia')}</span><strong>${fd(inv.issueDate)}</strong></div>
+        <div><span>${t('Data sprzedaży')}</span><strong>${fd(saleDate)}</strong></div>
+        <div><span>${t('Termin płatności')}</span><strong>${fd(inv.dueDate)}</strong></div>
         <div><span>${t('Sposób zapłaty')}</span><strong>${t('Przelew')}</strong></div>
       </div>
 
@@ -1672,7 +1683,7 @@ function printInvoiceDoc(id) {
           ${iss.bankName ? `<div><span>${t('Bank')}</span><strong>${e(iss.bankName)}</strong></div>` : ''}
           ${iss.iban ? `<div style="grid-column:span 2;"><span>${t('Numer konta / IBAN')}</span><strong>${e(iss.iban)}</strong></div>` : ''}
           ${iss.swift ? `<div><span>${t('SWIFT / BIC')}</span><strong>${e(iss.swift)}</strong></div>` : ''}
-          <div><span>${t('Termin')}</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+          <div><span>${t('Termin')}</span><strong>${fd(inv.dueDate)}</strong></div>
           <div><span>${t('Tytułem')}</span><strong>${e(inv.invoiceNumber || '')}</strong></div>
         </div>
       </div>` : ''}
@@ -1682,7 +1693,7 @@ function printInvoiceDoc(id) {
         <div class="lbl">${t('Podstawa rozliczenia')}</div>
         <div class="fv-grid">
           <div><span>${e(t((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || 'Podstawa'))}</span><strong>${e(inv.sourceNumber || ('#' + inv.sourceId))}</strong></div>
-          ${[inv.periodFrom, inv.periodTo].filter(Boolean).length ? `<div><span>${t('Okres')}</span><strong>${e([inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – '))}</strong></div>` : ''}
+          ${[inv.periodFrom, inv.periodTo].filter(Boolean).length ? `<div><span>${t('Okres')}</span><strong>${e([inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fd(d)).join(' – '))}</strong></div>` : ''}
           ${inv.savedEnergy ? `<div><span>${t('Oszczędność energii')}</span><strong>${_invNum(inv.savedEnergy)} ${e(inv.energyUnit || '')}</strong></div>` : ''}
           ${inv.savedMoney ? `<div><span>${t('Oszczędność kosztu')}</span><strong>${_invNum(inv.savedMoney)} ${e(cur)}</strong></div>` : ''}
           ${inv.escoShare != null ? `<div><span>${t('Udział WaterAI/ESCO')}</span><strong>${_invNum(inv.escoShare, 1)}%</strong></div>` : ''}
@@ -1997,20 +2008,22 @@ function saveCalendarEvent() {
 
 const _escA = (typeof escapeHtml === 'function') ? escapeHtml : (v => String(v == null ? '' : v));
 const _fmtDateA = (typeof fmtDate === 'function') ? fmtDate : (d => d || '—');
-function _waLocale() {
+function _waLocale(lang) {
   var m = { pl:'pl-PL', en:'en-GB', de:'de-DE', cs:'cs-CZ', sk:'sk-SK', es:'es-ES', at:'de-AT' };
-  var l;
-  try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
-  catch (e) { l = 'pl'; }
+  var l = lang;                      // jawnie podany język dokumentu wygrywa
+  if (!l) {
+    try { l = (typeof currentLanguage !== 'undefined' && currentLanguage) || (window.currentLanguage) || 'pl'; }
+    catch (e) { l = 'pl'; }
+  }
   return m[l] || 'pl-PL';
 }
 
-function _waDate(iso) {
+function _waDate(iso, lang) {
   if (!iso) return '—';
   var s = String(iso).slice(0, 10);
   var p = s.split('-');
   if (p.length !== 3) return iso;
-  var loc = _waLocale();
+  var loc = _waLocale(lang);
   if (loc === 'pl-PL') return p[2] + '.' + p[1] + '.' + p[0];
   try {
     var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
@@ -2019,8 +2032,8 @@ function _waDate(iso) {
   } catch (e) { return p[2] + '.' + p[1] + '.' + p[0]; }
 }
 
-function _fmtA(n, d = 2) {
-  return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(_waLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+function _fmtA(n, d = 2, lang) {
+  return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString(_waLocale(lang), { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
 const ANAL_TI = 20; // projektowa temperatura wewnętrzna [°C]
