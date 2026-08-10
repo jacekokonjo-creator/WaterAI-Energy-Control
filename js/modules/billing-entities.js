@@ -30,13 +30,13 @@ const BillingEntitiesModule = {
   // Domyślne ustawienia per kraj. To TYLKO wartości startowe — wszystko edytowalne.
   // Stawki VAT i etykiety identyfikatorów można nadpisać w panelu podmiotu.
   COUNTRIES: {
-    PL: { name: 'Polska',      flag: '🇵🇱', currency: 'PLN', vat: 23, taxNoLabel: 'NIP',            vatIdLabel: 'VAT-UE (PL…)' },
-    SK: { name: 'Słowacja',    flag: '🇸🇰', currency: 'EUR', vat: 23, taxNoLabel: 'IČO / DIČ',      vatIdLabel: 'IČ DPH (SK…)' },
-    CZ: { name: 'Czechy',      flag: '🇨🇿', currency: 'CZK', vat: 21, taxNoLabel: 'IČO',            vatIdLabel: 'DIČ (CZ…)' },
-    DE: { name: 'Niemcy',      flag: '🇩🇪', currency: 'EUR', vat: 19, taxNoLabel: 'Steuernummer',   vatIdLabel: 'USt-IdNr (DE…)' },
-    AT: { name: 'Austria',     flag: '🇦🇹', currency: 'EUR', vat: 20, taxNoLabel: 'Firmenbuchnr.',  vatIdLabel: 'UID (ATU…)' },
-    GB: { name: 'Anglia (UK)', flag: '🇬🇧', currency: 'GBP', vat: 20, taxNoLabel: 'Company No.',    vatIdLabel: 'VAT Reg. No. (GB…)' },
-    CH: { name: 'Szwajcaria',  flag: '🇨🇭', currency: 'CHF', vat: 8.1, taxNoLabel: 'UID / ID',       vatIdLabel: 'MWST (CHE…)' }
+    PL: { name: 'Polska',      flag: '🇵🇱', currency: 'PLN', vat: 23, lang: 'pl', taxNoLabel: 'NIP',            vatIdLabel: 'VAT-UE (PL…)' },
+    SK: { name: 'Słowacja',    flag: '🇸🇰', currency: 'EUR', vat: 23, lang: 'sk', taxNoLabel: 'IČO / DIČ',      vatIdLabel: 'IČ DPH (SK…)' },
+    CZ: { name: 'Czechy',      flag: '🇨🇿', currency: 'CZK', vat: 21, lang: 'cs', taxNoLabel: 'IČO',            vatIdLabel: 'DIČ (CZ…)' },
+    DE: { name: 'Niemcy',      flag: '🇩🇪', currency: 'EUR', vat: 19, lang: 'de', taxNoLabel: 'Steuernummer',   vatIdLabel: 'USt-IdNr (DE…)' },
+    AT: { name: 'Austria',     flag: '🇦🇹', currency: 'EUR', vat: 20, lang: 'at', taxNoLabel: 'Firmenbuchnr.',  vatIdLabel: 'UID (ATU…)' },
+    GB: { name: 'Anglia (UK)', flag: '🇬🇧', currency: 'GBP', vat: 20, lang: 'en', taxNoLabel: 'Company No.',    vatIdLabel: 'VAT Reg. No. (GB…)' },
+    CH: { name: 'Szwajcaria',  flag: '🇨🇭', currency: 'CHF', vat: 8.1, lang: 'en', taxNoLabel: 'UID / ID',       vatIdLabel: 'MWST (CHE…)' }
   },
 
   add(e) {
@@ -92,6 +92,9 @@ const BillingEntitiesModule = {
       bankName:       (e.bankName || '').trim(),
       iban:           (e.iban || '').trim(),
       swift:          (e.swift || '').trim(),
+      // Język dokumentu wystawianego przez ten podmiot — niezależny od języka
+      // interfejsu. Domyślnie język kraju rejestracji, ale w pełni edytowalny.
+      language:       e.language || c.lang || 'pl',
       defaultCurrency: e.defaultCurrency || c.currency,
       defaultVatRate:  isNaN(vat) ? c.vat : vat,
       numberPrefix:   (e.numberPrefix || '').trim(),
@@ -150,6 +153,7 @@ const BillingEntitiesModule = {
     {
       name: 'Blue Boson AG',
       country: 'CH',
+      language: 'en',
       addressLine: 'Gartenstrasse 6',
       postalCity: 'CH-6300 Zug',
       taxNo: 'CHE-301.960.915 (UID), CH-170-3049005-8 (ID)',
