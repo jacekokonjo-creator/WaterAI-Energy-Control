@@ -5749,5 +5749,20 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 
-  window.DomainI18n = { apply: apply, dict: DICT, translate: translateString };
+  // Tłumaczenie na JĘZYK WSKAZANY, a nie na język interfejsu. Potrzebne wszędzie
+  // tam, gdzie dokument ma własny język niezależny od aplikacji — przede wszystkim
+  // wydruk faktury, który idzie w języku spółki wystawiającej. Przełącza słownik
+  // na czas jednego wywołania i przywraca poprzedni, żeby nie psuć stanu silnika.
+  function translateTo(s, l) {
+    if (!s || !l || l === 'pl' || !DICT[l]) return s;
+    const prev = compiled;
+    try {
+      if (!compiled || compiled.lang !== l) compile(l);
+      return translateString(s);
+    } finally {
+      compiled = prev;
+    }
+  }
+
+  window.DomainI18n = { apply: apply, dict: DICT, translate: translateString, translateTo: translateTo };
 })();

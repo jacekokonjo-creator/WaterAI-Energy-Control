@@ -1502,11 +1502,33 @@ if (!window._fvPrintHooked) {
 }
 
 // Tłumaczenie na JĘZYK DOKUMENTU, a nie interfejsu: faktura idzie w języku spółki
-// wystawiającej. Korzysta z tych samych słowników co reszta aplikacji.
+// wystawiającej. Korzysta z tych samych słowników co reszta aplikacji — i z tego
+// samego silnika, więc łapie też frazy złożone („Raport ESCO za okres…"), a nie
+// wyłącznie klucze dokładne. Wcześniejsza wersja robiła samo `dict[txt]`, przez co
+// każdy napis spoza słownika zostawał po polsku na dokumencie w obcym języku.
 function _fvT(txt, lang) {
-  if (!lang || lang === 'pl') return txt;
-  const d = window.DomainI18n && window.DomainI18n.dict && window.DomainI18n.dict[lang];
+  if (!txt || !lang || lang === 'pl') return txt;
+  const api = window.DomainI18n;
+  if (api && typeof api.translateTo === 'function') return api.translateTo(txt, lang);
+  const d = api && api.dict && api.dict[lang];
   return (d && d[txt]) || txt;
+}
+
+// Nazwa kraju na dokumencie — w języku dokumentu, nie po polsku.
+// COUNTRIES[].name trzyma nazwy polskie („Słowacja"), więc na słowackiej fakturze
+// blok Sprzedawcy dostawał polski wtręt.
+function _fvCountry(code, lang) {
+  const c = (typeof BillingEntitiesModule !== 'undefined') ? (BillingEntitiesModule.COUNTRIES[code] || null) : null;
+  if (!c) return code || '';
+  return _fvT(c.name, lang);
+}
+
+// Etykieta identyfikatora podatkowego NABYWCY wg jego kraju (NIP / IČO / DIČ…).
+// Wcześniej było zawsze „NIP:" — polski identyfikator na czeskiej czy niemieckiej fakturze.
+function _fvClientTaxLabel(client) {
+  const c = (client && client.country && typeof BillingEntitiesModule !== 'undefined')
+    ? BillingEntitiesModule.COUNTRIES[client.country] : null;
+  return (c && c.taxNoLabel) || 'NIP';
 }
 
 function _fvDocLang(iss) {
@@ -1537,7 +1559,7 @@ function printInvoiceDoc(id) {
 
   const issuerLines = iss ? [
     iss.addressLine, iss.postalCity,
-    ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).name || iss.country),
+    _fvCountry(iss.country, dl),
     iss.taxNo ? ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).taxNoLabel || 'NIP') + ': ' + iss.taxNo : '',
     iss.vatId ? ((BillingEntitiesModule.COUNTRIES[iss.country] || {}).vatIdLabel || 'VAT') + ': ' + iss.vatId : '',
     iss.email, iss.phone
@@ -1545,8 +1567,8 @@ function printInvoiceDoc(id) {
 
   const clientLines = client ? [
     _escoClientAddr(client),
-    client.vatId ? 'NIP: ' + client.vatId : '',
-    client.regon ? 'REGON: ' + client.regon : ''
+    client.vatId ? _fvClientTaxLabel(client) + ': ' + client.vatId : '',
+    client.regon ? t('REGON') + ': ' + client.regon : ''
   ].filter(Boolean) : [];
 
   const itemName = inv.sourceType
@@ -1597,7 +1619,7 @@ function printInvoiceDoc(id) {
           <div class="lbl">${t('Nabywca')}</div>
           <div class="nm">${e(client ? client.name : '—')}</div>
           ${clientLines.map(l => `<div class="ln">${e(l)}</div>`).join('')}
-          ${obj ? `<div class="ln" style="margin-top:6px;font-size:11px;">Obiekt: ${e(obj.name)}</div>` : ''}
+          ${obj ? `<div class="ln" style="margin-top:6px;font-size:11px;">${t('Obiekt:')} ${e(obj.name)}</div>` : ''}
         </div>
       </div>
 
@@ -1640,7 +1662,7 @@ function printInvoiceDoc(id) {
         // fakturze w innym języku byłaby obcym wtrętem — słownik tego nie naprawi,
         // bo to tekst tworzony w locie, a nie stała fraza. W SK/CZ kwota słownie
         // nie jest wymagana, więc poza polskim po prostu jej nie drukujemy.
-        return dl === 'pl' ? 'Słownie: ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
+        return dl === 'pl' ? t('Słownie:') + ' ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
       })()}</div>
 
       ${(iss && (iss.iban || iss.bankName)) ? `
@@ -1676,7 +1698,7 @@ function printInvoiceDoc(id) {
 
       <div class="fv-foot">
         <div>${e(iss && iss.footerNote ? iss.footerNote : '')}</div>
-        <div>Wygenerowano w WaterAI Energy Control — ${fmtDate(new Date().toISOString().slice(0, 10))}</div>
+        <div>${t('Wygenerowano w WaterAI Energy Control —')} ${fmtDate(new Date().toISOString().slice(0, 10))}</div>
       </div>
     </div>`;
 }
