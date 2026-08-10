@@ -1036,6 +1036,15 @@
       document.querySelectorAll(".language-switcher button").forEach((button) => button.classList.remove("active"));
       document.getElementById("lang-" + language).classList.add("active");
       renderDashboard();
+
+      // Silnik i18n (i18n-domain.js) tłumaczy tekst NA MIEJSCU w DOM i nie ma słownika
+      // odwrotnego — powrót na polski wymaga wygenerowania widoku od nowa ze źródła.
+      // renderDashboard() odświeża tylko kafelki, więc zawartość otwartego modułu
+      // (np. podgląd konkretnej faktury) zostawała w poprzednim języku.
+      // Każdy widok rejestruje tu swoją funkcję odrysowującą.
+      if (typeof window._i18nRerender === "function") {
+        try { window._i18nRerender(); } catch (e) { console.warn("[i18n] Przerysowanie widoku nieudane:", e); }
+      }
     }
 
     function setRole(role) {
@@ -1249,6 +1258,11 @@
     }
 
    function openModule(moduleName) {
+  // Domyślny sposób odrysowania widoku po zmianie języka. Widoki zagnieżdżone
+  // (np. podgląd faktury) nadpisują to własną funkcją, żeby powrót na polski
+  // nie wyrzucał użytkownika z powrotem na listę.
+  window._i18nRerender = () => openModule(moduleName);
+
   const labels = getModuleLabels();
   const item = labels[moduleName];
 
@@ -1600,9 +1614,9 @@
 <script src="js/modules/calendar.js?v=1783380012"></script>
 <script src="js/modules/users.js?v=1785900007"></script>
 <script src="js/app.build.js?v=1786126837"></script>
-<script src="js/modules/app-v2.js?v=1786382891"></script>
+<script src="js/modules/app-v2.js?v=1786383781"></script>
 <script src="js/modules/i18n-domain.js?v=1786348272"></script>
-<script src="js/modules/i18n-invoicing.js?v=1786348644"></script>
+<script src="js/modules/i18n-invoicing.js?v=1786383781"></script>
 <script src="js/modules/i18n-cs-backfill.js?v=1786349896"></script>
 <script src="js/modules/i18n-cs-backfill-2.js?v=1786350119"></script>
 <script src="js/modules/i18n-cs-backfill-3.js?v=1786351538"></script>

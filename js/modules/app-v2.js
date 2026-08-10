@@ -402,6 +402,7 @@ function searchDocuments(clientId, query) {
 function renderInvoicingModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
+  window._i18nRerender = () => renderInvoicingModule();   // patrz setLanguage() w index.html
 
   const clients = ClientsModule.getAll();
   const allInvoices = InvoicingModule.getAll();
@@ -410,26 +411,74 @@ function renderInvoicingModule() {
   const q = (window._invSearch || '').toLowerCase();
   const sort = window._invSort || 'date_desc';
 
-  let invoices = allInvoices.filter(inv => !q ||
-    (inv.invoiceNumber||'').toLowerCase().includes(q) ||
-    ((ClientsModule.find(inv.clientId)||{}).name||'').toLowerCase().includes(q) ||
-    ((inv.objectId && (ObjectsModule.find(inv.objectId)||{}).name)||'').toLowerCase().includes(q) ||
-    (inv.status||'').toLowerCase().includes(q)
-  );
-  invoices = [...invoices].sort((a,b) => {
-    if (sort === 'date_desc') return (b.issueDate||'').localeCompare(a.issueDate||'');
-    if (sort === 'date_asc')  return (a.issueDate||'').localeCompare(b.issueDate||'');
-    if (sort === 'due_asc')   return (a.dueDate||'').localeCompare(b.dueDate||'');
-    if (sort === 'due_desc')  return (b.dueDate||'').localeCompare(a.dueDate||'');
-    if (sort === 'client_asc') return ((ClientsModule.find(a.clientId)||{}).name||'').localeCompare((ClientsModule.find(b.clientId)||{}).name||'');
-    if (sort === 'amount_desc') return (b.grossAmount||0) - (a.grossAmount||0);
-    return 0;
+  // ── etykiety kolumn: klient i obiekt zawsze ze swoim numerem (K1, K1-2) ──
+  const _cliNo = id => (id && ClientsModule.getNumber) ? ClientsModule.getNumber(id) : null;
+  const _objNo = id => (id && ObjectsModule.getNumber) ? ObjectsModule.getNumber(id) : null;
+
+  const invClientCode = inv => { const n = _cliNo(inv.clientId); return n ? 'K' + n : ''; };
+  const invClientName = inv => ((ClientsModule.find(inv.clientId) || {}).name || '');
+  const invObjectCode = inv => {
+    const o = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+    if (!o) return '';
+    const cn = _cliNo(o.clientId), on = _objNo(o.id);
+    return (cn && on) ? ('K' + cn + '-' + on) : '';
+  };
+  const invObjectName = inv => {
+    const o = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+    return o ? (o.name || '') : '';
+  };
+  const invIssuerName = inv => {
+    if (!inv.issuerId || typeof BillingEntitiesModule === 'undefined') return '';
+    const en = BillingEntitiesModule.find(inv.issuerId);
+    return en ? (en.name || '') : '';
+  };
+  const invStatusLabel = inv => (InvoicingModule.STATUSES[inv.status] || {}).label || inv.status || '';
+  const invTypeLabel = inv => (InvoicingModule.TYPES[inv.invoiceType] || {}).label || inv.invoiceType || '';
+
+  let invoices = allInvoices.filter(inv => !q || [
+    inv.invoiceNumber, inv.sourceNumber,
+    invClientCode(inv), invClientName(inv),
+    invObjectCode(inv), invObjectName(inv),
+    invIssuerName(inv), invStatusLabel(inv), invTypeLabel(inv)
+  ].some(v => String(v || '').toLowerCase().includes(q)));
+
+  // Sortowanie: KAŻDA kolumna, alfabetycznie wg reguł polskich (ą po a, ł po l…),
+  // z opcją numeric — dzięki temu FV/2026/08/2 idzie przed FV/2026/08/10.
+  // Puste wartości zawsze na końcu, niezależnie od kierunku.
+  const SORT_VAL = {
+    lp:     inv => Number(inv.id) || 0,
+    number: inv => inv.invoiceNumber || '',
+    client: inv => (invClientCode(inv) ? invClientCode(inv) + ' ' : '') + invClientName(inv),
+    object: inv => (invObjectCode(inv) ? invObjectCode(inv) + ' ' : '') + invObjectName(inv),
+    issuer: inv => invIssuerName(inv),
+    date:   inv => inv.issueDate || '',
+    due:    inv => inv.dueDate || '',
+    status: inv => invStatusLabel(inv)
+  };
+  const _m = String(sort).match(/^(.+)_(asc|desc)$/);
+  const sKey = (_m && SORT_VAL[_m[1]]) ? _m[1] : 'date';
+  const sDir = _m ? _m[2] : 'desc';
+  const _val = SORT_VAL[sKey];
+
+  invoices = [...invoices].sort((a, b) => {
+    const va = _val(a), vb = _val(b);
+    const ea = (va === '' || va == null), eb = (vb === '' || vb == null);
+    if (ea && eb) return 0;
+    if (ea) return 1;
+    if (eb) return -1;
+    const r = (typeof va === 'number' && typeof vb === 'number')
+      ? (va - vb)
+      : String(va).localeCompare(String(vb), 'pl', { numeric: true, sensitivity: 'base' });
+    return sDir === 'desc' ? -r : r;
   });
 
   const thS = (col, label, align) => {
-    const next = sort === col+'_asc' ? col+'_desc' : col+'_asc';
-    const arrow = sort === col+'_asc' ? ' ↑' : sort === col+'_desc' ? ' ↓' : '';
-    return `<th style="padding:8px 12px;text-align:${align||'left'};font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;"
+    const next = (sKey === col && sDir === 'asc') ? col + '_desc' : col + '_asc';
+    const arrow = (sKey === col)
+      ? (sDir === 'asc' ? ' ▲' : ' ▼')
+      : ' <span style="opacity:.35;font-weight:400;">↕</span>';
+    return `<th style="padding:8px 12px;text-align:${align||'left'};font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);cursor:pointer;white-space:nowrap;user-select:none;"
+      title="Kliknij, aby posortować"
       onclick="window._invSort='${next}';renderInvoicingModule();">${label}${arrow}</th>`;
   };
 
@@ -446,32 +495,37 @@ function renderInvoicingModule() {
     return `<option value="${en.id}">${c.flag || ''} ${escapeHtml(en.name || '(bez nazwy)')}${en.isDefault ? ' ⭐' : ''}</option>`;
   }).join('');
 
-  const invoiceRows = invoices.map(inv => {
-    const client = ClientsModule.find(inv.clientId);
-    const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
+  const _codeChip = code => code
+    ? `<span style="display:inline-block;font-size:10px;font-weight:700;color:#0C447C;background:#E6F1FB;border:1px solid #B5D4F4;border-radius:5px;padding:1px 5px;margin-right:6px;vertical-align:1px;">${escapeHtml(code)}</span>`
+    : '';
+
+  const invoiceRows = invoices.map((inv, idx) => {
     const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
+    const cName = invClientName(inv), oName = invObjectName(inv), iName = invIssuerName(inv);
+    const mdash = '<span style="color:var(--color-text-tertiary);">—</span>';
     return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
-      <td style="padding:9px 12px;font-size:13px;font-weight:500;">${escapeHtml(inv.invoiceNumber || '—')}${
+      <td style="padding:9px 12px;font-size:12px;color:var(--color-text-secondary);text-align:right;white-space:nowrap;">${idx + 1}</td>
+      <td style="padding:9px 12px;font-size:13px;font-weight:500;white-space:nowrap;">
+        <span title="${escapeHtml(typeInfo.label)}">${typeInfo.icon}</span> ${escapeHtml(inv.invoiceNumber || '—')}${
         inv.sourceType ? `<div style="font-size:11px;font-weight:400;color:var(--color-text-secondary);white-space:nowrap;">${(InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).icon || '📎'} ${escapeHtml(inv.sourceNumber || ('#' + inv.sourceId))}</div>` : ''
       }</td>
-      <td style="padding:9px 12px;font-size:13px;">${escapeHtml(client ? client.name : '—')}</td>
+      <td style="padding:9px 12px;font-size:13px;">${cName ? _codeChip(invClientCode(inv)) + escapeHtml(cName) : mdash}</td>
+      <td style="padding:9px 12px;font-size:13px;">${oName ? _codeChip(invObjectCode(inv)) + escapeHtml(oName) : mdash}</td>
       <td style="padding:9px 12px;font-size:12px;white-space:nowrap;">${(() => {
-        const en = (inv.issuerId && typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.find(inv.issuerId) : null;
-        if (!en) return '<span style="color:var(--color-text-tertiary);">—</span>';
+        if (!iName) return mdash;
+        const en = BillingEntitiesModule.find(inv.issuerId) || {};
         const c = (BillingEntitiesModule.COUNTRIES[en.country] || {});
-        return (c.flag || '') + ' ' + escapeHtml(en.name || '');
+        return (c.flag || '') + ' ' + escapeHtml(iName);
       })()}</td>
-      <td style="padding:9px 12px;font-size:13px;">${escapeHtml(obj ? obj.name : '—')}</td>
-      <td style="padding:9px 12px;font-size:13px;">${typeInfo.icon} ${typeInfo.label}</td>
-      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.issueDate)}</td>
-      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${fmtDate(inv.dueDate)}</td>
-      <td style="padding:9px 12px;">${statusHtml(inv.status)}</td>
-      <td style="padding:9px 12px;white-space:nowrap;">
-        <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="small-button" onclick="viewInvoice(${inv.id})" class="icon-btn" title="Podgląd">👁</button>
-          <button class="small-button" onclick="printInvoiceDoc(${inv.id})" class="icon-btn" title="Drukuj / PDF">🖨</button>
-          <button class="small-button" onclick="editInvoice(${inv.id})" class="icon-btn" title="Edytuj">✏️</button>
-          <button class="small-button" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" class="icon-btn icon-btn-del" title="Usuń">🗑</button>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${inv.issueDate ? fmtDate(inv.issueDate) : mdash}</td>
+      <td style="padding:9px 12px;font-size:13px;white-space:nowrap;">${inv.dueDate ? fmtDate(inv.dueDate) : mdash}</td>
+      <td style="padding:9px 12px;white-space:nowrap;">${statusHtml(inv.status)}</td>
+      <td style="padding:9px 12px;white-space:nowrap;width:1%;">
+        <div class="action-icons">
+          <button class="icon-btn" onclick="viewInvoice(${inv.id})" title="Podgląd">👁</button>
+          <button class="icon-btn" onclick="printInvoiceDoc(${inv.id})" title="Drukuj / PDF">🖨</button>
+          <button class="icon-btn" onclick="editInvoice(${inv.id})" title="Edytuj">✏️</button>
+          <button class="icon-btn icon-btn-del" onclick="if(confirm('Usuń fakturę?')){InvoicingModule.remove(${inv.id});renderInvoicingModule();}" title="Usuń">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -547,15 +601,15 @@ function renderInvoicingModule() {
       : `<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:10px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="background:var(--color-background-secondary);">
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Nr faktury</th>
+              ${thS('lp','L.p.','right')}
+              ${thS('number','Nr faktury')}
               ${thS('client','Klient')}
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Podmiot</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Obiekt</th>
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Typ faktury</th>
-              ${thS('date','Data wyst.')}
-              ${thS('due','Termin płat.')}
-              <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Status</th>
-              <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);">Akcje</th>
+              ${thS('object','Obiekt')}
+              ${thS('issuer','Podmiot wystawiający')}
+              ${thS('date','Data wystawienia')}
+              ${thS('due','Termin płatności')}
+              ${thS('status','Status')}
+              <th style="padding:8px 12px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);white-space:nowrap;">Akcje</th>
             </tr></thead>
             <tbody>${invoiceRows}</tbody>
           </table>
@@ -838,8 +892,12 @@ function saveInvoice() {
   if (!clientId) { alert('Wybierz klienta.'); return; }
 
   const numberEl = document.getElementById('inv-number');
-  const dueDate = document.getElementById('inv-due-date').value;
   const objectId = document.getElementById('inv-object').value || null;
+
+  // Ostatnia siatka bezpieczeństwa: faktura nie może wyjść bez terminu płatności.
+  const issueDateVal = document.getElementById('inv-issue-date').value;
+  const dueDate = document.getElementById('inv-due-date').value
+    || _invDueDate(issueDateVal, _invPaymentDays(ClientsModule.find(clientId)));
 
   InvoicingModule.add(Object.assign(_invSourcePayload(), {
     clientId,
@@ -884,6 +942,7 @@ function saveInvoice() {
 function viewInvoice(id) {
   const inv = InvoicingModule.find(id);
   if (!inv) return;
+  window._i18nRerender = () => viewInvoice(id);   // zmiana języka odrysowuje TEN podgląd
   const client = ClientsModule.find(inv.clientId);
   const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
   const typeInfo = InvoicingModule.TYPES[inv.invoiceType] || { icon: '🧾', label: inv.invoiceType || '—' };
@@ -977,11 +1036,21 @@ function editInvoice(id) {
     }, 50);
     const numEl = document.getElementById('inv-number'), dueEl = document.getElementById('inv-due-date');
     // Wartości z zapisanej faktury nie są już sugestią — chronimy je przed przeliczeniem.
+    // Wyjątek: PUSTY termin płatności nie jest wartością do ochrony — taką fakturę
+    // trzeba dopiero uzupełnić, więc pole zostaje otwarte na podpowiedź.
     [numEl, dueEl].forEach(el => { if (el) { el.dataset.invTouched = '1'; el.style.background = ''; el.style.borderColor = ''; delete el.dataset.invSug; } });
+    if (dueEl && !inv.dueDate) delete dueEl.dataset.invTouched;
     numEl.value = inv.invoiceNumber || '';
     document.getElementById('inv-type').value = inv.invoiceType || 'INVOICE';
     document.getElementById('inv-issue-date').value = inv.issueDate || '';
-    document.getElementById('inv-due-date').value = inv.dueDate || '';
+    if (inv.dueDate) {
+      dueEl.value = inv.dueDate;
+    } else {
+      // Faktura zapisana bez terminu — dolicz go z kartoteki klienta zamiast
+      // zostawiać puste pole (to była przyczyna „14 dni bez daty").
+      dueEl.value = '';
+      invRefreshDefaults();
+    }
     document.getElementById('inv-net').value = inv.netAmount || '';
     document.getElementById('inv-vat').value = inv.vatRate || '23';
     document.getElementById('inv-currency').value = inv.currency || 'PLN';
@@ -996,14 +1065,17 @@ function saveInvoiceEdit(id) {
   if (!net) { alert('Podaj kwotę netto.'); return; }
   const vatRate = Number(document.getElementById('inv-vat').value || 23);
   const vatAmount = net * vatRate / 100;
+  const clientIdVal = document.getElementById('inv-client').value;
+  const issueDateVal = document.getElementById('inv-issue-date').value;
   InvoicingModule.update(id, Object.assign(_invSourcePayload(), {
     issuerId: (document.getElementById('inv-issuer') || {}).value || null,
-    clientId: document.getElementById('inv-client').value,
+    clientId: clientIdVal,
     objectId: document.getElementById('inv-object').value || null,
     invoiceNumber: document.getElementById('inv-number').value.trim(),
     invoiceType: document.getElementById('inv-type').value,
-    issueDate: document.getElementById('inv-issue-date').value,
-    dueDate: document.getElementById('inv-due-date').value,
+    issueDate: issueDateVal,
+    dueDate: document.getElementById('inv-due-date').value
+      || _invDueDate(issueDateVal, _invPaymentDays(ClientsModule.find(clientIdVal))),
     netAmount: net, vatRate, vatAmount, grossAmount: net + vatAmount,
     currency: document.getElementById('inv-currency').value,
     status: document.getElementById('inv-status').value,
@@ -1052,21 +1124,43 @@ function invRefreshDefaults() {
   }
 
   // ── termin płatności: data wystawienia + „ile dni" z kartoteki klienta ──
+  // Pole MUSI dostać konkretną datę — sama liczba dni w podpowiedzi to za mało,
+  // bo faktura zapisywała się z pustym terminem (i bez wpisu w kalendarzu).
   const clSel = document.getElementById('inv-client');
   const cl = (clSel && clSel.value) ? ClientsModule.find(clSel.value) : null;
-  const days = (cl && cl.paymentDays != null && cl.paymentDays !== '') ? Number(cl.paymentDays) : null;
+  const days = _invPaymentDays(cl);
+  const due = _invDueDate(issueDate, days);
 
-  if (hint) hint.textContent = (days != null)
-    ? `— klient: ${days} dni`
-    : (cl ? '— klient nie ma ustawionej liczby dni' : '');
+  if (hint) hint.textContent = !cl ? ''
+    : (cl.paymentDays != null && cl.paymentDays !== '')
+      ? `— klient: ${days} dni${due ? ' → ' + fmtDate(due) : ''}`
+      : `— klient nie ma ustawionej liczby dni, przyjęto ${days}${due ? ' → ' + fmtDate(due) : ''}`;
 
-  if (dueEl && days != null && !isNaN(days)) {
-    const d = new Date(issueDate + 'T00:00:00');
-    if (!isNaN(d.getTime())) {
-      d.setDate(d.getDate() + days);
-      _invSuggest(dueEl, d.toISOString().slice(0, 10));
-    }
+  if (dueEl && due) {
+    // Puste pole uzupełniamy zawsze — również w trybie edycji, gdzie zapisana
+    // (pusta) wartość blokowałaby podpowiedź przez flagę invTouched.
+    if (!dueEl.value) delete dueEl.dataset.invTouched;
+    _invSuggest(dueEl, due);
   }
+}
+
+// Ile dni na zapłatę ma dany klient. Brak wartości w kartotece = 14 dni
+// (ta sama wartość domyślna co w formularzu klienta), nigdy „brak terminu".
+function _invPaymentDays(client) {
+  const v = client && client.paymentDays;
+  const n = (v == null || v === '') ? NaN : Number(v);
+  return isNaN(n) ? 14 : n;
+}
+
+// Data wystawienia + N dni → 'RRRR-MM-DD'. Liczone na lokalnym kalendarzu,
+// bez toISOString(), żeby strefa czasowa nie cofała terminu o dobę.
+function _invDueDate(issueDate, days) {
+  if (!issueDate || days == null || isNaN(days)) return '';
+  const d = new Date(issueDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + Number(days));
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1102,6 +1196,7 @@ function _beCountryOptions(sel) {
 function renderBillingEntities() {
   const container = document.getElementById('module-content');
   if (!container || typeof BillingEntitiesModule === 'undefined') return;
+  window._i18nRerender = () => renderBillingEntities();   // patrz setLanguage() w index.html
   const all = BillingEntitiesModule.getAll();
   const editId = window._beEditId || null;
   const en = editId ? (BillingEntitiesModule.find(editId) || {}) : {};
