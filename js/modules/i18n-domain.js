@@ -5649,9 +5649,21 @@
       const li = s.indexOf(trimmed);
       return s.slice(0, li) + hit + s.slice(li + trimmed.length);
     }
-    // pass podłańcuchowy — tylko gdy tekst wygląda na polski (heurystyka)
-    if (!/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(s) &&
-        !/\b(Brak|Usu[nń]|Dodaj|Zapisz|Edytuj|Anuluj|Wybierz|Okres|Odczyt|Metoda|Klient|Obiekt|Raport|Suma|Netto|Zamknij|Podaj|Kliknij|klient|obiekt|okres|zapisz|analiz|protok|regres|zuż|Zuż|Oferta|ofert|Scenariusz|scenariusz|Scen\.|bazowy|Payback|Zysk|Wynik|Inwestycja|Utworzono|utworz|Wydruk|Sporządz|Horyzont|horyzont|ogrzewani|wzrost|Wpływy|wpływy|Narastająco|Udział|udział|Waluta|Notatki|Rata|kaucj|opłat|osobod|stopniodni|PRZED|osobno|latach|Kwoty|Roczny|Analiz|Faktur|Symulacj|Protok|Dokument|dokument|Widoczn|Widzi|Edytuje|Edycja|Udost|udost|Wszyscy|Zaznacz|Rola|Role|Moduł|Instrukcj|Administrator|Back Office|Energy Analyst|Sales Rep|Widzisz|Dodajesz|Wyslac|wyslany|wyslac|udalo|uzytkownik|haslo|hasla|kliknieciu|wysylek|Zalogowa|Zablok|Konto|Przekaż|Profil|profil|Imię|Hasło|Reset|Szukaj|Uwaga|Zastąp|Dołącz|Przywr|Import|kopi|Kopia|Lokalna|lokaln|zestaw|lustro|JSON|Wpisujesz|prowizj|Odbiorca|Opiekun|Rdzeń|Pełn|Obsługa)/.test(s)) return s;
+    // Pass podłańcuchowy — dla węzłów, które NIE są w całości kluczem, bo w kodzie
+    // przerywa je ${…}: „Data raportu: 22.08.2026", „Prognoza zakłada dodatkowo: ",
+    // „Korekta TYM · Restauracja · Pri Lipe". W DOM to jeden węzeł tekstowy sklejony
+    // z literału i wstawionej wartości, więc dopasowanie dokładne nigdy nie trafia.
+    //
+    // Wcześniej bramką była lista polskich rdzeni i wymóg znaku diakrytycznego.
+    // „Data raportu:" nie ma ani jednego znaku diakrytycznego, ani żadnego słowa
+    // z listy — i dlatego zostawało po polsku na słowackim raporcie ESCO.
+    // Lista rdzeni jest z natury dziurawa: każdy nowy napis bez „ą/ć/ę/ł/ń/ó/ś/ź/ż"
+    // wypadał poza tłumaczenie i nikt tego nie widział.
+    //
+    // Teraz pass biegnie zawsze. Przed nadpisaniem wyniku pilnują go dwie rzeczy:
+    // granice słowa w subReplace (klucz „Bank" nie ruszy słowackiej „Banky")
+    // oraz test idempotencji w narzedzia/test-i18n-silnik.js, który sprawdza, że
+    // drugi przebieg po gotowym tłumaczeniu niczego już nie zmienia.
     let out = s;
     for (const k of compiled.subKeys) {
       if (out.indexOf(k) !== -1) out = subReplace(out, k, compiled.src[k]);
@@ -5661,7 +5673,35 @@
 
   const ATTRS = ['placeholder', 'title'];
 
-  function walk(root) {
+  // ── PAMIĘĆ ORYGINAŁÓW ────────────────────────────────────────────────────
+  // Silnik tłumaczy tekst W MIEJSCU, a apply() biegnie po każdym renderze
+  // (MutationObserver) i po każdej zmianie języka. Bez pamięci oryginału drugi
+  // przebieg brałby na wejście tekst JUŻ przetłumaczony i psuł go:
+  //   • łańcuchowo — klucz „Rola"→„Role", potem „Role"→„Roles",
+  //   • międzyjęzykowo — słowacki tekst po przełączeniu na czeski dostawał
+  //     podmienione pojedyncze słowa („dni"→„dny") i wychodziła hybryda.
+  // Dlatego przy pierwszym dotknięciu zapamiętujemy POLSKI oryginał i każde
+  // kolejne tłumaczenie liczymy zawsze z niego. Dzięki temu przełączenie na
+  // dowolny język, a także powrót na polski, daje czysty wynik — a pass
+  // podłańcuchowy może biec bez heurystyki, bo na wejściu ZAWSZE jest polski.
+  // WeakMap zwalnia wpisy razem z węzłami usuniętymi przez render.
+  const ORIG_TEXT = new WeakMap();     // węzeł tekstowy -> polski oryginał
+  const ORIG_ATTR = new WeakMap();     // element -> { nazwaAtrybutu: oryginał }
+
+  function zrodloTekstu(n) {
+    let src = ORIG_TEXT.get(n);
+    if (src === undefined) { src = n.nodeValue; ORIG_TEXT.set(n, src); }
+    return src;
+  }
+
+  function zrodloAtrybutu(el, a, biezaca) {
+    let m = ORIG_ATTR.get(el);
+    if (!m) { m = {}; ORIG_ATTR.set(el, m); }
+    if (m[a] === undefined) m[a] = biezaca;
+    return m[a];
+  }
+
+  function walk(root, przywroc) {
     if (!root) return;
     const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (n) {
@@ -5675,9 +5715,12 @@
         return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       }
     });
+    // przywroc === true → wracamy do polskiego oryginału (wybrano „PL")
+    const przelicz = przywroc ? (src => src) : translateString;
+
     let n;
     while ((n = tw.nextNode())) {
-      const t = translateString(n.nodeValue);
+      const t = przelicz(zrodloTekstu(n));
       if (t !== n.nodeValue) n.nodeValue = t;
     }
     if (root.querySelectorAll) {
@@ -5685,10 +5728,11 @@
         if (el.closest && el.closest('[data-i18n-skip]')) return;
         ATTRS.forEach(a => {
           const v = el.getAttribute && el.getAttribute(a);
-          if (v) { const t = translateString(v); if (t !== v) el.setAttribute(a, t); }
+          if (v) { const t = przelicz(zrodloAtrybutu(el, a, v)); if (t !== v) el.setAttribute(a, t); }
         });
         if (el.tagName === 'INPUT' && (el.type === 'button' || el.type === 'submit') && el.value) {
-          const t = translateString(el.value); if (t !== el.value) el.value = t;
+          const t = przelicz(zrodloAtrybutu(el, 'value', el.value));
+          if (t !== el.value) el.value = t;
         }
       });
     }
@@ -5696,10 +5740,18 @@
 
   function apply() {
     const l = lang();
-    if (!DICT[l]) return;                    // pl / inne języki — nic nie robimy
-    if (!compiled || compiled.lang !== l) compile(l);
     applying = true;
-    try { walk(document.body); } finally { applying = false; }
+    try {
+      if (!DICT[l]) {
+        // Polski (albo język bez słownika) — przywracamy zapamiętane oryginały.
+        // Wcześniej apply() po prostu wychodziło, więc powrót z SK na PL zostawiał
+        // słowacki tekst wszędzie tam, gdzie widok nie przerysował się sam.
+        walk(document.body, true);
+      } else {
+        if (!compiled || compiled.lang !== l) compile(l);
+        walk(document.body, false);
+      }
+    } finally { applying = false; }
   }
 
   function schedule() {
@@ -5712,7 +5764,6 @@
   function start() {
     const mo = new MutationObserver(function (muts) {
       if (applying) return;
-      if (!DICT[lang()]) return;
       for (const m of muts) {
         if (m.type === 'childList' && m.addedNodes.length) { schedule(); return; }
       }

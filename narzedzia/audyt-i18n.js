@@ -86,6 +86,7 @@ const SLOWNIKI = [
   'js/modules/i18n-cs-backfill-6.js',
   'js/modules/i18n-ui-core.js',
   'js/modules/i18n-ui-core-2.js',
+  'js/modules/i18n-ui-core-4.js',
   'js/modules/i18n-ui-core-3.js'
 ];
 
@@ -169,7 +170,8 @@ function zHtml(html, dodaj) {
 // Napisy, które NIE trafiają na ekran — nie ma sensu ich tłumaczyć.
 const IGNORUJ = [
   /^\[[a-zA-Z_-]+\]/,                        // komunikaty konsoli: [shares] …
-  /\u0000/,                                  // fragment urwany przez ${…} — nie jest pełnym węzłem
+  // (fragmenty rozdzielone przez ${…} NIE są pomijane — w DOM to pełne węzły tekstowe,
+  //  patrz rozbicie w funkcji dodaj())
   /=>|window\.|document\.|console\.|function\s*\(|return\s|typeof\s|\bvar\b|\bconst\b|\blet\b|\bnull\b|\bundefined\b/,
   /^[a-zA-Z_$][\w$]*\s*[:(=]/,               // fragment kodu: nazwa: wartość
   /^[-\w.]+\.(js|css|png|jpg|jpeg|svg|html|json|xlsx|pdf|md|sql)$/i,
@@ -177,7 +179,11 @@ const IGNORUJ = [
   /^[#.]?[\w-]+$/,                           // selektory CSS, klasy, gołe identyfikatory
   /^[\d\s.,:;%/+()–—-]+$/,                   // same liczby i separatory
   /^(px|em|rem|vh|vw|fr|auto|none|flex|grid|block|inline|bold|left|right|center|middle|nowrap|pointer|hidden|visible|solid|dashed|dotted|absolute|relative|fixed|sticky|border-box|transparent|currentColor|inherit|initial|unset)\b/,
-  /^[—·,.;}\])'"+]/,                         // urwane kawałki dłuższych zdań
+  // Fragment zaczynający się przecinkiem lub myślnikiem bywa DALSZYM CIĄGIEM zdania
+  // przerwanego przez ${…} — w DOM to pełnoprawny tekst do przetłumaczenia
+  // („, niezmieniony sposób użytkowania obiektu oraz"). Odsiewamy więc tylko
+  // krótkie ogonki, a nie całe frazy.
+  /^[—·,.;}\])'"+]\s*\S{0,3}$/,
   // liczebniki z _fvWords(): kwota słownie jest drukowana WYŁĄCZNIE po polsku
   /^(zero|jeden|jedna|dwa|dwie|trzy|cztery|pięć|sześć|siedem|osiem|dziewięć|dziesięć|jedenaście|dwanaście|trzynaście|czternaście|piętnaście|szesnaście|siedemnaście|osiemnaście|dziewiętnaście|dwadzieścia|trzydzieści|czterdzieści|pięćdziesiąt|sześćdziesiąt|siedemdziesiąt|osiemdziesiąt|dziewięćdziesiąt|sto|dwieście|trzysta|czterysta|pięćset|sześćset|siedemset|osiemset|dziewięćset|tysiąc|tysiące|tysięcy|milion|miliony|milionów|miliard|miliardy|miliardów|złoty|złote|złotych|grosz|grosze|groszy)$/,
   /^(Polski|Angielski|Niemiecki|Czeski|Słowacki|Hiszpański)$/,     // nazwy języków w przełączniku
@@ -205,6 +211,12 @@ const IGNORUJ = [
   /^(Blue Boson AG|PostFinance AG|WaterAI Energy)$/,
   /^\d{2,3}[ -]?\d{2,3} [A-ZĽŠČ]/,           // adresy: „110 00 Praha 1", „02-454 Warszawa"
   /^(readTime|std,|anw-|OB-INT|clients v|objects v|workflow items)/,  // identyfikatory techniczne
+  // dalsze sygnatury kodu, które tokenizer wyciąga jako string
+  /\.\w+\(/,                                 // wywołanie metody: .join(, .filter(
+  /^[}\)]/,                                  // urwane domknięcie bloku
+  /^\.[\w-]/,                                // „.csv,.xlsx", „.language-switcher button"
+  /^'n|\\"/,                                 // resztki escapowania w zagnieżdżonym stringu
+  /\bcatch\s*\(|\belse\s+if\b|\/\*/,
   // ── symbole i skróty wzorów: takie same w każdym języku ──
   /^[A-ZΣ∑Δ]{1,3}[.\/#]?$/,
   /^(Tᵢ|ΣSD|∑SD|\/ ΣSD|\/ ∑SD|− Qs|Qs po|Qs przed|t TYM|t rzecz\.|HDD TYM|°C·dni|dni z₀|Dni z₀|PRZED→PO|T Outdoor|−15…\+10 ?°C|id, data|v[\d.]+)$/,
@@ -228,8 +240,17 @@ function zbierzNapisy() {
     const p = path.join(ROOT, plik);
     if (!fs.existsSync(p)) continue;
     const kod = fs.readFileSync(p, 'utf8');
+    // Napis przerwany w kodzie przez ${…} trafia do DOM jako osobny węzeł tekstowy
+    // („Data raportu: ", „Prognoza zakłada dodatkowo: "), więc silnik musi umieć go
+    // przetłumaczyć — a więc audyt musi go sprawdzić. Wcześniej takie fragmenty
+    // wypadały z raportu i to one zostawały po polsku na obcojęzycznym raporcie ESCO.
     const dodaj = (tekst) => {
-      const t = String(tekst).replace(/\s+/g, ' ').trim();
+      const surowy = String(tekst);
+      if (surowy.indexOf('\u0000') !== -1) {
+        surowy.split('\u0000').forEach(cz => { if (cz.trim()) dodaj(cz); });
+        return;
+      }
+      const t = surowy.replace(/\s+/g, ' ').trim();
       if (t.length < 2 || t.length > 220) return;
       if (!/[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]/.test(t)) return;
       if (pomijac(t)) return;
