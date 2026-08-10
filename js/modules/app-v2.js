@@ -1079,6 +1079,14 @@ function applyInvIssuer() {
   invRefreshDefaults();          // prefiks numeru zależy od podmiotu
 }
 
+// Języki, dla których istnieją słowniki (pl = tekst źródłowy, bez tłumaczenia).
+const BE_LANGS = { pl: 'Polski', sk: 'Slovenčina', cs: 'Čeština', de: 'Deutsch', at: 'Deutsch (AT)', en: 'English', es: 'Español' };
+
+function _beLangOptions(sel) {
+  return Object.entries(BE_LANGS).map(([k, n]) =>
+    `<option value="${k}"${k === sel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+}
+
 function _beCountryOptions(sel) {
   return Object.entries(BillingEntitiesModule.COUNTRIES).map(([k, c]) =>
     `<option value="${k}"${k === sel ? ' selected' : ''}>${c.flag} ${escapeHtml(c.name)}</option>`).join('');
@@ -1102,7 +1110,7 @@ function renderBillingEntities() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
         <div>
           <div style="font-size:14px;font-weight:700;">${c.flag || ''} ${escapeHtml(x.name || '(bez nazwy)')} ${x.isDefault ? '<span style="font-size:11px;font-weight:600;color:#27500A;">⭐ domyślny</span>' : ''}</div>
-          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${escapeHtml(c.name || x.country || '')} · ${escapeHtml(x.defaultCurrency || '')} · VAT ${escapeHtml(String(x.defaultVatRate != null ? x.defaultVatRate : ''))}%</div>
+          <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px;">${escapeHtml(c.name || x.country || '')} · ${escapeHtml(x.defaultCurrency || '')} · VAT ${escapeHtml(String(x.defaultVatRate != null ? x.defaultVatRate : ''))}% · 🗣 ${escapeHtml(BE_LANGS[x.language || c.lang || 'pl'] || '')}</div>
         </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           ${x.isDefault ? '' : `<button class="small-button" onclick="beSetDefault(${x.id})" title="Ustaw jako domyślny">⭐</button>`}
@@ -1144,6 +1152,7 @@ function renderBillingEntities() {
         <div><label>Bank</label><input id="be-bank" value="${escapeHtml(en.bankName || '')}" /></div>
         <div style="grid-column:span 2;"><label>Numer konta / IBAN</label><input id="be-iban" value="${escapeHtml(en.iban || '')}" /></div>
         <div><label>SWIFT / BIC</label><input id="be-swift" value="${escapeHtml(en.swift || '')}" /></div>
+        <div><label>Język faktury</label><select id="be-lang">${_beLangOptions(en.language || cc.lang || 'pl')}</select></div>
         <div><label>Waluta domyślna</label><input id="be-currency" value="${escapeHtml(en.defaultCurrency || cc.currency || 'PLN')}" /></div>
         <div><label>Domyślny VAT (%)</label><input id="be-vat" type="number" step="0.1" min="0" max="100" value="${escapeHtml(String(en.defaultVatRate != null ? en.defaultVatRate : cc.vat))}" /></div>
         <div><label>Prefiks numeru FV</label><input id="be-prefix" value="${escapeHtml(en.numberPrefix || '')}" placeholder="FV-PL" /></div>
@@ -1166,10 +1175,12 @@ function beCountryChanged() {
   set('be-taxno-lbl', c.taxNoLabel || 'NIP');
   set('be-vatid-lbl', c.vatIdLabel || 'VAT');
   // Waluta i VAT tylko gdy użytkownik ich jeszcze nie zmienił świadomie — pola zostają edytowalne.
-  const cur = document.getElementById('be-currency'), vat = document.getElementById('be-vat');
+  const cur = document.getElementById('be-currency'), vat = document.getElementById('be-vat'),
+        lng = document.getElementById('be-lang');
   if (cur && !cur.dataset.beTouched) cur.value = c.currency || 'PLN';
   if (vat && !vat.dataset.beTouched) vat.value = c.vat != null ? c.vat : '';
-  [cur, vat].forEach(el => { if (el && !el._beHook) { el._beHook = true; el.addEventListener('input', () => { el.dataset.beTouched = '1'; }); } });
+  if (lng && !lng.dataset.beTouched) lng.value = c.lang || 'pl';
+  [cur, vat, lng].forEach(el => { if (el && !el._beHook) { el._beHook = true; ['input', 'change'].forEach(ev => el.addEventListener(ev, () => { el.dataset.beTouched = '1'; })); } });
 }
 
 function beNew() { window._beEditId = null; window._beNew = true; renderBillingEntities(); }
@@ -1210,6 +1221,7 @@ function beSave() {
     addressLine: val('be-address'), postalCity: val('be-postalcity'),
     email: val('be-email'), phone: val('be-phone'),
     bankName: val('be-bank'), iban: val('be-iban'), swift: val('be-swift'),
+    language: val('be-lang') || 'pl',
     defaultCurrency: val('be-currency').trim().toUpperCase(),
     defaultVatRate: val('be-vat'),
     numberPrefix: val('be-prefix'), footerNote: val('be-footer'),
@@ -1367,6 +1379,21 @@ if (!window._fvPrintHooked) {
   window.addEventListener('afterprint', _fvCleanup);
 }
 
+// Tłumaczenie na JĘZYK DOKUMENTU, a nie interfejsu: faktura idzie w języku spółki
+// wystawiającej. Korzysta z tych samych słowników co reszta aplikacji.
+function _fvT(txt, lang) {
+  if (!lang || lang === 'pl') return txt;
+  const d = window.DomainI18n && window.DomainI18n.dict && window.DomainI18n.dict[lang];
+  return (d && d[txt]) || txt;
+}
+
+function _fvDocLang(iss) {
+  if (iss && iss.language) return iss.language;
+  const c = iss && typeof BillingEntitiesModule !== 'undefined'
+    ? BillingEntitiesModule.COUNTRIES[iss.country] : null;
+  return (c && c.lang) || 'pl';
+}
+
 function printInvoiceDoc(id) {
   const inv = InvoicingModule.find(id);
   if (!inv) return;
@@ -1377,7 +1404,9 @@ function printInvoiceDoc(id) {
   const obj = inv.objectId ? ObjectsModule.find(inv.objectId) : null;
   const iss = _fvIssuer(inv);
   const cur = inv.currency || 'PLN';
-  const typeLabel = ((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Faktura').toUpperCase();
+  const dl = _fvDocLang(iss);                       // język dokumentu = język spółki
+  const t = (x) => _fvT(x, dl);
+  const typeLabel = t((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Faktura').toUpperCase();
   const m = (v) => _invNum(v) + ' ' + cur;
   const e = (v) => escapeHtml(String(v == null ? '' : v));
 
@@ -1399,9 +1428,9 @@ function printInvoiceDoc(id) {
   ].filter(Boolean) : [];
 
   const itemName = inv.sourceType
-    ? ((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || '') + ' ' + (inv.sourceNumber || '') +
-      ([inv.periodFrom, inv.periodTo].filter(Boolean).length ? ' — okres ' + [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ') : '')
-    : ((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Usługa') + (obj ? ' — ' + obj.name : '');
+    ? t((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || '') + ' ' + (inv.sourceNumber || '') +
+      ([inv.periodFrom, inv.periodTo].filter(Boolean).length ? ' — ' + t('okres') + ' ' + [inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – ') : '')
+    : t((InvoicingModule.TYPES[inv.invoiceType] || {}).label || 'Usługa') + (obj ? ' — ' + obj.name : '');
 
   const missing = [];
   if (!iss) missing.push('brak zdefiniowanego podmiotu wystawiającego (Sprzedawca)');
@@ -1417,7 +1446,7 @@ function printInvoiceDoc(id) {
     </div>
     ${missing.length ? `<div class="fv-noprint reminder-card" style="border-color:#F4D4A0;background:#FEF9EF;margin-bottom:14px;"><strong>Dokument niepełny</strong><div class="reminder-meta">${escapeHtml(missing.join('; '))}. Uzupełnij dane przed wysłaniem faktury do klienta.</div></div>` : ''}
 
-    <div id="fv-doc" class="fv-doc">
+    <div id="fv-doc" class="fv-doc" data-i18n-skip lang="${dl}">
       <div class="fv-head">
         <div>
           <img src="logo-waterai.png" alt="WaterAI" class="fv-logo" onerror="this.style.display='none'" />
@@ -1430,20 +1459,20 @@ function printInvoiceDoc(id) {
       </div>
 
       <div class="fv-dates">
-        <div><span>Data wystawienia</span><strong>${fmtDate(inv.issueDate)}</strong></div>
-        <div><span>Data sprzedaży</span><strong>${fmtDate(saleDate)}</strong></div>
-        <div><span>Termin płatności</span><strong>${fmtDate(inv.dueDate)}</strong></div>
-        <div><span>Sposób zapłaty</span><strong>Przelew</strong></div>
+        <div><span>${t('Data wystawienia')}</span><strong>${fmtDate(inv.issueDate)}</strong></div>
+        <div><span>${t('Data sprzedaży')}</span><strong>${fmtDate(saleDate)}</strong></div>
+        <div><span>${t('Termin płatności')}</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+        <div><span>${t('Sposób zapłaty')}</span><strong>${t('Przelew')}</strong></div>
       </div>
 
       <div class="fv-parties">
         <div class="fv-party">
-          <div class="lbl">Sprzedawca</div>
+          <div class="lbl">${t('Sprzedawca')}</div>
           <div class="nm">${e(iss ? iss.name : '—')}</div>
           ${issuerLines.map(l => `<div class="ln">${e(l)}</div>`).join('')}
         </div>
         <div class="fv-party">
-          <div class="lbl">Nabywca</div>
+          <div class="lbl">${t('Nabywca')}</div>
           <div class="nm">${e(client ? client.name : '—')}</div>
           ${clientLines.map(l => `<div class="ln">${e(l)}</div>`).join('')}
           ${obj ? `<div class="ln" style="margin-top:6px;font-size:11px;">Obiekt: ${e(obj.name)}</div>` : ''}
@@ -1452,19 +1481,19 @@ function printInvoiceDoc(id) {
 
       <table class="fv-t">
         <thead><tr>
-          <th style="width:26px;">Lp.</th>
-          <th>Nazwa usługi</th>
-          <th class="r">Ilość</th>
-          <th class="r">Cena netto</th>
-          <th class="r">Wartość netto</th>
+          <th style="width:26px;">${t('Lp.')}</th>
+          <th>${t('Nazwa usługi')}</th>
+          <th class="r">${t('Ilość')}</th>
+          <th class="r">${t('Cena netto')}</th>
+          <th class="r">${t('Wartość netto')}</th>
           <th class="r">VAT</th>
-          <th class="r">Kwota VAT</th>
-          <th class="r">Wartość brutto</th>
+          <th class="r">${t('Kwota VAT')}</th>
+          <th class="r">${t('Wartość brutto')}</th>
         </tr></thead>
         <tbody><tr>
           <td>1</td>
           <td>${e(itemName)}</td>
-          <td class="r">1 usł.</td>
+          <td class="r">${t('1 usł.')}</td>
           <td class="r">${m(inv.netAmount)}</td>
           <td class="r">${m(inv.netAmount)}</td>
           <td class="r">${e(inv.vatRate)}%</td>
@@ -1472,7 +1501,7 @@ function printInvoiceDoc(id) {
           <td class="r">${m(inv.grossAmount)}</td>
         </tr></tbody>
         <tfoot><tr>
-          <td colspan="4" class="r">Razem</td>
+          <td colspan="4" class="r">${t('Razem')}</td>
           <td class="r">${m(inv.netAmount)}</td>
           <td class="r">${e(inv.vatRate)}%</td>
           <td class="r">${m(inv.vatAmount)}</td>
@@ -1481,7 +1510,7 @@ function printInvoiceDoc(id) {
       </table>
 
       <div class="fv-total">
-        <div class="k">Do zapłaty</div>
+        <div class="k">${t('Do zapłaty')}</div>
         <div class="v">${m(inv.grossAmount)}</div>
       </div>
       <div class="fv-words">${(() => {
@@ -1489,39 +1518,38 @@ function printInvoiceDoc(id) {
         // fakturze w innym języku byłaby obcym wtrętem — słownik tego nie naprawi,
         // bo to tekst tworzony w locie, a nie stała fraza. W SK/CZ kwota słownie
         // nie jest wymagana, więc poza polskim po prostu jej nie drukujemy.
-        const lang = (typeof currentLanguage !== 'undefined') ? currentLanguage : 'pl';
-        return lang === 'pl' ? 'Słownie: ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
+        return dl === 'pl' ? 'Słownie: ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
       })()}</div>
 
       ${(iss && (iss.iban || iss.bankName)) ? `
       <div class="fv-box">
-        <div class="lbl">Płatność</div>
+        <div class="lbl">${t('Płatność')}</div>
         <div class="fv-grid">
-          ${iss.bankName ? `<div><span>Bank</span><strong>${e(iss.bankName)}</strong></div>` : ''}
-          ${iss.iban ? `<div style="grid-column:span 2;"><span>Numer konta / IBAN</span><strong>${e(iss.iban)}</strong></div>` : ''}
-          ${iss.swift ? `<div><span>SWIFT / BIC</span><strong>${e(iss.swift)}</strong></div>` : ''}
-          <div><span>Termin</span><strong>${fmtDate(inv.dueDate)}</strong></div>
-          <div><span>Tytułem</span><strong>${e(inv.invoiceNumber || '')}</strong></div>
+          ${iss.bankName ? `<div><span>${t('Bank')}</span><strong>${e(iss.bankName)}</strong></div>` : ''}
+          ${iss.iban ? `<div style="grid-column:span 2;"><span>${t('Numer konta / IBAN')}</span><strong>${e(iss.iban)}</strong></div>` : ''}
+          ${iss.swift ? `<div><span>${t('SWIFT / BIC')}</span><strong>${e(iss.swift)}</strong></div>` : ''}
+          <div><span>${t('Termin')}</span><strong>${fmtDate(inv.dueDate)}</strong></div>
+          <div><span>${t('Tytułem')}</span><strong>${e(inv.invoiceNumber || '')}</strong></div>
         </div>
       </div>` : ''}
 
       ${inv.sourceType ? `
       <div class="fv-box">
-        <div class="lbl">Podstawa rozliczenia</div>
+        <div class="lbl">${t('Podstawa rozliczenia')}</div>
         <div class="fv-grid">
-          <div><span>${e((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || 'Podstawa')}</span><strong>${e(inv.sourceNumber || ('#' + inv.sourceId))}</strong></div>
-          ${[inv.periodFrom, inv.periodTo].filter(Boolean).length ? `<div><span>Okres</span><strong>${e([inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – '))}</strong></div>` : ''}
-          ${inv.savedEnergy ? `<div><span>Oszczędność energii</span><strong>${_invNum(inv.savedEnergy)} ${e(inv.energyUnit || '')}</strong></div>` : ''}
-          ${inv.savedMoney ? `<div><span>Oszczędność kosztu</span><strong>${_invNum(inv.savedMoney)} ${e(cur)}</strong></div>` : ''}
-          ${inv.escoShare != null ? `<div><span>Udział WaterAI/ESCO</span><strong>${_invNum(inv.escoShare, 1)}%</strong></div>` : ''}
+          <div><span>${e(t((InvoicingModule.SOURCE_TYPES[inv.sourceType] || {}).label || 'Podstawa'))}</span><strong>${e(inv.sourceNumber || ('#' + inv.sourceId))}</strong></div>
+          ${[inv.periodFrom, inv.periodTo].filter(Boolean).length ? `<div><span>${t('Okres')}</span><strong>${e([inv.periodFrom, inv.periodTo].filter(Boolean).map(d => fmtDate(d)).join(' – '))}</strong></div>` : ''}
+          ${inv.savedEnergy ? `<div><span>${t('Oszczędność energii')}</span><strong>${_invNum(inv.savedEnergy)} ${e(inv.energyUnit || '')}</strong></div>` : ''}
+          ${inv.savedMoney ? `<div><span>${t('Oszczędność kosztu')}</span><strong>${_invNum(inv.savedMoney)} ${e(cur)}</strong></div>` : ''}
+          ${inv.escoShare != null ? `<div><span>${t('Udział WaterAI/ESCO')}</span><strong>${_invNum(inv.escoShare, 1)}%</strong></div>` : ''}
         </div>
       </div>` : ''}
 
-      ${inv.notes ? `<div class="fv-box"><div class="lbl">Uwagi</div><div>${e(inv.notes)}</div></div>` : ''}
+      ${inv.notes ? `<div class="fv-box"><div class="lbl">${t('Uwagi')}</div><div>${e(inv.notes)}</div></div>` : ''}
 
       <div class="fv-sign">
-        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">Osoba upoważniona do wystawienia</div></div>
-        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">Osoba upoważniona do odbioru</div></div>
+        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">${t('Osoba upoważniona do wystawienia')}</div></div>
+        <div class="fv-sign-box"><div class="fv-sign-line"></div><div class="fv-sign-cap">${t('Osoba upoważniona do odbioru')}</div></div>
       </div>
 
       <div class="fv-foot">
