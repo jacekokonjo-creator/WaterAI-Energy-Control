@@ -1449,7 +1449,13 @@ function _fvWords(n) {
   return out.join(' ').trim();
 }
 
-function _fvSlownie(v, cur) {
+// Kwota słownie w JĘZYKU DOKUMENTU. Liczebniki, odmianę waluty i uzgodnienie
+// rodzaju („dwa złote" vs „dwie korony", „dve eurá" vs „dva zloté") liczy
+// AmountWords (js/modules/amount-words.js). Wcześniej blok był wyłącznie polski,
+// więc na fakturze SK/CZ/DE/ES w ogóle się nie drukował.
+function _fvSlownie(v, cur, lang) {
+  if (window.AmountWords) return AmountWords.amount(v, cur || 'PLN', lang || 'pl');
+  // Zapasowo (moduł nie doszedł) — dotychczasowa wersja polska.
   const total = Math.round(Math.abs(Number(v) || 0) * 100);
   const int = Math.floor(total / 100), gr = total % 100;
   const grStr = String(gr).padStart(2, '0');
@@ -1657,13 +1663,7 @@ function printInvoiceDoc(id) {
         <div class="k">${t('Do zapłaty')}</div>
         <div class="v">${m(inv.grossAmount)}</div>
       </div>
-      <div class="fv-words">${(() => {
-        // Kwota słownie jest generowana po polsku (odmiana złoty/grosz), więc na
-        // fakturze w innym języku byłaby obcym wtrętem — słownik tego nie naprawi,
-        // bo to tekst tworzony w locie, a nie stała fraza. W SK/CZ kwota słownie
-        // nie jest wymagana, więc poza polskim po prostu jej nie drukujemy.
-        return dl === 'pl' ? t('Słownie:') + ' ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
-      })()}</div>
+      <div class="fv-words">${t('Słownie:') + ' ' + e(_fvSlownie(inv.grossAmount, cur, dl))}</div>
 
       ${(iss && (iss.iban || iss.bankName)) ? `
       <div class="fv-box">
