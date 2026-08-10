@@ -2049,14 +2049,15 @@ const ANAL_STYLE = `<style>
   .anw-rephead .sub{font-size:12px;color:var(--color-text-secondary);}
   .anw-rephead .num{font-size:13px;font-weight:700;color:#633806;text-align:right;white-space:nowrap;}
   .anw-step-card{border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--color-background-primary);}
-  table.anw-src{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}
-  table.anw-src th{text-align:left;padding:6px 9px;font-size:11px;font-weight:600;color:var(--color-text-secondary);background:var(--color-background-secondary);border-bottom:2px solid var(--color-border-tertiary);}
+  table.anw-src{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;line-height:1.5;}
+  table.anw-src th{text-align:left;padding:7px 10px;font-size:11px;font-weight:600;color:var(--color-text-secondary);background:var(--color-background-secondary);border-bottom:2px solid var(--color-border-tertiary);}
   table.anw-src th.b{color:#0C447C;background:#EEF4FB;} table.anw-src th.a{color:#27500A;background:#EAF3DE;}
-  table.anw-src td{padding:5px 9px;border-bottom:1px solid var(--color-border-tertiary);vertical-align:top;}
-  table.anw-src td.anw-src-l{color:var(--color-text-secondary);width:24%;font-size:11.5px;}
-  .anw-unit-idx{margin-top:10px;border-left:3px solid #0C447C;background:#F4F7FB;padding:9px 13px;border-radius:6px;}
+  table.anw-src td{padding:7px 10px;border-bottom:1px solid var(--color-border-tertiary);vertical-align:top;color:var(--color-text-primary);}
+  table.anw-src td.anw-src-l{color:var(--color-text-secondary);width:25%;font-size:12.5px;}
+  table.anw-src tr:last-child td{border-bottom:none;}
+  .anw-unit-idx{margin-top:10px;border-left:3px solid #0C447C;background:#F4F7FB;padding:10px 14px;border-radius:6px;font-size:12.5px;line-height:1.55;}
   .anw-step-card h4{margin:0 0 6px;font-size:14px;color:#0C447C;display:flex;align-items:center;gap:10px;}
-  .anw-step-num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#0C447C;color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+  .anw-step-num{flex:0 0 auto;min-width:24px;height:24px;padding:0 7px;box-sizing:border-box;border-radius:12px;background:#0C447C;color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;}
   .anw-formula{font-family:'Cambria Math','Times New Roman',Georgia,serif;background:#F4F7FB;border-left:3px solid #0C447C;padding:9px 13px;border-radius:6px;font-size:14.5px;margin:8px 0;overflow-x:auto;color:var(--color-text-primary);}
   .anw-desc{font-size:12.5px;color:var(--color-text-secondary);line-height:1.55;}
   .anw-desc li{margin:3px 0;}
@@ -2113,7 +2114,7 @@ const ANAL_STYLE = `<style>
     .anw-step-card h4{break-after:avoid;page-break-after:avoid;}
     .anw-desc{orphans:3;widows:3;}
     /* Atomowe bloki, których nie wolno rozcinać */
-    .anw-formula,.anw-pair,.anw-pair-col,table.anw-t,table.anw-bvs,.anw-g2,.anw-rgrid,.anw-tile,.anw-sign,.anw-chart-wrap canvas{break-inside:avoid;page-break-inside:avoid;}
+    .anw-formula,.anw-pair,.anw-pair-col,table.anw-t,table.anw-bvs,table.anw-src,.anw-unit-idx,.anw-g2,.anw-rgrid,.anw-tile,.anw-sign,.anw-chart-wrap canvas{break-inside:avoid;page-break-inside:avoid;}
     .anw-chart-wrap{gap:12px;margin-top:4px;}
     .anw-sign{margin-top:18px;}
     @page{margin:12mm;}
