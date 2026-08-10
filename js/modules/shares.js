@@ -142,14 +142,36 @@ function _shListResources(typeKey) {
 
 let _shType = 'measurement';
 let _shClientFilter = '';
+let _shRoleFilter = '';        // '' = wszystkie role zewnętrzne
+let _shUserSearch = '';        // szukanie po nazwisku / e-mailu
+
+// Nazwa użytkownika do wyświetlenia i do sortowania — jedna funkcja, żeby
+// kolejność kolumn zgadzała się z tym, co widać w nagłówku.
+function _shUserLabel(u) {
+  return String(u.fullName || u.email || '').trim();
+}
 
 function renderVisibilityModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
+  window._i18nRerender = () => renderVisibilityModule();   // patrz setLanguage() w index.html
 
   // Kolumny: tylko role, które BEZ udostępnienia nie widzą plików.
-  const users = (window.UsersModule ? UsersModule.getAll() : [])
+  // Admin, Back Office i Energy Analyst widzą wszystko z samej roli, więc nie ma
+  // czego im udostępniać — nie dostają kolumn i nie ma ich w filtrze.
+  const wszyscyZewnetrzni = (window.UsersModule ? UsersModule.getAll() : [])
     .filter(u => u.role === 'salesRepresentative' || u.role === 'client');
+
+  // Kolejność alfabetyczna wg reguł polskich (ą po a, ł po l), a nie kolejność
+  // z bazy — przy kilkunastu kontach lista „w dowolnej kolejności" była nie do
+  // przeszukania wzrokiem.
+  wszyscyZewnetrzni.sort((a, b) =>
+    _shUserLabel(a).localeCompare(_shUserLabel(b), 'pl', { sensitivity: 'base' }));
+
+  const q = _shUserSearch.trim().toLowerCase();
+  const users = wszyscyZewnetrzni.filter(u =>
+    (!_shRoleFilter || u.role === _shRoleFilter) &&
+    (!q || _shUserLabel(u).toLowerCase().includes(q) || String(u.email || '').toLowerCase().includes(q)));
 
   const clients = (window.ClientsModule ? ClientsModule.getAll() : []);
   let resources = _shListResources(_shType);
@@ -161,6 +183,20 @@ function renderVisibilityModule() {
     <button class="small-button" onclick="_shSetType('${t.key}')"
       style="${t.key === _shType ? 'background:var(--color-text-primary);color:#fff;border-color:var(--color-text-primary);' : ''}">
       ${t.icon} ${t.label}</button>`).join('');
+
+  // Filtr kolumn wg typu konta. Licznik pokazuje, ilu użytkowników ma daną rolę,
+  // więc od razu widać, czy pusta tabela to brak dokumentów, czy brak kont.
+  const roleTabs = [
+    { key: '', icon: '👥', label: 'Wszyscy' },
+    { key: 'salesRepresentative', icon: (window.UsersModule && UsersModule.ROLES.salesRepresentative.icon) || '🤝', label: 'Sales Representative' },
+    { key: 'client', icon: (window.UsersModule && UsersModule.ROLES.client.icon) || '👤', label: 'Client' }
+  ].map(r => {
+    const ile = r.key ? wszyscyZewnetrzni.filter(u => u.role === r.key).length : wszyscyZewnetrzni.length;
+    const akt = String(_shRoleFilter) === String(r.key);
+    return `<button class="small-button" onclick="_shSetRoleFilter('${r.key}')"
+      style="${akt ? 'background:var(--color-text-primary);color:#fff;border-color:var(--color-text-primary);' : ''}">
+      ${r.icon} ${r.label} (${ile})</button>`;
+  }).join('');
 
   const userHead = users.map(u => `
     <th style="padding:8px 10px;font-size:11px;font-weight:600;border-bottom:2px solid var(--color-border-tertiary);text-align:center;min-width:96px;">
@@ -189,7 +225,9 @@ function renderVisibilityModule() {
   const emptyInfo = moduleMissing
     ? 'Ten typ dokumentów nie jest jeszcze podłączony do wspólnej bazy.'
     : (users.length === 0
-        ? 'Brak użytkowników z rolą Sales Representative lub Client — nie ma komu udostępniać. Pozostałe role widzą wszystkie dokumenty automatycznie.'
+        ? (wszyscyZewnetrzni.length === 0
+            ? 'Brak użytkowników z rolą Sales Representative lub Client — nie ma komu udostępniać. Pozostałe role widzą wszystkie dokumenty automatycznie.'
+            : 'Żaden użytkownik nie pasuje do wybranego filtru kolumn.')
         : 'Brak dokumentów tego typu' + (_shClientFilter ? ' dla wybranego klienta' : '') + '.');
 
   container.innerHTML = `
@@ -205,6 +243,15 @@ function renderVisibilityModule() {
           <option value="">Wszyscy klienci</option>
           ${clients.map(c => `<option value="${c.id}" ${String(_shClientFilter) === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
         </select>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--color-border-tertiary);">
+        <span style="font-size:12px;color:var(--color-text-secondary);">Kolumny:</span>
+        ${roleTabs}
+        <input type="search" placeholder="Szukaj użytkownika..." value="${escapeHtml(_shUserSearch)}"
+          oninput="_shSetUserSearch(this.value)"
+          style="font-size:13px;padding:6px 10px;border:1px solid var(--color-border-tertiary);border-radius:8px;width:200px;" />
+        <span style="font-size:12px;color:var(--color-text-secondary);">
+          ${users.length} z ${wszyscyZewnetrzni.length} · kolejność alfabetyczna</span>
       </div>
     </div>
     ${(resources.length === 0 || users.length === 0)
@@ -227,6 +274,18 @@ window._shSetType = _shSetType;
 
 function _shSetClientFilter(v) { _shClientFilter = v; renderVisibilityModule(); }
 window._shSetClientFilter = _shSetClientFilter;
+
+function _shSetRoleFilter(v) { _shRoleFilter = v; renderVisibilityModule(); }
+window._shSetRoleFilter = _shSetRoleFilter;
+
+function _shSetUserSearch(v) {
+  _shUserSearch = v;
+  renderVisibilityModule();
+  // Przerysowanie gubi kursor — wracamy do pola i ustawiamy go na końcu wpisanego tekstu.
+  const el = document.querySelector('#module-content input[type=search]');
+  if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+}
+window._shSetUserSearch = _shSetUserSearch;
 
 // Zmiana checkboxa: W bez E → 'view'; E → 'edit' (wymusza W); nic → usunięcie wpisu.
 async function _shToggle(resourceUuid, userId, kind, el) {

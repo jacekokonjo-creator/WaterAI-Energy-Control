@@ -87,6 +87,7 @@ const SLOWNIKI = [
   'js/modules/i18n-ui-core.js',
   'js/modules/i18n-ui-core-2.js',
   'js/modules/i18n-ui-core-4.js',
+  'js/modules/i18n-instrukcja.js',
   'js/modules/i18n-ui-core-5.js',
   'js/modules/i18n-ui-core-3.js'
 ];
