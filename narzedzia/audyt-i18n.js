@@ -58,6 +58,7 @@ const PLIKI = [
   'js/modules/shares.js',
   'js/modules/users.js',
   'js/modules/backup.js',
+  'js/modules/auto-odswiezanie.js',
   'js/modules/instructions.js',
   'js/modules/role-preview.js',
   'js/modules/billing-entities.js',
@@ -236,6 +237,7 @@ const IGNORUJ = [
   /^\.[\w-]/,                                // „.csv,.xlsx", „.language-switcher button"
   /^'n|\\"/,                                 // resztki escapowania w zagnieżdżonym stringu
   /\bcatch\s*\(|\belse\s+if\b|\/\*/,
+  /^\\?" nieudane:$/,                          // ogon komunikatu console.warn, nie tekst na ekranie
   // ── symbole i skróty wzorów: takie same w każdym języku ──
   /^[A-ZΣ∑Δ]{1,3}[.\/#]?$/,
   /^(Tᵢ|ΣSD|∑SD|\/ ΣSD|\/ ∑SD|− Qs|Qs po|Qs przed|t TYM|t rzecz\.|HDD TYM|°C·dni|dni z₀|Dni z₀|PRZED→PO|T Outdoor|−15…\+10 ?°C|id, data|v[\d.]+)$/,

@@ -156,7 +156,12 @@
     // ── Moduł Widoczność: nowe napisy paska filtrów ──
     ['Szukaj użytkownika...', 'Hľadať používateľa...', 'Hledat uživatele...', 'Search for a user...', 'Benutzer suchen...', 'Buscar usuario...'],
     ['· kolejność alfabetyczna', '· abecedné poradie', '· abecední pořadí', '· alphabetical order', '· alphabetische Reihenfolge', '· orden alfabético'],
-    ['Żaden użytkownik nie pasuje do wybranego filtru kolumn.', 'Zvolenému filtru stĺpcov nezodpovedá žiadny používateľ.', 'Zvolenému filtru sloupců neodpovídá žádný uživatel.', 'No user matches the selected column filter.', 'Kein Benutzer entspricht dem gewählten Spaltenfilter.', 'Ningún usuario coincide con el filtro de columnas seleccionado.']
+    ['Żaden użytkownik nie pasuje do wybranego filtru kolumn.', 'Zvolenému filtru stĺpcov nezodpovedá žiadny používateľ.', 'Zvolenému filtru sloupců neodpovídá žádný uživatel.', 'No user matches the selected column filter.', 'Kein Benutzer entspricht dem gewählten Spaltenfilter.', 'Ningún usuario coincide con el filtro de columnas seleccionado.'],
+
+    // ── Pasek nowej wersji (auto-odswiezanie.js) ──
+    ['Dostępna jest nowsza wersja aplikacji.', 'K dispozícii je novšia verzia aplikácie.', 'K dispozici je novější verze aplikace.', 'A newer version of the application is available.', 'Eine neuere Version der Anwendung ist verfügbar.', 'Hay disponible una versión más reciente de la aplicación.'],
+    ['Odśwież', 'Obnoviť', 'Obnovit', 'Refresh', 'Aktualisieren', 'Actualizar'],
+    ['Zamknij', 'Zavrieť', 'Zavřít', 'Close', 'Schließen', 'Cerrar']
   ];
 
   const LANGS = ['sk', 'cs', 'en', 'de', 'es'];

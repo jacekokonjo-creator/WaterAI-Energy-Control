@@ -229,6 +229,14 @@ window.previewUserName = '';
       const content = document.getElementById('module-content');
       if (content) content.innerHTML = RolePreviewModule.render();
       RolePreviewModule.renderBanner();
+      window._i18nRerender = function () { window.openModule('rolePreview'); };   // patrz setLanguage()
+      // Podgląd ról pokazuje bieżący stan uprawnień, więc doba. Cykl przerysowuje
+      // widok i sprawdza wersję aplikacji (js/modules/auto-odswiezanie.js).
+      if (window.WaterAIAutoOdswiezanie) {
+        WaterAIAutoOdswiezanie.pilnuj('rolePreview', WaterAIAutoOdswiezanie.DOBA, function () {
+          window.openModule('rolePreview');
+        });
+      }
       return;
     }
     if (_prev) return _prev(moduleName);

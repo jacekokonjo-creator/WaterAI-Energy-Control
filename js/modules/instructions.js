@@ -310,6 +310,14 @@ window.InstructionsModule = InstructionsModule;
       const content = document.getElementById('module-content');
       if (content) content.innerHTML = InstructionsModule.render();
       window._i18nRerender = function () { window.openModule('instructions'); };   // patrz setLanguage()
+      // Instrukcja opisuje konfigurację ról i modułów, która zmienia się rzadko —
+      // stąd tydzień. Cykl przerysowuje stronę i sprawdza, czy nie wyszła nowsza
+      // wersja aplikacji (szczegóły w js/modules/auto-odswiezanie.js).
+      if (window.WaterAIAutoOdswiezanie) {
+        WaterAIAutoOdswiezanie.pilnuj('instructions', WaterAIAutoOdswiezanie.TYDZIEN, function () {
+          window.openModule('instructions');
+        });
+      }
       return;
     }
     if (_prev) return _prev(moduleName);
