@@ -1131,14 +1131,14 @@
       const password = document.getElementById("password").value.trim();
 
       if (!email || !password) {
-        alert(currentLanguage === "pl" ? "Wpisz login i hasło." : "Please enter login and password.");
+        alert("Wpisz login i hasło.");
         return;
       }
 
       try {
         await WaterAISupabase.signIn(email, password);
       } catch (e) {
-        alert((currentLanguage === "pl" ? "Logowanie nieudane: " : "Login failed: ") + (e.message || e));
+        alert("Logowanie nieudane: " + (e.message || e));
         return;
       }
       await enterApp();
@@ -1155,10 +1155,9 @@
           ? (e.message || '') + (e.code ? ' [kod: ' + e.code + ']' : '')
           : String(e);
         console.error('[enterApp] loadProfile:', e);
-        alert((currentLanguage === "pl"
-          ? "Dostęp zablokowany: to konto nie ma profilu w systemie WaterAI.\nKonta tworzy wyłącznie administrator w zakładce „Użytkownicy i role”."
-          : "Access blocked: this account has no profile in the WaterAI system.\nAccounts are created only by an administrator in the Users & Roles tab.")
-          + "\n\nSzczegóły techniczne / technical details:\n" + det);
+        alert("Dostęp zablokowany: to konto nie ma profilu w systemie WaterAI."
+          + "\nKonta tworzy wyłącznie administrator w zakładce „Użytkownicy i role”."
+          + "\n\nSzczegóły techniczne:\n" + det);
         await WaterAISupabase.signOut();
         return;
       }
@@ -1210,20 +1209,22 @@
       renderDashboard();
     }
 
+    // Komunikaty zawsze po polsku — tlumaczy je silnik i18n (DomainI18n opakowuje
+    // alert/confirm/prompt). Wczesniej byl tu warunek „polski albo angielski", przez
+    // co Niemiec, Czech, Slowak i Hiszpan dostawali angielszczyzne mimo wybranego jezyka.
     async function changeMyPassword() {
-      const pl = currentLanguage === "pl";
-      const p1 = prompt(pl ? "Nowe haslo (min. 6 znakow):" : "New password (min. 6 characters):");
+      const p1 = prompt("Nowe hasło (min. 6 znaków):");
       if (p1 === null) return;
-      if (!p1 || p1.length < 6) { alert(pl ? "Haslo musi miec min. 6 znakow." : "Password must be at least 6 characters."); return; }
-      const p2 = prompt(pl ? "Powtorz nowe haslo:" : "Repeat new password:");
+      if (!p1 || p1.length < 6) { alert("Hasło musi mieć min. 6 znaków."); return; }
+      const p2 = prompt("Powtórz nowe hasło:");
       if (p2 === null) return;
-      if (p1 !== p2) { alert(pl ? "Hasla sie roznia." : "Passwords do not match."); return; }
+      if (p1 !== p2) { alert("Hasła się różnią."); return; }
       try {
         const { error } = await WaterAISupabase.client.auth.updateUser({ password: p1 });
         if (error) throw error;
-        alert(pl ? "Haslo zostalo zmienione." : "Password changed.");
+        alert("Hasło zostało zmienione.");
       } catch (e) {
-        alert((pl ? "Nie udalo sie zmienic hasla: " : "Password change failed: ") + (e.message || e));
+        alert("Nie udało się zmienić hasła: " + (e.message || e));
       }
     }
 
@@ -1543,7 +1544,7 @@
       const firstDate = document.getElementById("reminder-date").value;
 
       if (!objectName || !firstDate) {
-        alert(currentLanguage === "pl" ? "Wpisz obiekt i datę pierwszego przypomnienia." : "Enter building and first reminder date.");
+        alert("Wpisz obiekt i datę pierwszego przypomnienia.");
         return;
       }
 
@@ -1624,6 +1625,8 @@
 <script src="js/modules/i18n-cs-backfill-5.js?v=1786353439"></script>
 <script src="js/modules/i18n-cs-backfill-6.js?v=1786353439"></script>
 <script src="js/modules/i18n-ui-core.js?v=1786388056"></script>
+<script src="js/modules/i18n-ui-core-2.js?v=1786389580"></script>
+<script src="js/modules/i18n-ui-core-3.js?v=1786389661"></script>
 <script src="js/modules/i18n-backfill-all.js?v=1786386804"></script>
 <script src="js/modules/i18n-parity-2026-08.js?v=1786385749"></script>
 <script src="js/modules/readings.js?v=1785753000"></script>

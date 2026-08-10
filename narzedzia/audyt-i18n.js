@@ -204,7 +204,20 @@ const IGNORUJ = [
   /^(Obchodný register|Zapsáno v obchodním|Commercial Register)/,   // wypisy z rejestrów spółek
   /^(Blue Boson AG|PostFinance AG|WaterAI Energy)$/,
   /^\d{2,3}[ -]?\d{2,3} [A-ZĽŠČ]/,           // adresy: „110 00 Praha 1", „02-454 Warszawa"
-  /^(readTime|std,|anw-|OB-INT|clients v|objects v|workflow items)/ // identyfikatory techniczne
+  /^(readTime|std,|anw-|OB-INT|clients v|objects v|workflow items)/,  // identyfikatory techniczne
+  // ── symbole i skróty wzorów: takie same w każdym języku ──
+  /^[A-ZΣ∑Δ]{1,3}[.\/#]?$/,
+  /^(Tᵢ|ΣSD|∑SD|\/ ΣSD|\/ ∑SD|− Qs|Qs po|Qs przed|t TYM|t rzecz\.|HDD TYM|°C·dni|dni z₀|Dni z₀|PRZED→PO|T Outdoor|−15…\+10 ?°C|id, data|v[\d.]+)$/,
+  // ── etykiety identyfikatorów podatkowych: zależą od KRAJU spółki, nie od języka UI ──
+  /^(DIČ \(CZ…\)|IČ DPH \(SK…\)|VAT-UE \(PL…\)|USt-IdNr \(DE…\)|VAT Reg\. No\. \(GB…\)|Company No\.|Firmenbuchnr\.)$/,
+  /^FV\/\d{4}\/\d{2}\/\d{3}$/,               // przykładowy numer faktury w podpowiedzi
+  /^#[\w-]+ [a-z]+$/,                        // selektory CSS: „#module-content form"
+  /^text-align:|^no-cache,/,                 // reguła CSS i nagłówek HTTP
+  /^application\/[\w.+-]+$/,                 // typy MIME
+  /^A\/#$/,                                  // symbol wzoru
+  /^szt\.\)\?$/,                             // ogon zdania rozbitego przez ${…}
+  // adresy i numery rejestrowe spółek grupy — dane, nie etykiety interfejsu
+  /^(CH-\d{4} |Gartenstrasse |\d{8} \(IČO\))/
 ];
 const pomijac = t => IGNORUJ.some(re => re.test(t));
 

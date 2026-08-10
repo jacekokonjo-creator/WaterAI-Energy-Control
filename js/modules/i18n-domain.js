@@ -5719,11 +5719,19 @@
     });
     mo.observe(document.body, { childList: true, subtree: true });
 
-    // opakowanie alert/confirm — komunikaty systemowe modułów
+    // opakowanie alert/confirm/prompt — komunikaty systemowe modułów.
+    // prompt() doszedł 2026-08-10: zmiana hasła pyta przez prompt, więc bez tego
+    // okno zostawało po polsku niezależnie od wybranego języka.
     const _alert = window.alert.bind(window);
     const _confirm = window.confirm.bind(window);
+    const _prompt = window.prompt ? window.prompt.bind(window) : null;
     window.alert = function (msg) { return _alert(DICT[lang()] ? translateString(String(msg)) : msg); };
     window.confirm = function (msg) { return _confirm(DICT[lang()] ? translateString(String(msg)) : msg); };
+    if (_prompt) {
+      window.prompt = function (msg, def) {
+        return _prompt(DICT[lang()] ? translateString(String(msg)) : msg, def);
+      };
+    }
 
     // przełączenie języka (setLanguage w index.html wywołuje renderDashboard →
     // observer i tak zadziała, ale dla pewności tłumaczymy też od razu)
