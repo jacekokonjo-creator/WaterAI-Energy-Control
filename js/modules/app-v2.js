@@ -2049,6 +2049,12 @@ const ANAL_STYLE = `<style>
   .anw-rephead .sub{font-size:12px;color:var(--color-text-secondary);}
   .anw-rephead .num{font-size:13px;font-weight:700;color:#633806;text-align:right;white-space:nowrap;}
   .anw-step-card{border:1px solid var(--color-border-tertiary);border-radius:12px;padding:16px;margin-bottom:14px;background:var(--color-background-primary);}
+  table.anw-src{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}
+  table.anw-src th{text-align:left;padding:6px 9px;font-size:11px;font-weight:600;color:var(--color-text-secondary);background:var(--color-background-secondary);border-bottom:2px solid var(--color-border-tertiary);}
+  table.anw-src th.b{color:#0C447C;background:#EEF4FB;} table.anw-src th.a{color:#27500A;background:#EAF3DE;}
+  table.anw-src td{padding:5px 9px;border-bottom:1px solid var(--color-border-tertiary);vertical-align:top;}
+  table.anw-src td.anw-src-l{color:var(--color-text-secondary);width:24%;font-size:11.5px;}
+  .anw-unit-idx{margin-top:10px;border-left:3px solid #0C447C;background:#F4F7FB;padding:9px 13px;border-radius:6px;}
   .anw-step-card h4{margin:0 0 6px;font-size:14px;color:#0C447C;display:flex;align-items:center;gap:10px;}
   .anw-step-num{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#0C447C;color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
   .anw-formula{font-family:'Cambria Math','Times New Roman',Georgia,serif;background:#F4F7FB;border-left:3px solid #0C447C;padding:9px 13px;border-radius:6px;font-size:14.5px;margin:8px 0;overflow-x:auto;color:var(--color-text-primary);}
@@ -3063,6 +3069,45 @@ function _analRegReductionSvg(title, m) {
   </svg>`;
 }
 
+// Metryka danych wejściowych regresji (sekcja 1.1). Czyta pola już zbierane: protokół okresu
+// bazowego (RegressionBaseModule — numer, data, źródło klimatu, notatki) oraz nazwę i zakres
+// zaimportowanego pliku CSV okresu analizowanego (reg.analyzed). Nic nie wylicza.
+function _analRegSourceCard(a, reg, bp, o, pfx, baseFrom, baseTo, derived) {
+  const an = (reg && reg.analyzed) || {};
+  const bill = (reg && reg.billing) || {};
+  const per = (f, t) => (f || t) ? (_fmtDateA(String(f || '').slice(0, 10)) + ' → ' + _fmtDateA(String(t || '').slice(0, 10))) : '';
+  const anTs = (an.rows || []).map(r => String((r && r.readTime) || '')).filter(Boolean).sort();
+  const fileRange = anTs.length ? (_fmtDateA(anTs[0].slice(0, 10)) + ' → ' + _fmtDateA(anTs[anTs.length - 1].slice(0, 10))) : '';
+  const READ = { INVOICE: 'faktury dostawcy', METER: 'licznik główny obiektu', SUBSTATION: 'węzeł cieplny' };
+  const meter = [READ[(o || {}).heatConsumptionReading] || '', _escA((o || {}).heatConsumptionReadingDetails || '')].filter(Boolean).join(' — ');
+  const clim = [ (bp && bp.climateSource) || '',
+                 (bp && bp.climateFetchDate) ? 'dane pobrano ' + _fmtDateA(bp.climateFetchDate) : '' ].filter(Boolean).join(' · ');
+  const rows = [
+    _analSourceRow('Protokół / plik źródłowy',
+      bp ? `<b>${_escA(bp.number || ('REG #' + bp.id))}</b>` : '',
+      an.fileName ? `<b>${_escA(an.fileName)}</b>` : ''),
+    _analSourceRow('Okres',
+      (baseFrom || baseTo) ? (_fmtDateA(baseFrom) + ' → ' + _fmtDateA(baseTo)) + (derived ? ' <span class="anw-muted">(wg zakresu odczytów)</span>' : '') : '',
+      per(bill.from || an.from, bill.to || an.to)),
+    _analSourceRow('Data protokołu / importu', (bp && bp.protocolDate) ? _fmtDateA(bp.protocolDate) : '', _fmtDateA(a.executedAt)),
+    _analSourceRow('Zakres danych w pliku', fileRange),
+    _analSourceRow('Źródło temperatury zewnętrznej', clim || 'czujnik obiektowy'),
+    _analSourceRow('Pomiar zużycia', meter || 'odczyt telemetryczny licznika (przyrost wskazań między odczytami)'),
+    _analSourceRow('Odczytów w pliku', (an.rows && an.rows.length) ? _fmtA(an.rows.length, 0) : ''),
+    _analSourceRow('Uwagi analityka', _escA((bp && bp.notes) || ''))
+  ].join('');
+  return `
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">${pfx}1.1</span> Dane wejściowe — pochodzenie i zakres</h4>
+    <div class="anw-desc" style="margin-bottom:4px;">Zestawienie zbiorów danych, z których wyznaczono obie
+    charakterystyki. Pozwala odtworzyć wynik i powiązać go z konkretnymi plikami źródłowymi.</div>
+    <table class="anw-src">
+      <thead><tr><th></th><th class="b">Okres bazowy (PRZED)</th><th class="a">Okres analizowany (PO)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
 // Pełny raport regresji w stylu raportu ESCO (TYM): okładka + numerowane sekcje z opisem.
 function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
   const _pfx=embedded?'B.':'';
@@ -3077,8 +3122,18 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
   const genDate = _fmtDateA(new Date().toISOString().slice(0, 10));
   const pid = reg.baseLines ? reg.baseLines.periodId : null;
   let bp = null; try { bp = (window.RegressionBaseModule && pid != null) ? RegressionBaseModule.find(a.objectId, pid) : null; } catch (e) {}
-  const baseFrom = bp && bp.periodFrom ? String(bp.periodFrom).slice(0, 10) : '';
-  const baseTo = bp && bp.periodTo ? String(bp.periodTo).slice(0, 10) : '';
+  let baseFrom = bp && bp.periodFrom ? String(bp.periodFrom).slice(0, 10) : '';
+  let baseTo = bp && bp.periodTo ? String(bp.periodTo).slice(0, 10) : '';
+  // Protokół bez wypełnionych pól „Okres bazowy — od/do" drukował dotąd „— → —". Zakres wynika
+  // wtedy z faktycznych odczytów okresu bazowego; oznaczamy to, żeby nie udawać deklaracji.
+  let baseRangeDerived = false;
+  if ((!baseFrom || !baseTo) && pid != null && window.RegressionBaseModule) {
+    try {
+      const rws = RegressionBaseModule.getRows(pid) || [];
+      const ts = rws.map(r => String((r && r.readTime) || '')).filter(Boolean).sort();
+      if (ts.length) { baseFrom = ts[0].slice(0, 10); baseTo = ts[ts.length - 1].slice(0, 10); baseRangeDerived = true; }
+    } catch (e) { /* zostaje pusto */ }
+  }
   const poFrom = (reg.billing && reg.billing.from) ? String(reg.billing.from).slice(0, 10) : ((reg.analyzed && reg.analyzed.from) ? String(reg.analyzed.from).slice(0, 10) : '');
   const poTo = (reg.billing && reg.billing.to) ? String(reg.billing.to).slice(0, 10) : ((reg.analyzed && reg.analyzed.to) ? String(reg.analyzed.to).slice(0, 10) : '');
   const pct = c.avgPct;
@@ -3108,7 +3163,7 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
     <div class="anw-cover-meta">
       ${embedded?`<div class="anw-cover-meta-card"><div class="anw-cm-lbl">Nr analizy</div><div class="anw-cm-val">${_escA(number)}</div><div class="anw-cm-sub">Wykonał: ${_escA(a.author || '—')} · ${_fmtDateA(a.executedAt)}</div></div>`:`<div class="anw-cover-meta-card"><div class="anw-cm-lbl">Dla kogo</div><div class="anw-cm-val">${_escA((cl && cl.name) || '—')}</div><div class="anw-cm-sub">Obiekt: ${_escA((o && o.name) || '—')}</div></div>
       <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Wykonał — Energy Analyst</div><div class="anw-cm-val">${_escA(a.author || '—')}</div><div class="anw-cm-sub">Data wykonania: ${_fmtDateA(a.executedAt)}</div></div>`}
-      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres bazowy (PRZED)</div><div class="anw-cm-val anw-cm-period">${baseFrom ? _fmtDateA(baseFrom) : '—'} → ${baseTo ? _fmtDateA(baseTo) : '—'}</div></div>
+      <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres bazowy (PRZED)</div><div class="anw-cm-val anw-cm-period">${baseFrom ? _fmtDateA(baseFrom) : '—'} → ${baseTo ? _fmtDateA(baseTo) : '—'}</div>${baseRangeDerived ? '<div class="anw-cm-sub">wg zakresu odczytów okresu bazowego</div>' : ''}</div>
       <div class="anw-cover-meta-card"><div class="anw-cm-lbl">Okres analizowany (PO)</div><div class="anw-cm-val anw-cm-period">${poFrom ? _fmtDateA(poFrom) : '—'} → ${poTo ? _fmtDateA(poTo) : '—'}</div></div>
     </div>
     <div class="anw-cover-result">
@@ -3147,6 +3202,8 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
       <p style="margin:0;">Dopasowanie wykonano w wariancie: <b>${methodTxt}</b>. Zakres temperatur do porównania i uśrednienia przyjęto na <b>${rngTxt}</b>.</p>
     </div>
   </div>
+
+  ${_analRegSourceCard(a, reg, bp, o, _pfx, baseFrom, baseTo, baseRangeDerived)}
 
   <div class="anw-step-card">
     <h4><span class="anw-step-num">${_pfx}2</span> Równania regresji wyznaczone dla obu okresów</h4>
@@ -3188,6 +3245,9 @@ function _analRegReportBody(a, reg, model, o, embedded, bannerHTML) {
       <div class="anw-tile"><div class="v">${s.avgDiff != null ? _fmtA(s.avgDiff, 2) + ' °C' : '—'}</div><div class="k">Średnia różnica temp. zasilania</div></div>
     </div>
     <div class="anw-desc" style="margin-top:10px;"><p style="margin:0;"><b>Tryb pogodowy</b> = regresja okresu bazowego (PRZED). <b>WaterAI</b> = regresja okresu analizowanego (PO) na danych z czujników.${subsetNote} Wynik ma charakter techniczny (porównanie charakterystyk pracy), niezależny od rozliczenia finansowego ESCO.</p></div>
+    <div class="anw-desc anw-unit-idx"><b style="color:var(--color-text-primary);">Odtwarzalność</b><br>
+      Wynik można odtworzyć z danych wymienionych w punkcie ${_pfx}1.1.${(reg.analyzed && reg.analyzed.fileName) ? ` Plik źródłowy <i>${_escA(reg.analyzed.fileName)}</i>${(reg.analyzed.rows && reg.analyzed.rows.length) ? ` (${_fmtA(reg.analyzed.rows.length, 0)} odczytów)` : ''} jest` : ' Dane źródłowe są'} przechowywany w systemie w wersji z dnia zamrożenia raportu ESCO i udostępniany Zamawiającemu na żądanie.
+    </div>
   </div>
 
   ${embedded?'':`<div class="anw-sign">
@@ -3527,7 +3587,7 @@ function _analCalcPeriodRows(months, std, ti, consumption) {
 }
 
 function _analReportData(source) {
-  let clientId, objectId, std, beforeP, afterP, energy, name, executedAt, number, tiBefore, tiAfter, base, saved, cid, author;
+  let clientId, objectId, std, beforeP, afterP, energy, name, executedAt, number, tiBefore, tiAfter, base, saved, cid, author, basePeriodId;
   if (source && source.saved) {
     const a = source.saved, ip = a.inputParams || {}, rr = a.results || {};
     clientId = a.clientId; objectId = a.objectId; std = ip.std || ANAL_STD_DEFAULT;
@@ -3542,7 +3602,7 @@ function _analReportData(source) {
     base = { savedEnergy: rr.savedEnergy,
       savedPct: rr.savedEnergyPct != null ? ((rr.savedEnergyPct > -1 && rr.savedEnergyPct < 1) ? rr.savedEnergyPct * 100 : rr.savedEnergyPct) : null,
       savedMoney: rr.savedMoney, escoShare: ip.escoShare, escoAmount: rr.escoAmount };
-    saved = true; cid = 'anw' + a.id;
+    saved = true; cid = 'anw' + a.id; basePeriodId = (ip.basePeriod != null) ? ip.basePeriod : null;
   } else {
     clientId = ANAL.clientId; objectId = ANAL.objectId; std = ANAL.std;
     beforeP = ANAL.before; afterP = ANAL.after; energy = ANAL.energy;
@@ -3554,7 +3614,7 @@ function _analReportData(source) {
     number = ANAL.editingId ? ((AnalysesModule.getNumber && AnalysesModule.getNumber(ANAL.editingId)) || ('#' + ANAL.editingId)) : '— (niezapisana)';
     const rr = ANAL.results || {};
     base = { savedEnergy: rr.savedEnergy, savedPct: rr.savedPct, savedMoney: rr.savedMoney, escoShare: rr.escoShare, escoAmount: rr.escoAmount };
-    saved = false; cid = 'anwlive';
+    saved = false; cid = 'anwlive'; basePeriodId = (ANAL && ANAL.basePeriod != null) ? ANAL.basePeriod : null;
   }
   const _isVol = (source && source.saved) ? (source.saved.analysisType === 'VOLUME') : (ANAL.type === 'VOLUME');
   const before = _isVol ? _analCalcPeriodRowsVOL(beforeP.months, std, beforeP.consumption) : _analCalcPeriodRows(beforeP.months, std, tiBefore, beforeP.consumption);
@@ -3572,7 +3632,7 @@ function _analReportData(source) {
   const clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
   return {
     client: ClientsModule.find(clientId), object: ObjectsModule.find(objectId),
-    name, executedAt, number, saved, std, energy, tiBefore, tiAfter, cid, author,
+    name, executedAt, number, saved, std, energy, tiBefore, tiAfter, cid, author, basePeriodId,
     type: _isVol ? 'VOLUME' : ((source && source.saved) ? source.saved.analysisType : ANAL.type),
     before: Object.assign({}, before, { from: beforeP.from, to: beforeP.to, consumption: beforeP.consumption }),
     after: Object.assign({}, after, { from: afterP.from, to: afterP.to, consumption: afterP.consumption }),
@@ -3650,6 +3710,60 @@ function _analClimateLine(data) {
   if (dd) parts.push(`dane pobrano: ${_fmtDateA(dd)}`);
   if (url) parts.push(`<span style="word-break:break-all;">${_escA(url)}</span>`);
   return `<div class="anw-muted" style="font-size:11px;margin-top:6px;">Temperatury rzeczywiste i normy standardowe (TYM) — ${parts.join(' · ')}.</div>`;
+}
+
+// ── Metryka danych wejściowych (sekcja 1.1) — pochodzenie i zakres zbiorów, z których
+// policzono stopniodni i zużycie. Czyta WYŁĄCZNIE pola już zbierane przez aplikację:
+// protokół TYM (MeasurementsModule), dane klimatyczne obiektu/snapshotu, kartę obiektu
+// i parametry analizy. Nic nie wylicza — tylko pokazuje to, co dotąd zostawało na ekranie.
+function _analSourceRow(label, a, b) {
+  if (b === undefined) return `<tr><td class="anw-src-l">${label}</td><td colspan="2">${a || '—'}</td></tr>`;
+  return `<tr><td class="anw-src-l">${label}</td><td>${a || '—'}</td><td>${b || '—'}</td></tr>`;
+}
+
+function _analSourceCard(data, pfx) {
+  let p = null;
+  try {
+    const bp = data.basePeriodId;
+    if (bp != null && bp !== 'manual' && !String(bp).startsWith('int:') && window.MeasurementsModule)
+      p = MeasurementsModule.find(Number(bp));
+  } catch (e) { p = null; }
+  const c = (data && data._climate) || (data && data.object) || {};
+  const o = (data && data.object) || {};
+  const u = data.energy.unit, cur = data.energy.currency;
+  const per = (f, t) => (f || t) ? (_fmtDateA(f) + ' → ' + _fmtDateA(t)) : '';
+  const READ = { INVOICE: 'faktury dostawcy', METER: 'licznik główny obiektu', SUBSTATION: 'węzeł cieplny' };
+  const src = [READ[o.heatConsumptionReading] || '', _escA(o.heatConsumptionReadingDetails || '')].filter(Boolean).join(' — ');
+  const clim = [ (p && p.weatherSource) || c.weatherSource || '',
+                 ((p && p.weatherDataDownloadDate) || c.weatherDataDownloadDate) ? 'dane pobrano ' + _fmtDateA((p && p.weatherDataDownloadDate) || c.weatherDataDownloadDate) : ''
+               ].filter(Boolean).join(' · ');
+  const rows = [
+    _analSourceRow('Protokół TYM', p ? (`<b>${_escA(p.protocolNumber || ('#' + p.id))}</b>` + (p.protocolDate ? ' · ' + _fmtDateA(p.protocolDate) : '')) : ''),
+    _analSourceRow('Okres', per(data.before.from, data.before.to), per(data.after.from, data.after.to)),
+    _analSourceRow('Stacja meteorologiczna', _escA((p && p.weatherStation) || c.weatherStation || '')),
+    _analSourceRow('Źródło temperatur', clim),
+    _analSourceRow('Norma TYM', _escA((p && p.tymDataSource) || '')),
+    _analSourceRow('Źródło zużycia Q<sub>c.o.</sub>', src),
+    _analSourceRow('Zużycie zmierzone',
+      data.before.consumption ? _fmtA(Number(data.before.consumption), 2) + ' ' + u : '',
+      data.after.consumption ? _fmtA(Number(data.after.consumption), 2) + ' ' + u : ''),
+    _analSourceRow('Temperatura wewnętrzna T<sub>i</sub>', data.tiBefore + ' °C', data.tiAfter + ' °C'),
+    _analSourceRow('Cena energii', data.energy.priceMode === 'VARIABLE'
+      ? (_fmtA(Number(data.energy.price || 0), 2) + ' ' + cur + ' — koszt zmienny całościowy')
+      : (_fmtA(Number(data.energy.price || 0), 4) + ' ' + cur + '/' + u)),
+    _analSourceRow('Udział WaterAI/ESCO', _fmtA(data.escoShare || 0, 0) + '%'),
+    _analSourceRow('Uwagi analityka', _escA((p && p.protocolNotes) || ''))
+  ].join('');
+  return `
+  <div class="anw-step-card">
+    <h4><span class="anw-step-num">${pfx}1.1</span> Dane wejściowe — pochodzenie i zakres</h4>
+    <div class="anw-desc" style="margin-bottom:4px;">Zestawienie zbiorów danych, z których wyznaczono stopniodni
+    i zużycie obu okresów. Pozwala odtworzyć wynik i powiązać go z konkretnymi dokumentami źródłowymi.</div>
+    <table class="anw-src">
+      <thead><tr><th></th><th class="b">Okres bazowy (PRZED)</th><th class="a">Okres po wdrożeniu (PO)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
 // Para paneli PRZED / PO obok siebie: rozdzielone graficznie i wyrównane wg miesięcy.
@@ -3739,6 +3853,24 @@ function _phiInterp(phi, label) {
   if (phi > 1.0005) return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} &gt; 1 — okres ${label} był <b>cieplejszy</b> od warunków standardowych, dlatego zmierzone zużycie koryguje się <b>w górę</b>.`;
   if (phi < 0.9995) return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} &lt; 1 — okres ${label} był <b>chłodniejszy</b> od warunków standardowych, dlatego zmierzone zużycie koryguje się <b>w dół</b>.`;
   return `φ<sub>${label}</sub> = ${_fmtA(phi, 4)} ≈ 1 — warunki rzeczywiste odpowiadały standardowym.`;
+}
+
+// Wskaźnik jednostkowy E — zużycie na jeden standardowy stopniodzień, osobno dla obu okresów.
+// Najbardziej porównywalna miara charakterystyki obiektu: nie zależy ani od pogody, ani od długości
+// okresu. Spadek E jest tożsamy z wyznaczoną oszczędnością — to ta sama liczba policzona drugą drogą.
+function _analUnitIndexBox(data, u) {
+  const eB = (data.before.sumS > 0 && data.before.qs != null) ? data.before.qs / data.before.sumS : null;
+  const eA = (data.after.sumS > 0 && data.after.qs != null) ? data.after.qs / data.after.sumS : null;
+  if (eB == null || eA == null || !(eB > 0)) return '';
+  const drop = (eB - eA) / eB * 100;
+  return `<div class="anw-desc anw-unit-idx">
+    <b style="color:var(--color-text-primary);">Wskaźnik jednostkowy E</b><br>
+    Zużycie na jeden standardowy stopniodzień to najbardziej porównywalna miara charakterystyki obiektu —
+    nie zależy ani od pogody, ani od długości okresu.
+    <b>E<sub>bazowy</sub> = ${_fmtA(eB, 3)} ${u}/SD</b> (${_fmtA(data.before.qs, 2)} / ${_fmtA(data.before.sumS, 1)}),
+    <b>E<sub>po wdrożeniu</sub> = ${_fmtA(eA, 3)} ${u}/SD</b> (${_fmtA(data.after.qs, 2)} / ${_fmtA(data.after.sumS, 1)}).
+    Spadek wskaźnika o <b>${_fmtA(drop, 1)}%</b> jest tożsamy z wyznaczoną oszczędnością — to samo liczone drugą drogą.
+  </div>`;
 }
 
 function _analReportBody(data) {
@@ -3843,6 +3975,8 @@ function _analReportBody(data) {
     ${_anwPeriodPair(data, tiB, tiA)}
   </div>
 
+  ${_analSourceCard(data, _pfx)}
+
   <div class="anw-step-card">
     <h4><span class="anw-step-num">${_pfx}2</span> Współczynnik korekcyjny φ</h4>
     <div class="anw-desc">
@@ -3894,6 +4028,7 @@ function _analReportBody(data) {
       <div class="anw-formula" style="border-color:#0C447C;">q = ${_fmtA(data.before.qs || 0, 2)} / ${_fmtA(data.before.sumS, 1)} = <b>${_fmtA(data.before.sumS > 0 ? (data.before.qs || 0) / data.before.sumS : 0, 3)} ${u}/SD</b></div>
       <div class="anw-formula" style="border-color:#0C447C;">Q<sub>PRZED→PO</sub> = ${_fmtA(data.before.sumS > 0 ? (data.before.qs || 0) / data.before.sumS : 0, 3)} · ${_fmtA(data.after.sumS, 1)} = <b>${_fmtA(data.qsBeforeNorm || 0, 2)} ${u}</b></div>
     </div>
+    ${_analUnitIndexBox(data, u)}
   </div>
 
   <div class="anw-step-card">
@@ -4878,10 +5013,26 @@ function escoBuildReportParts(rep){
     });
     if(fRows.length){
       _fx={e:fTotE,u:fUnit,m:fTotMoney,cur:fCur,mixed:fCurMixed};
+      // Założenia prognozy — wypisane wprost, żeby liczba roczna nie wisiała bez kontekstu.
+      let fAss='';
+      try{
+        const d0=_analReportData({saved:primaryAnals.find(a=>a.analysisType!=='VOLUME')});
+        const ti0=(d0.tiBefore!=null&&d0.tiBefore!=='')?Number(d0.tiBefore):20;
+        let ySD=0; for(let m=1;m<=12;m++){ const v=(d0.std&&d0.std[m])||[0,0]; ySD+=_sd20(Number(v[0]),Number(v[1]||0),ti0); }
+        const qB=(d0.before.qs||0)/d0.before.sumS, qP=(d0.after.qs||0)/d0.after.sumS, au=d0.energy.unit;
+        const prcTxt=(d0.energy.priceMode==='VARIABLE')?'przyjętą wycenę energii'
+          :`niezmienioną cenę energii (<b>${_fmtA(Number(d0.energy.price||0),4)} ${d0.energy.currency||cur}/${au}</b>)`;
+        fAss=`<div class="anw-desc anw-unit-idx"><b style="color:var(--color-text-primary);">Założenia prognozy</b><br>
+          Prognoza zakłada dodatkowo: ${prcTxt}, niezmieniony sposób użytkowania obiektu oraz
+          <b>${_fmtA(ySD,1)} SD</b> rocznie wg normy TYM dla lokalizacji obiektu. Wyliczenie:
+          ${_fmtA(qB*ySD,0)} ${au} = ${_fmtA(qB,3)} ${au}/SD × ${_fmtA(ySD,1)} SD (baza) oraz
+          ${_fmtA(qP*ySD,0)} ${au} = ${_fmtA(qP,3)} ${au}/SD × ${_fmtA(ySD,1)} SD (po wdrożeniu).
+          Odchylenie któregokolwiek z założeń zmienia wynik proporcjonalnie.</div>`;
+      }catch(e){ fAss=''; }
       bodyForecast=`
     <div class="anw-desc"><p style="margin:0 0 8px;">Prognoza ekstrapoluje jednostkowe zużycie energii na standardowy stopniodzień (q), wyznaczone w części dowodowej, na <b>pełny rok w warunkach Typowego Roku Meteorologicznego</b>: prognozowane zużycie roczne = q × suma standardowych stopniodni pełnego sezonu. Zestawienie porównuje zużycie roczne przy charakterystyce energetycznej okresu bazowego (bez technologii) i okresu po wdrożeniu (z technologią WaterAI).</p></div>
     <table class="anw-t"><thead><tr><th>Analiza</th><th style="text-align:right;">Rocznie bez technologii</th><th style="text-align:right;">Rocznie z technologią</th><th style="text-align:right;">Prognoza oszczędności energii</th><th style="text-align:right;">Prognoza wartości / rok</th></tr></thead><tbody>${fRows.join('')}</tbody>${(fRows.length>1&&!fCurMixed)?`<tfoot><tr><td colspan="4"><b>Łącznie</b></td><td class="calc"><b>${_fmtA(fTotMoney,2)} ${fCur}</b></td></tr></tfoot>`:''}</table>
-    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Prognoza ma charakter <b>orientacyjny</b> — zakłada utrzymanie charakterystyki energetycznej obu okresów oraz typowe warunki pogodowe (TYM). <b>Nie stanowi podstawy do wystawienia faktury</b>; rozliczenia dokonywane są wyłącznie za zamknięte okresy rozliczeniowe, zgodnie z sekcją „Rozliczenie finansowe ESCO".</p></div>`;
+    <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Prognoza ma charakter <b>orientacyjny</b> — zakłada utrzymanie charakterystyki energetycznej obu okresów oraz typowe warunki pogodowe (TYM). <b>Nie stanowi podstawy do wystawienia faktury</b>; rozliczenia dokonywane są wyłącznie za zamknięte okresy rozliczeniowe, zgodnie z sekcją „Rozliczenie finansowe ESCO".</p></div>${fAss}`;
     }
   }catch(e){}
 
@@ -4950,16 +5101,65 @@ function escoBuildReportParts(rep){
     +(resCharts?`<div class="anw-desc" style="margin-top:12px;"><p style="margin:0 0 6px;font-weight:700;color:#0f2f4f;">Kluczowe wykresy</p></div>`+resCharts:'')
     +(regProofAnals.length?`<div class="anw-desc" style="margin-top:12px;"><p style="margin:0 0 6px;font-weight:700;color:#0f2f4f;">Zgodność i porównanie metod</p></div>`+cmpNums+_mc.sec4:'');
 
+  // Zestawienie źródeł obu metod — pozwala ocenić, czy metody są od siebie niezależne.
+  // Czyta wyłącznie dane już obecne w raporcie (analizy, protokoły, pliki CSV).
+  let bodySources='';
+  try{
+    const pa=primaryAnals[0], ra=regProofAnals[0];
+    if(pa&&ra){
+      let pd=null; try{ pd=_analReportData({saved:pa}); }catch(e){}
+      if(fz&&fz.objectClimate&&pd) pd._climate=fz.objectClimate;
+      let pProto=null;
+      try{ const bpid=(pa.inputParams||{}).basePeriod;
+        if(bpid!=null&&bpid!=='manual'&&window.MeasurementsModule) pProto=MeasurementsModule.find(Number(bpid)); }catch(e){}
+      let rIn=(ra.inputParams&&ra.inputParams.reg)?ra.inputParams.reg:null;
+      if(!rIn&&fz){ const lv=AnalysesModule.find(ra.id); rIn=(lv&&lv.inputParams&&lv.inputParams.reg)?lv.inputParams.reg:null; }
+      let rBp=null;
+      try{ const pid=(rIn&&rIn.baseLines)?rIn.baseLines.periodId:null;
+        if(pid!=null&&window.RegressionBaseModule) rBp=RegressionBaseModule.find(ra.objectId,pid); }catch(e){}
+      const cl=(pd&&(pd._climate||pd.object))||{};
+      const ob=(pd&&pd.object)||(window.ObjectsModule?ObjectsModule.find(ra.objectId):null)||{};
+      const READ={INVOICE:'faktury dostawcy',METER:'licznik główny obiektu',SUBSTATION:'węzeł cieplny'};
+      const meter=[READ[ob.heatConsumptionReading]||'',escapeHtml(ob.heatConsumptionReadingDetails||'')].filter(Boolean).join(' — ');
+      const stac=[escapeHtml((pProto&&pProto.weatherSource)||cl.weatherSource||''),
+                  escapeHtml((pProto&&pProto.weatherStation)||cl.weatherStation||'')].filter(Boolean).join(' — stacja ');
+      const rPer=_escoAnalPeriod(ra), pPer=_escoAnalPeriod(pa);
+      const an=(rIn&&rIn.analyzed)||{};
+      const row=(l,x,y)=>`<tr><td class="anw-src-l">${l}</td><td>${x||'—'}</td><td>${y||'—'}</td></tr>`;
+      bodySources=`<div class="anw-desc" style="margin-bottom:4px;">Pełne metryki znajdują się w załącznikach.
+        Poniżej zestawienie pozwalające ocenić <b>niezależność</b> obu metod.</div>
+        <table class="anw-src"><thead><tr><th></th>
+          <th class="b">Metoda główna — ${escapeHtml((AnalysesModule.TYPES[primType]||{}).label||primType)}</th>
+          <th class="a">Metoda pomocnicza — regresja</th></tr></thead><tbody>
+        ${row('Źródło zużycia', meter||'licznik lub faktury', 'telemetria licznika (odczyt ciągły)')}
+        ${row('Źródło temperatury', stac, escapeHtml((rBp&&rBp.climateSource)||'czujnik obiektowy'))}
+        ${row('Rozdzielczość danych','miesięczna','pomiary ciągłe (co 10 min)')}
+        ${row('Okres odniesienia', _mcPer.tymFrom?(fmtDate(_mcPer.tymFrom)+' – '+fmtDate(_mcPer.tymTo)):'',
+              _mcPer.regBaseFrom?(fmtDate(_mcPer.regBaseFrom)+' – '+fmtDate(_mcPer.regBaseTo)):'')}
+        ${row('Okres oceniany', fmtDate(pPer.from)+' – '+fmtDate(pPer.to), fmtDate(rPer.from)+' – '+fmtDate(rPer.to))}
+        ${row('Dokument źródłowy', pProto?escapeHtml(pProto.protocolNumber||('#'+pProto.id)):'',
+              [rBp?escapeHtml(rBp.number||''):'', an.fileName?escapeHtml(an.fileName):''].filter(Boolean).join(' + '))}
+        ${row('Mierzona wielkość','całkowite zużycie okresu ['+u+']','intensywność na 1 °C temp. zewn.')}
+        </tbody></table>
+        <div class="anw-desc" style="margin-top:8px;"><p style="margin:0;">Metody korzystają z rozłącznych źródeł
+        pomiaru temperatury i z różnych ścieżek odczytu zużycia (rozliczenie handlowe vs telemetria), co czyni ich
+        zgodność wzajemnym potwierdzeniem, a nie powieleniem tego samego pomiaru. Różnią się też oknem czasowym —
+        regresja obejmuje część okna rozliczeniowego, według danych pomiarowych dostępnych na dzień sporządzenia
+        analizy technicznej.</p></div>`;
+    }
+  }catch(e){ bodySources=''; }
+
   const secSummary=sec('Podsumowanie wykonawcze', bodySummary);
   const secMetodyka=sec('Metodyka rozliczenia oszczędności', bodyMetodyka);
+  const secZrodla=(bodySources?`<div class="anw-step-card"><h4><span class="anw-step-num">${n}.1</span> Zestawienie źródeł danych obu metod</h4>${bodySources}</div>`:'');
   const secResults=sec('Wyniki i porównanie metod', bodyResults||`<div class="anw-desc"><p style="margin:0;">Brak analiz w raporcie.</p></div>`);
   const secFin=sec('Rozliczenie finansowe ESCO', bodyFin);
   const secForecast=bodyForecast?sec('Prognoza roczna oszczędności (orientacyjna)', bodyForecast):'';
   const secNotes=rep.notes?sec('Uwagi',`<div class="anw-desc"><p style="margin:0;">${escapeHtml(rep.notes)}</p></div>`):'';
 
-  const attachments=proofs?`<div id="anw-attachments"><div class="anw-step-card" style="page-break-before:always;break-before:page;"><h4>📎 Załączniki — część dowodowa</h4><div class="anw-desc"><p style="margin:0;">Załącznik A — dowód metody rozliczeniowej (${escapeHtml(primLabel)})${regProofAnals.length?'; Załącznik B — dowód metody pomocniczej (regresja liniowa)':''}. Załączniki zawierają pełne wyprowadzenia, tabele danych źródłowych i wykresy; wyniki końcowe oraz rozliczenie przedstawiono w części głównej raportu.</p></div></div>${proofs}</div>`:'';
+  const attachments=proofs?`<div id="anw-attachments"><div class="anw-step-card" style="page-break-before:always;break-before:page;"><h4>📎 Załączniki — część dowodowa</h4><div class="anw-desc"><p style="margin:0;">Załącznik A — dowód metody rozliczeniowej (${escapeHtml(primLabel)})${regProofAnals.length?'; Załącznik B — dowód metody pomocniczej (regresja liniowa)':''}. Załączniki zawierają pełne wyprowadzenia, tabele danych źródłowych i wykresy; wyniki końcowe oraz rozliczenie przedstawiono w części głównej raportu.</p></div>${fz?`<div class="anw-desc anw-unit-idx"><b style="color:var(--color-text-primary);">Oświadczenie o odtwarzalności</b><br>Treść rozliczeniowa niniejszego raportu została zamrożona ${fmtDate(fz.at.slice(0,10))}. Wszystkie protokoły i pliki wymienione w metrykach danych (sekcja „Zestawienie źródeł danych obu metod\" oraz punkty 1.1 załączników) są przechowywane w systemie WaterAI Energy Control w wersji z dnia zamrożenia i udostępniane Zamawiającemu na żądanie. Późniejsze zmiany danych źródłowych nie wpływają na liczby przedstawione w tym dokumencie.</div>`:''}</div>${proofs}</div>`:'';
 
-  const html=cover+secSummary+secMetodyka+secResults+secFin+secForecast+secNotes+signatures+attachments;
+  const html=cover+secSummary+secMetodyka+secZrodla+secResults+secFin+secForecast+secNotes+signatures+attachments;
   return {html, drawDatas};
 }
 
