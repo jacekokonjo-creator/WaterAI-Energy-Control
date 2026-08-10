@@ -1405,6 +1405,33 @@ const FV_STYLE = `<style>
   .fv-doc .fv-sign-cap{font-size:10.5px;color:#5b6670;margin-top:6px;}
   .fv-doc .fv-foot{margin-top:18px;padding-top:10px;border-top:1px solid #e6edf5;font-size:10.5px;color:#79858f;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
   @media(max-width:680px){.fv-doc{padding:18px;}.fv-doc .fv-parties{grid-template-columns:1fr;}.fv-doc .fv-sign{grid-template-columns:1fr;gap:10px;}}
+  /* ── UKŁAD WYDRUKU ────────────────────────────────────────────────────────
+     Reguły zagęszczające celowo NIE siedzą w @media print, tylko pod klasą
+     body.fv-printing. Dzięki temu obowiązują też podczas POMIARU wysokości
+     w _fvPrepare() — inaczej mierzylibyśmy luźny układ ekranowy i skala
+     dopasowania wychodziłaby błędna. */
+  body.fv-printing #fv-print-root .fv-doc{border:none;border-radius:0;padding:0;max-width:none;box-shadow:none;margin:0;font-size:11.5px;line-height:1.35;}
+  body.fv-printing #fv-print-root .fv-doc .fv-head{padding-bottom:9px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-logo{height:36px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-title h1{font-size:19px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-title .num{font-size:13.5px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-dates{margin:9px 0 10px;gap:8px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-parties{gap:10px;margin-bottom:10px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-party{padding:8px 10px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-party .nm{font-size:12.5px;}
+  body.fv-printing #fv-print-root .fv-doc table.fv-t{margin-bottom:9px;}
+  body.fv-printing #fv-print-root .fv-doc table.fv-t th,
+  body.fv-printing #fv-print-root .fv-doc table.fv-t td{padding:5px 6px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-total{padding:9px 14px;margin-bottom:4px;border-radius:9px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-total .v{font-size:20px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-words{margin-bottom:9px;font-size:11px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-box{padding:8px 10px;margin-bottom:8px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-grid{gap:7px;}
+  /* Podpisy zjadały najwięcej miejsca: 38px marginesu + 42px na kreskę. */
+  body.fv-printing #fv-print-root .fv-doc .fv-sign{margin:16px 4px 2px;gap:30px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-sign-box{padding-top:26px;}
+  body.fv-printing #fv-print-root .fv-doc .fv-foot{margin-top:9px;padding-top:7px;font-size:9.5px;}
+
   @media print{
     /* Ukrywamy rodzeństwo przez display:none, nie visibility — visibility zostawia
        pustą przestrzeń po wysokiej stronie aplikacji, co dawało puste strony wydruku. */
@@ -1413,10 +1440,20 @@ const FV_STYLE = `<style>
     body.fv-printing > #fv-print-root{display:block !important;}
     #fv-print-root{margin:0;padding:0;}
     .fv-noprint{display:none !important;}
-    .fv-doc{border:none !important;border-radius:0 !important;padding:0 !important;max-width:none !important;box-shadow:none !important;margin:0 !important;}
     .fv-doc .fv-party,.fv-doc table.fv-t,.fv-doc .fv-total,.fv-doc .fv-box,.fv-doc .fv-sign{break-inside:avoid;page-break-inside:avoid;}
     .fv-doc > *:last-child{page-break-after:avoid;break-after:avoid;}
-    @page{margin:14mm;}
+
+    /* Dopasowanie do jednej strony. Dokument układa się na szerokości
+       182mm/skala, a potem jest pomniejszany o tę skalę — po przeskalowaniu
+       wypełnia pełną szerokość kolumny druku, a jest odpowiednio niższy.
+       Skalę wylicza _fvPrepare(); przy braku pomiaru zostaje 1 i nic się nie zmienia. */
+    #fv-print-root.fv-fit{height:269mm;overflow:hidden;}
+    #fv-print-root.fv-fit > .fv-doc{
+      width:calc(182mm / var(--fv-scale,1));
+      transform:scale(var(--fv-scale,1));
+      transform-origin:top left;
+    }
+    @page{margin:14mm;size:A4 portrait;}
   }
 </style>`;
 
@@ -1484,6 +1521,25 @@ function _fvIssuer(inv) {
 // Druk: kopia dokumentu ląduje jako bezpośrednie dziecko <body>, a reszta strony
 // znika przez display:none. Bez tego wysoki układ aplikacji zostawał w przepływie
 // i drukarka dokładała puste strony.
+// Fizyczne wymiary kolumny druku A4 przy marginesie 14mm z @page.
+const FV_PAGE_W_MM = 210 - 2 * 14;     // 182 mm
+const FV_PAGE_H_MM = 297 - 2 * 14;     // 269 mm
+// Poniżej tej skali faktura robi się nieczytelna. Wtedy NIE wymuszamy jednej
+// strony — lepszy dwustronicowy dokument niż mikroskopijny albo, co gorsza,
+// ucięty przez overflow:hidden. Faktura to dokument księgowy: nic nie może zniknąć.
+const FV_MIN_SCALE = 0.62;
+
+// Przelicznik mm→px liczony z realnego DOM, a nie z założenia 96 dpi:
+// przy powiększeniu strony w przeglądarce (u nas 120%) sztywna stała rozjeżdża pomiar.
+function _fvMmDoPx(mm) {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;top:0;left:0;height:' + mm + 'mm;';
+  document.body.appendChild(probe);
+  const px = probe.getBoundingClientRect().height;
+  probe.remove();
+  return px;
+}
+
 function _fvPrepare() {
   if (document.getElementById('fv-print-root')) return true;
   const doc = document.getElementById('fv-doc');
@@ -1493,14 +1549,41 @@ function _fvPrepare() {
   const clone = doc.cloneNode(true);
   clone.removeAttribute('id');          // id zostaje przy oryginale
   root.appendChild(clone);
+
+  // ── POMIAR: klon idzie najpierw poza ekran, na dokładnej szerokości druku ──
+  // Mierzymy z klasą fv-printing na <body>, bo to ona włącza zagęszczony układ.
+  root.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + FV_PAGE_W_MM + 'mm;';
   document.body.appendChild(root);
   document.body.classList.add('fv-printing');
+
+  let skala = 1;
+  try {
+    const dostepna = _fvMmDoPx(FV_PAGE_H_MM);
+    const wysokosc = clone.getBoundingClientRect().height;
+    if (wysokosc > dostepna && dostepna > 0) skala = dostepna / wysokosc;
+  } catch (e) { skala = 1; }
+
+  // Dokument układa się na szerokości 182mm/skala i jest pomniejszany o skalę.
+  // Szersza kolumna sama z siebie skraca tekst, więc po przeskalowaniu wynik jest
+  // NIŻSZY niż wyliczony — jedna strona wychodzi z zapasem, bez drugiego pomiaru.
+  if (skala < 1 && skala >= FV_MIN_SCALE) {
+    root.classList.add('fv-fit');
+    root.style.setProperty('--fv-scale', String(skala.toFixed(4)));
+  } else if (skala < FV_MIN_SCALE) {
+    console.info('[faktura] Treść nie mieści się na jednej stronie przy czytelnym rozmiarze ' +
+                 '(potrzebna skala ' + skala.toFixed(2) + ') — drukuję na dwóch stronach.');
+  }
+
+  root.style.position = '';             // z powrotem w normalny przepływ
+  root.style.left = '';
+  root.style.top = '';
+  root.style.width = '';
   return true;
 }
 
 function _fvCleanup() {
   const root = document.getElementById('fv-print-root');
-  if (root) root.remove();
+  if (root) root.remove();              // razem z nim znika klasa fv-fit i --fv-scale
   document.body.classList.remove('fv-printing');
 }
 
@@ -1604,6 +1687,7 @@ function printInvoiceDoc(id) {
       <button class="small-button" onclick="renderInvoicingModule()">Lista faktur</button>
       <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="fvPrint()">🖨 Drukuj / zapisz PDF</button>
       <span style="font-size:11px;color:var(--color-text-secondary);">W oknie drukowania wybierz „Zapisz jako PDF", żeby dostać plik.</span>
+      <span id="fv-fit-info" style="font-size:11px;font-weight:600;"></span>
     </div>
     ${missing.length ? `<div class="fv-noprint reminder-card" style="border-color:#F4D4A0;background:#FEF9EF;margin-bottom:14px;"><strong>Dokument niepełny</strong><div class="reminder-meta">${escapeHtml(missing.join('; '))}. Uzupełnij dane przed wysłaniem faktury do klienta.</div></div>` : ''}
 
@@ -1712,6 +1796,52 @@ function printInvoiceDoc(id) {
         <div>${t('Wygenerowano w WaterAI Energy Control —')} ${fmtDate(new Date().toISOString().slice(0, 10))}</div>
       </div>
     </div>`;
+
+  // Od razu policz, czy dokument zmieści się na jednej stronie — lepiej powiedzieć
+  // to teraz niż zostawić odkrycie na okno drukowania.
+  setTimeout(_fvFitInfo, 0);
+}
+
+// Pomiar „na sucho": ile stron zajmie wydruk. Ta sama ścieżka co w _fvPrepare()
+// (klon poza ekranem, szerokość kolumny druku, zagęszczony układ), tylko wynik
+// idzie do paska nad podglądem zamiast do druku.
+function _fvZmierzSkale() {
+  const doc = document.getElementById('fv-doc');
+  if (!doc || document.getElementById('fv-print-root')) return null;
+  const root = document.createElement('div');
+  root.id = 'fv-print-root';
+  const clone = doc.cloneNode(true);
+  clone.removeAttribute('id');
+  root.appendChild(clone);
+  root.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + FV_PAGE_W_MM + 'mm;';
+  document.body.appendChild(root);
+  document.body.classList.add('fv-printing');
+  let skala = 1;
+  try {
+    const dostepna = _fvMmDoPx(FV_PAGE_H_MM);
+    const wysokosc = clone.getBoundingClientRect().height;
+    if (wysokosc > dostepna && dostepna > 0) skala = dostepna / wysokosc;
+  } catch (e) { skala = 1; }
+  root.remove();
+  document.body.classList.remove('fv-printing');
+  return skala;
+}
+
+function _fvFitInfo() {
+  const el = document.getElementById('fv-fit-info');
+  if (!el) return;
+  const skala = _fvZmierzSkale();
+  if (skala == null) return;
+  if (skala >= 1) {
+    el.style.color = '#27500A';
+    el.textContent = '✓ Mieści się na jednej stronie';
+  } else if (skala >= FV_MIN_SCALE) {
+    el.style.color = '#27500A';
+    el.textContent = '✓ Jedna strona — pomniejszone do ' + Math.round(skala * 100) + '%';
+  } else {
+    el.style.color = '#7A4A00';
+    el.textContent = '⚠ Nie zmieści się na jednej stronie w czytelnym rozmiarze — wydruk na dwóch stronach';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

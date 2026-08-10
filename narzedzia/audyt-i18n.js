@@ -87,6 +87,7 @@ const SLOWNIKI = [
   'js/modules/i18n-ui-core.js',
   'js/modules/i18n-ui-core-2.js',
   'js/modules/i18n-ui-core-4.js',
+  'js/modules/i18n-ui-core-5.js',
   'js/modules/i18n-ui-core-3.js'
 ];
 
@@ -123,37 +124,53 @@ function zaladujSilnik() {
 // Regexem się tego nie zrobi — apostrof w komentarzu („nie ma") otwierał fałszywy
 // string ciągnący się przez pół pliku i zaśmiecał wynik fragmentami kodu.
 function tokenizuj(kod) {
+  // Skaner ze stosem kontekstów. Trzy stany: kod, literał szablonowy i wnętrze ${…}.
+  // Wcześniejsze wersje próbowały radzić sobie płaskim licznikiem głębokości i za
+  // każdym razem gubiły się na SZABLONIE W SZABLONIE — a tego w tym kodzie jest
+  // pełno: `…${cond ? `<div>…</div>` : ''}…`. Po rozjeździe tokenizer wciągał
+  // kilkaset linii kodu jako „tekst interfejsu", a prawdziwe napisy z dalszej
+  // części pliku znikały z audytu (tak umknął cały moduł Użytkownicy).
   const stringi = [], szablony = [];
+  const stos = [];                                   // {typ:'tpl',buf} | {typ:'exp',glebokosc}
   let i = 0;
   const n = kod.length;
+
+  const szczyt = () => stos.length ? stos[stos.length - 1] : null;
+
   while (i < n) {
+    const ramka = szczyt();
     const c = kod[i];
-    if (c === '/' && kod[i + 1] === '/') {
-      const k = kod.indexOf('\n', i);
-      i = k === -1 ? n : k + 1;
-    } else if (c === '/' && kod[i + 1] === '*') {
-      const k = kod.indexOf('*/', i);
-      i = k === -1 ? n : k + 2;
-    } else if (c === "'" || c === '"') {
+
+    // ── wnętrze literału szablonowego ──
+    if (ramka && ramka.typ === 'tpl') {
+      if (c === '\\') { ramka.buf += kod[i + 1]; i += 2; continue; }
+      if (c === '`') { szablony.push(ramka.buf); stos.pop(); i++; continue; }
+      if (c === '$' && kod[i + 1] === '{') { ramka.buf += '\u0000'; stos.push({ typ: 'exp', glebokosc: 0 }); i += 2; continue; }
+      ramka.buf += c; i++; continue;
+    }
+
+    // ── kod: najwyższy poziom albo wnętrze ${…} ──
+    if (c === '/' && kod[i + 1] === '/') { const k = kod.indexOf('\n', i); i = k === -1 ? n : k + 1; continue; }
+    if (c === '/' && kod[i + 1] === '*') { const k = kod.indexOf('*/', i); i = k === -1 ? n : k + 2; continue; }
+    if (c === '\'' || c === '"') {
       const q = c; let j = i + 1, buf = '';
       while (j < n && kod[j] !== q) {
         if (kod[j] === '\\') { buf += kod[j + 1] === 'n' ? '\n' : kod[j + 1]; j += 2; }
         else if (kod[j] === '\n') break;
         else { buf += kod[j]; j++; }
       }
-      stringi.push(buf); i = j + 1;
-    } else if (c === '`') {
-      let j = i + 1, buf = '', glebokosc = 0;
-      while (j < n) {
-        if (kod[j] === '\\') { buf += kod[j + 1]; j += 2; continue; }
-        if (kod[j] === '$' && kod[j + 1] === '{') { glebokosc++; buf += '\u0000'; j += 2; continue; }
-        if (kod[j] === '}' && glebokosc) { glebokosc--; j++; continue; }
-        if (kod[j] === '`' && !glebokosc) break;
-        if (!glebokosc) buf += kod[j];
-        j++;
+      stringi.push(buf); i = j + 1; continue;
+    }
+    if (c === '`') { stos.push({ typ: 'tpl', buf: '' }); i++; continue; }
+    if (ramka && ramka.typ === 'exp') {
+      if (c === '{') { ramka.glebokosc++; i++; continue; }
+      if (c === '}') {
+        if (ramka.glebokosc) ramka.glebokosc--;
+        else stos.pop();                             // koniec ${…}
+        i++; continue;
       }
-      szablony.push(buf); i = j + 1;
-    } else i++;
+    }
+    i++;
   }
   return { stringi, szablony };
 }
@@ -186,7 +203,8 @@ const IGNORUJ = [
   /^[—·,.;}\])'"+]\s*\S{0,3}$/,
   // liczebniki z _fvWords(): kwota słownie jest drukowana WYŁĄCZNIE po polsku
   /^(zero|jeden|jedna|dwa|dwie|trzy|cztery|pięć|sześć|siedem|osiem|dziewięć|dziesięć|jedenaście|dwanaście|trzynaście|czternaście|piętnaście|szesnaście|siedemnaście|osiemnaście|dziewiętnaście|dwadzieścia|trzydzieści|czterdzieści|pięćdziesiąt|sześćdziesiąt|siedemdziesiąt|osiemdziesiąt|dziewięćdziesiąt|sto|dwieście|trzysta|czterysta|pięćset|sześćset|siedemset|osiemset|dziewięćset|tysiąc|tysiące|tysięcy|milion|miliony|milionów|miliard|miliardy|miliardów|złoty|złote|złotych|grosz|grosze|groszy)$/,
-  /^(Polski|Angielski|Niemiecki|Czeski|Słowacki|Hiszpański)$/,     // nazwy języków w przełączniku
+  /^(Polski|Angielski|Niemiecki|Czeski|Słowacki|Hiszpański|Español|Deutsch|English|Čeština|Slovenčina)$/,  // nazwy języków
+  /^(my \+|·\s?x \+|REG #|Śr)$/,            // urwane etykiety wzorów i wykresów (y = a·x + b)
   /^(Facturación|Cerrar sesión|Iniciar sesión|Gestión|Módulo)/,    // hiszpańskie napisy z data-i18n
   // marki, jednostki i skróty jednakowe we wszystkich językach
   /^(WaterAI|Water AI|Supabase|Excel|PDF|CSV|JSON|XML|IBAN|SWIFT|BIC|VAT|DPH|USt|NIP|IČO|DIČ|REGON|EUR|PLN|CZK|CHF|GBP|HDD|CDD|TYM|TMY|ESCO|CO2|kWh|MWh|GJ|MJ|m³|m2|m3|°C|API|URL|ID|OK|SQL|RLS|UUID)$/,
