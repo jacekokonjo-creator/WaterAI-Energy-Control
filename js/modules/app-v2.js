@@ -441,10 +441,9 @@ function renderInvoicingModule() {
   const clientOptions = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
   const entities = (typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.getAll() : [];
-  const defEntity = (typeof BillingEntitiesModule !== 'undefined') ? BillingEntitiesModule.getDefault() : null;
   const issuerOptions = `<option value="">— nie wskazano —</option>` + entities.map(en => {
     const c = (BillingEntitiesModule.COUNTRIES[en.country] || {});
-    return `<option value="${en.id}"${defEntity && Number(defEntity.id) === Number(en.id) ? ' selected' : ''}>${c.flag || ''} ${escapeHtml(en.name || '(bez nazwy)')}${en.isDefault ? ' ⭐' : ''}</option>`;
+    return `<option value="${en.id}">${c.flag || ''} ${escapeHtml(en.name || '(bez nazwy)')}${en.isDefault ? ' ⭐' : ''}</option>`;
   }).join('');
 
   const invoiceRows = invoices.map(inv => {
@@ -517,8 +516,8 @@ function renderInvoicingModule() {
         <div><label>Data wystawienia</label><input id="inv-issue-date" type="date" value="${new Date().toISOString().slice(0,10)}" onchange="invRefreshDefaults()" /></div>
         <div><label>Termin płatności <span id="inv-due-hint" style="font-weight:400;color:var(--color-text-secondary);font-size:11px;"></span></label><input id="inv-due-date" type="date" /></div>
         <div><label>Kwota netto</label><input id="inv-net" type="number" step="0.01" min="0" placeholder="0.00" /></div>
-        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="21">21%</option><option value="20">20%</option><option value="19">19%</option><option value="8">8%</option><option value="0">0%</option></select></div>
-        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="GBP">GBP</option></select></div>
+        <div><label>VAT (%)</label><select id="inv-vat"><option value="23">23%</option><option value="21">21%</option><option value="20">20%</option><option value="19">19%</option><option value="8.1">8,1%</option><option value="8">8%</option><option value="0">0%</option></select></div>
+        <div><label>Waluta</label><select id="inv-currency"><option value="PLN">PLN</option><option value="EUR">EUR</option><option value="CZK">CZK</option><option value="GBP">GBP</option><option value="CHF">CHF</option></select></div>
         <div><label>Status</label><select id="inv-status">${Object.entries(InvoicingModule.STATUSES).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
         <div style="grid-column:1/-1;"><label>Uwagi</label><input id="inv-notes" placeholder="opcjonalne uwagi" /></div>
         <div style="grid-column:1/-1;"><button class="primary-button" type="button" onclick="saveInvoice()" style="width:auto;padding:10px 24px;margin:0;">Zapisz fakturę</button></div>
@@ -952,7 +951,7 @@ function editInvoice(id) {
     if (btn) { btn.textContent = 'Zapisz zmiany'; btn.setAttribute('onclick', `saveInvoiceEdit(${id})`); }
     window._invEditId = id;
     const issSel = document.getElementById('inv-issuer');
-    if (issSel) issSel.value = inv.issuerId || '';
+    if (issSel) { issSel.dataset.invTouched = '1'; issSel.value = inv.issuerId || ''; }
     document.getElementById('inv-client').value = inv.clientId || '';
     updateInvObjects(inv.clientId);
     setTimeout(() => {
@@ -1015,6 +1014,20 @@ function markInvoicePaid(id) {
 // sprzedawcy, klienta albo daty wystawienia. Ręcznie zmienione pole zostaje nietknięte.
 function invRefreshDefaults() {
   const issSel = document.getElementById('inv-issuer');
+
+  // Podmiot domyślny podpowiadamy TYLKO gdy pole jest puste i nietknięte.
+  // Raz wybrana ręcznie spółka nie może już zostać cofnięta przez przerysowanie formularza.
+  if (issSel) {
+    if (!issSel._invHooked) {
+      issSel._invHooked = true;
+      issSel.addEventListener('change', () => { issSel.dataset.invTouched = '1'; });
+    }
+    if (!issSel.value && issSel.dataset.invTouched !== '1' && typeof BillingEntitiesModule !== 'undefined') {
+      const d = BillingEntitiesModule.getDefault();
+      if (d) issSel.value = String(d.id);
+    }
+  }
+
   const numEl = document.getElementById('inv-number');
   const issueEl = document.getElementById('inv-issue-date');
   const dueEl = document.getElementById('inv-due-date');
@@ -1106,7 +1119,7 @@ function renderBillingEntities() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
       <button class="small-button" onclick="window._beEditId=null;renderInvoicingModule();">← Lista faktur</button>
       <button class="primary-button" style="width:auto;padding:8px 18px;margin:0;" onclick="beNew()">+ Dodaj podmiot</button>
-      <button class="small-button" onclick="beSeed()" title="Wstawia gotowe dane rejestrowe trzech spółek WaterAI">🏢 Dodaj spółki WaterAI (PL / SK / CZ)</button>
+      <button class="small-button" onclick="beSeed()" title="Wstawia gotowe dane rejestrowe trzech spółek WaterAI">🏢 Dodaj spółki grupy (PL / SK / CZ / CH)</button>
     </div>
 
     <div class="reminder-card" style="margin-bottom:16px;">
@@ -1163,10 +1176,10 @@ function beNew() { window._beEditId = null; window._beNew = true; renderBillingE
 function beEdit(id) { window._beEditId = id; window._beNew = false; renderBillingEntities(); }
 
 function beSeed() {
-  const names = BillingEntitiesModule.WATERAI_COMPANIES.map(c => '· ' + c.name).join('\n');
-  if (!confirm('Dodać spółki WaterAI z danymi rejestrowymi?\n\n' + names +
+  const names = BillingEntitiesModule.GROUP_COMPANIES.map(c => '· ' + c.name).join('\n');
+  if (!confirm('Dodać spółki grupy z danymi rejestrowymi?\n\n' + names +
                '\n\nSpółki już obecne na liście zostaną pominięte.')) return;
-  const added = BillingEntitiesModule.seedWaterAI();
+  const added = BillingEntitiesModule.seedCompanies();
   renderBillingEntities();
   alert(added ? ('Dodano: ' + added + '. Sprawdź dane przed pierwszą fakturą.')
               : 'Nic nie dodano — te spółki są już na liście.');
