@@ -35,7 +35,8 @@ const BillingEntitiesModule = {
     CZ: { name: 'Czechy',      flag: '🇨🇿', currency: 'CZK', vat: 21, taxNoLabel: 'IČO',            vatIdLabel: 'DIČ (CZ…)' },
     DE: { name: 'Niemcy',      flag: '🇩🇪', currency: 'EUR', vat: 19, taxNoLabel: 'Steuernummer',   vatIdLabel: 'USt-IdNr (DE…)' },
     AT: { name: 'Austria',     flag: '🇦🇹', currency: 'EUR', vat: 20, taxNoLabel: 'Firmenbuchnr.',  vatIdLabel: 'UID (ATU…)' },
-    GB: { name: 'Anglia (UK)', flag: '🇬🇧', currency: 'GBP', vat: 20, taxNoLabel: 'Company No.',    vatIdLabel: 'VAT Reg. No. (GB…)' }
+    GB: { name: 'Anglia (UK)', flag: '🇬🇧', currency: 'GBP', vat: 20, taxNoLabel: 'Company No.',    vatIdLabel: 'VAT Reg. No. (GB…)' },
+    CH: { name: 'Szwajcaria',  flag: '🇨🇭', currency: 'CHF', vat: 8.1, taxNoLabel: 'UID / ID',       vatIdLabel: 'MWST (CHE…)' }
   },
 
   add(e) {
@@ -101,11 +102,11 @@ const BillingEntitiesModule = {
 
   // Tworzy 6 podmiotów startowych (po jednym na kraj) — TYLKO gdy lista jest pusta.
   // Dane rejestrowe (NIP/IČO, adres, konto) celowo puste — do uzupełnienia w panelu.
-  // Trzy spółki WaterAI — dane rejestrowe przekazane 2026-08-08.
+  // Spółki grupy — dane rejestrowe przekazane 2026-08-08.
   // Idempotentne: pomija spółki, które już są na liście (dopasowanie po nazwie).
   // numberPrefix celowo pusty → wszystkie używają formatu FV/rok/miesiąc/nr.
   // Ustaw prefiks (np. FV-SK), jeśli któraś spółka ma mieć własną serię numerów.
-  WATERAI_COMPANIES: [
+  GROUP_COMPANIES: [
     {
       name: 'Water AI P.S.A.',
       country: 'PL',
@@ -145,18 +146,32 @@ const BillingEntitiesModule = {
       defaultCurrency: 'CZK',
       defaultVatRate: 21,
       footerNote: 'Zapsáno v obchodním rejstříku pod spis. zn. C 383346 vedená u Městského soudu v Praze · č. účtu CZK: 275917918/0600'
+    },
+    {
+      name: 'Blue Boson AG',
+      country: 'CH',
+      addressLine: 'Gartenstrasse 6',
+      postalCity: 'CH-6300 Zug',
+      taxNo: 'CHE-301.960.915 (UID), CH-170-3049005-8 (ID)',
+      vatId: '',
+      bankName: 'PostFinance AG',
+      iban: 'CH04 0900 0000 1631 6086 4',
+      swift: 'POFICHBEXXX',
+      defaultCurrency: 'CHF',
+      defaultVatRate: 8.1,
+      footerNote: 'Commercial Register and Bankruptcy Office of the Canton of Zug, publ. SOGC No. 1005855608'
     }
   ],
 
   // Zwraca liczbę faktycznie dodanych spółek (pominięte = już były).
-  seedWaterAI() {
+  seedCompanies() {
     const existing = this.getAll();
     const has = name => existing.some(e => String(e.name || '').trim().toLowerCase() === name.trim().toLowerCase());
     const now = new Date().toISOString();
     const anyDefault = existing.some(e => e.isDefault);
 
     let added = 0;
-    this.WATERAI_COMPANIES.forEach((c, i) => {
+    this.GROUP_COMPANIES.forEach((c, i) => {
       if (has(c.name)) return;
       const n = this._normalize(Object.assign({}, c, {
         // Nie odbieramy gwiazdki podmiotowi, który już jest domyślny.
