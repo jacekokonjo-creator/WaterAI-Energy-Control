@@ -503,7 +503,10 @@ function renderInvoicingModule() {
         <button class="small-button" onclick="document.getElementById('inv-form-area').style.display='none'">✕</button>
       </div>
       <div class="calendar-form">
-        <div style="grid-column:1/-1;"><label>Podmiot wystawiający (sprzedawca)</label><select id="inv-issuer" onchange="applyInvIssuer()">${issuerOptions}</select></div>
+        <div style="grid-column:1/-1;"><label>Podmiot wystawiający (sprzedawca)</label><select id="inv-issuer" onchange="applyInvIssuer()">${issuerOptions}</select>${
+          entities.length < BillingEntitiesModule.GROUP_COMPANIES.length
+            ? `<div style="font-size:11px;color:#7A4A00;margin-top:4px;">Na liście ${entities.length} z ${BillingEntitiesModule.GROUP_COMPANIES.length} spółek grupy — uzupełnij w <b>⚙ Podmioty</b>.</div>` : ''
+        }</div>
         <div><label>Klient</label><select id="inv-client" onchange="updateInvObjects(this.value)">${clientOptions}</select></div>
         <div><label>Obiekt (opcjonalnie)</label><select id="inv-object" onchange="updateInvSources()"><option value="">— ogólnie —</option>${clients.length ? ObjectsModule.findByClient(clients[0].id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('') : ''}</select></div>
         <div style="grid-column:1/-1;">
@@ -1132,7 +1135,13 @@ function renderBillingEntities() {
 
     <div class="reminder-card" style="margin-bottom:16px;">
       <strong>Podmioty wystawiające faktury</strong>
-      <div class="reminder-meta">Firmy, w imieniu których wystawiacie FV. Dane stąd trafiają w blok „Sprzedawca" na wydruku faktury. Lista jest wspólna dla całego zespołu — zapisywać mogą Administrator i Back Office.</div>
+      <div class="reminder-meta"><b>Na liście: ${all.length} podmiot(ów)${(() => {
+        const st = BillingEntitiesModule._rowIds;
+        const wBazie = st ? Object.keys(st).length : null;
+        return wBazie === null ? ' (tryb lokalny — brak mostka Supabase)'
+             : (wBazie === all.length ? ' · wszystkie zapisane we wspólnej bazie'
+             : ' · we wspólnej bazie tylko ' + wBazie + ' — reszta istnieje wyłącznie w tej przeglądarce');
+      })()}</b><br>Firmy, w imieniu których wystawiacie FV. Dane stąd trafiają w blok „Sprzedawca" na wydruku faktury. Lista jest wspólna dla całego zespołu — zapisywać mogą Administrator i Back Office.</div>
     </div>
 
     <div id="be-form" style="display:${editId || window._beNew ? 'block' : 'none'};border:1px solid var(--color-border-tertiary);border-radius:14px;padding:20px;margin-bottom:20px;">
@@ -1187,13 +1196,24 @@ function beNew() { window._beEditId = null; window._beNew = true; renderBillingE
 function beEdit(id) { window._beEditId = id; window._beNew = false; renderBillingEntities(); }
 
 function beSeed() {
-  const names = BillingEntitiesModule.GROUP_COMPANIES.map(c => '· ' + c.name).join('\n');
-  if (!confirm('Dodać spółki grupy z danymi rejestrowymi?\n\n' + names +
-               '\n\nSpółki już obecne na liście zostaną pominięte.')) return;
-  const added = BillingEntitiesModule.seedCompanies();
+  const all = BillingEntitiesModule.GROUP_COMPANIES;
+  const before = BillingEntitiesModule.getAll().map(e => String(e.name || '').trim().toLowerCase());
+  const brakuje = all.filter(c => before.indexOf(c.name.trim().toLowerCase()) < 0);
+
+  if (!brakuje.length) { alert('Wszystkie spółki grupy są już na liście.'); return; }
+  if (!confirm('Dodać brakujące spółki grupy?\n\n' + brakuje.map(c => '· ' + c.name).join('\n'))) return;
+
+  BillingEntitiesModule.seedCompanies();
   renderBillingEntities();
-  alert(added ? ('Dodano: ' + added + '. Sprawdź dane przed pierwszą fakturą.')
-              : 'Nic nie dodano — te spółki są już na liście.');
+
+  // Weryfikacja PO zapisie — nie ufamy licznikowi, sprawdzamy stan faktyczny.
+  const po = BillingEntitiesModule.getAll().map(e => String(e.name || '').trim().toLowerCase());
+  const ok = brakuje.filter(c => po.indexOf(c.name.trim().toLowerCase()) >= 0);
+  const nie = brakuje.filter(c => po.indexOf(c.name.trim().toLowerCase()) < 0);
+  alert('Dodano: ' + ok.length + ' z ' + brakuje.length +
+        (nie.length ? '\n\nNIE dodano:\n' + nie.map(c => '· ' + c.name).join('\n') +
+          '\n\nSprawdź konsolę (F12) — najczęściej to brak uprawnień do zapisu (RLS).' : '') +
+        '\n\nNa liście jest teraz ' + po.length + ' podmiot(ów).');
 }
 
 function beSetDefault(id) {
