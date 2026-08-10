@@ -3743,7 +3743,7 @@ function _analSourceCard(data, pfx) {
     _analSourceRow('Okres', per(data.before.from, data.before.to), per(data.after.from, data.after.to)),
     _analSourceRow('Stacja meteorologiczna', _escA((p && p.weatherStation) || c.weatherStation || '')),
     _analSourceRow('Źródło temperatur', clim),
-    _analSourceRow('Norma TYM', _escA((p && p.tymDataSource) || '')),
+    _analSourceRow('Źródło norm TYM', _escA((p && p.tymDataSource) || '')),
     _analSourceRow('Źródło zużycia Q<sub>c.o.</sub>', src),
     _analSourceRow('Zużycie zmierzone',
       data.before.consumption ? _fmtA(Number(data.before.consumption), 2) + ' ' + u : '',
