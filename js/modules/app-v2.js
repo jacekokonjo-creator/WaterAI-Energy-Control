@@ -1484,7 +1484,14 @@ function printInvoiceDoc(id) {
         <div class="k">Do zapłaty</div>
         <div class="v">${m(inv.grossAmount)}</div>
       </div>
-      <div class="fv-words">Słownie: ${e(_fvSlownie(inv.grossAmount, cur))}</div>
+      <div class="fv-words">${(() => {
+        // Kwota słownie jest generowana po polsku (odmiana złoty/grosz), więc na
+        // fakturze w innym języku byłaby obcym wtrętem — słownik tego nie naprawi,
+        // bo to tekst tworzony w locie, a nie stała fraza. W SK/CZ kwota słownie
+        // nie jest wymagana, więc poza polskim po prostu jej nie drukujemy.
+        const lang = (typeof currentLanguage !== 'undefined') ? currentLanguage : 'pl';
+        return lang === 'pl' ? 'Słownie: ' + e(_fvSlownie(inv.grossAmount, cur)) : '';
+      })()}</div>
 
       ${(iss && (iss.iban || iss.bankName)) ? `
       <div class="fv-box">
