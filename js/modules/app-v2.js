@@ -2601,6 +2601,7 @@ function _analWizard() {
                 : `<option value="">${ANAL.objectId ? (baseProtocols.length ? '— wybierz okres bazowy —' : 'brak zapisanych okresów bazowych') : 'najpierw obiekt'}</option>
                    ${baseProtocols.map(p => `<option value="${p.id}" ${String(ANAL.basePeriod) === String(p.id) ? 'selected' : ''}>${_escA(p.protocolNumber || ('Protokół ' + p.id))}${p.protocolDate ? ' · ' + _escA(p.protocolDate) : ''}</option>`).join('')}
                    ${(ANAL.type === 'VOLUME' && window.BasePeriodModule && ANAL.objectId) ? BasePeriodModule.findByObjectType(ANAL.objectId, 'volume').map(it => `<option value="int:${it.id}" ${ANAL.basePeriod === ('int:' + it.id) ? 'selected' : ''}>⚙️ ${_escA(it.protocolNumber || 'Okres bazowy intensywności')} · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
+                   ${(ANAL.type === 'OCCUPANCY' && window.BasePeriodModule && ANAL.objectId) ? BasePeriodModule.findByObjectType(ANAL.objectId, 'occupancy').map(it => `<option value="occ:${it.id}" ${ANAL.basePeriod === ('occ:' + it.id) ? 'selected' : ''}>🏨 ${_escA(it.protocolNumber || 'Okres bazowy obłożenia')} · ${_fmtDateA(it.periodFrom)}–${_fmtDateA(it.periodTo)}</option>`).join('') : ''}
                    <option value="manual" ${ANAL.basePeriod === 'manual' ? 'selected' : ''}>✏️ Ręczne wprowadzenie</option>`}
             </select></div>
         </div>
@@ -2619,6 +2620,10 @@ function _analWizard() {
     body = ANAL.basePeriod
       ? _analRegSheet()
       : `<div class="reminder-card"><strong>Wybierz okres bazowy regresji</strong><div class="reminder-meta">Wskaż zapisany okres bazowy z arkusza regresji. Następnie wybierzesz metodę (1/2), skopiujesz dane bazowe, zaimportujesz okres analizowany (CSV) i podasz zakres rozliczeniowy.</div></div>`;
+  } else if (ANAL.type === 'OCCUPANCY' && typeof _analOCCSheet === 'function') {
+    body = ANAL.basePeriod
+      ? _analOCCSheet()
+      : `<div class="reminder-card"><strong>Wybierz okres bazowy obłożenia</strong><div class="reminder-meta">Wskaż protokół 🏨 z modułu Pomiary → Korekta obłożenia. Wczytane zostaną miesiące, temperatury, obłożenie i parametry metody.</div></div>`;
   } else {
     body = `<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">${t.icon}</span><h3>${_escA(t.label)}</h3></div>
       <div class="anw-body" style="text-align:center;padding:40px 20px;color:var(--color-text-secondary);">
@@ -2626,7 +2631,7 @@ function _analWizard() {
         <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
   }
 
-  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'REGRESSION')) ? `
+  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'REGRESSION' || ANAL.type === 'OCCUPANCY')) ? `
     ${ANAL.type === 'VOLUME' ? `<div class="anw-muted" style="margin:14px 0 6px;">Wsk = I·z₀ · φ = ΣWsk_ref / ΣWsk_rzecz · Qs = Q·φ (zużycie sprowadzone do referencyjnej intensywności)</div>` : ''}
     <div class="anw-act" style="justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
       <div class="anw-f" style="min-width:240px;max-width:360px;flex:1;">
@@ -3716,7 +3721,7 @@ function _analComputePeriod(key) {
 }
 
 function _analRecalcLive() {
-  if (!ANAL || !ANAL.objectId || (ANAL.type !== 'TYM' && ANAL.type !== 'VOLUME')) return;
+  if (!ANAL || !ANAL.objectId || (ANAL.type !== 'TYM' && ANAL.type !== 'VOLUME' && ANAL.type !== 'OCCUPANCY')) return;
   if (ANAL.type === 'TYM') {
     let stdSum = 0;
     for (let m = 1; m <= 12; m++) {

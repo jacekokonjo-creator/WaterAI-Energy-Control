@@ -309,3 +309,160 @@
 
   console.log('[occupancy] Korekta obłożenia — okres bazowy wpięty (Załącznik nr 3)');
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KOREKTA OBŁOŻENIA — ANALIZA (kreator)
+   ───────────────────────────────────────────────────────────────────────────
+   Model ogólny, niezależny od klienta. Arkusz jak w TYM, z dwiema różnicami:
+     • kolumna O [%] — obłożenie miesięczne, z którego liczone jest tᵢ,eff
+     • kolumna „odlicz." — dowolne odliczenie od Qc.o. (np. c.w.u., technologia,
+       najemca na podliczniku). Wpisywane ręcznie; skąd wzięta liczba, decyduje
+       analityk. Puste = 0, czyli metoda redukuje się do czystych stopniodni.
+
+   O_ref jest JEDNO dla całej analizy (z okresu bazowego) i obowiązuje tak samo
+   dla PRZED i PO — inaczej oszczędność byłaby artefaktem zmiany bazy odniesienia.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function N(v) { return (v === '' || v == null || isNaN(Number(v))) ? null : Number(v); }
+  function F(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d) : Number(v).toFixed(d); }
+
+  function _occAnalP() {
+    var p = (window.ANAL && ANAL.occParams) || {};
+    return { ti: N(p.ti) != null ? N(p.ti) : 20, tiRed: N(p.tiRed) != null ? N(p.tiRed) : 17,
+      fCommon: N(p.fCommon) != null ? N(p.fCommon) : 0, oRef: N(p.oRef) != null ? N(p.oRef) : 100,
+      heatLimit: N(p.heatLimit) != null ? N(p.heatLimit) : 12 };
+  }
+
+  /* Qc.o. netto = zużycie okresu − suma odliczeń miesięcznych */
+  function _occNetQ(P) {
+    var q = N(P.consumption); if (q == null) return null;
+    var ded = 0;
+    (P.months || []).forEach(function (m) { ded += N(m.ded) || 0; });
+    return q - ded;
+  }
+  window._occNetQ = _occNetQ;
+
+  /* ── silnik: nadpisanie _analComputePeriod tylko dla OCCUPANCY ──────────── */
+  var _cpOrig = window._analComputePeriod;
+  window._analComputePeriod = function (key) {
+    if (!(window.ANAL && ANAL.type === 'OCCUPANCY')) return _cpOrig.apply(this, arguments);
+    var P = ANAL[key], p = _occAnalP(), sumR = 0, sumS = 0, days = 0;
+    var tiEffRef = _occTiEff(p.oRef, p);
+    (P.months || []).forEach(function (mo, idx) {
+      var z0 = Number(mo.days || 0);
+      var tme = N(mo.tme), occ = N(mo.occ);
+      var stdM = ANAL.std[mo.month] || [0, 0];
+      var tmeStd = N(stdM[0]);
+      var tiEff = _occTiEff(occ == null ? p.oRef : occ, p);
+      var grzR = (tme != null && tme <= p.heatLimit);
+      var grzS = (tmeStd != null && tmeStd <= p.heatLimit);
+      var sdR = grzR ? Math.max(0, tiEff - tme) * z0 : 0;
+      var sdS = grzS ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
+      sumR += sdR; sumS += sdS; days += z0;
+      var e1 = document.getElementById('anw-' + key + '-sdr-' + idx); if (e1) e1.textContent = grzR ? F(sdR, 1) : '—';
+      var e2 = document.getElementById('anw-' + key + '-sds-' + idx); if (e2) e2.textContent = F(sdS, 1);
+      var e3 = document.getElementById('anw-' + key + '-tieff-' + idx); if (e3) e3.textContent = F(tiEff, 2);
+    });
+    var phi = sumR > 0 ? sumS / sumR : null;
+    var q = _occNetQ(P);
+    var eq = document.getElementById('anw-' + key + '-netq'); if (eq) eq.textContent = q != null ? F(q, 3) : '—';
+    return { sumR: sumR, sumS: sumS, days: days, phi: phi, q: q || 0, qs: (phi != null && q != null) ? q * phi : null };
+  };
+
+  /* ── wczytanie okresu bazowego obłożenia do kreatora ────────────────────── */
+  window._analApplyOccupancyBase = function (it) {
+    ANAL.occParams = JSON.parse(JSON.stringify(it.occParams || { ti: 20, tiRed: 17, fCommon: 0, oRef: 100, heatLimit: 12 }));
+    ANAL.before.from = it.periodFrom || '';
+    ANAL.before.to = it.periodTo || '';
+    ANAL.before.months = (it.months || []).map(function (m) {
+      return { month: Number(m.month), name: m.name, days: m.days, tme: m.tme, occ: m.occ, ded: m.ded || '' };
+    });
+    var std = {};
+    for (var mo = 1; mo <= 12; mo++) std[mo] = [ANAL_STD_DEFAULT[mo] ? ANAL_STD_DEFAULT[mo][0] : 0, new Date(2025, mo, 0).getDate()];
+    (it.months || []).forEach(function (m) {
+      var k = Number(m.month);
+      if (k >= 1 && k <= 12) std[k] = [(m.tmeStd != null && m.tmeStd !== '') ? m.tmeStd : std[k][0], (m.days != null ? m.days : std[k][1])];
+    });
+    ANAL.std = std;
+    ANAL.before.consumption = (it.consumption != null) ? it.consumption : '';
+    if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
+  };
+
+  /* przechwycenie wyboru „occ:<id>" w selektorze okresu bazowego */
+  var _obpOrig = window.analOnBasePeriod;
+  window.analOnBasePeriod = function (v) {
+    if (typeof v === 'string' && v.indexOf('occ:') === 0 && window.BasePeriodModule) {
+      var it = BasePeriodModule.find(Number(v.slice(4)));
+      ANAL.basePeriod = v;
+      if (it) _analApplyOccupancyBase(it);
+      renderAnalysesModule();
+      return;
+    }
+    return _obpOrig.apply(this, arguments);
+  };
+
+  /* ── arkusz okresu (PRZED / PO) ─────────────────────────────────────────── */
+  function _occPeriodSheet(key, title, headCls, ico, qLabel) {
+    var P = ANAL[key], p = _occAnalP();
+    var tiEffRef = _occTiEff(p.oRef, p);
+    var months = Array.isArray(P.months) ? P.months : [];
+    var rows = months.length ? months.map(function (mo, idx) {
+      var z0 = Number(mo.days || 0), tme = N(mo.tme), occ = N(mo.occ);
+      var stdM = ANAL.std[mo.month] || [0, 0], tmeStd = N(stdM[0]);
+      var tiEff = _occTiEff(occ == null ? p.oRef : occ, p);
+      var grzR = (tme != null && tme <= p.heatLimit);
+      var sdR = grzR ? Math.max(0, tiEff - tme) * z0 : 0;
+      var sdS = (tmeStd != null && tmeStd <= p.heatLimit) ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
+      return '<tr' + (grzR ? '' : ' style="opacity:.45;"') + '>' +
+        '<td>' + mo.name + '</td>' +
+        '<td><input type="number" min="0" max="31" value="' + (mo.days == null ? '' : mo.days) + '" oninput="ANAL.' + key + '.months[' + idx + '].days=this.value;_analRecalcLive()"></td>' +
+        '<td><input type="number" step="0.1" value="' + (mo.tme == null ? '' : mo.tme) + '" placeholder="tme" oninput="ANAL.' + key + '.months[' + idx + '].tme=this.value;_analRecalcLive()"></td>' +
+        '<td><input type="number" step="1" min="0" max="100" value="' + (mo.occ == null ? '' : mo.occ) + '" placeholder="O %" oninput="ANAL.' + key + '.months[' + idx + '].occ=this.value;_analRecalcLive()"></td>' +
+        '<td class="calc" id="anw-' + key + '-tieff-' + idx + '">' + F(tiEff, 2) + '</td>' +
+        '<td class="calc" id="anw-' + key + '-sdr-' + idx + '">' + (grzR ? F(sdR, 1) : '—') + '</td>' +
+        '<td><input type="number" step="0.001" value="' + (mo.ded == null ? '' : mo.ded) + '" placeholder="0" oninput="ANAL.' + key + '.months[' + idx + '].ded=this.value;_analRecalcLive()"></td>' +
+        '<td class="anw-sep"><input type="number" step="0.1" value="' + stdM[0] + '" placeholder="tme,std" oninput="ANAL.std[' + mo.month + '][0]=this.value;_analRecalcLive()"></td>' +
+        '<td class="calc" id="anw-' + key + '-sds-' + idx + '">' + F(sdS, 1) + '</td>' +
+      '</tr>';
+    }).join('') : '<tr><td colspan="9" style="text-align:center;padding:14px;">Ustaw zakres dat okresu.</td></tr>';
+
+    return '<div class="anw-sec"><div class="anw-head ' + headCls + '"><span class="ico">' + ico + '</span><h3>' + title + '</h3></div><div class="anw-body">' +
+      '<div class="anw-row">' +
+        '<div class="anw-f"><label>Data od</label><input type="date" value="' + (P.from || '') + '" onchange="analOnDates(\'' + key + '\',\'from\',this.value)"></div>' +
+        '<div class="anw-f"><label>Data do</label><input type="date" value="' + (P.to || '') + '" onchange="analOnDates(\'' + key + '\',\'to\',this.value)"></div>' +
+        '<div class="anw-f"><label>' + qLabel + ' [' + (ANAL.energy.unit || 'GJ') + ']</label><input type="number" step="0.001" value="' + (P.consumption == null ? '' : P.consumption) + '" oninput="ANAL.' + key + '.consumption=this.value;_analRecalcLive()"></div>' +
+        '<div class="anw-f"><label>po odliczeniach</label><div class="calc" id="anw-' + key + '-netq" style="padding:8px 0;font-weight:600;">' + (function () { var q = _occNetQ(P); return q != null ? F(q, 3) : '—'; })() + '</div></div>' +
+      '</div>' +
+      '<table class="anw-t"><thead><tr>' +
+        '<th>Miesiąc</th><th>dni z₀</th><th>tme [°C]</th><th>O [%]</th><th>tᵢ,eff</th><th>SDeff,rzecz</th><th>odlicz.</th>' +
+        '<th class="anw-sep">tme,std</th><th>SDeff,stand</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="anw-muted" style="margin-top:8px;">Kolumna <b>odlicz.</b> — ilość energii odejmowana od Qc.o. tego okresu (c.w.u., technologia, podlicznik najemcy). Wpisywana ręcznie, w jednostce zużycia. Puste = brak odliczenia.</div>' +
+    '</div></div>';
+  }
+
+  /* ── nagłówek parametrów metody ─────────────────────────────────────────── */
+  function _occParamBar() {
+    var p = _occAnalP();
+    var f = function (k, lab) {
+      return '<div class="anw-f" style="min-width:120px;"><label>' + lab + '</label>' +
+        '<input type="number" step="0.1" value="' + p[k] + '" oninput="ANAL.occParams=ANAL.occParams||{};ANAL.occParams.' + k + '=this.value;_analRecalcLive()"></div>';
+    };
+    return '<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">🏨</span><h3>Parametry metody — wspólne dla PRZED i PO</h3></div><div class="anw-body">' +
+      '<div class="anw-row">' + f('ti', 'tᵢ [°C]') + f('tiRed', 'tᵢ,red [°C]') + f('fCommon', 'f_wsp [%]') + f('oRef', 'O_ref [%]') + f('heatLimit', 'próg grzew. [°C]') + '</div>' +
+      '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme) · φ = ΣSDeff,stand / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
+      'O_ref obowiązuje identycznie w obu okresach — zmiana bazy odniesienia między PRZED a PO dałaby pozorną oszczędność.</div>' +
+    '</div></div>';
+  }
+
+  window._analOCCSheet = function () {
+    return _occParamBar() +
+      _occPeriodSheet('before', 'Okres bazowy — PRZED instalacją', 'anw-before', '📉', 'Qc.o. przed') +
+      _occPeriodSheet('after', 'Okres analizowany — PO instalacji', 'anw-after', '📈', 'Qc.o. po') +
+      _analEnergyBlock();
+  };
+
+  console.log('[occupancy] Analiza — Korekta obłożenia wpięta w kreator');
+})();
