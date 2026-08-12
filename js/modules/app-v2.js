@@ -2418,7 +2418,7 @@ function _analStepsBar() {
 // ── KROK 1: wybór typu + „+ Nowa analiza" + lista istniejących ──────────────────
 function _analTypeSelect() {
   const cards = Object.entries(AnalysesModule.TYPES).map(([k, t]) => {
-    const ready = (k === 'TYM' || k === 'REGRESSION'); // gotowe metody
+    const ready = (k === 'TYM' || k === 'REGRESSION' || k === 'OCCUPANCY'); // gotowe metody
     return `<div class="anw-type ${ANAL.type === k ? 'sel' : ''}" onclick="analSelectType('${k}')">
       ${ANAL.type === k ? '<span class="chk">✓</span>' : ''}
       <span class="badge ${ready ? 'ready' : 'soon'}">${ready ? 'GOTOWE' : 'WKRÓTCE'}</span>
