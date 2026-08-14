@@ -1,0 +1,48 @@
+name: Deploy to control.waterai.cloud
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-control-waterai
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      # Na serwer idzie tylko to, co jest potrzebne do działania aplikacji.
+      # Poprzednio wgrywane było `./*`, czyli CAŁE repo — a `put -r` w sftp nie
+      # tworzy katalogów najwyższego poziomu, których nie ma jeszcze na serwerze.
+      # Każdy nowy katalog w repo (test, sql, _archiwum) wywracał wdrożenie,
+      # mimo że pliki aplikacji wgrywały się poprawnie. Katalogi deweloperskie
+      # nie mają zresztą czego szukać na produkcji.
+      - name: Przygotuj katalog wdrożeniowy
+        run: |
+          set -e
+          mkdir -p _deploy
+          cp index.html _deploy/
+          cp logo-waterai.png logo-waterai-icon.png _deploy/ 2>/dev/null || true
+          cp -r css js _deploy/
+          [ -d narzedzia ] && cp -r narzedzia _deploy/ || true
+          [ -d supabase ] && cp -r supabase _deploy/ || true
+          echo "Do wgrania:"
+          find _deploy -maxdepth 2 -type d | sort
+          echo "Plików: $(find _deploy -type f | wc -l)"
+
+      - name: Wgraj pliki na serwer (SFTP)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
+        with:
+          username: ${{ secrets.FTP_USERNAME }}
+          server: waterai.cloud
+          port: 22
+          password: ${{ secrets.FTP_PASSWORD }}
+          local_path: './_deploy/*'
+          remote_path: './'
+          sftp_only: true

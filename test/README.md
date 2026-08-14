@@ -56,3 +56,19 @@ albo wypchnąć tokenem z zakresem `workflow`.
 
 Uruchamia kontrolę składni i wszystkie trzy zestawy testów przy każdym push
 na `main` — **przed** wdrożeniem, więc błąd nie trafi na produkcję.
+
+## Naprawa wdrożenia (2026-08-14)
+
+`DEPLOY-poprawiony.yml.txt` zastępuje `.github/workflows/deploy.yml`.
+
+**Problem:** stary workflow wgrywał `./*`, czyli całe repo. `put -r` w sftp
+nie tworzy katalogów najwyższego poziomu, których nie ma jeszcze na serwerze,
+więc każdy nowy katalog w repo (`test`, `sql`, `_archiwum`) kończył się
+`path canonicalization failed` i całe wdrożenie świeciło na czerwono —
+mimo że pliki aplikacji wgrywały się poprawnie.
+
+**Rozwiązanie:** krok `Przygotuj katalog wdrożeniowy` kopiuje do `_deploy/`
+wyłącznie to, co potrzebne na produkcji (index.html, logo, css, js, narzedzia,
+supabase), a SFTP wgrywa `./_deploy/*`. Dodanie kolejnego katalogu
+deweloperskiego nie ruszy już wdrożenia, a kod testowy i migracje SQL
+nie trafiają na serwer.
