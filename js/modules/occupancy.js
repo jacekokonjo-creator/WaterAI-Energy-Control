@@ -671,3 +671,25 @@
 
   console.log('[occupancy] Raport — kolumny O / tᵢ,eff i blok metodyczny wpięte');
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Wybór typu — reset kontenera referencyjnego
+   ───────────────────────────────────────────────────────────────────────────
+   `analSelectType` zeruje ANAL.std tylko dla VOLUME (poziomy intensywności).
+   Przy przełączeniu VOLUME → OCCUPANCY/TYM zostawały zera zamiast temperatur
+   TYM; przy wyborze okresu bazowego to się naprawia samo, ale przy „✏️ Ręczne
+   wprowadzenie" — już nie, i sezon standardowy liczyłby się od 0 °C.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var _stOrig = window.analSelectType;
+  window.analSelectType = function (k) {
+    var prev = window.ANAL ? ANAL.type : null;
+    _stOrig.apply(this, arguments);
+    if ((k === 'OCCUPANCY' || k === 'TYM') && prev === 'VOLUME' && window.ANAL) {
+      ANAL.std = JSON.parse(JSON.stringify(ANAL_STD_DEFAULT));   // temperatury TYM, nie zera
+      if (k === 'OCCUPANCY' && !ANAL.occParams) ANAL.occParams = { ti: 20, tiRed: 17, fCommon: 0, oRef: 100 };
+      renderAnalysesModule();
+    }
+  };
+})();
