@@ -19,6 +19,12 @@
 (function () {
   'use strict';
 
+  /* ANAL jest zadeklarowane jako `let` na poziomie skryptu — trafia do globalnego
+     środowiska LEKSYKALNEGO, a nie na `window`. `window.ANAL` jest więc zawsze
+     undefined; odwołanie musi iść przez gołą nazwę. */
+  function _A() { try { return (typeof ANAL !== 'undefined') ? ANAL : null; } catch (e) { return null; } }
+  window._occA = _A;
+
   var OCC_DEFAULTS = { ti: 20, tiRed: 17, fCommon: 0, oRef: 100 };
 
   function _occN(v) { return (v === '' || v == null || isNaN(Number(v))) ? null : Number(v); }
@@ -330,7 +336,7 @@
   function F(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d) : Number(v).toFixed(d); }
 
   function _occAnalP() {
-    var p = (window.ANAL && ANAL.occParams) || {};
+    var p = (_occA() && _occA().occParams) || {};
     return { ti: N(p.ti) != null ? N(p.ti) : 20, tiRed: N(p.tiRed) != null ? N(p.tiRed) : 17,
       fCommon: N(p.fCommon) != null ? N(p.fCommon) : 0, oRef: N(p.oRef) != null ? N(p.oRef) : 100 };
   }
@@ -347,7 +353,7 @@
   /* ── silnik: nadpisanie _analComputePeriod tylko dla OCCUPANCY ──────────── */
   var _cpOrig = window._analComputePeriod;
   window._analComputePeriod = function (key) {
-    if (!(window.ANAL && ANAL.type === 'OCCUPANCY')) return _cpOrig.apply(this, arguments);
+    if (!(_occA() && _occA().type === 'OCCUPANCY')) return _cpOrig.apply(this, arguments);
     var P = ANAL[key], p = _occAnalP(), sumR = 0, sumS = 0, days = 0;
     var tiEffRef = _occTiEff(p.oRef, p);
     (P.months || []).forEach(function (mo, idx) {
@@ -406,7 +412,7 @@
   /* ── zmiana dat: zachowaj obłożenie i odliczenia (analOnDates kasuje miesiące) ── */
   var _odOrig = window.analOnDates;
   window.analOnDates = function (key, which, val) {
-    if (!(window.ANAL && ANAL.type === 'OCCUPANCY')) return _odOrig.apply(this, arguments);
+    if (!(_occA() && _occA().type === 'OCCUPANCY')) return _odOrig.apply(this, arguments);
     var prev = {};
     (ANAL[key].months || []).forEach(function (m) { prev[Number(m.month)] = { occ: m.occ, ded: m.ded }; });
     ANAL[key][which] = val;
@@ -537,7 +543,7 @@
     if (!d || d.type !== 'OCCUPANCY') return d;
 
     var ip = (source && source.saved) ? (source.saved.inputParams || {}) : null;
-    var raw = ip ? (ip.occParams || {}) : ((window.ANAL && ANAL.occParams) || {});
+    var raw = ip ? (ip.occParams || {}) : ((_occA() && _occA().occParams) || {});
     var P = { ti: N(raw.ti) != null ? N(raw.ti) : 20, tiRed: N(raw.tiRed) != null ? N(raw.tiRed) : 17,
               fCommon: N(raw.fCommon) != null ? N(raw.fCommon) : 0, oRef: N(raw.oRef) != null ? N(raw.oRef) : 100 };
     var bP = ip ? (ip.before || {}) : ANAL.before;
@@ -565,7 +571,7 @@
     d.escoAmount = escoAmount;
     d.clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
     d.occParams = P;
-    d.occBasis = ip ? (ip.occBasis || '') : ((window.ANAL && ANAL.occBasis) || '');
+    d.occBasis = ip ? (ip.occBasis || '') : ((_occA() && _occA().occBasis) || '');
     /* tᵢ pokazywane w raporcie = efektywne przy obłożeniu referencyjnym */
     d.tiBefore = _occTiEff(P.oRef, P); d.tiAfter = d.tiBefore;
     return d;
@@ -684,9 +690,9 @@
   'use strict';
   var _stOrig = window.analSelectType;
   window.analSelectType = function (k) {
-    var prev = window.ANAL ? ANAL.type : null;
+    var prev = _occA() ? _occA().type : null;
     _stOrig.apply(this, arguments);
-    if ((k === 'OCCUPANCY' || k === 'TYM') && prev === 'VOLUME' && window.ANAL) {
+    if ((k === 'OCCUPANCY' || k === 'TYM') && prev === 'VOLUME' && _occA()) {
       ANAL.std = JSON.parse(JSON.stringify(ANAL_STD_DEFAULT));   // temperatury TYM, nie zera
       if (k === 'OCCUPANCY' && !ANAL.occParams) ANAL.occParams = { ti: 20, tiRed: 17, fCommon: 0, oRef: 100 };
       renderAnalysesModule();
