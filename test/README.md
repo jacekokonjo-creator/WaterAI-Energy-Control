@@ -30,3 +30,24 @@ liczył zwykły TYM, dając wiarygodnie wyglądające, ale błędne kwoty faktur
 
 Odwołania do zmiennych `let`/`const` z poziomu pliku muszą iść przez gołą
 nazwę (z osłoną `typeof X !== 'undefined'`), nigdy przez `window.X`.
+
+## Pliki
+
+| Plik | Zakres | Asercji |
+|---|---|---|
+| `t_flow.js` | okres bazowy → analiza → zapis → raport (obłożenie + intensywność), przypadki brzegowe | 62 |
+| `t_smoke.js` | każda funkcja `render*` × 5 ról × 4 zakładki × 4 typy analiz | 170 wywołań |
+| `t_persist.js` | zapis → przeładowanie → odczyt, kopia zapasowa, kwoty ESCO | 20 |
+
+Uruchamiane automatycznie przy każdym push na `main`
+(`.github/workflows/testy.yml`) — **przed** wdrożeniem.
+
+## CI — do dodania ręcznie
+
+Plik `test/CI-testy.yml.txt` zawiera gotowy workflow. Token użyty do wypchnięcia
+tych zmian nie ma uprawnienia `workflow`, więc trzeba go dodać samodzielnie:
+skopiować zawartość do `.github/workflows/testy.yml` przez interfejs GitHuba
+albo wypchnąć tokenem z zakresem `workflow`.
+
+Uruchamia kontrolę składni i wszystkie trzy zestawy testów przy każdym push
+na `main` — **przed** wdrożeniem, więc błąd nie trafi na produkcję.

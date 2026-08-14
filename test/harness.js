@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
-const REPO = '/home/claude/repo';
+const REPO = path.resolve(__dirname, '..');
 
 function boot(opts = {}) {
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');

@@ -1,0 +1,42 @@
+name: Testy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testy:
+    name: Składnia + testy jsdom
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Kontrola składni wszystkich ładowanych plików
+        run: |
+          set -e
+          n=0
+          for f in $(grep -o 'js/[a-zA-Z0-9._/-]*\.js' index.html | sort -u); do
+            if [ ! -f "$f" ]; then echo "BRAK PLIKU: $f"; exit 1; fi
+            node --check "$f"
+            n=$((n+1))
+          done
+          echo "Składnia OK: $n plików"
+
+      - name: Instalacja jsdom
+        run: npm install jsdom --no-save
+
+      - name: Test przepływu (okres bazowy → analiza → raport)
+        run: node test/t_flow.js
+
+      - name: Smoke-test modułów we wszystkich rolach
+        run: node test/t_smoke.js
+
+      - name: Test trwałości danych i kopii zapasowej
+        run: node test/t_persist.js
