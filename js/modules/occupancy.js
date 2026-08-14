@@ -163,8 +163,12 @@
         param('fCommon', 'f_wsp — powierzchnie wspólne [%]', 'grzane niezależnie od obłożenia', '1') +
         param('oRef', 'O_ref — obłożenie referencyjne [%]', 'dla sezonu standardowego', '1') +
       '</div>' +
+      '<div style="margin-top:10px;"><label style="' + pl + '">Podstawa obłożenia <span style="opacity:.7;">(opcjonalne, trafia do wydruku)</span></label>' +
+      '<input type="text" value="' + _occEsc(d.occBasis || '') + '" placeholder="np. % pokoi zajętych wg raportu recepcji / % m² użytkowanych / % godzin w trybie użytkowym" ' +
+      'oninput="_bpDraft.occBasis=this.value" style="' + pi + '">' +
+      '<span style="font-size:10.5px;color:var(--color-text-tertiary);">Zapisz, z czego policzono procent — za rok nikt tego nie odtworzy z samej liczby.</span></div>' +
       '<div style="font-size:11px;color:#33475B;margin-top:9px;line-height:1.5;">' +
-        'Przy <b>f_wsp = 0</b> wzór jest dokładnie taki jak w Załączniku nr 3. Wartość &gt; 0 uwzględnia części wspólne budynku (korytarze, klatki, kuchnie, recepcja) ogrzewane niezależnie od obłożenia. Liczbę dni grzewczych w miesiącu ustalasz kolumną z₀ — wpisz 0, aby wyłączyć miesiąc.' +
+        'Przy <b>f_wsp = 0</b> wzór jest dokładnie taki jak w Załączniku nr 3. Wartość &gt; 0 uwzględnia części wspólne budynku (korytarze, klatki, kuchnie, recepcja) ogrzewane niezależnie od obłożenia. Liczbę dni grzewczych w miesiącu ustalasz kolumną z₀ — wpisz 0, aby wyłączyć miesiąc. W kolumnie <b>O</b> podajesz <b>udział procentowy (0–100)</b> — obojętne, czy liczony z pokoi, osób, powierzchni czy godzin pracy. Przeliczenie robisz po swojej stronie.' +
       '</div>' +
     '</div>' +
 
@@ -264,7 +268,8 @@
       step(1, 'Efektywna temperatura wewnętrzna (równanie 2a)',
         box('tᵢ,eff = f_wsp·tᵢ + (1 − f_wsp)·[ O·tᵢ + (1 − O)·tᵢ,red ]<br>' +
             'tᵢ = <b>' + _occFmt(P.ti, 1) + ' °C</b> · tᵢ,red = <b>' + _occFmt(P.tiRed, 1) + ' °C</b> · ' +
-            'f_wsp = <b>' + _occFmt(P.fCommon, 0) + '%</b> · O_ref = <b>' + _occFmt(P.oRef, 0) + '%</b>')) +
+            'f_wsp = <b>' + _occFmt(P.fCommon, 0) + '%</b> · O_ref = <b>' + _occFmt(P.oRef, 0) + '%</b>' +
+            (it.occBasis ? '<br>Podstawa obłożenia: <b>' + _occEsc(it.occBasis) + '</b>' : ''))) +
 
       step(2, 'Stopniodni z uwzględnieniem obłożenia (równanie 2)',
         '<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">' +
@@ -380,6 +385,7 @@
       if (k >= 1 && k <= 12) std[k] = [(m.tmeStd != null && m.tmeStd !== '') ? m.tmeStd : std[k][0], (m.days != null ? m.days : std[k][1])];
     });
     ANAL.std = std;
+    ANAL.occBasis = it.occBasis || '';
     ANAL.before.consumption = (it.consumption != null) ? it.consumption : '';
     if (it.energyUnit) ANAL.energy.unit = it.energyUnit;
   };
@@ -471,8 +477,10 @@
     };
     return '<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">🏨</span><h3>Parametry metody — wspólne dla PRZED i PO</h3></div><div class="anw-body">' +
       '<div class="anw-row">' + f('ti', 'tᵢ [°C]') + f('tiRed', 'tᵢ,red [°C]') + f('fCommon', 'f_wsp [%]') + f('oRef', 'O_ref [%]') + '</div>' +
+      '<div class="anw-row"><div class="anw-f" style="flex:1;"><label>Podstawa obłożenia <span style="opacity:.7;">(opcjonalne)</span></label>' +
+      '<input type="text" value="' + String(ANAL.occBasis || '').replace(/"/g, '&quot;') + '" placeholder="np. % pokoi zajętych / % m² użytkowanych / % godzin pracy" oninput="ANAL.occBasis=this.value"></div></div>' +
       '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme), gdzie z₀ = dni grzewcze wpisane ręcznie · φ = ΣSDeff,stand / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
-      'O_ref obowiązuje identycznie w obu okresach — zmiana bazy odniesienia między PRZED a PO dałaby pozorną oszczędność.</div>' +
+      'W kolumnie <b>O</b> podajesz udział procentowy (0–100) — z pokoi, osób, powierzchni lub godzin pracy, wedle uznania; przelicz przed wpisaniem.<br>O_ref obowiązuje identycznie w obu okresach — zmiana bazy odniesienia między PRZED a PO dałaby pozorną oszczędność.</div>' +
     '</div></div>';
   }
 
