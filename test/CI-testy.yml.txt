@@ -49,3 +49,9 @@ jobs:
 
       - name: Test dokumentów i folderów
         run: node test/t_documents.js
+
+      - name: Test odczytów (przeliczniki jednostek)
+        run: node test/t_readings.js
+
+      - name: Test kalendarza (terminy, strefa czasowa)
+        run: node test/t_calendar.js

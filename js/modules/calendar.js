@@ -106,32 +106,54 @@ const CalendarModule = {
     });
   },
 
+  // Dzień wg czasu LOKALNego użytkownika. `toISOString()` zwraca UTC, więc
+  // w Polsce (UTC+1/+2) wieczorem podawał już jutrzejszą datę — zadania na
+  // dziś wypadały z „Dziś", a jutrzejsze wskakiwały do „Po terminie".
+  _today() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  // Termin w formacie RRRR-MM-DD; brak terminu → null (a NIE pusty string,
+  // bo '' < '2026-08-14' jest prawdą i zadania bez terminu lądowały
+  // w „Po terminie", strasząc użytkownika nieistniejącym zaległym zadaniem).
+  _due(e) {
+    const v = (e && e.dueDate != null) ? String(e.dueDate) : '';
+    return /^\d{4}-\d{2}-\d{2}/.test(v) ? v : null;
+  },
+
   getToday() {
-    const today = new Date().toISOString().slice(0, 10);
-    return this.getAll().filter(e => e.dueDate === today && e.status === 'PENDING');
+    const today = this._today();
+    return this.getAll().filter(e => this._due(e) === today && e.status === 'PENDING');
   },
 
   getOverdue() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this._today();
     return this.getAll()
-      .filter(e => e.dueDate < today && e.status === 'PENDING')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      .filter(e => { const d = this._due(e); return d !== null && d < today && e.status === 'PENDING'; })
+      .sort((a, b) => this._due(a).localeCompare(this._due(b)));
   },
 
   getUpcoming(days) {
     const today = new Date();
     const future = new Date(today);
     future.setDate(future.getDate() + days);
-    const todayStr = today.toISOString().slice(0, 10);
-    const futureStr = future.toISOString().slice(0, 10);
+    const todayStr = this._today();
+    const futureStr = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
     return this.getAll()
-      .filter(e => e.dueDate > todayStr && e.dueDate <= futureStr && e.status === 'PENDING')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      .filter(e => { const d = this._due(e); return d !== null && d > todayStr && d <= futureStr && e.status === 'PENDING'; })
+      .sort((a, b) => this._due(a).localeCompare(this._due(b)));
   },
 
+  // Bez terminu → poza kalendarzem miesięcznym (zamiast wyjątku na undefined).
   getByMonth(year, month) {
     const prefix = `${year}-${String(month).padStart(2, '0')}`;
-    return this.getAll().filter(e => e.dueDate.startsWith(prefix));
+    return this.getAll().filter(e => { const d = this._due(e); return d !== null && d.startsWith(prefix); });
+  },
+
+  // Zadania bez terminu — wcześniej nie dało się ich nigdzie zobaczyć.
+  getUndated() {
+    return this.getAll().filter(e => this._due(e) === null && e.status === 'PENDING');
   },
 
   getDashboardSummary() {
