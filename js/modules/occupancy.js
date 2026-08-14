@@ -397,6 +397,28 @@
     return _obpOrig.apply(this, arguments);
   };
 
+  /* ── zmiana dat: zachowaj obłożenie i odliczenia (analOnDates kasuje miesiące) ── */
+  var _odOrig = window.analOnDates;
+  window.analOnDates = function (key, which, val) {
+    if (!(window.ANAL && ANAL.type === 'OCCUPANCY')) return _odOrig.apply(this, arguments);
+    var prev = {};
+    (ANAL[key].months || []).forEach(function (m) { prev[Number(m.month)] = { occ: m.occ, ded: m.ded }; });
+    ANAL[key][which] = val;
+    ANAL[key].months = _analMonthsBetween(ANAL[key].from, ANAL[key].to).map(function (m) {
+      var k = Number(m.month), old = prev[k] || {};
+      return { month: k, name: m.name, days: m.days, tme: m.tme != null ? m.tme : '',
+               occ: old.occ != null ? old.occ : '', ded: old.ded != null ? old.ded : '' };
+    });
+    renderAnalysesModule();
+  };
+
+  /* miesiące z dniami grzewczymi, ale bez wpisanego obłożenia */
+  function _occMissing(P) {
+    return (P.months || []).filter(function (m) {
+      return Number(m.days || 0) > 0 && N(m.tme) != null && N(m.occ) == null;
+    }).map(function (m) { return m.name; });
+  }
+
   /* ── arkusz okresu (PRZED / PO) ─────────────────────────────────────────── */
   function _occPeriodSheet(key, title, headCls, ico, qLabel) {
     var P = ANAL[key], p = _occAnalP();
@@ -413,7 +435,7 @@
         '<td>' + mo.name + '</td>' +
         '<td><input type="number" min="0" max="31" value="' + (mo.days == null ? '' : mo.days) + '" oninput="ANAL.' + key + '.months[' + idx + '].days=this.value;_analRecalcLive()"></td>' +
         '<td><input type="number" step="0.1" value="' + (mo.tme == null ? '' : mo.tme) + '" placeholder="tme" oninput="ANAL.' + key + '.months[' + idx + '].tme=this.value;_analRecalcLive()"></td>' +
-        '<td><input type="number" step="1" min="0" max="100" value="' + (mo.occ == null ? '' : mo.occ) + '" placeholder="O %" oninput="ANAL.' + key + '.months[' + idx + '].occ=this.value;_analRecalcLive()"></td>' +
+        '<td><input type="number" step="1" min="0" max="100" value="' + (mo.occ == null ? '' : mo.occ) + '" placeholder="O %"' + ((z0 > 0 && tme != null && occ == null) ? ' style="border:1.5px solid #C2410C;background:#FFF7ED;"' : '') + ' oninput="ANAL.' + key + '.months[' + idx + '].occ=this.value;_analRecalcLive()"></td>' +
         '<td class="calc" id="anw-' + key + '-tieff-' + idx + '">' + F(tiEff, 2) + '</td>' +
         '<td class="calc" id="anw-' + key + '-sdr-' + idx + '">' + (grzR ? F(sdR, 1) : '—') + '</td>' +
         '<td><input type="number" step="0.001" value="' + (mo.ded == null ? '' : mo.ded) + '" placeholder="0" oninput="ANAL.' + key + '.months[' + idx + '].ded=this.value;_analRecalcLive()"></td>' +
@@ -433,6 +455,9 @@
         '<th>Miesiąc</th><th>dni z₀</th><th>tme [°C]</th><th>O [%]</th><th>tᵢ,eff</th><th>SDeff,rzecz</th><th>odlicz.</th>' +
         '<th class="anw-sep">tme,std</th><th>SDeff,stand</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      (function () { var miss = _occMissing(P); return miss.length
+        ? '<div style="margin-top:10px;padding:9px 12px;border-radius:8px;background:#FFF7ED;border:1px solid #FDBA74;color:#7C2D12;font-size:12.5px;"><b>Brak obłożenia w ' + miss.length + ' mies.:</b> ' + miss.join(', ') + ' — te miesiące liczone są jak O = O_ref (' + _occAnalP().oRef + '%), czyli bez korekty obłożenia. Uzupełnij O, aby korekta zadziałała.</div>'
+        : ''; })() +
       '<div class="anw-muted" style="margin-top:8px;">Kolumna <b>odlicz.</b> — ilość energii odejmowana od Qc.o. tego okresu (c.w.u., technologia, podlicznik najemcy). Wpisywana ręcznie, w jednostce zużycia. Puste = brak odliczenia.</div>' +
     '</div></div>';
   }
