@@ -1,105 +1,132 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Migracja 008 — zawężenie widoczności ról zewnętrznych
 --
--- ⚠️  NIE URUCHAMIAĆ BEZ PRZECZYTANIA. Zmienia polityki RLS na produkcji.
---     Błąd w tym pliku = odcięcie użytkowników od danych albo przeciek.
---     Przed uruchomieniem: kopia zapasowa + test na kopii bazy.
+-- ⚠️  URUCHAMIAĆ DOPIERO PO PRZYPISANIU OPIEKUNÓW (skrypt 009a).
+--     Bez tego handlowcy stracą dostęp do wszystkiego.
+--     Przed uruchomieniem: kopia zapasowa bazy.
 --
--- Problem (z KONTEKST 2026-07-12, punkt „do zrobienia" nr 1–3):
---   1. is_internal() obejmuje salesRepresentative → przedstawiciel handlowy
---      widzi WSZYSTKICH klientów, obiekty, pomiary i faktury. To przeciek
---      danych między klientami, a rola jest ZEWNĘTRZNA.
---   2. Klient widzi dokumenty po client_id zamiast „utworzone przez siebie
---      + udostępnione".
---   3. Back Office nie może zarządzać udostępnieniami (tylko admin + analityk).
+-- Problem (KONTEKST, sekcja „Model ról", punkt otwarty):
+--   `is_internal()` obejmuje salesRepresentative, więc handlowiec — rola
+--   ZEWNĘTRZNA — widzi wszystkich klientów, obiekty, pomiary i faktury.
+--   To przeciek danych między klientami.
 --
--- Zasada docelowa: dla ról zewnętrznych (Klient, Sales Rep) żadnych przecieków
--- cudzych danych ani ślepych funkcji.
+-- Opiekun obiektu trzymany jest w `objects.data->>'ownerId'` (uuid użytkownika),
+-- spójnie z resztą schematu, gdzie dane rekordu żyją w kolumnie jsonb `data`.
+-- Dzięki temu pole jest zapisywalne także z poziomu aplikacji.
 --
--- Plik jest IDEMPOTENTNY — można uruchomić wielokrotnie.
+-- Skrypt ma wbudowany BEZPIECZNIK: przerwie się, jeśli żaden obiekt nie ma
+-- opiekuna. Jest idempotentny — można uruchomić wielokrotnie.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 begin;
 
--- ── 1. Rozdzielenie „wewnętrzny" od „ma dostęp do wszystkiego" ──────────────
--- is_internal() zostaje bez zmian (używane w wielu miejscach), ale dochodzi
--- węższa funkcja dla ról z pełnym wglądem w dane wszystkich klientów.
+-- ── 1. Funkcje pomocnicze ──────────────────────────────────────────────────
 
+-- Role z pełnym wglądem we wszystkie dane. `is_internal()` zostaje bez zmian
+-- (używane w wielu miejscach); to jego węższy odpowiednik, BEZ handlowca.
 create or replace function public.is_full_access()
-returns boolean language sql stable as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
-      and p.roles && array['admin','backOffice','energyAnalyst']::text[]
+      and (p.role in ('admin','backOffice','energyAnalyst')
+           or (p.data->'roles') ?| array['admin','backOffice','energyAnalyst'])
   );
 $$;
 
 -- Czy bieżący użytkownik jest opiekunem danego obiektu.
--- WYMAGA kolumny objects.owner_id (patrz krok 2) — bez niej Sales Rep
--- straciłby dostęp do wszystkiego, łącznie z własnymi obiektami.
 create or replace function public.is_object_owner(obj_id uuid)
-returns boolean language sql stable as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.objects o
-    where o.id = obj_id and o.owner_id = auth.uid()
+    where o.id = obj_id
+      and (o.data->>'ownerId')::uuid = auth.uid()
   );
 $$;
 
--- ── 2. Pole opiekuna obiektu ────────────────────────────────────────────────
-alter table public.objects
-  add column if not exists owner_id uuid references auth.users(id);
+-- ── 2. Indeks na opiekunie ─────────────────────────────────────────────────
+create index if not exists idx_objects_owner
+  on public.objects (((data->>'ownerId')::uuid));
 
-create index if not exists idx_objects_owner on public.objects(owner_id);
+-- ── 3. BEZPIECZNIK ─────────────────────────────────────────────────────────
+-- Przerywa migrację, jeśli ŻADEN obiekt nie ma opiekuna — to znak, że
+-- skrypt 009a nie został wykonany, a włączenie polityk odcięłoby handlowców
+-- od wszystkich danych.
+do $$
+declare n int;
+begin
+  select count(*) into n from public.objects where data->>'ownerId' is not null;
+  if n = 0 then
+    raise exception
+      'PRZERWANO: żaden obiekt nie ma przypisanego opiekuna (data->>''ownerId''). '
+      'Uruchom najpierw sql/009a_lista_obiektow.sql i przypisz opiekunów, '
+      'inaczej handlowcy stracą dostęp do wszystkich danych.';
+  end if;
+  raise notice 'Obiektów z przypisanym opiekunem: %', n;
+end $$;
 
--- UWAGA: dopóki owner_id jest puste, Sales Rep nie zobaczy NICZEGO.
--- Przed włączeniem polityk z kroku 3 trzeba uzupełnić opiekunów, np.:
---   update public.objects set owner_id = '<uuid-handlowca>' where id in (...);
--- Krok 3 jest celowo zakomentowany — odkomentować dopiero po uzupełnieniu.
+-- ── 4. Widoczność obiektów ─────────────────────────────────────────────────
+drop policy if exists p_obj_internal_all on public.objects;
+drop policy if exists p_obj_scoped on public.objects;
+create policy p_obj_scoped on public.objects for select using (
+  public.is_full_access()
+  or public.is_object_owner(id)
+  or public.has_share('object', id)
+  or exists (select 1 from public.profiles p
+             where p.id = auth.uid() and p.client_id = objects.client_id)
+);
 
--- ── 3. Zawężenie Sales Rep (ZAKOMENTOWANE — patrz uwaga wyżej) ──────────────
--- drop policy if exists p_obj_internal_all on public.objects;
--- create policy p_obj_scoped on public.objects for select using (
---   public.is_full_access()
---   or public.is_object_owner(id)
---   or public.has_share('object', id)
--- );
---
--- drop policy if exists p_cli_internal_all on public.clients;
--- create policy p_cli_scoped on public.clients for select using (
---   public.is_full_access()
---   or exists (select 1 from public.objects o
---              where o.client_id = clients.id and o.owner_id = auth.uid())
--- );
---
--- drop policy if exists p_read_internal_all on public.readings;
--- create policy p_read_scoped on public.readings for select using (
---   public.is_full_access()
---   or public.is_object_owner(object_id)
---   or exists (select 1 from public.objects o
---              join public.clients c on c.id = o.client_id
---              where o.id = readings.object_id and c.auth_user_id = auth.uid())
--- );
+-- ── 5. Widoczność klientów ─────────────────────────────────────────────────
+-- Handlowiec widzi klienta, jeśli opiekuje się choć jednym jego obiektem.
+drop policy if exists p_cli_internal_all on public.clients;
+drop policy if exists p_cli_scoped on public.clients;
+create policy p_cli_scoped on public.clients for select using (
+  public.is_full_access()
+  or exists (select 1 from public.objects o
+             where o.client_id = clients.id
+               and (o.data->>'ownerId')::uuid = auth.uid())
+  or exists (select 1 from public.profiles p
+             where p.id = auth.uid() and p.client_id = clients.id)
+);
 
--- ── 4. Back Office zarządza udostępnieniami ─────────────────────────────────
--- Rozszerzenie is_analyst_or_admin() o backOffice, zgodnie z docelowym
--- modelem ról. Nazwa funkcji zostaje (używana w politykach resource_shares).
+-- ── 6. Widoczność pomiarów ─────────────────────────────────────────────────
+drop policy if exists p_read_internal_all on public.readings;
+drop policy if exists p_read_scoped on public.readings;
+create policy p_read_scoped on public.readings for select using (
+  public.is_full_access()
+  or public.is_object_owner(object_id)
+  or exists (select 1 from public.objects o
+             join public.profiles p on p.client_id = o.client_id
+             where o.id = readings.object_id and p.id = auth.uid())
+);
+
+-- ── 7. Back Office zarządza udostępnieniami ────────────────────────────────
+-- Zgodnie z modelem ról (KONTEKST_PROJEKTU.md). Nazwa funkcji zostaje
+-- (używana w politykach resource_shares), zmienia się tylko zakres.
 create or replace function public.is_analyst_or_admin()
-returns boolean language sql stable as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
-      and p.roles && array['admin','energyAnalyst','backOffice']::text[]
+      and (p.role in ('admin','energyAnalyst','backOffice')
+           or (p.data->'roles') ?| array['admin','energyAnalyst','backOffice'])
   );
 $$;
 
 commit;
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- PO URUCHOMIENIU — lista kontrolna:
---   [ ] Zalogować się jako admin        → widzi wszystko
---   [ ] Zalogować się jako backOffice   → widzi wszystko + zarządza udostępnieniami
---   [ ] Zalogować się jako energyAnalyst→ bez zmian
---   [ ] Zalogować się jako salesRep     → widzi TYLKO przypisane obiekty
---   [ ] Zalogować się jako client       → widzi tylko swoje
---   [ ] Sprawdzić, że faktury i raporty nadal się otwierają dla każdej roli
+-- LISTA KONTROLNA — zalogować się kolejno jako:
+--   [ ] admin               → widzi wszystko
+--   [ ] backOffice          → widzi wszystko + zarządza udostępnieniami
+--   [ ] energyAnalyst       → bez zmian
+--   [ ] salesRepresentative → widzi TYLKO przypisane obiekty i ich klientów
+--   [ ] client              → widzi tylko swoje
+--   [ ] faktury i raporty otwierają się dla każdej roli
+--
+-- WYCOFANIE (gdyby coś poszło nie tak):
+--   drop policy if exists p_obj_scoped  on public.objects;
+--   drop policy if exists p_cli_scoped  on public.clients;
+--   drop policy if exists p_read_scoped on public.readings;
+--   …i przywrócić poprzednie polityki z migracji 003.
 -- ═══════════════════════════════════════════════════════════════════════════

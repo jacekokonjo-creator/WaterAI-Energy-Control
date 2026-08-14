@@ -147,15 +147,22 @@ const sqlExists = fs.existsSync(sqlPath);
 ok('migracja 008 przygotowana', sqlExists);
 if (sqlExists) {
   const sql = fs.readFileSync(sqlPath, 'utf8');
-  const zakomentowane = sql.includes('-- create policy p_obj_scoped');
-  if (zakomentowane) {
-    info('RLS NIE zawęża jeszcze Sales Repa — polityki w 008 są zakomentowane',
-         'salesRepresentative widzi w bazie WSZYSTKICH klientów, obiekty, pomiary i faktury');
-    info('UI pokazuje mu Klientów i Obiekty bez ograniczenia do przypisanych',
-         'wymaga uzupełnienia objects.owner_id przed włączeniem polityk');
-  } else {
-    ok('polityki zawężające Sales Repa są aktywne w 008', true);
-  }
+  ok('008 zawęża obiekty (p_obj_scoped)', /^create policy p_obj_scoped/m.test(sql));
+  ok('008 zawęża klientów (p_cli_scoped)', /^create policy p_cli_scoped/m.test(sql));
+  ok('008 zawęża pomiary (p_read_scoped)', /^create policy p_read_scoped/m.test(sql));
+  ok('008 ma bezpiecznik przerywający bez opiekunów',
+     sql.includes('PRZERWANO') && sql.includes('raise exception'),
+     'brak zabezpieczenia — uruchomienie odcięłoby handlowców');
+  ok('008 spójne ze schematem (ownerId w jsonb, nie osobna kolumna)',
+     sql.includes("data->>'ownerId'") && !/alter table public\.objects\s+add column/i.test(sql));
+  ok('is_full_access NIE obejmuje salesRepresentative',
+     /is_full_access[\s\S]{0,400}?\$\$/.test(sql) &&
+     !/is_full_access[\s\S]{0,400}?salesRepresentative/.test(sql),
+     'handlowiec nie może mieć pełnego wglądu');
+  ok('009a (lista obiektów) przygotowany',
+     fs.existsSync(path.resolve(__dirname, '..', 'sql', '009a_lista_obiektow.sql')));
+  info('RLS nie jest jeszcze URUCHOMIONE na produkcji',
+       'do wykonania: 009a (przypisanie opiekunów) → 008 (włączenie polityk)');
   ok('008 rozszerza is_analyst_or_admin o backOffice',
      sql.includes("'backOffice'") && sql.includes('is_analyst_or_admin'));
 }
