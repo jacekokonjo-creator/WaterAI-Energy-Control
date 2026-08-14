@@ -573,3 +573,101 @@
 
   console.log('[occupancy] Raport ESCO — przeliczanie z tᵢ,eff wpięte');
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RAPORT / PDF — tabele miesięczne z kolumnami obłożenia
+   ───────────────────────────────────────────────────────────────────────────
+   Wartości liczbowe podmienia blok wyżej, ale tabele w raporcie renderują się
+   szablonem TYM (Miesiąc | z₀ | t rzecz | SD | t TYM | SD std) — nie widać
+   ani O, ani tᵢ,eff. Dokument pokazywałby wynik uwzględniający obłożenie,
+   bez możliwości odtworzenia, skąd się wziął. Poniżej te same tabele
+   z dwiema dodatkowymi kolumnami, wyłącznie dla analiz OCCUPANCY.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function _occIsRep() { return !!(window._occRepMode); }
+  function F(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d) : Number(v).toFixed(d); }
+
+  function _cells(r) {
+    return '<td class="calc">' + (r.occ == null ? '—' : F(r.occ, 0) + '%') + '</td>' +
+           '<td class="calc">' + (r.tiEff == null ? '—' : F(r.tiEff, 2)) + '</td>';
+  }
+  function _head() { return '<th>O</th><th>tᵢ,eff</th>'; }
+
+  /* tabela zwykła */
+  var _ptOrig = window._anwPeriodTable;
+  window._anwPeriodTable = function (P, ti) {
+    if (!_occIsRep()) return _ptOrig.apply(this, arguments);
+    var rows = (P.rows || []).map(function (r) {
+      return '<tr><td style="white-space:nowrap;">' + _anwMonShort(r) + '</td>' +
+        '<td class="calc">' + r.days + '</td>' +
+        '<td class="calc">' + (r.tme == null ? '—' : F(r.tme, 1)) + '</td>' +
+        _cells(r) +
+        '<td class="calc">' + F(r.sdR, 1) + '</td>' +
+        '<td class="calc">' + F(r.tStd, 1) + '</td>' +
+        '<td class="calc">' + F(r.sdS, 1) + '</td></tr>';
+    }).join('');
+    return '<table class="anw-t"><thead><tr>' +
+      '<th>Miesiąc</th><th>Dni z₀</th><th>t rzecz.</th>' + _head() + '<th>SDeff rzecz.</th><th>t TYM</th><th>SDeff std.</th>' +
+      '</tr></thead><tbody>' + (rows || '<tr><td colspan="8" class="anw-muted">Brak miesięcy</td></tr>') + '</tbody>' +
+      '<tfoot><tr><td>∑</td><td class="calc">' + P.days + '</td><td></td><td></td><td></td>' +
+      '<td class="calc">' + F(P.sumR, 1) + '</td><td></td><td class="calc">' + F(P.sumS, 1) + '</td></tr></tfoot></table>';
+  };
+
+  /* tabela wyrównana do wspólnej osi miesięcy (PRZED/PO obok siebie) */
+  var _ptaOrig = window._anwPeriodTableAligned;
+  window._anwPeriodTableAligned = function (P, ti, axis) {
+    if (!_occIsRep()) return _ptaOrig.apply(this, arguments);
+    var byMonth = {};
+    (P.rows || []).forEach(function (r) { if (r.month != null) byMonth[r.month] = r; });
+    var lastIdx = -1;
+    axis.forEach(function (m, i) { if (byMonth[m]) lastIdx = i; });
+    var body = '';
+    for (var i = 0; i <= lastIdx; i++) {
+      var r = byMonth[axis[i]];
+      body += r ? ('<tr><td style="white-space:nowrap;">' + _anwMonShort(r) + '</td>' +
+        '<td class="calc">' + r.days + '</td>' +
+        '<td class="calc">' + (r.tme == null ? '—' : F(r.tme, 1)) + '</td>' +
+        _cells(r) +
+        '<td class="calc">' + F(r.sdR, 1) + '</td>' +
+        '<td class="calc">' + F(r.tStd, 1) + '</td>' +
+        '<td class="calc">' + F(r.sdS, 1) + '</td></tr>')
+        : '<tr class="anw-blank"><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>';
+    }
+    if (lastIdx < 0) body = '<tr><td colspan="8" class="anw-muted">Brak miesięcy</td></tr>';
+    return '<table class="anw-t"><thead><tr>' +
+      '<th>Miesiąc</th><th>Dni z₀</th><th>t rzecz.</th>' + _head() + '<th>SDeff rzecz.</th><th>t TYM</th><th>SDeff std.</th>' +
+      '</tr></thead><tbody>' + body + '</tbody>' +
+      '<tfoot><tr><td>∑</td><td class="calc">' + P.days + '</td><td></td><td></td><td></td>' +
+      '<td class="calc">' + F(P.sumR, 1) + '</td><td></td><td class="calc">' + F(P.sumS, 1) + '</td></tr></tfoot></table>';
+  };
+
+  /* flaga trybu: ustawiana tylko na czas renderowania raportu analizy OCCUPANCY */
+  var _rbOrig = window._analReportBody;
+  window._analReportBody = function (data) {
+    if (!(data && data.type === 'OCCUPANCY')) return _rbOrig.apply(this, arguments);
+    window._occRepMode = true;
+    var html;
+    try { html = _rbOrig.apply(this, arguments); }
+    finally { window._occRepMode = false; }
+
+    /* blok metodyczny: parametry i podstawa obłożenia — żeby wynik dało się odtworzyć */
+    var P = data.occParams || {};
+    var info = '<div class="anw-rep-sec"><h3>Parametry korekty obłożenia</h3>' +
+      '<p class="anw-rep-p">tᵢ,eff = f_wsp·tᵢ + (1 − f_wsp)·[O·tᵢ + (1 − O)·tᵢ,red]<br>' +
+      'tᵢ = <b>' + F(P.ti, 1) + ' °C</b> · tᵢ,red = <b>' + F(P.tiRed, 1) + ' °C</b> · ' +
+      'f_wsp = <b>' + F(P.fCommon, 0) + '%</b> · obłożenie referencyjne O_ref = <b>' + F(P.oRef, 0) + '%</b>' +
+      (data.occBasis ? '<br>Podstawa obłożenia: <b>' + _escA(data.occBasis) + '</b>' : '') +
+      ((data.before && data.before.deducted) || (data.after && data.after.deducted)
+        ? '<br>Odliczenia od Qc.o.: PRZED <b>' + F((data.before || {}).deducted || 0, 2) + '</b>, PO <b>' + F((data.after || {}).deducted || 0, 2) + '</b> ' + _escA(data.energy.unit || '')
+        : '') +
+      '</p></div>';
+
+    var marker = '<div class="anw-repfoot">';
+    var i = html.lastIndexOf(marker);
+    return (i >= 0) ? (html.slice(0, i) + info + html.slice(i)) : (html + info);
+  };
+
+  console.log('[occupancy] Raport — kolumny O / tᵢ,eff i blok metodyczny wpięte');
+})();

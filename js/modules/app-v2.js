@@ -2494,10 +2494,7 @@ function _analTypeDesc(k) {
     TYM: 'Sprowadzenie zużycia do standardowego sezonu metodą stopniodni.',
     REGRESSION: 'Porównanie techniczne PRZED/PO wg równań y = ax + b.',
     OCCUPANCY: 'Normalizacja względem stopnia wykorzystania obiektu (udział % — pokoje, osoby, powierzchnia lub czas pracy).',
-    AREA: 'Wskaźniki zużycia na m² powierzchni ogrzewanej.',
-    VOLUME: 'Normalizacja względem wolumenu / intensywności pracy.',
-    SCHEDULE: 'Uwzględnienie harmonogramu pracy obiektu.',
-    CUSTOM: 'Dowolny model definiowany przez analityka.'
+    VOLUME: 'Normalizacja względem wolumenu / intensywności pracy.'
   })[k] || '';
 }
 
@@ -6166,16 +6163,15 @@ let _bpShow = false;
 let _bpViewId = null;
 
 const _BP_LABELS = {
-  volume: '⚙️ Korekta intensywności', occupancy: '🏨 Korekta obłożenia', area: '📐 Korekta powierzchni',
-  schedule: '🕐 Korekta harmonogramu', custom: '🔬 Metoda niestandardowa'
+  volume: '⚙️ Korekta intensywności', occupancy: '🏨 Korekta obłożenia'
 };
 function _bpDriverLabel(type) {
-  return ({ volume: 'intensywność pracy (goście / m³ / produkcja / osoby)', occupancy: 'obłożenie (osobonoce / % / liczba użytkowników)',
-    area: 'powierzchnia [m²]', schedule: 'godziny / dni pracy', custom: 'wskaźnik własny' })[type] || 'wskaźnik';
+  return ({ volume: 'intensywność pracy (goście / m³ / produkcja / osoby)',
+    occupancy: 'wykorzystanie obiektu [%] — pokoje, osoby, powierzchnia lub czas pracy' })[type] || 'wskaźnik';
 }
 
 function _bpNextNumber(type) {
-  const pfx = ({ volume: 'INT', occupancy: 'OBL', area: 'POW', schedule: 'HAR', custom: 'CUS' })[type] || 'OB';
+  const pfx = ({ volume: 'INT', occupancy: 'OBL' })[type] || 'OB';
   const yr = new Date().getFullYear();
   const n = BasePeriodModule.findByType(type).filter(x => (x.protocolNumber || '').indexOf('/' + yr + '/') >= 0).length + 1;
   return 'OB-' + pfx + '/' + yr + '/' + String(n).padStart(3, '0');
@@ -6420,7 +6416,7 @@ function renderBasePeriodTab(type, meta) {
 // Routing: wszystkie typy poza TYM/Regresją dostają uniwersalny przepływ okresów bazowych.
 function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
   const meta = { icon, title, description, bgLight, bgBorder, textColor };
-  if (['volume', 'occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
+  if (['volume', 'occupancy'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
   return `
   <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
     <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
