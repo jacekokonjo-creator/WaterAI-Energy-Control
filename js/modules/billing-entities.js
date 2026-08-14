@@ -42,7 +42,7 @@ const BillingEntitiesModule = {
   add(e) {
     const items = this.getAll();
     const item = this._normalize(e);
-    item.id = Date.now();
+    item.id = (window._waNextIdFor ? _waNextIdFor(this.getAll()) : Date.now());
     item.createdAt = new Date().toISOString();
     if (item.isDefault) items.forEach(x => { x.isDefault = false; });
     items.push(item);

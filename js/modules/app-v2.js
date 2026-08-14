@@ -231,13 +231,18 @@ function renameDocFolder(folderId, clientId) {
 }
 
 function deleteDocFolder(folderId, clientId) {
-  const cnt = DocumentsModule.findByClient(clientId).filter(d => Number(d.folderId) === Number(folderId)).length;
-  if (!confirm(cnt > 0 ? `Usunąć folder i przenieść ${cnt} dokumentów do folderu głównego?` : 'Usunąć pusty folder?')) return;
-  if (cnt > 0) {
-    const root = DocFoldersModule.getAll().find(f => Number(f.clientId) === Number(clientId) && f.type === 'client' && !f.parentId);
-    DocumentsModule.getAll().filter(d => Number(d.folderId) === Number(folderId)).forEach(d => DocumentsModule.update(d.id, { folderId: root ? root.id : null }));
-  }
-  DocFoldersModule.remove(folderId);
+  // Licznik musi obejmować CAŁE poddrzewo — inaczej okno mówi „0 dokumentów",
+  // a znikają pliki leżące w podfolderach.
+  const ids = (typeof DocFoldersModule.descendantIds === 'function')
+    ? DocFoldersModule.descendantIds(folderId).map(Number)
+    : [Number(folderId)];
+  const cnt = DocumentsModule.findByClient(clientId).filter(d => ids.indexOf(Number(d.folderId)) >= 0).length;
+  const subs = ids.length - 1;
+  const opis = subs > 0 ? `folder wraz z ${subs} podfolderami` : 'folder';
+  if (!confirm(cnt > 0
+      ? `Usunąć ${opis} i przenieść ${cnt} dokumentów do folderu głównego?`
+      : `Usunąć pusty ${opis}?`)) return;
+  DocFoldersModule.remove(folderId);   // przeniesienie dokumentów robi sam moduł
   window._docSelectedFolderId = null;
   renderDocumentsModule(clientId);
 }
@@ -4856,7 +4861,7 @@ function escoBuildReportFromForm(form){
   const prev=editId?(EscoReportsModule.getAll().find(x=>x.id===editId)||{}):{};
 
   return {
-    id: editId||('esco_'+Date.now()),
+    id: editId||('esco_'+(window._waNextId ? _waNextId() : Date.now())),
     createdAt: prev.createdAt||new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     reportNumber: form.reportNumber.value.trim(),

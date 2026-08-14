@@ -40,6 +40,7 @@ nazwę (z osłoną `typeof X !== 'undefined'`), nigdy przez `window.X`.
 | `t_persist.js` | zapis → przeładowanie → odczyt, kopia zapasowa, kwoty ESCO | 20 |
 | `t_invoicing.js` | VAT, numeracja, kwoty słownie, powiązanie z analizą, trwałość | 44 |
 | `t_shares.js` | typy zasobów vs polityki RLS, uprawnienia, spójność z migracją | 28 |
+| `t_documents.js` | hierarchia folderów, usuwanie kaskadowe, brak osieroceń | 28 |
 
 Uruchamiane automatycznie przy każdym push na `main`
 (`.github/workflows/testy.yml`) — **przed** wdrożeniem.

@@ -46,3 +46,6 @@ jobs:
 
       - name: Test widoczności (typy zasobów, uprawnienia)
         run: node test/t_shares.js
+
+      - name: Test dokumentów i folderów
+        run: node test/t_documents.js

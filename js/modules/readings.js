@@ -52,7 +52,7 @@ const ReadingsModule = {
   add(reading) {
     const items = this.getAll();
     items.push(this._normalize({
-      id: reading.id || Date.now(),
+      id: reading.id || (window._waNextIdFor ? _waNextIdFor(items) : Date.now()),
       createdAt: new Date().toISOString(),
       ...reading
     }));
@@ -840,7 +840,7 @@ async function _rdSaveSingle() {
   const btn = g('rd-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie…'; }
 
-  const recId = _rdEditingId || Date.now();
+  const recId = _rdEditingId || (window._waNextId ? _waNextId() : Date.now());
   let attachments = _rdKeepAtt.slice();
   try {
     const uploaded = await _rdUploadPending(_rdObjectId, recId);
@@ -1104,7 +1104,7 @@ function _rdSaveSerial() {
   const today = now.slice(0, 10);
 
   // Jeden zbiorczy saveAll (add() w pętli powielał wiersze — bug 2026-07-06).
-  let idBase = Date.now();
+  let idBase = (window._waNextId ? _waNextId() : Date.now());
   const items = ReadingsModule.getAll();
   rows.forEach(r => {
     items.push(ReadingsModule._normalize({

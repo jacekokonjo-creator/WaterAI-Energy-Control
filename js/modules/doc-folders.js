@@ -27,7 +27,7 @@ const DocFoldersModule = {
 
   add(folder) {
     const items = this.getAll();
-    const id = Date.now();
+    const id = (window._waNextIdFor ? _waNextIdFor(items) : Date.now());
     items.push({
       id,
       createdAt: new Date().toISOString(),
@@ -48,16 +48,43 @@ const DocFoldersModule = {
     ));
   },
 
-  remove(id) {
-    // Remove folder and all its children recursively
+  // Zwraca id usuwanego folderu wraz ze wszystkimi podfolderami (bez usuwania).
+  // Potrzebne, żeby policzyć i przenieść dokumenty z CAŁEGO poddrzewa — samo
+  // `folderId === id` pomija pliki leżące w podfolderach.
+  descendantIds(id) {
     const all = this.getAll();
-    const toRemove = new Set();
+    const out = new Set();
     const collect = (fid) => {
-      toRemove.add(Number(fid));
+      if (out.has(Number(fid))) return;          // osłona przed cyklem parentId
+      out.add(Number(fid));
       all.filter(f => Number(f.parentId) === Number(fid)).forEach(f => collect(f.id));
     };
     collect(id);
+    return Array.from(out);
+  },
+
+  remove(id) {
+    // Usuwa folder wraz z podfolderami. Dokumenty z CAŁEGO poddrzewa są
+    // przenoszone do folderu głównego klienta — bez tego zostawały osierocone:
+    // znikały z drzewa, ale nadal zajmowały miejsce w bazie i w buckecie,
+    // a użytkownik nie miał jak ich odzyskać.
+    const all = this.getAll();
+    const toRemove = new Set(this.descendantIds(id).map(Number));
+    const removed = all.filter(f => toRemove.has(Number(f.id)));
+
+    if (window.DocumentsModule && typeof DocumentsModule.getAll === 'function') {
+      const clientId = removed.length ? removed[0].clientId : null;
+      const root = all.find(f =>
+        Number(f.clientId) === Number(clientId) && f.type === 'client' && !f.parentId &&
+        !toRemove.has(Number(f.id)));
+      const target = root ? root.id : null;
+      DocumentsModule.getAll()
+        .filter(d => toRemove.has(Number(d.folderId)))
+        .forEach(d => DocumentsModule.update(d.id, { folderId: target }));
+    }
+
     this.saveAll(all.filter(f => !toRemove.has(Number(f.id))));
+    return Array.from(toRemove);
   },
 
   find(id) {
