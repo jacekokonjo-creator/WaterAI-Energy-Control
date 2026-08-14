@@ -493,3 +493,83 @@
 
   console.log('[occupancy] Analiza — Korekta obłożenia wpięta w kreator');
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RAPORT ESCO / PDF — przeliczenie zapisanej analizy z korektą obłożenia
+   ───────────────────────────────────────────────────────────────────────────
+   `_analReportData` liczy okresy przez `_analCalcPeriodRows` ze STAŁYM tᵢ.
+   Dla OCCUPANCY dałoby to wynik zwykłego TYM — obłożenie zniknęłoby z raportu
+   i z faktury. Poniżej okresy są przeliczane ponownie z tᵢ,eff per miesiąc,
+   a wielkości pochodne (normalizacja, oszczędność, kwota ESCO) odtworzone
+   dokładnie tym samym wzorem co w app-v2.js.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function N(v) { return (v === '' || v == null || isNaN(Number(v))) ? null : Number(v); }
+
+  function _occRowsFor(months, std, P, consumption) {
+    var sumR = 0, sumS = 0, days = 0, rows = [];
+    var tiEffRef = _occTiEff(P.oRef, P);
+    (months || []).forEach(function (mo) {
+      var d = Number(mo.days || 0);
+      var filled = !(mo.tme === '' || mo.tme == null);
+      var tme = Number(mo.tme || 0);
+      var occ = N(mo.occ);
+      var stdM = (std && std[mo.month]) ? std[mo.month] : [0, 0];
+      var tiEff = _occTiEff(occ == null ? P.oRef : occ, P);
+      var sdR = (filled && d > 0) ? Math.max(0, tiEff - tme) * d : 0;
+      var sdS = (d > 0) ? Math.max(0, tiEffRef - Number(stdM[0])) * d : 0;
+      sumR += sdR; sumS += sdS; days += d;
+      rows.push({ name: mo.name, month: mo.month, days: d, tme: filled ? tme : null,
+        tStd: Number(stdM[0]), occ: occ, tiEff: tiEff, sdR: sdR, sdS: sdS });
+    });
+    var phi = sumR > 0 ? sumS / sumR : null;
+    var ded = 0; (months || []).forEach(function (m) { ded += N(m.ded) || 0; });
+    var q = Number(consumption || 0) - ded;
+    return { rows: rows, sumR: sumR, sumS: sumS, days: days, phi: phi, q: q,
+      qs: phi != null ? q * phi : null, deducted: ded };
+  }
+
+  var _rdOrig = window._analReportData;
+  window._analReportData = function (source) {
+    var d = _rdOrig.apply(this, arguments);
+    if (!d || d.type !== 'OCCUPANCY') return d;
+
+    var ip = (source && source.saved) ? (source.saved.inputParams || {}) : null;
+    var raw = ip ? (ip.occParams || {}) : ((window.ANAL && ANAL.occParams) || {});
+    var P = { ti: N(raw.ti) != null ? N(raw.ti) : 20, tiRed: N(raw.tiRed) != null ? N(raw.tiRed) : 17,
+              fCommon: N(raw.fCommon) != null ? N(raw.fCommon) : 0, oRef: N(raw.oRef) != null ? N(raw.oRef) : 100 };
+    var bP = ip ? (ip.before || {}) : ANAL.before;
+    var aP = ip ? (ip.after || {}) : ANAL.after;
+
+    var before = _occRowsFor(bP.months, d.std, P, bP.consumption);
+    var after  = _occRowsFor(aP.months, d.std, P, aP.consumption);
+
+    /* wielkości pochodne — identyczny wzór jak w _analReportData */
+    var normF = (before.sumS > 0) ? after.sumS / before.sumS : 1;
+    var qsBeforeNorm = (before.qs != null) ? before.qs * normF : null;
+    var savedEnergy = (qsBeforeNorm != null && after.qs != null) ? qsBeforeNorm - after.qs : null;
+    var savedPct = (qsBeforeNorm > 0 && savedEnergy != null) ? savedEnergy / qsBeforeNorm * 100 : null;
+    var price = Number((d.energy && d.energy.price) || 0);
+    var savedMoney = (d.energy && d.energy.priceMode === 'VARIABLE')
+      ? (savedPct != null ? price * savedPct / 100 : null)
+      : (savedEnergy != null ? savedEnergy * price : null);
+    var escoShare = Number((d.energy && d.energy.escoShare) || 0);
+    var escoAmount = (savedMoney != null) ? savedMoney * escoShare / 100 : null;
+
+    d.before = Object.assign({}, before, { from: bP.from, to: bP.to, consumption: bP.consumption });
+    d.after  = Object.assign({}, after,  { from: aP.from, to: aP.to, consumption: aP.consumption });
+    d.normF = normF; d.qsBeforeNorm = qsBeforeNorm;
+    d.savedEnergy = savedEnergy; d.savedPct = savedPct; d.savedMoney = savedMoney;
+    d.escoAmount = escoAmount;
+    d.clientAmount = (savedMoney != null && escoAmount != null) ? savedMoney - escoAmount : null;
+    d.occParams = P;
+    d.occBasis = ip ? (ip.occBasis || '') : ((window.ANAL && ANAL.occBasis) || '');
+    /* tᵢ pokazywane w raporcie = efektywne przy obłożeniu referencyjnym */
+    d.tiBefore = _occTiEff(P.oRef, P); d.tiAfter = d.tiBefore;
+    return d;
+  };
+
+  console.log('[occupancy] Raport ESCO — przeliczanie z tᵢ,eff wpięte');
+})();

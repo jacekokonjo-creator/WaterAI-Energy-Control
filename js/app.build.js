@@ -2871,11 +2871,8 @@ function renderMeasurementsModule() {
       const T=[
         ['tym','🌡️','Korekta TYM','Sprowadzenie zużycia do standardowego sezonu metodą stopniodni.',true],
         ['regression','📈','Regresja liniowa','Porównanie techniczne PRZED/PO wg równań y = ax + b.',true],
-        ['occupancy','🏨','Korekta obłożenia','Normalizacja zużycia względem obłożenia obiektu.',true],
-        ['area','📐','Korekta powierzchni','Wskaźniki zużycia na m² powierzchni ogrzewanej.',false],
-        ['volume','⚙️','Korekta intensywności','Normalizacja względem wolumenu / intensywności pracy.',false],
-        ['schedule','🕐','Korekta harmonogramu','Uwzględnienie harmonogramu pracy obiektu.',false],
-        ['custom','🔬','Metoda niestandardowa','Dowolny model definiowany przez analityka.',false]
+        ['occupancy','🏨','Korekta obłożenia','Normalizacja zużycia względem stopnia wykorzystania obiektu (udział % — pokoje, osoby, powierzchnia lub czas pracy).',true],
+        ['volume','⚙️','Korekta intensywności','Normalizacja względem wolumenu / intensywności pracy.',true]
       ];
       return T.map(function(x){
         const sel = activeMeasurementsTab===x[0] ? 'sel' : '';

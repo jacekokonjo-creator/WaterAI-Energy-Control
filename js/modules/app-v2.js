@@ -2418,7 +2418,7 @@ function _analStepsBar() {
 // ── KROK 1: wybór typu + „+ Nowa analiza" + lista istniejących ──────────────────
 function _analTypeSelect() {
   const cards = Object.entries(AnalysesModule.TYPES).map(([k, t]) => {
-    const ready = (k === 'TYM' || k === 'REGRESSION' || k === 'OCCUPANCY'); // gotowe metody
+    const ready = (k === 'TYM' || k === 'REGRESSION' || k === 'OCCUPANCY' || k === 'VOLUME'); // gotowe metody
     return `<div class="anw-type ${ANAL.type === k ? 'sel' : ''}" onclick="analSelectType('${k}')">
       ${ANAL.type === k ? '<span class="chk">✓</span>' : ''}
       <span class="badge ${ready ? 'ready' : 'soon'}">${ready ? 'GOTOWE' : 'WKRÓTCE'}</span>
@@ -2493,7 +2493,7 @@ function _analTypeDesc(k) {
   return ({
     TYM: 'Sprowadzenie zużycia do standardowego sezonu metodą stopniodni.',
     REGRESSION: 'Porównanie techniczne PRZED/PO wg równań y = ax + b.',
-    OCCUPANCY: 'Normalizacja zużycia względem obłożenia obiektu.',
+    OCCUPANCY: 'Normalizacja względem stopnia wykorzystania obiektu (udział % — pokoje, osoby, powierzchnia lub czas pracy).',
     AREA: 'Wskaźniki zużycia na m² powierzchni ogrzewanej.',
     VOLUME: 'Normalizacja względem wolumenu / intensywności pracy.',
     SCHEDULE: 'Uwzględnienie harmonogramu pracy obiektu.',
@@ -2620,6 +2620,10 @@ function _analWizard() {
     body = ANAL.basePeriod
       ? _analRegSheet()
       : `<div class="reminder-card"><strong>Wybierz okres bazowy regresji</strong><div class="reminder-meta">Wskaż zapisany okres bazowy z arkusza regresji. Następnie wybierzesz metodę (1/2), skopiujesz dane bazowe, zaimportujesz okres analizowany (CSV) i podasz zakres rozliczeniowy.</div></div>`;
+  } else if (ANAL.type === 'VOLUME') {
+    body = ANAL.basePeriod
+      ? _analVOLUMESheet()
+      : `<div class="reminder-card"><strong>Wybierz okres bazowy intensywności</strong><div class="reminder-meta">Wskaż protokół ⚙️ z modułu Pomiary → Korekta intensywności albo „✏️ Ręczne wprowadzenie".</div></div>`;
   } else if (ANAL.type === 'OCCUPANCY' && typeof _analOCCSheet === 'function') {
     body = ANAL.basePeriod
       ? _analOCCSheet()
@@ -2631,7 +2635,7 @@ function _analWizard() {
         <div class="anw-muted" style="margin-top:6px;">Szkielet kreatora jest gotowy. Arkusz obliczeniowy tej metody dodamy w kolejnym kroku.</div></div></div>`;
   }
 
-  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'REGRESSION' || ANAL.type === 'OCCUPANCY')) ? `
+  const footer = (ANAL.objectId && ANAL.basePeriod && (ANAL.type === 'TYM' || ANAL.type === 'REGRESSION' || ANAL.type === 'OCCUPANCY' || ANAL.type === 'VOLUME')) ? `
     ${ANAL.type === 'VOLUME' ? `<div class="anw-muted" style="margin:14px 0 6px;">Wsk = I·z₀ · φ = ΣWsk_ref / ΣWsk_rzecz · Qs = Q·φ (zużycie sprowadzone do referencyjnej intensywności)</div>` : ''}
     <div class="anw-act" style="justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
       <div class="anw-f" style="min-width:240px;max-width:360px;flex:1;">
@@ -3804,6 +3808,7 @@ function analSave() {
     inputParams: {
       std: ANAL.std, before: ANAL.before, after: ANAL.after,
       baseTi: ANAL.baseTi,
+      occParams: ANAL.occParams, occBasis: ANAL.occBasis,
       energyUnit: ANAL.energy.unit, currency: ANAL.energy.currency,
       energyPrice: ANAL.energy.price, escoShare: ANAL.energy.escoShare,
       priceMode: ANAL.energy.priceMode, priceDescription: ANAL.energy.priceDescription,
@@ -4833,14 +4838,15 @@ function escoBuildReportFromForm(form){
   const r=window._escoLiveResults||{};
 
   const anals=ids.map(id=>AnalysesModule.find(id)).filter(Boolean);
-  const tymIds=anals.filter(a=>a.analysisType==='TYM').map(a=>Number(a.id));
+  // Metoda rozliczeniowa = dowolna korekta (TYM, obłożenie, intensywność). Regresja = dowód techniczny.
+  const tymIds=anals.filter(a=>a.analysisType!=='REGRESSION').map(a=>Number(a.id));
   const regIds=anals.filter(a=>a.analysisType==='REGRESSION').map(a=>Number(a.id));
-  const firstTym=anals.find(a=>a.analysisType==='TYM')||anals[0]||{};
+  const firstTym=anals.find(a=>a.analysisType!=='REGRESSION')||anals[0]||{};
   const ftIp=firstTym.inputParams||{}, ftR=firstTym.results||{};
 
   // okres rozliczeniowy = okres PO (liczenia oszczędności): TYM trzyma go w inputParams.after.{from,to}.
   // Preferuj analizy TYM; jeśli brak — dowolne wybrane. Min from / max to.
-  const periodAnals=tymIds.length?anals.filter(a=>a.analysisType==='TYM'):anals;
+  const periodAnals=tymIds.length?anals.filter(a=>a.analysisType!=='REGRESSION'):anals;
   const froms=periodAnals.map(a=>_escoAnalPeriod(a).from).filter(Boolean).sort();
   const tos  =periodAnals.map(a=>_escoAnalPeriod(a).to).filter(Boolean).sort();
   const regAnals=anals.filter(a=>a.analysisType==='REGRESSION');
@@ -5282,7 +5288,7 @@ function escoBuildReportParts(rep){
       // Założenia prognozy — wypisane wprost, żeby liczba roczna nie wisiała bez kontekstu.
       let fAss='';
       try{
-        const d0=_analReportData({saved:primaryAnals.find(a=>a.analysisType!=='VOLUME')});
+        const d0=_analReportData({saved:primaryAnals.find(a=>a.analysisType!=='VOLUME')||primaryAnals[0]});
         const ti0=(d0.tiBefore!=null&&d0.tiBefore!=='')?Number(d0.tiBefore):20;
         let ySD=0; for(let m=1;m<=12;m++){ const v=(d0.std&&d0.std[m])||[0,0]; ySD+=_sd20(Number(v[0]),Number(v[1]||0),ti0); }
         const qB=(d0.before.qs||0)/d0.before.sumS, qP=(d0.after.qs||0)/d0.after.sumS, au=d0.energy.unit;

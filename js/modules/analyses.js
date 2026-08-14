@@ -27,10 +27,7 @@ const AnalysesModule = {
     TYM:        { label: 'Korekta TYM',             icon: '🌡️' },
     REGRESSION: { label: 'Regresja liniowa',         icon: '📈' },
     OCCUPANCY:  { label: 'Korekta obłożenia',        icon: '🏨' },
-    AREA:       { label: 'Korekta powierzchni',       icon: '📐' },
-    VOLUME:     { label: 'Korekta intensywności',     icon: '⚙️' },
-    SCHEDULE:   { label: 'Korekta harmonogramu',      icon: '🕐' },
-    CUSTOM:     { label: 'Metoda niestandardowa',     icon: '🔬' }
+    VOLUME:     { label: 'Korekta intensywności',     icon: '⚙️' }
   },
 
   STATUSES: {
