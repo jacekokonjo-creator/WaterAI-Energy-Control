@@ -39,6 +39,7 @@ nazwę (z osłoną `typeof X !== 'undefined'`), nigdy przez `window.X`.
 | `t_smoke.js` | każda funkcja `render*` × 5 ról × 4 zakładki × 4 typy analiz | 170 wywołań |
 | `t_persist.js` | zapis → przeładowanie → odczyt, kopia zapasowa, kwoty ESCO | 20 |
 | `t_invoicing.js` | VAT, numeracja, kwoty słownie, powiązanie z analizą, trwałość | 44 |
+| `t_shares.js` | typy zasobów vs polityki RLS, uprawnienia, spójność z migracją | 28 |
 
 Uruchamiane automatycznie przy każdym push na `main`
 (`.github/workflows/testy.yml`) — **przed** wdrożeniem.

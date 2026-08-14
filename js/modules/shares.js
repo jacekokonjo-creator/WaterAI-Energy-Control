@@ -72,7 +72,8 @@ window.SharesModule = SharesModule;
 // ── 2. ŹRÓDŁA DOKUMENTÓW (typ zasobu → lista + uuid z mostka) ────────────────
 
 const _shTypes = [
-  { key: 'measurement', icon: '📊', label: 'Okresy bazowe' },   // Protokoły TYM (MeasurementsModule) — has_share('measurement')
+  { key: 'measurement', icon: '📊', label: 'Protokoły TYM' },   // MeasurementsModule — has_share('measurement')
+  { key: 'base_period', icon: '🏨', label: 'Okresy bazowe' },   // BasePeriodModule (obłożenie/intensywność) — has_share('base_period')
   { key: 'analysis',    icon: '📐', label: 'Analizy' },
   { key: 'esco_report', icon: '📈', label: 'Raporty ESCO' },
   { key: 'invoice',     icon: '🧾', label: 'Faktury' },

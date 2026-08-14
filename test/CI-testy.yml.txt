@@ -43,3 +43,6 @@ jobs:
 
       - name: Test faktur (VAT, numeracja, kwoty słownie)
         run: node test/t_invoicing.js
+
+      - name: Test widoczności (typy zasobów, uprawnienia)
+        run: node test/t_shares.js
