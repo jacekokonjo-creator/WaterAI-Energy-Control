@@ -61,6 +61,38 @@ GitHub Pages. Front jest serwowany wprost z repo; dane idą do Supabase.
   (szczegóły w sekcji 8).
 - **Role:** `admin`, `backOffice`, `energyAnalyst`, `salesRepresentative`, `client` (+ macierz RLS w bazie, sekcja 6).
 
+### Model ról (stan faktyczny, zweryfikowany 2026-08-14)
+
+Weryfikowany automatycznie przez `test/t_roles.js` — test porównuje kafelki
+z `roleModules` w `index.html` oraz realne uprawnienia (np. `_usrCanManage()`)
+z poniższym opisem. Zmiana uprawnień bez aktualizacji tej sekcji zapali test.
+
+| Rola | Zakres | Zakłada konta | Faktury | Udostępnianie |
+|---|---|---|---|---|
+| **Administrator** | wszystko; usuwa dowolny rekord | tak | tak | tak |
+| **Back Office** | pełny dostęp operacyjno-rozliczeniowy; wystawia faktury; tworzy symulacje; usuwa rekordy | **tak** | tak | tak (docelowo w RLS — migracja 008) |
+| **Energy Analyst** | dane energetyczne; analizy, raporty ESCO, symulacje; nie usuwa cudzych rekordów | nie | nie | tak |
+| **Sales Representative** (ZEWNĘTRZNA) | dodaje klientów, obiekty, pomiary; prowadzi **przypisane** obiekty; dokumenty widzi wyłącznie udostępnione; widzi swoją prowizję | nie | nie | nie |
+| **Klient** (ZEWNĘTRZNA) | swoje obiekty i pomiary; dodaje odczyty swoich obiektów; dokumenty utworzone przez siebie + udostępnione | nie | nie | nie |
+
+**Zakładanie kont przez Back Office** — pierwotne ustalenie (2026-07-12) mówiło,
+że Back Office kont nie zakłada. Zweryfikowane z użytkownikiem 2026-08-14:
+**Back Office zakłada konta**; `_usrCanManage()` w `js/modules/users.js`
+odzwierciedla to poprawnie. Ta sekcja jest źródłem prawdy.
+
+**Hierarchia** (`expandRoles()` w `index.html` = SQL `expand_roles()` z migracji 007):
+`admin ⇒ backOffice, energyAnalyst, salesRepresentative` oraz `backOffice ⇒ energyAnalyst`.
+Role zewnętrzne nie dziedziczą niczego.
+
+**Zasada nadrzędna:** dla ról zewnętrznych (Klient, Sales Rep) — żadnych
+przecieków cudzych danych ani niedziałających/ślepych funkcji.
+
+> ⚠ **Otwarte:** RLS nie zawęża jeszcze Sales Repa do przypisanych obiektów —
+> `is_internal()` wciąż go obejmuje, więc w bazie widzi wszystkich klientów,
+> obiekty, pomiary i faktury. Migracja `sql/008_rls_role_scoping.sql` jest
+> przygotowana, ale polityki są **zakomentowane**: wymagają uprzedniego
+> uzupełnienia `objects.owner_id`, inaczej odetną handlowców od wszystkiego.
+
 ### Pliki i kolejność ładowania (z `index.html`, ~1360 linii)
 
 | # | Plik | Rola |

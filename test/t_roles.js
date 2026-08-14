@@ -50,12 +50,10 @@ if (RM.backOffice.includes('users')) {
     try { realRoles = ['backOffice']; realRole = 'backOffice'; currentRole = 'backOffice';
           return _usrCanManage(); } catch (e) { return 'błąd: ' + e.message; }
   })()`);
-  if (boCanManage === true) {
-    info('backOffice MOŻE zakładać konta (_usrCanManage → true)',
-         'model ról z KONTEKST mówi: „Back Office … nie zakłada kont" — decyzja biznesowa do rozstrzygnięcia');
-  } else {
-    ok('backOffice widzi Użytkowników, ale nie zakłada kont', boCanManage === false, boCanManage);
-  }
+  // Ustalenie z użytkownikiem 2026-08-14: Back Office ZAKŁADA konta.
+  // Zastępuje wcześniejszy zapis z 2026-07-12 („nie zakłada kont").
+  // Źródło prawdy: sekcja „Model ról" w KONTEKST_PROJEKTU.md.
+  ok('backOffice MOŻE zakładać konta (zgodnie z modelem)', boCanManage === true, boCanManage);
   const eaCanManage = w.eval(`(function(){
     try { realRoles = ['energyAnalyst']; realRole = 'energyAnalyst'; currentRole = 'energyAnalyst';
           return _usrCanManage(); } catch (e) { return 'błąd: ' + e.message; }
@@ -99,6 +97,22 @@ ok('klient ma wyłącznie moduły "my*" + Instrukcja', clientOwn, RM.client.join
 ok('klient NIE ma Widoczności', !RM.client.includes('visibility'));
 ok('klient NIE ma Analiz', !RM.client.includes('analyses'));
 ok('klient NIE ma Użytkowników', !RM.client.includes('users'));
+
+// ── 2b. Spójność z dokumentacją ────────────────────────────────────────────
+section('2b. Spójność z KONTEKST_PROJEKTU.md');
+const ctxPath = path.resolve(__dirname, '..', 'KONTEKST_PROJEKTU.md');
+if (fs.existsSync(ctxPath)) {
+  const ctx = fs.readFileSync(ctxPath, 'utf8');
+  ok('dokumentacja zawiera sekcję Model ról', ctx.includes('### Model ról'));
+  ok('dokumentacja potwierdza: Back Office zakłada konta',
+     /Back Office zakłada konta/.test(ctx),
+     'sekcja Model ról musi być zgodna z _usrCanManage()');
+  ok('dokumentacja nie zawiera już nieaktualnego zapisu',
+     !/Back Office[^|]*nie zakłada kont/.test(ctx),
+     'znaleziono sprzeczny zapis');
+} else {
+  info('brak KONTEKST_PROJEKTU.md');
+}
 
 // ── 3. Hierarchia ról (musi być zgodna z SQL expand_roles) ─────────────────
 section('3. Hierarchia ról — UI vs SQL');
