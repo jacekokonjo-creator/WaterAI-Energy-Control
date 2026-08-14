@@ -45,7 +45,7 @@ const CalendarModule = {
   add(event) {
     const items = this.getAll();
     items.push({
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(items) : Date.now()),
       createdAt: new Date().toISOString(),
 
       clientId: event.clientId ? Number(event.clientId) : null,

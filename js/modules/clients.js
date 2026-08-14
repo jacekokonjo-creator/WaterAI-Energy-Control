@@ -127,7 +127,7 @@ const ClientsModule = {
   add(client) {
     const clients = this.getAll();
     clients.push({
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(clients) : Date.now()),
       createdAt: new Date().toISOString(),
 
       name: client.name || '',

@@ -54,11 +54,16 @@ const InvoicingModule = {
 
   add(inv) {
     const items = this.getAll();
-    const grossAmount = Number(inv.netAmount || 0) * (1 + Number(inv.vatRate || 23) / 100);
-    const vatAmount = grossAmount - Number(inv.netAmount || 0);
+    // UWAGA: `||` zamiast `??` zamieniało stawkę 0% na 23% — faktura z odwrotnym
+    // obciążeniem, eksportem lub zwolnieniem była liczona z pełnym VAT-em.
+    // To samo dotyczy udziału ESCO 0%. Zero jest tu poprawną wartością.
+    const _net = Number(inv.netAmount ?? 0) || 0;
+    const _vatRate = (inv.vatRate === '' || inv.vatRate == null || isNaN(Number(inv.vatRate))) ? 23 : Number(inv.vatRate);
+    const grossAmount = _net * (1 + _vatRate / 100);
+    const vatAmount = grossAmount - _net;
 
     items.push({
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(items) : Date.now()),
       createdAt: new Date().toISOString(),
 
       clientId: Number(inv.clientId),
@@ -70,8 +75,8 @@ const InvoicingModule = {
       issueDate: inv.issueDate || new Date().toISOString().slice(0, 10),
       dueDate: inv.dueDate || '',
 
-      netAmount: Number(inv.netAmount || 0),
-      vatRate: Number(inv.vatRate || 23),
+      netAmount: _net,
+      vatRate: _vatRate,
       vatAmount: Number(vatAmount.toFixed(2)),
       grossAmount: Number(grossAmount.toFixed(2)),
       currency: inv.currency || 'PLN',
@@ -87,7 +92,7 @@ const InvoicingModule = {
       protocolIds: inv.protocolIds || [],
       savedEnergy: Number(inv.savedEnergy || 0),
       savedMoney: Number(inv.savedMoney || 0),
-      escoShare: Number(inv.escoShare || 50),
+      escoShare: (inv.escoShare === '' || inv.escoShare == null || isNaN(Number(inv.escoShare))) ? 50 : Number(inv.escoShare),
       energyUnit: inv.energyUnit || '',
 
       status: inv.status || 'DRAFT',

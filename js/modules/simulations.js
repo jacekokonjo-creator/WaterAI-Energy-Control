@@ -108,7 +108,7 @@ const SimulationsModule = {
   add(sim) {
     const items = this.getAll();
     const rec = { ...JSON.parse(JSON.stringify(this.DEFAULTS)), ...sim,
-      id: Date.now(), createdAt: new Date().toISOString(), status: sim.status || 'DRAFT',
+      id: (window._waNextIdFor ? _waNextIdFor(items) : Date.now()), createdAt: new Date().toISOString(), status: sim.status || 'DRAFT',
       seq: this.nextSeq() };
     items.push(rec);
     this.saveAll(items);

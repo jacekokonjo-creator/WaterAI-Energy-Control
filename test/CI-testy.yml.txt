@@ -40,3 +40,6 @@ jobs:
 
       - name: Test trwałości danych i kopii zapasowej
         run: node test/t_persist.js
+
+      - name: Test faktur (VAT, numeracja, kwoty słownie)
+        run: node test/t_invoicing.js

@@ -27,7 +27,7 @@ const ObjectsModule = {
   add(object) {
     const objects = this.getAll();
     objects.push({
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(objects) : Date.now()),
       createdAt: new Date().toISOString(),
 
       clientId: Number(object.clientId),

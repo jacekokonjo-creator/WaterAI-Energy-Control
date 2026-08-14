@@ -26,7 +26,7 @@ const MeasurementsModule = {
     const items = this.getAll();
 
     items.push({
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(items) : Date.now()),
       createdAt: new Date().toISOString(),
       ...protocol,
       clientId: Number(protocol.clientId),

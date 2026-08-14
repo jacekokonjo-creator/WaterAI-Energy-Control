@@ -47,7 +47,7 @@ const DocumentsModule = {
   add(doc) {
     const items = this.getAll();
     const rec = {
-      id: Date.now(),
+      id: (window._waNextIdFor ? _waNextIdFor(items) : Date.now()),
       createdAt: new Date().toISOString(),
 
       clientId: Number(doc.clientId),
