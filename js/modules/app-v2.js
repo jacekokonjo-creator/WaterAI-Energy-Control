@@ -6420,7 +6420,7 @@ function renderBasePeriodTab(type, meta) {
 // Routing: wszystkie typy poza TYM/Regresją dostają uniwersalny przepływ okresów bazowych.
 function renderPlaceholderMeasTab(icon, title, type, description, bgLight, bgBorder, textColor) {
   const meta = { icon, title, description, bgLight, bgBorder, textColor };
-  if (['occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
+  if (['volume', 'occupancy', 'area', 'schedule', 'custom'].indexOf(type) >= 0) return renderBasePeriodTab(type, meta);
   return `
   <div style="border:1px solid ${bgBorder};border-radius:10px;overflow:hidden;margin-bottom:20px;">
     <div style="background:${bgLight};padding:14px 18px;display:flex;align-items:center;gap:12px;">
