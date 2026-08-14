@@ -97,9 +97,14 @@ setTimeout(() => {
   if (fs.existsSync(sqlPath)) {
     const sql = fs.readFileSync(sqlPath, 'utf8');
     ok('migracja 008 obecna', true);
-    ok('008 nie włącza polityk bez owner_id (zakomentowane)',
-       sql.includes('-- drop policy if exists p_obj_internal_all'),
-       'polityki odkomentowane — sprawdź, czy owner_id jest uzupełnione!');
+    // Polityki są aktywne, a przed przypadkowym uruchomieniem bez przypisanych
+    // opiekunów chroni bezpiecznik w samym SQL (raise exception), nie komentarz.
+    ok('008 ma bezpiecznik przed uruchomieniem bez opiekunów',
+       sql.includes('raise exception') && sql.includes('PRZERWANO'),
+       'bez tego uruchomienie odcięłoby handlowców od wszystkich danych');
+    ok('008 obejmuje typ base_period w udostępnieniach lub go nie narusza',
+       !sql.includes('drop policy') || !/p_bp_share/.test(sql.split('drop policy').slice(1).join('')),
+       'migracja nie może kasować polityk has_share dla okresów bazowych');
   } else {
     ok('migracja 008 obecna', false, 'brak pliku');
   }
