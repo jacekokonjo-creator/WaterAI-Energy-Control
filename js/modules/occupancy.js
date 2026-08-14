@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  var OCC_DEFAULTS = { ti: 20, tiRed: 17, fCommon: 0, oRef: 100, heatLimit: 12 };
+  var OCC_DEFAULTS = { ti: 20, tiRed: 17, fCommon: 0, oRef: 100 };
 
   function _occN(v) { return (v === '' || v == null || isNaN(Number(v))) ? null : Number(v); }
   function _occFmt(v, d) { return (typeof _fmtA === 'function') ? _fmtA(v, d) : Number(v).toFixed(d); }
@@ -31,8 +31,7 @@
       ti: p.ti != null && p.ti !== '' ? Number(p.ti) : OCC_DEFAULTS.ti,
       tiRed: p.tiRed != null && p.tiRed !== '' ? Number(p.tiRed) : OCC_DEFAULTS.tiRed,
       fCommon: p.fCommon != null && p.fCommon !== '' ? Number(p.fCommon) : OCC_DEFAULTS.fCommon,
-      oRef: p.oRef != null && p.oRef !== '' ? Number(p.oRef) : OCC_DEFAULTS.oRef,
-      heatLimit: p.heatLimit != null && p.heatLimit !== '' ? Number(p.heatLimit) : OCC_DEFAULTS.heatLimit
+      oRef: p.oRef != null && p.oRef !== '' ? Number(p.oRef) : OCC_DEFAULTS.oRef
     };
   }
 
@@ -53,10 +52,9 @@
       var tme = _occN(m.tme), tmeStd = _occN(m.tmeStd), occ = _occN(m.occ);
       var tiEff = _occTiEff(occ == null ? P.oRef : occ, P);
       var tiEffRef = _occTiEff(P.oRef, P);
-      var grzR = (tme != null && tme <= P.heatLimit);
-      var grzS = (tmeStd != null && tmeStd <= P.heatLimit);
+      var grzR = (z0 > 0 && tme != null);
       var sdR = grzR ? Math.max(0, tiEff - tme) * z0 : 0;
-      var sdS = grzS ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
+      var sdS = (z0 > 0 && tmeStd != null) ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
       sumR += sdR; sumS += sdS; if (grzR) days += z0;
       rows.push({ name: m.name, z0: z0, tme: tme, occ: occ, tmeStd: tmeStd,
         tiEff: tiEff, tiEffRef: tiEffRef, sdR: sdR, sdS: sdS, grzR: grzR });
@@ -164,10 +162,9 @@
         param('tiRed', 'tᵢ,red — pokoje puste [°C]', 'obniżona, zwykle 17') +
         param('fCommon', 'f_wsp — powierzchnie wspólne [%]', 'grzane niezależnie od obłożenia', '1') +
         param('oRef', 'O_ref — obłożenie referencyjne [%]', 'dla sezonu standardowego', '1') +
-        param('heatLimit', 'próg dnia grzewczego [°C]', 'miesiąc liczony gdy tme ≤ progu') +
       '</div>' +
       '<div style="font-size:11px;color:#33475B;margin-top:9px;line-height:1.5;">' +
-        'Przy <b>f_wsp = 0</b> wzór jest dokładnie taki jak w Załączniku nr 3. Wartość &gt; 0 uwzględnia korytarze, kuchnie i pralnie ogrzewane niezależnie od obłożenia — bez tego korekta zawyża efekt obłożenia w akademiku.' +
+        'Przy <b>f_wsp = 0</b> wzór jest dokładnie taki jak w Załączniku nr 3. Wartość &gt; 0 uwzględnia części wspólne budynku (korytarze, klatki, kuchnie, recepcja) ogrzewane niezależnie od obłożenia. Liczbę dni grzewczych w miesiącu ustalasz kolumną z₀ — wpisz 0, aby wyłączyć miesiąc.' +
       '</div>' +
     '</div>' +
 
@@ -202,7 +199,7 @@
     '<div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:#E6F1FB;border:1px solid #B5D4F4;font-size:13px;color:#0C447C;">' +
       'φ = ΣSDeff,stand / ΣSDeff,rzecz = <b id="occ-phi">' + (c.phi != null ? _occFmt(c.phi, 4) : '—') + '</b>' +
       ' · Qs = Qc.o.·φ = <b id="occ-qs">' + (c.qs != null ? _occFmt(c.qs, 2) : '—') + '</b> ' + _occEsc(d.energyUnit || 'GJ') +
-      '<div style="font-size:11px;opacity:0.8;margin-top:5px;">Miesiące z tme powyżej progu grzewczego są wyszarzone i nie wchodzą do sum.</div>' +
+      '<div style="font-size:11px;opacity:0.8;margin-top:5px;">Miesiące z z₀ = 0 lub bez temperatury są wyszarzone i nie wchodzą do sum.</div>' +
     '</div>';
   }
 
@@ -267,8 +264,7 @@
       step(1, 'Efektywna temperatura wewnętrzna (równanie 2a)',
         box('tᵢ,eff = f_wsp·tᵢ + (1 − f_wsp)·[ O·tᵢ + (1 − O)·tᵢ,red ]<br>' +
             'tᵢ = <b>' + _occFmt(P.ti, 1) + ' °C</b> · tᵢ,red = <b>' + _occFmt(P.tiRed, 1) + ' °C</b> · ' +
-            'f_wsp = <b>' + _occFmt(P.fCommon, 0) + '%</b> · O_ref = <b>' + _occFmt(P.oRef, 0) + '%</b> · ' +
-            'próg dnia grzewczego = <b>' + _occFmt(P.heatLimit, 1) + ' °C</b>')) +
+            'f_wsp = <b>' + _occFmt(P.fCommon, 0) + '%</b> · O_ref = <b>' + _occFmt(P.oRef, 0) + '%</b>')) +
 
       step(2, 'Stopniodni z uwzględnieniem obłożenia (równanie 2)',
         '<div style="overflow-x:auto;border:1px solid var(--color-border-tertiary);border-radius:8px;">' +
@@ -331,8 +327,7 @@
   function _occAnalP() {
     var p = (window.ANAL && ANAL.occParams) || {};
     return { ti: N(p.ti) != null ? N(p.ti) : 20, tiRed: N(p.tiRed) != null ? N(p.tiRed) : 17,
-      fCommon: N(p.fCommon) != null ? N(p.fCommon) : 0, oRef: N(p.oRef) != null ? N(p.oRef) : 100,
-      heatLimit: N(p.heatLimit) != null ? N(p.heatLimit) : 12 };
+      fCommon: N(p.fCommon) != null ? N(p.fCommon) : 0, oRef: N(p.oRef) != null ? N(p.oRef) : 100 };
   }
 
   /* Qc.o. netto = zużycie okresu − suma odliczeń miesięcznych */
@@ -356,10 +351,9 @@
       var stdM = ANAL.std[mo.month] || [0, 0];
       var tmeStd = N(stdM[0]);
       var tiEff = _occTiEff(occ == null ? p.oRef : occ, p);
-      var grzR = (tme != null && tme <= p.heatLimit);
-      var grzS = (tmeStd != null && tmeStd <= p.heatLimit);
+      var grzR = (z0 > 0 && tme != null);
       var sdR = grzR ? Math.max(0, tiEff - tme) * z0 : 0;
-      var sdS = grzS ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
+      var sdS = (z0 > 0 && tmeStd != null) ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
       sumR += sdR; sumS += sdS; days += z0;
       var e1 = document.getElementById('anw-' + key + '-sdr-' + idx); if (e1) e1.textContent = grzR ? F(sdR, 1) : '—';
       var e2 = document.getElementById('anw-' + key + '-sds-' + idx); if (e2) e2.textContent = F(sdS, 1);
@@ -373,7 +367,7 @@
 
   /* ── wczytanie okresu bazowego obłożenia do kreatora ────────────────────── */
   window._analApplyOccupancyBase = function (it) {
-    ANAL.occParams = JSON.parse(JSON.stringify(it.occParams || { ti: 20, tiRed: 17, fCommon: 0, oRef: 100, heatLimit: 12 }));
+    ANAL.occParams = JSON.parse(JSON.stringify(it.occParams || { ti: 20, tiRed: 17, fCommon: 0, oRef: 100 }));
     ANAL.before.from = it.periodFrom || '';
     ANAL.before.to = it.periodTo || '';
     ANAL.before.months = (it.months || []).map(function (m) {
@@ -412,9 +406,9 @@
       var z0 = Number(mo.days || 0), tme = N(mo.tme), occ = N(mo.occ);
       var stdM = ANAL.std[mo.month] || [0, 0], tmeStd = N(stdM[0]);
       var tiEff = _occTiEff(occ == null ? p.oRef : occ, p);
-      var grzR = (tme != null && tme <= p.heatLimit);
+      var grzR = (z0 > 0 && tme != null);
       var sdR = grzR ? Math.max(0, tiEff - tme) * z0 : 0;
-      var sdS = (tmeStd != null && tmeStd <= p.heatLimit) ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
+      var sdS = (z0 > 0 && tmeStd != null) ? Math.max(0, tiEffRef - tmeStd) * z0 : 0;
       return '<tr' + (grzR ? '' : ' style="opacity:.45;"') + '>' +
         '<td>' + mo.name + '</td>' +
         '<td><input type="number" min="0" max="31" value="' + (mo.days == null ? '' : mo.days) + '" oninput="ANAL.' + key + '.months[' + idx + '].days=this.value;_analRecalcLive()"></td>' +
@@ -451,8 +445,8 @@
         '<input type="number" step="0.1" value="' + p[k] + '" oninput="ANAL.occParams=ANAL.occParams||{};ANAL.occParams.' + k + '=this.value;_analRecalcLive()"></div>';
     };
     return '<div class="anw-sec"><div class="anw-head anw-gold"><span class="ico">🏨</span><h3>Parametry metody — wspólne dla PRZED i PO</h3></div><div class="anw-body">' +
-      '<div class="anw-row">' + f('ti', 'tᵢ [°C]') + f('tiRed', 'tᵢ,red [°C]') + f('fCommon', 'f_wsp [%]') + f('oRef', 'O_ref [%]') + f('heatLimit', 'próg grzew. [°C]') + '</div>' +
-      '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme) · φ = ΣSDeff,stand / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
+      '<div class="anw-row">' + f('ti', 'tᵢ [°C]') + f('tiRed', 'tᵢ,red [°C]') + f('fCommon', 'f_wsp [%]') + f('oRef', 'O_ref [%]') + '</div>' +
+      '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme), gdzie z₀ = dni grzewcze wpisane ręcznie · φ = ΣSDeff,stand / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
       'O_ref obowiązuje identycznie w obu okresach — zmiana bazy odniesienia między PRZED a PO dałaby pozorną oszczędność.</div>' +
     '</div></div>';
   }
