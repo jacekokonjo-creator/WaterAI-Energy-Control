@@ -55,3 +55,6 @@ jobs:
 
       - name: Test kalendarza (terminy, strefa czasowa)
         run: node test/t_calendar.js
+
+      - name: Audyt uprawnień ról
+        run: node test/t_roles.js
