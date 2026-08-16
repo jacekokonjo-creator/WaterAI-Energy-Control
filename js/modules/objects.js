@@ -21,6 +21,14 @@ const _objectsStore = (window.WaterAIBridge && WaterAIBridge.makeStore)
       legacyIdForRow() { return null; }
     });
 
+// Uuid zalogowanego użytkownika. Czytane przez JEDNĄ referencję —
+// mieszanie `window.WaterAISupabase` w warunku z gołym `WaterAISupabase`
+// w odczycie działa tylko dopóki oba wskazują ten sam obiekt.
+function _objCurrentUserId() {
+  const sb = (typeof window !== 'undefined') ? window.WaterAISupabase : null;
+  return (sb && sb.profile && sb.profile.id) ? sb.profile.id : null;
+}
+
 const ObjectsModule = {
   ..._objectsStore,
 
@@ -34,6 +42,13 @@ const ObjectsModule = {
       name: object.name || '',
       objectType: object.objectType || 'HOTEL',
       status: object.status || 'OFFER',
+
+      // Opiekun obiektu (uuid konta). Po włączeniu RLS (migracja 008) handlowiec
+      // widzi wyłącznie obiekty, których jest opiekunem — bez tego pola nowo
+      // dodany obiekt zniknąłby mu natychmiast po zapisaniu.
+      // Jawnie podany ownerId (przypisanie przez admina) ma pierwszeństwo;
+      // w przeciwnym razie opiekunem zostaje osoba tworząca rekord.
+      ownerId: object.ownerId || _objCurrentUserId(),
 
       country: object.country || 'PL',
       postalCode: object.postalCode || '',
