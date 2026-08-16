@@ -58,3 +58,6 @@ jobs:
 
       - name: Audyt uprawnień ról
         run: node test/t_roles.js
+
+      - name: Test symulacji (silniki finansowe)
+        run: node test/t_simulations.js

@@ -179,7 +179,12 @@ function _simEngineDeposit(p, savingsPct) {
     totalSavings: rows.reduce((a, r) => a + r.F, 0),
     netProfit: last.I,
     roi: last.roi,
-    cagr: (inv > 0 && last.I > 0) ? Math.pow(last.I / inv, 1 / years) - 1 : null
+    // CAGR liczy się od KROTNOŚCI kapitału ((I+inv)/inv), nie od samego zysku.
+    // Poprzednia postać (I/inv) dawała 0 % przy podwojeniu kapitału i wartości
+    // UJEMNE przy realnym zysku mniejszym od inwestycji — np. −12,9 % zamiast
+    // +2,3 % przy zwrocie 25 tys. z inwestycji 100 tys. w 10 lat.
+    // Zgodne z silnikiem opłaty stałej (patrz _simEngineFeeFixed).
+    cagr: (inv > 0 && last.I > 0) ? Math.pow((last.I + inv) / inv, 1 / years) - 1 : null
   };
   return { rows, kpi };
 }
@@ -218,7 +223,7 @@ function _simEngineFee(p, savingsPct) {
     totalSavings: rows.reduce((a, r) => a + r.F, 0),
     netProfit: last.I,
     roi: last.roi,
-    cagr: (fee > 0 && last.I > 0) ? Math.pow(last.I / fee, 1 / years) - 1 : null
+    cagr: (fee > 0 && last.I > 0) ? Math.pow((last.I + fee) / fee, 1 / years) - 1 : null
   };
   return { rows, kpi };
 }

@@ -43,7 +43,8 @@ nazwę (z osłoną `typeof X !== 'undefined'`), nigdy przez `window.X`.
 | `t_documents.js` | hierarchia folderów, usuwanie kaskadowe, brak osieroceń | 28 |
 | `t_readings.js` | przeliczniki jednostek, przelicznik gazu, separacja obiektów | 25 |
 | `t_calendar.js` | terminy, zaległości, strefa czasowa, uszkodzone dane | 20 |
-| `t_roles.js` | kafelki i uprawnienia ról vs model z KONTEKST, hierarchia, rozbieżności z RLS | 42 |
+| `t_roles.js` | kafelki i uprawnienia ról vs model z KONTEKST, hierarchia, rozbieżności z RLS | 53 |
+| `t_simulations.js` | silniki finansowe, CAGR, okres zwrotu, kapowanie rat | 36 |
 
 Uruchamiane automatycznie przy każdym push na `main`
 (`.github/workflows/testy.yml`) — **przed** wdrożeniem.
