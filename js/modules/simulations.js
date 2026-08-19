@@ -563,6 +563,8 @@ const SIM_STYLE = `<style>
   .sim-step .t { font-size:12px; font-weight:600; margin-top:2px; }
   .sim-step .d { font-size:11px; color:var(--color-text-secondary); margin-top:3px; line-height:1.4; }
   .sim-footnote { font-size:10px; color:var(--color-text-tertiary); line-height:1.5; }
+  /* Wiersz właśnie zapisanej oferty — gaśnie sam po kilku sekundach. */
+  .sim-row-flash { background:#FEF3DC; box-shadow:inset 3px 0 0 #E0A800; transition:background .6s ease; }
 
   @media(max-width:680px){ .sim-cover{padding:22px 18px 18px;} .sim-cover h1{font-size:24px;}
     .sim-cover-meta{grid-template-columns:1fr;} .sim-cover-kpis{grid-template-columns:1fr;}
@@ -704,7 +706,8 @@ function renderSimulationsModule() {
     const sim = e.sim;
     const st = SimulationsModule.STATUSES[sim.status] || SimulationsModule.STATUSES.DRAFT;
     const stale = (sim.status === 'PRESENTED' && e.days != null && e.days > 21);
-    return `<tr style="border-bottom:1px solid var(--color-border-tertiary);">
+    const flash = (window._simFlashId != null && Number(window._simFlashId) === Number(sim.id));
+    return `<tr id="sim-row-${sim.id}" class="${flash ? 'sim-row-flash' : ''}" style="border-bottom:1px solid var(--color-border-tertiary);">
       <td style="padding:9px 6px;font-size:12px;color:var(--color-text-secondary);">${e.no || '—'}</td>
       <td style="padding:9px 6px;font-size:12px;font-family:monospace;">${escapeHtml(sim.simNumber || '—')}
         <div style="font-family:inherit;font-size:11px;color:var(--color-text-secondary);">${escapeHtml(sim.name || '')}</div></td>
@@ -764,6 +767,16 @@ function renderSimulationsModule() {
             <tbody>${rows || `<tr><td colspan="9" style="padding:20px;text-align:center;font-size:13px;color:var(--color-text-secondary);">Brak wyników.</td></tr>`}</tbody>
           </table></div>`}
   `;
+
+  // Przewiń do właśnie zapisanej oferty i zgaś jej podświetlenie po chwili.
+  if (window._simFlashId != null) {
+    const _row = document.getElementById('sim-row-' + window._simFlashId);
+    window._simFlashId = null;
+    if (_row) {
+      try { _row.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { _row.scrollIntoView(); }
+      setTimeout(() => { _row.classList.remove('sim-row-flash'); }, 4000);
+    }
+  }
 }
 window.renderSimulationsModule = renderSimulationsModule;
 
@@ -1152,8 +1165,20 @@ function simSave() {
   if (!(_simDraft.heatingCost > 0)) { alert('Podaj roczny koszt ogrzewania (> 0).'); return; }
   if (!_simDraft.name) _simDraft.name = 'Oferta — ' + _simCliName(_simDraft.clientId);
   if (!_simDraft.simNumber) _simDraft.simNumber = simSuggestNumber(_simDraft.clientId, _simDraft.objectId || null);
+  let _savedId = _simEditId;
   if (_simEditId) SimulationsModule.update(_simEditId, _simDraft);
-  else SimulationsModule.add(_simDraft);
+  else {
+    const _rec = SimulationsModule.add(_simDraft);
+    _savedId = _rec && _rec.id;
+    // NOWA oferta: lista wraca do widoku domyślnego (najnowsze na górze, bez
+    // filtra i bez frazy szukania). Bez tego zapamiętane sortowanie — np. po
+    // kolumnie „#" rosnąco — wrzuca świeży rekord na koniec tabeli i wygląda to
+    // tak, jakby zapis się nie udał.
+    window._simSort = 'date_desc';
+    window._simStatusFilter = 'ALL';
+    window._simSearch = '';
+  }
+  window._simFlashId = _savedId || null;
   renderSimulationsModule();
 }
 window.simSave = simSave;
