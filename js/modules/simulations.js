@@ -98,7 +98,12 @@ const SimulationsModule = {
     clientSharePct: 50,
     paybackReturnPct: 25,
     currency: 'PLN',
-    scenarios: [{ label: 'A', savingsPct: 18, note: '', base: true }],
+    // Trzy warianty od razu wypełnione i edytowalne: A bazowy, potem ostrożniejsze.
+    scenarios: [
+      { label: 'A', savingsPct: 50, note: '', base: true },
+      { label: 'B', savingsPct: 35, note: '', base: false },
+      { label: 'C', savingsPct: 20, note: '', base: false }
+    ],
     photos: []
   },
 
@@ -853,11 +858,9 @@ function simEdit(id) {
   if (!_allowedSetl.includes(_simDraft.settlementType || 'DEPOSIT')) {
     _simDraft.settlementType = _allowedSetl[0];
   }
-  // Dla NOWEJ oferty zagranicznej podpowiedz walutę kraju, jeśli pozostała domyślna PLN
-  // (Czechy → CZK, pozostałe kraje → EUR). Zapisanych ofert nie ruszamy.
-  if (!id && _simCurrentLang() !== 'pl' && (_simDraft.currency || 'PLN') === 'PLN') {
-    _simDraft.currency = (_simCurrentLang() === 'cs') ? 'CZK' : 'EUR';
-  }
+  // NOWA oferta: waluta wg kraju klienta (o ile klient jest już wybrany), inaczej
+  // wg języka interfejsu. Zapisanych ofert nie ruszamy — mogły mieć walutę ustawioną ręcznie.
+  if (!id) _simDraft.currency = _simCurForClient(_simDraft.clientId);
   // NOWA oferta w wariancie „opłata w 2. roku": wstaw sugerowaną kwotę opłaty
   // (ta sama logika, co przy ręcznym przełączeniu wariantu). Kwota jest edytowalna.
   if (!id && _simDraft.settlementType === 'FEE_Y2' && !Number(_simDraft.investment)) {
@@ -908,7 +911,7 @@ function simEdit(id) {
               Sugerowana opłata za usługę (edytowalna): ${_simFmt(_simSuggestedFee(_simDraft.currency || 'PLN'))} ${_simDraft.currency || 'PLN'}. Spłacana z oszczędności w 2. roku eksploatacji.</p></div>
           <div class="sim-field"><label>Waluta</label>
             <select id="sim-currency" onchange="_simCurrencyChanged()">
-              ${['PLN', 'EUR', 'CZK'].map(c => `<option ${_simDraft.currency === c ? 'selected' : ''}>${c}</option>`).join('')}
+              ${_SIM_CURRENCIES.map(c => `<option ${_simDraft.currency === c ? 'selected' : ''}>${c}</option>`).join('')}
             </select></div>
         </div>
         <div class="sim-field"><label>Roczny koszt ogrzewania (rok 1)</label>
@@ -995,6 +998,15 @@ function _simClientChanged() {
   document.getElementById('sim-object').innerHTML = _simObjectOptions(_simDraft.clientId, '');
   const numEl = document.getElementById('sim-number');
   if (numEl && !numEl.value && _simDraft.clientId) numEl.value = simSuggestNumber(_simDraft.clientId, null);
+  // Waluta idzie za krajem klienta — ale tylko dopóki użytkownik sam jej nie zmienił
+  // (pole trzyma wtedy walutę spoza mapy krajów albo świadomie inną).
+  const curSel = document.getElementById('sim-currency');
+  const nowa = _simCurForClient(_simDraft.clientId);
+  if (curSel && curSel.value !== nowa && !_simDraft._curReczna) {
+    curSel.value = nowa;
+    _simCurrencyChanged();   // przeliczy też sugerowaną opłatę i podpowiedź
+    return;
+  }
   _simRecalc();
 }
 window._simClientChanged = _simClientChanged;
@@ -1108,10 +1120,28 @@ function _simAllowedSettlements() {
     : ['FREE', 'FEE_Y2'];
 }
 
+// Waluta wynika z KRAJU KLIENTA, a nie z języka interfejsu. Wcześniej brało się
+// to z języka (cs → CZK, każdy inny obcy → EUR), więc oferta dla klienta ze
+// Słowacji przygotowana po polsku wychodziła w złotówkach, a brytyjska nie miała
+// swojej waluty w ogóle. Kody krajów jak w formularzu klienta (app.build.js).
+const _SIM_CUR_BY_COUNTRY = {
+  PL: 'PLN', CZ: 'CZK', SK: 'EUR', AT: 'EUR', DE: 'EUR', GB: 'GBP'
+};
+const _SIM_CURRENCIES = ['PLN', 'EUR', 'CZK', 'GBP'];
+function _simCurByCountry(country) {
+  return _SIM_CUR_BY_COUNTRY[String(country || '').toUpperCase()] || 'EUR';
+}
+// Waluta dla klienta oferty; brak klienta → waluta wg języka interfejsu jak dotąd.
+function _simCurForClient(clientId) {
+  const c = _simCli(clientId);
+  if (c && c.country) return _simCurByCountry(c.country);
+  return (_simCurrentLang() === 'pl') ? 'PLN' : ((_simCurrentLang() === 'cs') ? 'CZK' : 'EUR');
+}
+
 // Sugerowana Opłata za Usługę dla wariantu FEE_Y2, zależna od waluty.
-// Polska (PLN): 24 990. Kraje zagraniczne: 6 900 EUR / 169 000 CZK (Czechy).
+// Polska: 24 990 PLN. Zagranica: 6 900 EUR / 169 000 CZK / 5 900 GBP.
 // Wartość jest tylko SUGESTIĄ — użytkownik może ją nadpisać w polu kwoty.
-const _SIM_FEE_SUGGEST = { PLN: 24990, EUR: 6900, CZK: 169000 };
+const _SIM_FEE_SUGGEST = { PLN: 24990, EUR: 6900, CZK: 169000, GBP: 5900 };
 function _simSuggestedFee(currency) {
   return _SIM_FEE_SUGGEST[currency] != null ? _SIM_FEE_SUGGEST[currency] : _SIM_FEE_SUGGEST.PLN;
 }
@@ -1132,6 +1162,8 @@ function _simCurrencyChanged() {
     }
   }
   _simDraft.currency = newCur;
+  // Ślad po ręcznym wyborze: od tej chwili zmiana klienta nie nadpisuje waluty.
+  if (newCur !== _simCurForClient(_simDraft.clientId)) _simDraft._curReczna = true;
   // odśwież podpowiedź pod polem
   const feeHint = document.getElementById('sim-fee-hint');
   if (feeHint && _simDraft.settlementType === 'FEE_Y2') {
