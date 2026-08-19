@@ -1,0 +1,1185 @@
+/* ============================================================================
+   landing.js — opis metody pomiaru i rozliczania na ekranie logowania.
+   Dokłada treść po lewej stronie karty logowania. Nie rusza logiki logowania
+   ani tłumaczeń aplikacji: własna przestrzeń nazw window.LANDING,
+   własny <style> ze wszystkimi regułami ograniczonymi do #landing-doc.
+   Podpina się pod istniejące window.setLanguage(code).
+   Wyłączenie: usunąć <script src="js/landing.js"> z index.html.
+   ========================================================================== */
+window.LANDING = window.LANDING || {};
+
+
+window.LANDING["pl"] = {
+label: "PL", htmlLang: "pl",
+title: "WaterAI Energy Control — system pomiaru i rozliczania oszczędności energii",
+desc: "Jak mierzymy i rozliczamy oszczędności energii: korekta na Typowy Rok Meteorologiczny i kontrolna regresja liniowa. Logowanie do panelu Energy Control.",
+eyebrow: "Energy Control · metoda pomiaru i rozliczania",
+h1: "Oszczędność energii bez inwestycji własnej",
+lede: "Płacą Państwo wyłącznie za energię, którą uda się realnie zaoszczędzić — odmierzoną z licznika, skorygowaną o wpływ pogody i potwierdzoną drugą, niezależną metodą. Przed startem przygotujemy symulację opartą na Państwa rzeczywistych kosztach.",
+switchIntro: "<strong>Chcą Państwo wiedzieć dokładnie, jak liczymy?</strong> Włączenie szczegółów rozwija na tej stronie pełny opis metody: wzory, źródła danych, kolejność kroków rozliczenia i model regresji.",
+toggleOff: "Szczegółowe informacje",
+toggleOn: "Ukryj szczegóły",
+cards: [
+["Zero nakładów", "Bez inwestycji po Państwa stronie i bez ingerencji w istniejącą regulację."],
+["Płatność z oszczędności", "Wynagrodzenie to uzgodniony udział w wartości odmierzonej oszczędności."],
+["Wynik odporny na pogodę", "Każdy okres przeliczany na te same, normowe warunki (TYM)."]
+],
+login: {
+title: "Energy Control", sub: "System pomiaru i rozliczania oszczędności energii",
+email: "Login / e-mail", emailPh: "np. admin@waterai.pl",
+pass: "Hasło", passPh: "Wpisz hasło", submit: "Zaloguj",
+errEmpty: "Podaj login i hasło.",
+mock: "Makieta — podłącz przycisk do logiki logowania aplikacji.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Język",
+aside: [
+["Nie mają Państwo jeszcze konta?", "Konta zakłada administrator. W panelu widać wyniki dla Państwa obiektów, a obok opisujemy metodę, według której te wyniki powstają."],
+["Chcą Państwo wiedzieć, ile to może dać u Państwa?", "Przygotujemy symulację oszczędności na podstawie Państwa rzeczywistych kosztów — wystarczą faktury za nośnik energii lub odczyty licznika z ostatnich sezonów. Symulacja jest prognozą; rozliczamy wyłącznie to, co po okresie pokaże pomiar."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Opis ma charakter informacyjny; wiążące warunki określa umowa i protokół pomiarowy."],
+closing: "Po zakończeniu okresu umownego cały efekt technologii pozostaje po Państwa stronie.",
+sections: [
+{h: "Co proponujemy", b: [
+["p", "Wdrażamy prediktywne sterowanie ogrzewaniem na istniejącej instalacji. Układ uczy się zachowania budynku i reakcji na pogodę, a następnie wyprzedza zapotrzebowanie zamiast reagować z opóźnieniem. Nie wymieniamy źródła ciepła ani nie ingerujemy w obecną automatykę."],
+["p", "Rozliczenie prowadzimy w modelu ESCO: koszt wdrożenia i eksploatacji pokrywamy my, a naszym wynagrodzeniem jest udział w wartości oszczędności potwierdzonej pomiarem. Jeżeli oszczędności nie ma — nie ma faktury."],
+["d", "Szczegóły", [
+["p", "Granicę pomiaru ustalamy przed startem i zapisujemy w protokole pomiarowym: rozliczeniu podlega wyłącznie energia objęta wskazanym licznikiem. Media mierzone osobno — na przykład ciepła woda użytkowa — nie wchodzą ani do okresu bazowego, ani do rozliczenia."],
+["p", "Jeżeli równolegle rozważana jest inna technologia (np. fizyczne uzdatnianie wody), oceniamy ją jako odrębny krok z własną bazą. Efekty nie są sumowane w jednym wskaźniku, żeby każdy z nich dało się obronić osobno."]
+]]
+]},
+{h: "Symulacja przed startem — i dlaczego wynik podajemy dopiero po okresie", b: [
+["p", "Zanim cokolwiek podpiszemy, przygotowujemy <strong>symulację oszczędności opartą na Państwa rzeczywistych kosztach</strong> — na fakturach za nośnik energii i odczytach licznika z ostatnich sezonów. Symulacja pokazuje spodziewany rząd wielkości: ile energii może zostać w budynku, ile to znaczy w pieniądzu przy Państwa cenie i jak dzieli się ten efekt między strony."],
+["cw", ["<strong>Symulacja jest prognozą, nie obietnicą.</strong> Nie podajemy z góry gwarantowanego procentu, bo oszczędność zależy od czynników, nad którymi nikt nie panuje w całości: przebiegu pogody w konkretnym sezonie, sposobu użytkowania obiektu, zmian obłożenia i godzin pracy, stanu instalacji, a także decyzji podejmowanych na miejscu. Twardą liczbę podajemy dopiero za zamknięty okres — odmierzoną z licznika i skorygowaną o wpływ pogody.", "Ryzyko rozjazdu prognozy z wynikiem obciąża nas, nie Państwa: fakturujemy wyłącznie to, co zostało zmierzone. Jeżeli oszczędności nie ma, nie ma faktury."]],
+["d", "Szczegóły · zakres symulacji", [
+["h3", "Co wchodzi do symulacji"],
+["ul", ["zużycie i koszty z ostatnich sezonów — z faktur albo z odczytów licznika,", "charakterystyka obiektu wynikająca z tych danych, sprowadzona do warunków normowych (TYM),", "cena nośnika energii, którą płacą Państwo dziś, oraz przewidziany w umowie tryb jej aktualizacji,", "uzgodniony podział efektu między strony."]],
+["h3", "Czego symulacja nie obejmuje"],
+["ul", ["przebiegu pogody w nadchodzącym sezonie — z definicji nieznanego,", "zmian po Państwa stronie: obłożenia, godzin pracy, nowych najemców, prac budowlanych,", "zmian ceny nośnika energii poza tym, co zapisano w umowie,", "awarii i przestojów instalacji."]],
+["p", "Dlatego symulację podajemy jako przedział, a nie jako pojedynczą liczbę, i wskazujemy, przy jakich założeniach powstała. Nie jest ona podstawą rozliczenia — służy podjęciu decyzji."],
+["c", ["<strong>Prognozę weryfikujemy po fakcie.</strong> Po pierwszym zamkniętym okresie zestawiamy symulację z wynikiem pomiaru i pokazujemy odchylenie razem z jego przyczyną. To ten sam materiał, na którym korygujemy prognozę na kolejny sezon — i po którym widać, czy nasze założenia były rzetelne."]]
+]]
+]},
+{h: "Skąd bierze się liczba, za którą płacą Państwo", b: [
+["p", "Nie porównujemy zużyć rok do roku, bo taki wynik mówi przede wszystkim o tym, która zima była łagodniejsza. Każdy okres — bazowy i rozliczeniowy — przeliczamy na te same, normowe warunki pogodowe, czyli na <strong>Typowy Rok Meteorologiczny (TYM)</strong>. Dopiero tak sprowadzone do wspólnego mianownika wielkości są porównywalne."],
+["ps", "Skutek jest jednoznaczny: łagodniejsza zima nie może zostać wykazana jako oszczędność, a zima ostrzejsza od normy nie obciąża wyniku technologii."],
+["d", "Szczegóły · oznaczenia i wzory", [
+["t", [["Symbol", "Znaczenie"],
+["z", "liczba dni z aktywnym ogrzewaniem w danym miesiącu"],
+["T<sub>i</sub>", "temperatura wewnętrzna przyjęta do wyliczeń — parametr umowny, ten sam dla bazy i dla każdego okresu rozliczeniowego"],
+["t", "średnia temperatura zewnętrzna w dniach grzewczych danego miesiąca (dane rzeczywiste)"],
+["t<sub>TYM</sub>", "temperatura normowa tego samego miesiąca według Typowego Roku Meteorologicznego"],
+["SD", "stopniodni — miara zapotrzebowania na ciepło wynikającego z pogody [°C·dni]"],
+["Q · Q<sub>s</sub>", "zużycie zmierzone i zużycie skorygowane do warunków normowych, wyrażone w <strong>jednostce rozliczeniowej [j.r.]</strong> — tej, w której mierzy licznik i wystawia fakturę dostawca: kWh, MWh lub GJ dla ciepła sieciowego, m<sup>3</sup> dla gazu"],
+["φ", "współczynnik korekcyjny okresu"],
+["E", "wskaźnik jednostkowy — zużycie na jeden standardowy stopniodzień [j.r./SD]"],
+["ΔQ", "odmierzona oszczędność, w tej samej jednostce rozliczeniowej co Q"]]],
+["f", [["Stopniodni", "SD = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·dni]"],
+["Współczynnik korekcyjny", "φ = ΣSD<sub>standardowe</sub> / ΣSD<sub>rzeczywiste</sub>"],
+["Zużycie skorygowane", "Q<sub>s</sub> = Q × φ"],
+["Wskaźnik jednostkowy", "E = Q<sub>s</sub> / ΣSD<sub>standardowe</sub>&nbsp;&nbsp;[j.r./SD]"],
+["Projekcja bazy", "Q<sub>baza→rozl.</sub> = E<sub>bazy</sub> × ΣSD<sub>standardowe okresu rozliczeniowego</sub>"],
+["Oszczędność", "ΔQ = Q<sub>baza→rozl.</sub> − Q<sub>s, rozl.</sub>"]]],
+["fine", "Stopniodni standardowe liczymy dokładnie tak samo jak rzeczywiste — z tą samą liczbą dni grzewczych <em>z</em> i tą samą temperaturą T<sub>i</sub> — podstawiając wyłącznie temperatury Typowego Roku Meteorologicznego w miejsce rzeczywistych. Różnica między jednymi a drugimi to więc czysty efekt pogody, nic poza tym."]
+]]
+]},
+{h: "Skąd pochodzi każda wielkość", b: [
+["p", "Każda liczba wchodząca do rozliczenia ma nazwane źródło i moment ustalenia. To warunek odtwarzalności — raport musi dać się przeliczyć niezależnie, bez pytania nas o cokolwiek."],
+["d", "Szczegóły · źródła danych", [
+["t3", [["Wielkość", "Źródło", "Kiedy jest ustalana"],
+["Temperatury rzeczywiste <span class=\"sym\">t</span>", "stacja meteorologiczna w lokalizacji obiektu; w raporcie podajemy nazwę stacji i datę pobrania danych", "dla każdego okresu osobno"],
+["Normały <span class=\"sym\">t<sub>TYM</sub></span>", "wieloletni szereg pomiarowy dla lokalizacji; w raporcie podajemy zakres lat, z których policzono normały", "raz — utrwalone w protokole TYM"],
+["Dni grzewcze <span class=\"sym\">z</span>", "kalendarz sezonu grzewczego obiektu; ta sama wartość wchodzi do stopniodni rzeczywistych i standardowych", "dla każdego miesiąca okresu"],
+["Temperatura <span class=\"sym\">T<sub>i</sub></span>", "parametr umowny zapisany w protokole pomiarowym", "raz — identyczna dla bazy i wszystkich okresów"],
+["Zużycie <span class=\"sym\">Q</span>", "fakturacyjny licznik energii albo faktury od dostawcy, zawsze z podaniem granicy pomiaru", "dla każdego okresu"],
+["Cena nośnika energii", "protokół pomiarowy; wskazujemy, czy jest to cena stała, czy rzeczywista cena fakturowa", "raz, z trybem aktualizacji zapisanym w umowie"],
+["Udział stron", "umowa", "raz"]]]
+]],
+["psfine", "Po włączeniu szczegółów zobaczą Państwo pełne zestawienie: co pochodzi ze stacji meteorologicznej, co z licznika, a co z protokołu pomiarowego."]
+]},
+{h: "Okres bazowy — punkt odniesienia", b: [
+["p", "Bazę wyznaczamy z trzech pełnych sezonów grzewczych poprzedzających wdrożenie. Bazą nie jest jednak zużycie wyrażone w jednostkach rozliczeniowych, lecz <strong>wskaźnik jednostkowy E</strong> — zużycie przypadające na jeden standardowy stopniodzień. Wielkość ta nie zależy ani od pogody, ani od długości okresu."],
+["d", "Szczegóły · jak powstaje baza", [
+["ul", ["Każdy z trzech sezonów przeliczamy osobno na TYM i wyznaczamy dla niego wskaźnik E.", "Bazą jest średnia arytmetyczna wskaźników z tych sezonów.", "Sprawdzamy rozrzut wskaźników wokół średniej — to test jakości bazy."]],
+["p", "Mały rozrzut oznacza, że obiekt w tych latach nie zmieniał się eksploatacyjnie i baza jest spójna. Wyraźnie większy jest sygnałem, że w szeregu zaszła zmiana — najemca, powierzchnia, godziny pracy — i wtedy bazę korygujemy albo skracamy szereg. Bazy nie przyjmujemy w ciemno."]
+]]
+]},
+{h: "Przebieg rozliczenia okresu", b: [
+["steps", [["Stopniodni okresu", "Wyznaczamy stopniodni rzeczywiste i standardowe. Pytanie: jaka naprawdę była pogoda, a jaka byłaby przy normie?"],
+["Korekta zużycia", "Obliczamy współczynnik φ i sprowadzamy zmierzone zużycie do warunków normowych."],
+["Projekcja bazy", "Rzutujemy bazę na ten sam okres: ile obiekt zużyłby teraz, gdyby zachował charakterystykę sprzed wdrożenia?"],
+["Oszczędność", "Różnica obu wielkości to energia faktycznie zaoszczędzona."],
+["Kontrola drugą drogą", "Ten sam wynik musi wyjść przez spadek wskaźnika E."]]],
+["d", "Szczegóły · dlaczego akurat tak", [
+["p", "<strong>Krok 3</strong> rozwiązuje przy okazji problem różnej długości okresów. Baza jest rzutowana dokładnie na ten okres, który rozliczamy, a nie porównywana z całym rokiem — dzięki temu można rozliczyć sezon skrócony, przesunięty albo przerwany bez zniekształcenia wyniku."],
+["p", "<strong>Krok 5</strong> jest bezwarunkowy. Jeżeli obie drogi nie dają tego samego wyniku, w raporcie jest błąd i raport nie zostaje wydany. To wewnętrzna kontrola po naszej stronie, nie formalność."],
+["c", ["<strong>Korekta na TYM działa na Państwa korzyść.</strong> Porównanie samych zmierzonych zużyć, bez uwzględnienia pogody, w sezonie łagodniejszym od normy pokazuje oszczędność wyższą niż rzeczywista — przypisuje technologii to, co zrobiła pogoda. My ten efekt z wyniku usuwamy, więc fakturujemy liczbę niższą od tej, którą dałoby proste porównanie."]]
+]]
+]},
+{h: "Druga, niezależna metoda kontrolna — regresja liniowa", b: [
+["p", "Korekta na TYM porównuje <strong>okresy</strong> sprowadzone do wspólnej pogody. Regresja robi to samo na poziomie <strong>pojedynczych odczytów</strong>: opisuje obiekt równaniem, w którym temperatura zewnętrzna jest zmienną objaśniającą. To dwa niezależne od siebie dowody na ten sam efekt — i oczekujemy, że powiedzą to samo."],
+["ps", "Metoda pokazuje też, jak zmienia się sposób sterowania: o ile niżej pracuje temperatura zasilania przy tej samej pogodzie."],
+["d", "Szczegóły · model i dane", [
+["h3", "Dane wejściowe"],
+["p", "Rejestr z licznika i sterownika w stałym kroku czasowym. Do modelu wchodzą: znacznik czasu odczytu, temperatura zewnętrzna, temperatura zasilania i powrotu, przepływ oraz moc i zużycie energii. Nie agregujemy ich do miesięcy — pracujemy na surowych odczytach, bo dopiero one pokazują, jak obiekt zachowuje się w konkretnych warunkach."],
+["h3", "Model"],
+["f", [["Prosta regresji", "y = a · x + b"],
+["Różnica trybów", "Δ(x) = y<sub>pogodowy</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Redukcja", "R(x) = Δ(x) / y<sub>pogodowy</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Symbol", "Znaczenie"],
+["x", "temperatura zewnętrzna w chwili odczytu [°C]"],
+["y", "wielkość badana: temperatura zasilania [°C] albo moc / zużycie energii"],
+["a", "nachylenie prostej — wrażliwość obiektu na pogodę, czyli o ile rośnie <em>y</em> na każdy stopień spadku temperatury zewnętrznej"],
+["b", "wyraz wolny — poziom przy 0 °C, czyli składowa niezależna od pogody: nastawy, bezwładność, straty obiegu"]]],
+["p", "Współczynniki <em>a</em> i <em>b</em> wyznaczamy metodą najmniejszych kwadratów, osobno dla dwóch zbiorów odczytów: pracy w <strong>trybie pogodowym</strong> (dotychczasowa krzywa grzewcza) i pracy w <strong>trybie prediktywnym WaterAI</strong>. Powstają dwie proste, które porównujemy przy tej samej temperaturze zewnętrznej."],
+["chart", {alt: "Wykres schematyczny: dwie proste regresji — tryb pogodowy powyżej, tryb WaterAI poniżej, różnica między nimi to efekt sterowania", base: "tryb pogodowy", ai: "tryb WaterAI", delta: "Δ(x) — efekt sterowania", xl: "niższa temperatura zewnętrzna", xr: "wyższa →", cap: "Wykres schematyczny. Odstęp między prostymi nie jest stały — dlatego wynik podajemy jako funkcję temperatury zewnętrznej, a nie jedną liczbę."}],
+["h3", "Co liczymy równolegle"],
+["ul", ["<strong>Temperatura zasilania</strong> — dowód, że zmienił się sposób sterowania: przy tej samej pogodzie obiekt pracuje na niższym parametrze.", "<strong>Moc i zużycie energii</strong> — dowód, że zmiana sterowania przełożyła się na energię."]],
+["p", "Obie wielkości muszą być spójne. Spadek temperatury zasilania bez odpowiadającego mu spadku poboru energii jest sygnałem ostrzegawczym — oznacza zwykle wydłużony czas pracy albo przesunięcie poboru, a nie oszczędność."],
+["h3", "Warunki poprawności porównania"],
+["ul", ["ten sam zakres temperatur zewnętrznych dla obu zbiorów — proste porównujemy wyłącznie tam, gdzie oba mają dane,", "wykluczenie odczytów spoza sezonu grzewczego oraz okresów postoju i prac serwisowych,", "wykluczenie stanów przejściowych po rozruchu, które zaburzają zależność,", "porównywalna liczba punktów w obu zbiorach,", "kontrola dopasowania (współczynnik determinacji) i rozrzutu reszt — słabe dopasowanie oznacza, że na obiekt działa czynnik spoza modelu i wynik wymaga wyjaśnienia,", "identyczna granica pomiaru i ten sam krok czasowy dla obu trybów."]],
+["c", ["<strong>Regresja nie jest podstawą fakturowania.</strong> Fakturujemy wyłącznie metodą TYM, z jednostek odczytanych z licznika rozliczeniowego. Regresja służy do weryfikacji tego wyniku, do diagnostyki obiektu i do sprawdzania, czy efekt utrzymuje się w czasie. Jeżeli obie metody się rozchodzą, szukamy przyczyny przed wydaniem raportu — a nie wybieramy korzystniejszej liczby."]]
+]]
+]},
+{h: "Rozliczenie i faktura", b: [
+["ul", ["Wartość oszczędności to odmierzona ilość jednostek rozliczeniowych pomnożona przez uzgodnioną cenę nośnika energii.", "Nasze wynagrodzenie to ustalony w umowie udział w tej wartości — i jest jedyną pozycją faktury.", "Faktura powołuje się na numer raportu i na okres rozliczeniowy, którego dotyczy.", "Rozliczamy wyłącznie zamknięte okresy; prognozy roczne służą planowaniu budżetu i nigdy nie są podstawą fakturowania."]],
+["d", "Szczegóły · identyfikowalność raportu", [
+["p", "W każdym raporcie rozliczeniowym nazwane są wprost:"],
+["ul", ["stacja meteorologiczna i źródło temperatur wraz z datą pobrania danych,", "zakres lat, z których policzono normały TYM,", "numer protokołu TYM i numer analizy — każdy raport da się powiązać ze swoim materiałem źródłowym,", "źródło danych o zużyciu, czyli konkretny licznik lub faktury, wraz z granicą pomiaru,", "temperatura T<sub>i</sub> przyjęta dla bazy i dla okresu rozliczeniowego,", "cena nośnika energii i uzgodniony udział, ze wskazaniem, czy cena jest stała, czy fakturowa."]],
+["fine", "Wszystkie kwoty w raporcie są netto; VAT nalicza się według stawki obowiązującej w dniu wystawienia faktury."]
+]]
+]},
+{h: "Kiedy koryguje się bazę", b: [
+["cw", ["<strong>Bazy nie przepisujemy osiągniętą oszczędnością.</strong> Osiągnięty wynik nie staje się nowym punktem odniesienia — inaczej efekt technologii z każdym rokiem znikałby z rozliczenia."]],
+["p", "Bazę korygujemy wyłącznie przy zmianach, które nie mają związku z technologią, a wpływają na zużycie."],
+["d", "Szczegóły · katalog zmian", [
+["ul", ["zmiana sposobu użytkowania obiektu lub godzin pracy,", "istotna zmiana obłożenia albo zmiana najemców,", "zmiana powierzchni ogrzewanej,", "ingerencja w przegrody budynku,", "wymiana lub dołożenie źródła energii,", "nowa technologia z własnym poborem energii,", "zmiana uzgodnionej temperatury wewnętrznej T<sub>i</sub>."]],
+["fine", "Korekta jest dwukierunkowa — także na naszą niekorzyść. Jeżeli zmiana w obiekcie sama z siebie obniża zużycie, baza zostaje o ten efekt pomniejszona i nie jest rozliczana jako oszczędność technologii."]
+]]
+]},
+{h: "Jak zaczynamy", b: [
+["steps", [["Dane wejściowe", "Faktury za nośnik energii lub odczyty licznika z ostatnich sezonów — na tym etapie nic więcej nie jest potrzebne."],
+["Symulacja oszczędności", "Na Państwa rzeczywistych kosztach pokazujemy spodziewany efekt i podział korzyści. To prognoza, nie zobowiązanie."],
+["Analiza i protokół pomiarowy", "Wyznaczamy bazę, ustalamy granicę pomiaru, T<sub>i</sub>, cenę nośnika energii i udział stron."],
+["Montaż i przełączenie", "Instalacja bez przerywania pracy obiektu, okres pracy w trybie dotychczasowym, następnie przejście w tryb prediktywny. Od tej daty biegnie okres rozliczeniowy."],
+["Raport i rozliczenie", "Po zamknięciu okresu wydajemy raport z pełnym wyliczeniem; faktura odwołuje się do jego numeru."]]]
+]}
+]
+};
+
+
+window.LANDING["en"] = {
+label: "EN", htmlLang: "en",
+title: "WaterAI Energy Control — measuring and settling energy savings",
+desc: "How we measure and settle energy savings: correction to a Typical Meteorological Year plus a linear-regression cross-check. Sign in to the Energy Control panel.",
+eyebrow: "Energy Control · measurement and settlement method",
+h1: "Energy savings with no capital outlay",
+lede: "You pay only for energy that is actually saved — metered, corrected for weather and confirmed by a second, independent method. Before we start, we prepare a simulation based on your real costs.",
+switchIntro: "<strong>Want to know exactly how we calculate?</strong> Turning on the details expands the full method on this page: formulas, data sources, the order of settlement steps and the regression model.",
+toggleOff: "Detailed information",
+toggleOn: "Hide details",
+cards: [
+["No capital outlay", "No investment on your side and no interference with the existing control system."],
+["Paid from savings", "Our fee is an agreed share of the value of the measured saving."],
+["Weather-proof result", "Every period is converted to the same standard conditions (TMY)."]
+],
+login: {
+title: "Energy Control", sub: "Energy savings measurement and settlement system",
+email: "Login / e-mail", emailPh: "e.g. admin@waterai.pl",
+pass: "Password", passPh: "Enter password", submit: "Sign in",
+errEmpty: "Enter your login and password.",
+mock: "Mock-up — connect this button to the application's sign-in logic.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Language",
+aside: [
+["Don't have an account yet?", "Accounts are created by the administrator. The panel shows results for your sites; alongside it we describe the method those results come from."],
+["Want to know what it could deliver for you?", "We will prepare a savings simulation based on your real costs — energy invoices or meter readings from recent seasons are enough. The simulation is a forecast; we settle only what the measurement shows once the period closes."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "This description is informational; binding terms are set by the contract and the measurement protocol."],
+closing: "Once the contract period ends, the full effect of the technology stays with you.",
+sections: [
+{h: "What we offer", b: [
+["p", "We deploy predictive heating control on your existing installation. The system learns how the building behaves and how it responds to weather, then anticipates demand instead of reacting late. We do not replace the heat source and we do not interfere with the existing automation."],
+["p", "Settlement follows the ESCO model: we cover the cost of deployment and operation, and our fee is a share of the value of savings confirmed by measurement. No saving means no invoice."],
+["d", "Details", [
+["p", "The measurement boundary is agreed before the start and recorded in the measurement protocol: only energy covered by the designated meter is settled. Utilities metered separately — domestic hot water, for example — enter neither the baseline nor the settlement."],
+["p", "If another technology is under consideration in parallel (physical water treatment, for instance), we assess it as a separate step with its own baseline. Effects are not merged into a single indicator, so that each one can be defended on its own."]
+]]
+]},
+{h: "A simulation before the start — and why the result comes only after the period", b: [
+["p", "Before anything is signed, we prepare a <strong>savings simulation based on your real costs</strong> — on energy invoices and meter readings from recent seasons. The simulation shows the expected order of magnitude: how much energy could stay in the building, what that means in money at your price, and how the effect is shared between the parties."],
+["cw", ["<strong>A simulation is a forecast, not a promise.</strong> We do not state a guaranteed percentage up front, because savings depend on factors nobody fully controls: how the weather turns out in a given season, how the building is used, changes in occupancy and operating hours, the condition of the installation, and decisions made on site. The firm number comes only for a closed period — metered and corrected for weather.", "The risk that the forecast and the result diverge sits with us, not with you: we invoice only what has been measured. No saving, no invoice."]],
+["d", "Details · scope of the simulation", [
+["h3", "What goes into the simulation"],
+["ul", ["consumption and costs from recent seasons — from invoices or meter readings,", "the building's characteristic derived from that data, converted to standard conditions (TMY),", "the energy price you pay today and the update mechanism set out in the contract,", "the agreed split of the effect between the parties."]],
+["h3", "What the simulation does not cover"],
+["ul", ["how the weather will turn out in the coming season — unknowable by definition,", "changes on your side: occupancy, operating hours, new tenants, construction work,", "energy price changes beyond what the contract provides for,", "faults and installation downtime."]],
+["p", "That is why we present the simulation as a range rather than a single figure, and state the assumptions behind it. It is not a basis for settlement — it is there to support a decision."],
+["c", ["<strong>We check the forecast against reality.</strong> After the first closed period we set the simulation against the measured result and show the deviation together with its cause. That same material is what we use to adjust the forecast for the next season — and what shows whether our assumptions were sound."]]
+]]
+]},
+{h: "Where the number you pay for comes from", b: [
+["p", "We do not compare consumption year against year, because such a result mostly tells you which winter was milder. Every period — baseline and settlement alike — is converted to the same standard weather conditions, the <strong>Typical Meteorological Year (TMY)</strong>. Only once reduced to that common denominator are the quantities comparable."],
+["ps", "The consequence is clear-cut: a milder winter cannot be reported as a saving, and a winter harsher than normal does not count against the technology."],
+["d", "Details · symbols and formulas", [
+["t", [["Symbol", "Meaning"],
+["z", "number of days with active heating in a given month"],
+["T<sub>i</sub>", "indoor temperature adopted for the calculation — a contractual parameter, identical for the baseline and for every settlement period"],
+["t", "mean outdoor temperature during the heating days of a given month (actual data)"],
+["t<sub>TMY</sub>", "standard temperature for the same month according to the Typical Meteorological Year"],
+["SD", "degree days — a measure of weather-driven heat demand [°C·days]"],
+["Q · Q<sub>s</sub>", "measured consumption and consumption corrected to standard conditions, expressed in the <strong>settlement unit [s.u.]</strong> — the one the meter records and the supplier invoices in: kWh, MWh or GJ for district heat, m<sup>3</sup> for gas"],
+["φ", "correction coefficient for the period"],
+["E", "unit indicator — consumption per one standard degree day [s.u./SD]"],
+["ΔQ", "the measured saving, in the same settlement unit as Q"]]],
+["f", [["Degree days", "SD = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·days]"],
+["Correction coefficient", "φ = ΣSD<sub>standard</sub> / ΣSD<sub>actual</sub>"],
+["Corrected consumption", "Q<sub>s</sub> = Q × φ"],
+["Unit indicator", "E = Q<sub>s</sub> / ΣSD<sub>standard</sub>&nbsp;&nbsp;[s.u./SD]"],
+["Baseline projection", "Q<sub>base→sett.</sub> = E<sub>base</sub> × ΣSD<sub>standard, settlement period</sub>"],
+["Saving", "ΔQ = Q<sub>base→sett.</sub> − Q<sub>s, sett.</sub>"]]],
+["fine", "Standard degree days are calculated exactly like the actual ones — same number of heating days <em>z</em>, same temperature T<sub>i</sub> — substituting only Typical Meteorological Year temperatures for the actual ones. The difference between the two is therefore the pure weather effect, nothing else."]
+]]
+]},
+{h: "Where each quantity comes from", b: [
+["p", "Every figure entering the settlement has a named source and a defined moment of determination. That is the condition for reproducibility — the report must be recalculable independently, without asking us anything."],
+["d", "Details · data sources", [
+["t3", [["Quantity", "Source", "When it is set"],
+["Actual temperatures <span class=\"sym\">t</span>", "weather station at the site's location; the report names the station and the date the data was retrieved", "for each period separately"],
+["Normals <span class=\"sym\">t<sub>TMY</sub></span>", "long-term measurement series for the location; the report states the range of years the normals were calculated from", "once — fixed in the TMY protocol"],
+["Heating days <span class=\"sym\">z</span>", "the site's heating season calendar; the same value enters both actual and standard degree days", "for each month of the period"],
+["Temperature <span class=\"sym\">T<sub>i</sub></span>", "contractual parameter recorded in the measurement protocol", "once — identical for the baseline and all periods"],
+["Consumption <span class=\"sym\">Q</span>", "the billing energy meter or supplier invoices, always with the measurement boundary stated", "for each period"],
+["Energy price", "measurement protocol; we state whether it is a fixed price or the actual invoiced price", "once, with the update mechanism set in the contract"],
+["Party shares", "the contract", "once"]]]
+]],
+["psfine", "Turn on the details to see the full breakdown: what comes from the weather station, what from the meter, and what from the measurement protocol."]
+]},
+{h: "The baseline period — the reference point", b: [
+["p", "The baseline is derived from three full heating seasons preceding deployment. The baseline is not consumption expressed in settlement units, however, but the <strong>unit indicator E</strong> — consumption per one standard degree day. That quantity depends neither on the weather nor on the length of the period."],
+["d", "Details · how the baseline is built", [
+["ul", ["Each of the three seasons is converted to TMY separately and its indicator E is determined.", "The baseline is the arithmetic mean of the indicators from those seasons.", "We check the spread of the indicators around the mean — that is the baseline quality test."]],
+["p", "A small spread means the building did not change operationally over those years and the baseline is consistent. A markedly larger one signals that something shifted in the series — a tenant, floor area, operating hours — in which case we adjust the baseline or shorten the series. We do not accept a baseline sight unseen."]
+]]
+]},
+{h: "How a period is settled", b: [
+["steps", [["Degree days for the period", "We determine actual and standard degree days. The question: what was the weather really like, and what would it have been at the norm?"],
+["Consumption correction", "We calculate the coefficient φ and bring measured consumption to standard conditions."],
+["Baseline projection", "We project the baseline onto the same period: how much would the building have used now had it kept its pre-deployment characteristic?"],
+["Saving", "The difference between the two is the energy actually saved."],
+["Cross-check", "The same result must come out via the drop in indicator E."]]],
+["d", "Details · why exactly this way", [
+["p", "<strong>Step 3</strong> also resolves the problem of periods of different length. The baseline is projected onto precisely the period being settled rather than compared against a full year — which makes it possible to settle a shortened, shifted or interrupted season without distorting the result."],
+["p", "<strong>Step 5</strong> is unconditional. If the two routes do not give the same result, the report contains an error and is not issued. That is an internal control on our side, not a formality."],
+["c", ["<strong>The TMY correction works in your favour.</strong> Comparing raw measured consumption, ignoring the weather, shows a higher saving than the real one in a season milder than normal — it credits the technology with what the weather did. We strip that effect out, so we invoice a lower figure than a simple comparison would give."]]
+]]
+]},
+{h: "A second, independent cross-check — linear regression", b: [
+["p", "The TMY correction compares <strong>periods</strong> reduced to shared weather. Regression does the same at the level of <strong>individual readings</strong>: it describes the building with an equation in which outdoor temperature is the explanatory variable. These are two mutually independent pieces of evidence for the same effect — and we expect them to agree."],
+["ps", "The method also shows how the control strategy changed: how much lower the flow temperature runs in the same weather."],
+["d", "Details · model and data", [
+["h3", "Input data"],
+["p", "A log from the meter and the controller at a fixed time step. The model takes: reading timestamp, outdoor temperature, flow and return temperature, flow rate, and power and energy consumption. We do not aggregate them into months — we work on raw readings, because only those show how the building behaves under specific conditions."],
+["h3", "Model"],
+["f", [["Regression line", "y = a · x + b"],
+["Difference between modes", "Δ(x) = y<sub>weather-comp.</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Reduction", "R(x) = Δ(x) / y<sub>weather-comp.</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Symbol", "Meaning"],
+["x", "outdoor temperature at the moment of the reading [°C]"],
+["y", "the quantity studied: flow temperature [°C] or power / energy consumption"],
+["a", "slope of the line — the building's sensitivity to weather, i.e. how much <em>y</em> rises per degree of drop in outdoor temperature"],
+["b", "intercept — the level at 0 °C, i.e. the weather-independent component: settings, thermal inertia, circuit losses"]]],
+["p", "Coefficients <em>a</em> and <em>b</em> are fitted by least squares, separately for two sets of readings: operation in <strong>weather-compensation mode</strong> (the existing heating curve) and operation in <strong>WaterAI predictive mode</strong>. Two lines emerge, which we compare at the same outdoor temperature."],
+["chart", {alt: "Schematic chart: two regression lines — weather-compensation mode above, WaterAI mode below, the gap between them being the control effect", base: "weather-comp. mode", ai: "WaterAI mode", delta: "Δ(x) — control effect", xl: "lower outdoor temperature", xr: "higher →", cap: "Schematic chart. The gap between the lines is not constant — which is why we present the result as a function of outdoor temperature rather than a single number."}],
+["h3", "What we track in parallel"],
+["ul", ["<strong>Flow temperature</strong> — evidence that the control strategy changed: in the same weather the building runs at a lower parameter.", "<strong>Power and energy consumption</strong> — evidence that the change in control translated into energy."]],
+["p", "The two must be consistent. A drop in flow temperature without a matching drop in energy draw is a warning sign — it usually means longer run times or shifted demand, not a saving."],
+["h3", "Conditions for a valid comparison"],
+["ul", ["the same outdoor temperature range for both sets — we compare the lines only where both have data,", "exclusion of readings outside the heating season and of shutdown or servicing periods,", "exclusion of transient states after start-up, which distort the relationship,", "a comparable number of points in both sets,", "a check on goodness of fit (coefficient of determination) and residual spread — a poor fit means a factor outside the model is acting on the building and the result needs explaining,", "an identical measurement boundary and the same time step for both modes."]],
+["c", ["<strong>Regression is not a basis for invoicing.</strong> We invoice solely by the TMY method, from units read off the billing meter. Regression serves to verify that result, to diagnose the building and to check whether the effect holds over time. If the two methods diverge, we look for the cause before issuing the report — we do not pick the more favourable figure."]]
+]]
+]},
+{h: "Settlement and invoicing", b: [
+["ul", ["The value of the saving is the measured quantity of settlement units multiplied by the agreed energy price.", "Our fee is the share of that value set in the contract — and it is the sole line on the invoice.", "The invoice references the report number and the settlement period it covers.", "We settle closed periods only; annual forecasts serve budget planning and are never a basis for invoicing."]],
+["d", "Details · report traceability", [
+["p", "Every settlement report names explicitly:"],
+["ul", ["the weather station and the temperature source together with the data retrieval date,", "the range of years the TMY normals were calculated from,", "the TMY protocol number and the analysis number — every report can be tied to its source material,", "the source of consumption data, i.e. the specific meter or invoices, together with the measurement boundary,", "the temperature T<sub>i</sub> adopted for the baseline and for the settlement period,", "the energy price and the agreed share, stating whether the price is fixed or as invoiced."]],
+["fine", "All amounts in the report are net; VAT is added at the rate in force on the date the invoice is issued."]
+]]
+]},
+{h: "When the baseline is adjusted", b: [
+["cw", ["<strong>The baseline is never rewritten by the saving achieved.</strong> The result achieved does not become the new reference point — otherwise the effect of the technology would disappear from the settlement year by year."]],
+["p", "We adjust the baseline only for changes unrelated to the technology that nevertheless affect consumption."],
+["d", "Details · catalogue of changes", [
+["ul", ["a change in how the building is used or in operating hours,", "a material change in occupancy or a change of tenants,", "a change in heated floor area,", "work on the building envelope,", "replacement of or addition to the energy source,", "new technology with its own energy draw,", "a change in the agreed indoor temperature T<sub>i</sub>."]],
+["fine", "The adjustment runs both ways — including against us. If a change in the building lowers consumption by itself, the baseline is reduced by that effect and it is not settled as a saving from the technology."]
+]]
+]},
+{h: "How we begin", b: [
+["steps", [["Input data", "Energy invoices or meter readings from recent seasons — nothing more is needed at this stage."],
+["Savings simulation", "Working from your real costs, we show the expected effect and how the benefit is split. A forecast, not a commitment."],
+["Analysis and measurement protocol", "We determine the baseline and agree the measurement boundary, T<sub>i</sub>, the energy price and the party shares."],
+["Installation and switch-over", "Installation without interrupting the building's operation, a period of running in the existing mode, then the switch to predictive mode. The settlement period runs from that date."],
+["Report and settlement", "Once the period closes we issue a report with the full calculation; the invoice references its number."]]]
+]}
+]
+};
+
+
+window.LANDING["de"] = {
+label: "DE", htmlLang: "de",
+title: "WaterAI Energy Control — Messung und Abrechnung von Energieeinsparungen",
+desc: "Wie wir Energieeinsparungen messen und abrechnen: Korrektur auf das Typische Meteorologische Jahr und eine lineare Regression als Gegenprobe. Anmeldung zum Energy-Control-Panel.",
+eyebrow: "Energy Control · Mess- und Abrechnungsmethode",
+h1: "Energie sparen ohne eigene Investition",
+lede: "Sie zahlen ausschließlich für Energie, die tatsächlich eingespart wird — am Zähler gemessen, um den Wettereinfluss bereinigt und durch eine zweite, unabhängige Methode bestätigt. Vor dem Start erstellen wir eine Simulation auf Basis Ihrer tatsächlichen Kosten.",
+switchIntro: "<strong>Sie möchten genau wissen, wie wir rechnen?</strong> Mit den Details öffnet sich auf dieser Seite die vollständige Beschreibung der Methode: Formeln, Datenquellen, die Reihenfolge der Abrechnungsschritte und das Regressionsmodell.",
+toggleOff: "Ausführliche Informationen",
+toggleOn: "Details ausblenden",
+cards: [
+["Kein Kapitaleinsatz", "Keine Investition auf Ihrer Seite und kein Eingriff in die bestehende Regelung."],
+["Vergütung aus der Einsparung", "Unser Honorar ist ein vereinbarter Anteil am Wert der gemessenen Einsparung."],
+["Wetterfestes Ergebnis", "Jeder Zeitraum wird auf dieselben Normbedingungen (TMJ) umgerechnet."]
+],
+login: {
+title: "Energy Control", sub: "System zur Messung und Abrechnung von Energieeinsparungen",
+email: "Login / E-Mail", emailPh: "z. B. admin@waterai.pl",
+pass: "Passwort", passPh: "Passwort eingeben", submit: "Anmelden",
+errEmpty: "Bitte Login und Passwort eingeben.",
+mock: "Mockup — diese Schaltfläche an die Anmeldelogik der Anwendung anbinden.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Sprache",
+aside: [
+["Noch kein Konto?", "Konten legt der Administrator an. Im Panel sehen Sie die Ergebnisse für Ihre Objekte — daneben beschreiben wir die Methode, aus der diese Ergebnisse entstehen."],
+["Sie möchten wissen, was das bei Ihnen bringt?", "Wir erstellen eine Einsparsimulation auf Basis Ihrer tatsächlichen Kosten — Energierechnungen oder Zählerstände der letzten Saisons genügen. Die Simulation ist eine Prognose; abgerechnet wird ausschließlich, was die Messung nach Ablauf des Zeitraums zeigt."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Die Darstellung dient der Information; verbindlich sind der Vertrag und das Messprotokoll."],
+closing: "Nach Ablauf der Vertragslaufzeit verbleibt der gesamte Effekt der Technologie bei Ihnen.",
+sections: [
+{h: "Was wir anbieten", b: [
+["p", "Wir setzen eine prädiktive Heizungsregelung auf der bestehenden Anlage ein. Das System lernt das Verhalten des Gebäudes und seine Reaktion auf das Wetter und kommt dem Bedarf zuvor, statt verzögert zu reagieren. Wir tauschen die Wärmequelle nicht aus und greifen nicht in die vorhandene Automatisierung ein."],
+["p", "Abgerechnet wird im ESCO-Modell: Die Kosten für Einbau und Betrieb tragen wir, unser Honorar ist ein Anteil am Wert der messtechnisch bestätigten Einsparung. Gibt es keine Einsparung, gibt es keine Rechnung."],
+["d", "Details", [
+["p", "Die Messgrenze legen wir vor dem Start fest und halten sie im Messprotokoll fest: Abgerechnet wird ausschließlich Energie, die der bezeichnete Zähler erfasst. Getrennt gemessene Medien — etwa Warmwasser — gehen weder in den Basiszeitraum noch in die Abrechnung ein."],
+["p", "Wird parallel eine weitere Technologie erwogen (etwa physikalische Wasseraufbereitung), bewerten wir sie als eigenen Schritt mit eigener Basis. Die Effekte werden nicht in einer Kennzahl zusammengefasst, damit jeder für sich belegbar bleibt."]
+]]
+]},
+{h: "Simulation vor dem Start — und warum das Ergebnis erst nach dem Zeitraum feststeht", b: [
+["p", "Bevor etwas unterschrieben wird, erstellen wir eine <strong>Einsparsimulation auf Basis Ihrer tatsächlichen Kosten</strong> — aus Energierechnungen und Zählerständen der letzten Saisons. Die Simulation zeigt die zu erwartende Größenordnung: wie viel Energie im Gebäude bleiben kann, was das bei Ihrem Preis in Geld bedeutet und wie sich dieser Effekt auf die Parteien verteilt."],
+["cw", ["<strong>Eine Simulation ist eine Prognose, kein Versprechen.</strong> Wir nennen vorab keinen garantierten Prozentsatz, denn die Einsparung hängt von Faktoren ab, die niemand vollständig beherrscht: vom Witterungsverlauf der jeweiligen Saison, von der Nutzung des Objekts, von Änderungen der Belegung und der Betriebszeiten, vom Zustand der Anlage sowie von Entscheidungen vor Ort. Die belastbare Zahl nennen wir erst für einen abgeschlossenen Zeitraum — am Zähler gemessen und um den Wettereinfluss bereinigt.", "Das Risiko, dass Prognose und Ergebnis auseinanderlaufen, tragen wir, nicht Sie: Wir stellen ausschließlich das in Rechnung, was gemessen wurde. Gibt es keine Einsparung, gibt es keine Rechnung."]],
+["d", "Details · Umfang der Simulation", [
+["h3", "Was in die Simulation eingeht"],
+["ul", ["Verbrauch und Kosten der letzten Saisons — aus Rechnungen oder Zählerständen,", "die daraus abgeleitete Gebäudecharakteristik, umgerechnet auf Normbedingungen (TMJ),", "der Energiepreis, den Sie heute zahlen, sowie der im Vertrag vorgesehene Anpassungsmechanismus,", "die vereinbarte Aufteilung des Effekts zwischen den Parteien."]],
+["h3", "Was die Simulation nicht abdeckt"],
+["ul", ["den Witterungsverlauf der kommenden Saison — definitionsgemäß unbekannt,", "Änderungen auf Ihrer Seite: Belegung, Betriebszeiten, neue Mieter, Bauarbeiten,", "Änderungen des Energiepreises über das im Vertrag Geregelte hinaus,", "Störungen und Stillstände der Anlage."]],
+["p", "Deshalb geben wir die Simulation als Bandbreite an, nicht als eine einzelne Zahl, und nennen die Annahmen, unter denen sie entstanden ist. Sie ist keine Abrechnungsgrundlage — sie dient der Entscheidung."],
+["c", ["<strong>Die Prognose prüfen wir im Nachhinein.</strong> Nach dem ersten abgeschlossenen Zeitraum stellen wir die Simulation dem Messergebnis gegenüber und zeigen die Abweichung samt ihrer Ursache. Auf derselben Grundlage korrigieren wir die Prognose für die nächste Saison — und daran zeigt sich, ob unsere Annahmen belastbar waren."]]
+]]
+]},
+{h: "Woher die Zahl kommt, für die Sie zahlen", b: [
+["p", "Wir vergleichen Verbräuche nicht Jahr für Jahr, denn ein solches Ergebnis sagt vor allem aus, welcher Winter milder war. Jeden Zeitraum — Basis wie Abrechnung — rechnen wir auf dieselben Normwetterbedingungen um, also auf das <strong>Typische Meteorologische Jahr (TMJ)</strong>. Erst auf diesen gemeinsamen Nenner gebracht sind die Größen vergleichbar."],
+["ps", "Die Folge ist eindeutig: Ein milderer Winter kann nicht als Einsparung ausgewiesen werden, und ein Winter über der Norm belastet das Ergebnis der Technologie nicht."],
+["d", "Details · Bezeichnungen und Formeln", [
+["t", [["Symbol", "Bedeutung"],
+["z", "Anzahl der Tage mit aktiver Beheizung im jeweiligen Monat"],
+["T<sub>i</sub>", "für die Berechnung angesetzte Innentemperatur — vertraglicher Parameter, identisch für die Basis und jeden Abrechnungszeitraum"],
+["t", "mittlere Außentemperatur während der Heiztage des jeweiligen Monats (Ist-Daten)"],
+["t<sub>TMJ</sub>", "Normtemperatur desselben Monats nach dem Typischen Meteorologischen Jahr"],
+["GT", "Gradtage — Maß für den wetterbedingten Wärmebedarf [°C·Tage]"],
+["Q · Q<sub>s</sub>", "gemessener und auf Normbedingungen bereinigter Verbrauch, angegeben in der <strong>Abrechnungseinheit [AE]</strong> — jener, in der der Zähler misst und der Lieferant abrechnet: kWh, MWh oder GJ bei Fernwärme, m<sup>3</sup> bei Gas"],
+["φ", "Korrekturkoeffizient des Zeitraums"],
+["E", "Einheitskennzahl — Verbrauch je einem Normgradtag [AE/GT]"],
+["ΔQ", "gemessene Einsparung, in derselben Abrechnungseinheit wie Q"]]],
+["f", [["Gradtage", "GT = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·Tage]"],
+["Korrekturkoeffizient", "φ = ΣGT<sub>Norm</sub> / ΣGT<sub>Ist</sub>"],
+["Bereinigter Verbrauch", "Q<sub>s</sub> = Q × φ"],
+["Einheitskennzahl", "E = Q<sub>s</sub> / ΣGT<sub>Norm</sub>&nbsp;&nbsp;[AE/GT]"],
+["Projektion der Basis", "Q<sub>Basis→Abr.</sub> = E<sub>Basis</sub> × ΣGT<sub>Norm, Abrechnungszeitraum</sub>"],
+["Einsparung", "ΔQ = Q<sub>Basis→Abr.</sub> − Q<sub>s, Abr.</sub>"]]],
+["fine", "Die Normgradtage berechnen wir genau wie die tatsächlichen — mit derselben Zahl an Heiztagen <em>z</em> und derselben Temperatur T<sub>i</sub> — und setzen ausschließlich die Temperaturen des Typischen Meteorologischen Jahres anstelle der tatsächlichen ein. Der Unterschied zwischen beiden ist damit der reine Wettereffekt, nichts sonst."]
+]]
+]},
+{h: "Woher jede Größe stammt", b: [
+["p", "Jede Zahl, die in die Abrechnung eingeht, hat eine benannte Quelle und einen festgelegten Zeitpunkt der Festlegung. Das ist die Voraussetzung für Nachvollziehbarkeit — der Bericht muss sich unabhängig nachrechnen lassen, ohne bei uns nachzufragen."],
+["d", "Details · Datenquellen", [
+["t3", [["Größe", "Quelle", "Wann festgelegt"],
+["Ist-Temperaturen <span class=\"sym\">t</span>", "Wetterstation am Standort des Objekts; der Bericht nennt die Station und das Datum des Datenabrufs", "für jeden Zeitraum gesondert"],
+["Normalwerte <span class=\"sym\">t<sub>TMJ</sub></span>", "langjährige Messreihe für den Standort; der Bericht nennt den Zeitraum der Jahre, aus denen die Normalwerte berechnet wurden", "einmalig — im TMJ-Protokoll fixiert"],
+["Heiztage <span class=\"sym\">z</span>", "Heizsaisonkalender des Objekts; derselbe Wert geht in Ist- und Normgradtage ein", "für jeden Monat des Zeitraums"],
+["Temperatur <span class=\"sym\">T<sub>i</sub></span>", "vertraglicher Parameter, im Messprotokoll festgehalten", "einmalig — identisch für Basis und alle Zeiträume"],
+["Verbrauch <span class=\"sym\">Q</span>", "Abrechnungszähler oder Rechnungen des Lieferanten, stets unter Angabe der Messgrenze", "für jeden Zeitraum"],
+["Energiepreis", "Messprotokoll; wir geben an, ob es sich um einen Festpreis oder den tatsächlichen Rechnungspreis handelt", "einmalig, mit dem im Vertrag geregelten Anpassungsmechanismus"],
+["Anteile der Parteien", "Vertrag", "einmalig"]]]
+]],
+["psfine", "Mit eingeschalteten Details sehen Sie die vollständige Übersicht: was von der Wetterstation stammt, was vom Zähler und was aus dem Messprotokoll."]
+]},
+{h: "Der Basiszeitraum — der Bezugspunkt", b: [
+["p", "Die Basis ermitteln wir aus drei vollständigen Heizsaisons vor dem Einbau. Basis ist dabei nicht der in Abrechnungseinheiten ausgedrückte Verbrauch, sondern die <strong>Einheitskennzahl E</strong> — der Verbrauch je einem Normgradtag. Diese Größe hängt weder vom Wetter noch von der Länge des Zeitraums ab."],
+["d", "Details · wie die Basis entsteht", [
+["ul", ["Jede der drei Saisons wird gesondert auf das TMJ umgerechnet, daraus ergibt sich ihre Kennzahl E.", "Basis ist das arithmetische Mittel der Kennzahlen dieser Saisons.", "Wir prüfen die Streuung der Kennzahlen um den Mittelwert — das ist der Qualitätstest der Basis."]],
+["p", "Eine geringe Streuung bedeutet, dass sich das Objekt in diesen Jahren betrieblich nicht verändert hat und die Basis konsistent ist. Eine deutlich größere ist ein Hinweis darauf, dass sich in der Reihe etwas geändert hat — Mieter, Fläche, Betriebszeiten — dann korrigieren wir die Basis oder verkürzen die Reihe. Eine Basis übernehmen wir nicht ungeprüft."]
+]]
+]},
+{h: "Ablauf der Abrechnung eines Zeitraums", b: [
+["steps", [["Gradtage des Zeitraums", "Wir ermitteln Ist- und Normgradtage. Die Frage: Wie war das Wetter tatsächlich, und wie wäre es bei der Norm gewesen?"],
+["Verbrauchskorrektur", "Wir berechnen den Koeffizienten φ und führen den gemessenen Verbrauch auf Normbedingungen zurück."],
+["Projektion der Basis", "Wir projizieren die Basis auf denselben Zeitraum: Wie viel hätte das Objekt jetzt verbraucht, wenn es seine Charakteristik von vor dem Einbau behalten hätte?"],
+["Einsparung", "Die Differenz beider Größen ist die tatsächlich eingesparte Energie."],
+["Gegenprobe", "Dasselbe Ergebnis muss sich über den Rückgang der Kennzahl E ergeben."]]],
+["d", "Details · warum genau so", [
+["p", "<strong>Schritt 3</strong> löst zugleich das Problem unterschiedlich langer Zeiträume. Die Basis wird genau auf den abgerechneten Zeitraum projiziert und nicht mit einem ganzen Jahr verglichen — dadurch lässt sich auch eine verkürzte, verschobene oder unterbrochene Saison ohne Verzerrung abrechnen."],
+["p", "<strong>Schritt 5</strong> ist unbedingt. Ergeben beide Wege nicht dasselbe Ergebnis, enthält der Bericht einen Fehler und wird nicht ausgegeben. Das ist eine interne Kontrolle auf unserer Seite, keine Formalie."],
+["c", ["<strong>Die TMJ-Korrektur wirkt zu Ihren Gunsten.</strong> Ein Vergleich der reinen Messwerte ohne Berücksichtigung des Wetters weist in einer Saison unter der Norm eine höhere Einsparung aus als die tatsächliche — er schreibt der Technologie zu, was das Wetter bewirkt hat. Wir rechnen diesen Effekt heraus und stellen damit eine niedrigere Zahl in Rechnung, als der einfache Vergleich ergäbe."]]
+]]
+]},
+{h: "Zweite, unabhängige Gegenprobe — lineare Regression", b: [
+["p", "Die TMJ-Korrektur vergleicht <strong>Zeiträume</strong>, die auf gemeinsames Wetter zurückgeführt wurden. Die Regression tut dasselbe auf der Ebene <strong>einzelner Messwerte</strong>: Sie beschreibt das Objekt durch eine Gleichung, in der die Außentemperatur die erklärende Variable ist. Das sind zwei voneinander unabhängige Belege für denselben Effekt — und wir erwarten, dass sie dasselbe aussagen."],
+["ps", "Die Methode zeigt außerdem, wie sich die Regelung verändert hat: um wie viel niedriger die Vorlauftemperatur bei gleichem Wetter läuft."],
+["d", "Details · Modell und Daten", [
+["h3", "Eingangsdaten"],
+["p", "Aufzeichnungen von Zähler und Regler in konstantem Zeitraster. In das Modell gehen ein: Zeitstempel des Messwerts, Außentemperatur, Vorlauf- und Rücklauftemperatur, Durchfluss sowie Leistung und Energieverbrauch. Wir aggregieren sie nicht auf Monate — wir arbeiten mit Rohwerten, denn erst diese zeigen, wie sich das Objekt unter konkreten Bedingungen verhält."],
+["h3", "Modell"],
+["f", [["Regressionsgerade", "y = a · x + b"],
+["Differenz der Betriebsarten", "Δ(x) = y<sub>witterungsgef.</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Reduktion", "R(x) = Δ(x) / y<sub>witterungsgef.</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Symbol", "Bedeutung"],
+["x", "Außentemperatur zum Zeitpunkt des Messwerts [°C]"],
+["y", "untersuchte Größe: Vorlauftemperatur [°C] oder Leistung / Energieverbrauch"],
+["a", "Steigung der Geraden — die Wetterempfindlichkeit des Objekts, also um wie viel <em>y</em> je Grad Rückgang der Außentemperatur steigt"],
+["b", "Achsenabschnitt — das Niveau bei 0 °C, also der wetterunabhängige Anteil: Einstellungen, Trägheit, Kreislaufverluste"]]],
+["p", "Die Koeffizienten <em>a</em> und <em>b</em> bestimmen wir nach der Methode der kleinsten Quadrate, getrennt für zwei Messwertmengen: Betrieb in der <strong>witterungsgeführten Betriebsart</strong> (bisherige Heizkurve) und Betrieb in der <strong>prädiktiven Betriebsart WaterAI</strong>. Es entstehen zwei Geraden, die wir bei derselben Außentemperatur vergleichen."],
+["chart", {alt: "Schematische Darstellung: zwei Regressionsgeraden — witterungsgeführte Betriebsart oben, WaterAI-Betriebsart unten, der Abstand dazwischen ist der Regelungseffekt", base: "witterungsgeführt", ai: "WaterAI-Betrieb", delta: "Δ(x) — Regelungseffekt", xl: "niedrigere Außentemperatur", xr: "höhere →", cap: "Schematische Darstellung. Der Abstand zwischen den Geraden ist nicht konstant — deshalb geben wir das Ergebnis als Funktion der Außentemperatur an und nicht als eine einzelne Zahl."}],
+["h3", "Was wir parallel auswerten"],
+["ul", ["<strong>Vorlauftemperatur</strong> — der Beleg, dass sich die Regelung geändert hat: Bei gleichem Wetter fährt das Objekt auf einem niedrigeren Parameter.", "<strong>Leistung und Energieverbrauch</strong> — der Beleg, dass sich die geänderte Regelung in Energie niedergeschlagen hat."]],
+["p", "Beide Größen müssen zusammenpassen. Ein Rückgang der Vorlauftemperatur ohne entsprechenden Rückgang des Energiebezugs ist ein Warnsignal — er bedeutet meist längere Laufzeiten oder verschobenen Bezug, keine Einsparung."],
+["h3", "Bedingungen für einen gültigen Vergleich"],
+["ul", ["derselbe Außentemperaturbereich für beide Mengen — die Geraden vergleichen wir nur dort, wo beide Daten haben,", "Ausschluss von Messwerten außerhalb der Heizsaison sowie von Stillstands- und Servicezeiten,", "Ausschluss von Übergangszuständen nach dem Anfahren, die den Zusammenhang verzerren,", "eine vergleichbare Anzahl von Punkten in beiden Mengen,", "Prüfung der Anpassungsgüte (Bestimmtheitsmaß) und der Streuung der Residuen — eine schwache Anpassung bedeutet, dass ein Faktor außerhalb des Modells wirkt und das Ergebnis erklärungsbedürftig ist,", "identische Messgrenze und dasselbe Zeitraster für beide Betriebsarten."]],
+["c", ["<strong>Die Regression ist keine Abrechnungsgrundlage.</strong> Abgerechnet wird ausschließlich nach der TMJ-Methode, aus den am Abrechnungszähler abgelesenen Einheiten. Die Regression dient der Überprüfung dieses Ergebnisses, der Diagnose des Objekts und der Frage, ob der Effekt über die Zeit Bestand hat. Laufen beide Methoden auseinander, suchen wir die Ursache, bevor der Bericht erstellt wird — und wählen nicht die günstigere Zahl."]]
+]]
+]},
+{h: "Abrechnung und Rechnung", b: [
+["ul", ["Der Wert der Einsparung ist die gemessene Menge an Abrechnungseinheiten multipliziert mit dem vereinbarten Energiepreis.", "Unser Honorar ist der im Vertrag festgelegte Anteil an diesem Wert — und die einzige Position der Rechnung.", "Die Rechnung verweist auf die Berichtsnummer und den betreffenden Abrechnungszeitraum.", "Wir rechnen ausschließlich abgeschlossene Zeiträume ab; Jahresprognosen dienen der Budgetplanung und sind niemals Grundlage einer Rechnung."]],
+["d", "Details · Nachvollziehbarkeit des Berichts", [
+["p", "In jedem Abrechnungsbericht sind ausdrücklich genannt:"],
+["ul", ["die Wetterstation und die Temperaturquelle samt Datum des Datenabrufs,", "der Zeitraum der Jahre, aus denen die TMJ-Normalwerte berechnet wurden,", "die Nummer des TMJ-Protokolls und die Nummer der Analyse — jeder Bericht lässt sich seiner Quelle zuordnen,", "die Quelle der Verbrauchsdaten, also der konkrete Zähler oder die Rechnungen, samt Messgrenze,", "die für Basis und Abrechnungszeitraum angesetzte Temperatur T<sub>i</sub>,", "der Energiepreis und der vereinbarte Anteil, mit Angabe, ob es sich um einen Fest- oder Rechnungspreis handelt."]],
+["fine", "Alle Beträge im Bericht sind Nettobeträge; die Umsatzsteuer wird nach dem am Tag der Rechnungsstellung geltenden Satz berechnet."]
+]]
+]},
+{h: "Wann die Basis angepasst wird", b: [
+["cw", ["<strong>Die Basis wird nicht durch die erzielte Einsparung überschrieben.</strong> Das erreichte Ergebnis wird nicht zum neuen Bezugspunkt — sonst verschwände der Effekt der Technologie Jahr für Jahr aus der Abrechnung."]],
+["p", "Wir passen die Basis ausschließlich bei Änderungen an, die nichts mit der Technologie zu tun haben, den Verbrauch aber beeinflussen."],
+["d", "Details · Katalog der Änderungen", [
+["ul", ["Änderung der Nutzungsart des Objekts oder der Betriebszeiten,", "wesentliche Änderung der Belegung oder Mieterwechsel,", "Änderung der beheizten Fläche,", "Eingriff in die Gebäudehülle,", "Austausch oder Ergänzung der Energiequelle,", "neue Technologie mit eigenem Energiebezug,", "Änderung der vereinbarten Innentemperatur T<sub>i</sub>."]],
+["fine", "Die Anpassung wirkt in beide Richtungen — auch zu unseren Ungunsten. Senkt eine Änderung am Objekt den Verbrauch von sich aus, wird die Basis um diesen Effekt vermindert und er wird nicht als Einsparung der Technologie abgerechnet."]
+]]
+]},
+{h: "Wie wir beginnen", b: [
+["steps", [["Eingangsdaten", "Energierechnungen oder Zählerstände der letzten Saisons — mehr ist in diesem Stadium nicht nötig."],
+["Einsparsimulation", "Auf Basis Ihrer tatsächlichen Kosten zeigen wir den zu erwartenden Effekt und die Aufteilung des Nutzens. Eine Prognose, keine Zusage."],
+["Analyse und Messprotokoll", "Wir ermitteln die Basis und legen Messgrenze, T<sub>i</sub>, Energiepreis und Anteile der Parteien fest."],
+["Einbau und Umschaltung", "Installation ohne Betriebsunterbrechung, eine Phase im bisherigen Betrieb, danach Umschaltung in die prädiktive Betriebsart. Ab diesem Datum läuft der Abrechnungszeitraum."],
+["Bericht und Abrechnung", "Nach Abschluss des Zeitraums erstellen wir einen Bericht mit der vollständigen Berechnung; die Rechnung verweist auf dessen Nummer."]]]
+]}
+]
+};
+
+
+window.LANDING["cs"] = {
+label: "CZ", htmlLang: "cs",
+title: "WaterAI Energy Control — měření a vyúčtování úspor energie",
+desc: "Jak měříme a vyúčtováváme úspory energie: korekce na Typický meteorologický rok a kontrolní lineární regrese. Přihlášení do panelu Energy Control.",
+eyebrow: "Energy Control · metoda měření a vyúčtování",
+h1: "Úspora energie bez vlastní investice",
+lede: "Platíte výhradně za energii, kterou se skutečně podaří ušetřit — odměřenou z měřidla, očištěnou o vliv počasí a potvrzenou druhou, nezávislou metodou. Před startem připravíme simulaci na základě vašich skutečných nákladů.",
+switchIntro: "<strong>Chcete vědět přesně, jak počítáme?</strong> Zapnutím podrobností se na této stránce rozvine úplný popis metody: vzorce, zdroje dat, pořadí kroků vyúčtování a regresní model.",
+toggleOff: "Podrobné informace",
+toggleOn: "Skrýt podrobnosti",
+cards: [
+["Nulové vstupní náklady", "Žádná investice na vaší straně a žádný zásah do stávající regulace."],
+["Platba z úspory", "Naší odměnou je dohodnutý podíl na hodnotě odměřené úspory."],
+["Výsledek odolný vůči počasí", "Každé období se přepočítává na tytéž normové podmínky (TMR)."]
+],
+login: {
+title: "Energy Control", sub: "Systém měření a vyúčtování úspor energie",
+email: "Login / e-mail", emailPh: "např. admin@waterai.pl",
+pass: "Heslo", passPh: "Zadejte heslo", submit: "Přihlásit se",
+errEmpty: "Zadejte login a heslo.",
+mock: "Maketa — připojte toto tlačítko k přihlašovací logice aplikace.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Jazyk",
+aside: [
+["Nemáte ještě účet?", "Účty zakládá administrátor. V panelu vidíte výsledky pro vaše objekty a vedle popisujeme metodu, ze které tyto výsledky vznikají."],
+["Chcete vědět, kolik to může přinést u vás?", "Připravíme simulaci úspor na základě vašich skutečných nákladů — stačí faktury za energii nebo odečty měřidla z posledních sezon. Simulace je prognóza; vyúčtováváme výhradně to, co po skončení období ukáže měření."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Popis má informativní charakter; závazné podmínky určuje smlouva a měřicí protokol."],
+closing: "Po skončení smluvního období zůstává celý efekt technologie vám.",
+sections: [
+{h: "Co nabízíme", b: [
+["p", "Nasazujeme prediktivní řízení vytápění na stávající instalaci. Systém se učí chování budovy a její reakci na počasí a poté potřebu předjímá, místo aby reagoval se zpožděním. Neměníme zdroj tepla ani nezasahujeme do stávající automatiky."],
+["p", "Vyúčtování vedeme v modelu ESCO: náklady na nasazení a provoz neseme my a naší odměnou je podíl na hodnotě úspory potvrzené měřením. Není-li úspora, není faktura."],
+["d", "Podrobnosti", [
+["p", "Hranici měření stanovíme před startem a zapíšeme do měřicího protokolu: vyúčtování podléhá výhradně energie, kterou zachycuje určené měřidlo. Média měřená samostatně — například teplá užitková voda — nevstupují ani do bázového období, ani do vyúčtování."],
+["p", "Pokud se souběžně zvažuje jiná technologie (například fyzikální úprava vody), hodnotíme ji jako samostatný krok s vlastní bází. Efekty se nesčítají do jednoho ukazatele, aby se každý z nich dal obhájit zvlášť."]
+]]
+]},
+{h: "Simulace před startem — a proč výsledek uvádíme až po skončení období", b: [
+["p", "Než se cokoli podepíše, připravíme <strong>simulaci úspor založenou na vašich skutečných nákladech</strong> — na fakturách za energii a odečtech měřidla z posledních sezon. Simulace ukazuje očekávaný řád veličiny: kolik energie může v budově zůstat, co to znamená v penězích při vaší ceně a jak se tento efekt dělí mezi strany."],
+["cw", ["<strong>Simulace je prognóza, nikoli slib.</strong> Neuvádíme předem garantované procento, protože úspora závisí na faktorech, které nikdo plně neovládá: na průběhu počasí v konkrétní sezoně, způsobu užívání objektu, změnách obsazenosti a provozních hodin, stavu instalace i na rozhodnutích činěných na místě. Tvrdé číslo uvádíme až za uzavřené období — odměřené z měřidla a očištěné o vliv počasí.", "Riziko, že se prognóza a výsledek rozejdou, neseme my, nikoli vy: fakturujeme výhradně to, co bylo změřeno. Není-li úspora, není faktura."]],
+["d", "Podrobnosti · rozsah simulace", [
+["h3", "Co do simulace vstupuje"],
+["ul", ["spotřeba a náklady z posledních sezon — z faktur nebo z odečtů měřidla,", "charakteristika objektu vyplývající z těchto dat, převedená na normové podmínky (TMR),", "cena energie, kterou platíte dnes, a způsob její aktualizace předvídaný ve smlouvě,", "dohodnuté rozdělení efektu mezi strany."]],
+["h3", "Co simulace nezahrnuje"],
+["ul", ["průběh počasí v nadcházející sezoně — z definice neznámý,", "změny na vaší straně: obsazenost, provozní hodiny, nové nájemce, stavební práce,", "změny ceny energie nad rámec toho, co je zapsáno ve smlouvě,", "poruchy a odstávky instalace."]],
+["p", "Proto simulaci uvádíme jako rozpětí, nikoli jako jediné číslo, a uvádíme, za jakých předpokladů vznikla. Není podkladem pro vyúčtování — slouží k rozhodnutí."],
+["c", ["<strong>Prognózu ověřujeme zpětně.</strong> Po prvním uzavřeném období postavíme simulaci vedle výsledku měření a ukážeme odchylku i s její příčinou. Na témž podkladu korigujeme prognózu na další sezonu — a je z něj vidět, zda byly naše předpoklady poctivé."]]
+]]
+]},
+{h: "Odkud se bere číslo, za které platíte", b: [
+["p", "Neporovnáváme spotřeby rok od roku, protože takový výsledek vypovídá především o tom, která zima byla mírnější. Každé období — bázové i zúčtovací — přepočítáváme na tytéž normové povětrnostní podmínky, tedy na <strong>Typický meteorologický rok (TMR)</strong>. Teprve takto převedené na společného jmenovatele jsou veličiny srovnatelné."],
+["ps", "Důsledek je jednoznačný: mírnější zima nemůže být vykázána jako úspora a zima ostřejší než norma nezatěžuje výsledek technologie."],
+["d", "Podrobnosti · označení a vzorce", [
+["t", [["Symbol", "Význam"],
+["z", "počet dní s aktivním vytápěním v daném měsíci"],
+["T<sub>i</sub>", "vnitřní teplota přijatá do výpočtu — smluvní parametr, tentýž pro bázi i pro každé zúčtovací období"],
+["t", "průměrná venkovní teplota během vytápěcích dní daného měsíce (skutečná data)"],
+["t<sub>TMR</sub>", "normová teplota téhož měsíce podle Typického meteorologického roku"],
+["DS", "dennostupně — míra potřeby tepla vyplývající z počasí [°C·dny]"],
+["Q · Q<sub>s</sub>", "změřená spotřeba a spotřeba korigovaná na normové podmínky, vyjádřená v <strong>zúčtovací jednotce [z.j.]</strong> — té, ve které měří měřidlo a fakturuje dodavatel: kWh, MWh nebo GJ u dálkového tepla, m<sup>3</sup> u plynu"],
+["φ", "korekční koeficient období"],
+["E", "jednotkový ukazatel — spotřeba na jeden normový dennostupeň [z.j./DS]"],
+["ΔQ", "odměřená úspora, ve stejné zúčtovací jednotce jako Q"]]],
+["f", [["Dennostupně", "DS = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·dny]"],
+["Korekční koeficient", "φ = ΣDS<sub>normové</sub> / ΣDS<sub>skutečné</sub>"],
+["Korigovaná spotřeba", "Q<sub>s</sub> = Q × φ"],
+["Jednotkový ukazatel", "E = Q<sub>s</sub> / ΣDS<sub>normové</sub>&nbsp;&nbsp;[z.j./DS]"],
+["Projekce báze", "Q<sub>báze→zúčt.</sub> = E<sub>báze</sub> × ΣDS<sub>normové, zúčtovací období</sub>"],
+["Úspora", "ΔQ = Q<sub>báze→zúčt.</sub> − Q<sub>s, zúčt.</sub>"]]],
+["fine", "Normové dennostupně počítáme přesně stejně jako skutečné — se stejným počtem vytápěcích dní <em>z</em> a stejnou teplotou T<sub>i</sub> — a dosazujeme výhradně teploty Typického meteorologického roku místo skutečných. Rozdíl mezi nimi je tedy čistý efekt počasí, nic víc."]
+]]
+]},
+{h: "Odkud pochází každá veličina", b: [
+["p", "Každé číslo vstupující do vyúčtování má pojmenovaný zdroj a okamžik stanovení. To je podmínka reprodukovatelnosti — report musí být možné přepočítat nezávisle, bez dotazu na nás."],
+["d", "Podrobnosti · zdroje dat", [
+["t3", [["Veličina", "Zdroj", "Kdy se stanovuje"],
+["Skutečné teploty <span class=\"sym\">t</span>", "meteorologická stanice v lokalitě objektu; v reportu uvádíme název stanice a datum stažení dat", "pro každé období zvlášť"],
+["Normály <span class=\"sym\">t<sub>TMR</sub></span>", "dlouholetá měřicí řada pro lokalitu; v reportu uvádíme rozsah let, ze kterých byly normály spočteny", "jednou — fixováno v protokolu TMR"],
+["Vytápěcí dny <span class=\"sym\">z</span>", "kalendář topné sezony objektu; tatáž hodnota vstupuje do skutečných i normových dennostupňů", "pro každý měsíc období"],
+["Teplota <span class=\"sym\">T<sub>i</sub></span>", "smluvní parametr zapsaný v měřicím protokolu", "jednou — shodná pro bázi i všechna období"],
+["Spotřeba <span class=\"sym\">Q</span>", "fakturační měřidlo energie nebo faktury od dodavatele, vždy s uvedením hranice měření", "pro každé období"],
+["Cena energie", "měřicí protokol; uvádíme, zda jde o cenu pevnou, nebo skutečnou fakturační", "jednou, se způsobem aktualizace zapsaným ve smlouvě"],
+["Podíl stran", "smlouva", "jednou"]]]
+]],
+["psfine", "Po zapnutí podrobností uvidíte úplný přehled: co pochází z meteorologické stanice, co z měřidla a co z měřicího protokolu."]
+]},
+{h: "Bázové období — vztažný bod", b: [
+["p", "Bázi určujeme ze tří úplných topných sezon předcházejících nasazení. Bází však není spotřeba vyjádřená v zúčtovacích jednotkách, nýbrž <strong>jednotkový ukazatel E</strong> — spotřeba připadající na jeden normový dennostupeň. Tato veličina nezávisí ani na počasí, ani na délce období."],
+["d", "Podrobnosti · jak báze vzniká", [
+["ul", ["Každou ze tří sezon přepočítáme samostatně na TMR a určíme pro ni ukazatel E.", "Bází je aritmetický průměr ukazatelů z těchto sezon.", "Kontrolujeme rozptyl ukazatelů kolem průměru — to je test kvality báze."]],
+["p", "Malý rozptyl znamená, že se objekt v těch letech provozně neměnil a báze je konzistentní. Výrazně větší je signálem, že v řadě nastala změna — nájemce, plocha, provozní hodiny — a pak bázi korigujeme nebo řadu zkracujeme. Bázi nepřijímáme naslepo."]
+]]
+]},
+{h: "Průběh vyúčtování období", b: [
+["steps", [["Dennostupně období", "Určíme skutečné a normové dennostupně. Otázka: jaké počasí opravdu bylo a jaké by bylo při normě?"],
+["Korekce spotřeby", "Spočítáme koeficient φ a převedeme změřenou spotřebu na normové podmínky."],
+["Projekce báze", "Promítneme bázi do téhož období: kolik by objekt spotřeboval nyní, kdyby si zachoval charakteristiku z doby před nasazením?"],
+["Úspora", "Rozdíl obou veličin je skutečně ušetřená energie."],
+["Kontrola druhou cestou", "Tentýž výsledek musí vyjít i přes pokles ukazatele E."]]],
+["d", "Podrobnosti · proč právě takto", [
+["p", "<strong>Krok 3</strong> zároveň řeší problém rozdílné délky období. Báze se promítá přesně do období, které vyúčtováváme, a neporovnává se s celým rokem — díky tomu lze vyúčtovat i sezonu zkrácenou, posunutou nebo přerušenou bez zkreslení výsledku."],
+["p", "<strong>Krok 5</strong> je bezpodmínečný. Pokud obě cesty nedají tentýž výsledek, je v reportu chyba a report se nevydá. Je to vnitřní kontrola na naší straně, ne formalita."],
+["c", ["<strong>Korekce na TMR působí ve váš prospěch.</strong> Porovnání samotných změřených spotřeb bez ohledu na počasí ukáže v sezoně mírnější než norma vyšší úsporu, než je skutečná — přisuzuje technologii to, co udělalo počasí. My tento efekt z výsledku odstraňujeme, a fakturujeme tak nižší číslo, než jaké by dalo prosté porovnání."]]
+]]
+]},
+{h: "Druhá, nezávislá kontrolní metoda — lineární regrese", b: [
+["p", "Korekce na TMR porovnává <strong>období</strong> převedená na společné počasí. Regrese dělá totéž na úrovni <strong>jednotlivých odečtů</strong>: popisuje objekt rovnicí, v níž je venkovní teplota vysvětlující proměnnou. Jsou to dva na sobě nezávislé důkazy téhož efektu — a očekáváme, že řeknou totéž."],
+["ps", "Metoda navíc ukazuje, jak se změnil způsob řízení: o kolik níže pracuje teplota přívodu při stejném počasí."],
+["d", "Podrobnosti · model a data", [
+["h3", "Vstupní data"],
+["p", "Záznam z měřidla a regulátoru v konstantním časovém kroku. Do modelu vstupují: časová značka odečtu, venkovní teplota, teplota přívodu a zpátečky, průtok a výkon i spotřeba energie. Neagregujeme je do měsíců — pracujeme se surovými odečty, protože teprve ty ukazují, jak se objekt chová za konkrétních podmínek."],
+["h3", "Model"],
+["f", [["Regresní přímka", "y = a · x + b"],
+["Rozdíl režimů", "Δ(x) = y<sub>ekvitermní</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Redukce", "R(x) = Δ(x) / y<sub>ekvitermní</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Symbol", "Význam"],
+["x", "venkovní teplota v okamžiku odečtu [°C]"],
+["y", "sledovaná veličina: teplota přívodu [°C] nebo výkon / spotřeba energie"],
+["a", "sklon přímky — citlivost objektu na počasí, tedy o kolik roste <em>y</em> na každý stupeň poklesu venkovní teploty"],
+["b", "absolutní člen — úroveň při 0 °C, tedy složka nezávislá na počasí: nastavení, setrvačnost, ztráty okruhu"]]],
+["p", "Koeficienty <em>a</em> a <em>b</em> určujeme metodou nejmenších čtverců, zvlášť pro dvě množiny odečtů: provoz v <strong>ekvitermním režimu</strong> (dosavadní topná křivka) a provoz v <strong>prediktivním režimu WaterAI</strong>. Vzniknou dvě přímky, které porovnáváme při téže venkovní teplotě."],
+["chart", {alt: "Schematický graf: dvě regresní přímky — ekvitermní režim nahoře, režim WaterAI dole, rozdíl mezi nimi je efekt řízení", base: "ekvitermní režim", ai: "režim WaterAI", delta: "Δ(x) — efekt řízení", xl: "nižší venkovní teplota", xr: "vyšší →", cap: "Schematický graf. Odstup mezi přímkami není konstantní — proto výsledek uvádíme jako funkci venkovní teploty, nikoli jako jedno číslo."}],
+["h3", "Co sledujeme souběžně"],
+["ul", ["<strong>Teplota přívodu</strong> — důkaz, že se změnil způsob řízení: při stejném počasí jede objekt na nižším parametru.", "<strong>Výkon a spotřeba energie</strong> — důkaz, že se změna řízení promítla do energie."]],
+["p", "Obě veličiny musí být konzistentní. Pokles teploty přívodu bez odpovídajícího poklesu odběru energie je varovný signál — znamená obvykle delší dobu provozu nebo posunutý odběr, nikoli úsporu."],
+["h3", "Podmínky správnosti porovnání"],
+["ul", ["tentýž rozsah venkovních teplot pro obě množiny — přímky porovnáváme jen tam, kde mají data obě,", "vyloučení odečtů mimo topnou sezonu a období odstávek a servisních prací,", "vyloučení přechodových stavů po najetí, které vztah zkreslují,", "srovnatelný počet bodů v obou množinách,", "kontrola těsnosti proložení (koeficient determinace) a rozptylu reziduí — slabé proložení znamená, že na objekt působí faktor mimo model a výsledek vyžaduje vysvětlení,", "shodná hranice měření a tentýž časový krok pro oba režimy."]],
+["c", ["<strong>Regrese není podkladem pro fakturaci.</strong> Fakturujeme výhradně metodou TMR, z jednotek odečtených z fakturačního měřidla. Regrese slouží k ověření tohoto výsledku, k diagnostice objektu a ke kontrole, zda efekt v čase vydrží. Pokud se obě metody rozcházejí, hledáme příčinu ještě před vydáním reportu — a nevybíráme si příznivější číslo."]]
+]]
+]},
+{h: "Vyúčtování a faktura", b: [
+["ul", ["Hodnota úspory je odměřené množství zúčtovacích jednotek vynásobené dohodnutou cenou energie.", "Naše odměna je smluvně stanovený podíl na této hodnotě — a je jedinou položkou faktury.", "Faktura se odvolává na číslo reportu a na zúčtovací období, kterého se týká.", "Vyúčtováváme výhradně uzavřená období; roční prognózy slouží plánování rozpočtu a nikdy nejsou podkladem pro fakturaci."]],
+["d", "Podrobnosti · dohledatelnost reportu", [
+["p", "V každém zúčtovacím reportu jsou výslovně uvedeny:"],
+["ul", ["meteorologická stanice a zdroj teplot spolu s datem stažení dat,", "rozsah let, ze kterých byly spočteny normály TMR,", "číslo protokolu TMR a číslo analýzy — každý report lze spojit s jeho zdrojovým podkladem,", "zdroj údajů o spotřebě, tedy konkrétní měřidlo nebo faktury, včetně hranice měření,", "teplota T<sub>i</sub> přijatá pro bázi i pro zúčtovací období,", "cena energie a dohodnutý podíl, s uvedením, zda jde o cenu pevnou, nebo fakturační."]],
+["fine", "Všechny částky v reportu jsou bez DPH; DPH se počítá podle sazby platné v den vystavení faktury."]
+]]
+]},
+{h: "Kdy se báze upravuje", b: [
+["cw", ["<strong>Bázi nepřepisujeme dosaženou úsporou.</strong> Dosažený výsledek se nestává novým vztažným bodem — jinak by efekt technologie rok co rok z vyúčtování mizel."]],
+["p", "Bázi upravujeme výhradně při změnách, které s technologií nesouvisejí, ale ovlivňují spotřebu."],
+["d", "Podrobnosti · katalog změn", [
+["ul", ["změna způsobu využívání objektu nebo provozních hodin,", "podstatná změna obsazenosti nebo změna nájemců,", "změna vytápěné plochy,", "zásah do obálky budovy,", "výměna nebo doplnění zdroje energie,", "nová technologie s vlastním odběrem energie,", "změna dohodnuté vnitřní teploty T<sub>i</sub>."]],
+["fine", "Úprava je obousměrná — tedy i v náš neprospěch. Pokud změna na objektu sama o sobě snižuje spotřebu, báze se o tento efekt zmenší a ten se nevyúčtuje jako úspora technologie."]
+]]
+]},
+{h: "Jak začínáme", b: [
+["steps", [["Vstupní data", "Faktury za energii nebo odečty měřidla z posledních sezon — víc v této fázi není potřeba."],
+["Simulace úspor", "Na vašich skutečných nákladech ukážeme očekávaný efekt a rozdělení přínosu. Je to prognóza, ne závazek."],
+["Analýza a měřicí protokol", "Určíme bázi, stanovíme hranici měření, T<sub>i</sub>, cenu energie a podíl stran."],
+["Montáž a přepnutí", "Instalace bez přerušení provozu objektu, období provozu v dosavadním režimu, poté přechod do prediktivního režimu. Od tohoto data běží zúčtovací období."],
+["Report a vyúčtování", "Po uzavření období vydáme report s úplným výpočtem; faktura se odvolává na jeho číslo."]]]
+]}
+]
+};
+
+
+window.LANDING["sk"] = {
+label: "SK", htmlLang: "sk",
+title: "WaterAI Energy Control — meranie a zúčtovanie energetických úspor",
+desc: "Ako meriame a zúčtovávame energetické úspory: korekcia na Typický meteorologický rok a kontrolná lineárna regresia. Prihlásenie do panela Energy Control.",
+eyebrow: "Energy Control · metóda merania a zúčtovania",
+h1: "Úspora energie bez vlastnej investície",
+lede: "Platíte výhradne za energiu, ktorú sa reálne podarí ušetriť — odmeranú z meradla, očistenú o vplyv počasia a potvrdenú druhou, nezávislou metódou. Pred štartom pripravíme simuláciu na základe vašich skutočných nákladov.",
+switchIntro: "<strong>Chcete vedieť presne, ako počítame?</strong> Zapnutím podrobností sa na tejto stránke rozvinie úplný opis metódy: vzorce, zdroje údajov, poradie krokov zúčtovania a regresný model.",
+toggleOff: "Podrobné informácie",
+toggleOn: "Skryť podrobnosti",
+cards: [
+["Nulové vstupné náklady", "Žiadna investícia na vašej strane a žiadny zásah do existujúcej regulácie."],
+["Platba z úspory", "Našou odmenou je dohodnutý podiel na hodnote odmeranej úspory."],
+["Výsledok odolný voči počasiu", "Každé obdobie sa prepočítava na tie isté normové podmienky (TMR)."]
+],
+login: {
+title: "Energy Control", sub: "Systém merania a zúčtovania energetických úspor",
+email: "Login / e-mail", emailPh: "napr. admin@waterai.pl",
+pass: "Heslo", passPh: "Zadajte heslo", submit: "Prihlásiť sa",
+errEmpty: "Zadajte login a heslo.",
+mock: "Maketa — pripojte toto tlačidlo k prihlasovacej logike aplikácie.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Jazyk",
+aside: [
+["Nemáte ešte účet?", "Účty zakladá administrátor. V paneli vidíte výsledky pre vaše objekty a vedľa opisujeme metódu, z ktorej tieto výsledky vznikajú."],
+["Chcete vedieť, koľko to môže priniesť u vás?", "Pripravíme simuláciu úspor na základe vašich skutočných nákladov — stačia faktúry za energiu alebo odpočty meradla z posledných sezón. Simulácia je prognóza; zúčtovávame výhradne to, čo po skončení obdobia ukáže meranie."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Opis má informatívny charakter; záväzné podmienky určuje zmluva a merací protokol."],
+closing: "Po skončení zmluvného obdobia zostáva celý efekt technológie vám.",
+sections: [
+{h: "Čo ponúkame", b: [
+["p", "Nasadzujeme prediktívne riadenie vykurovania na existujúcej inštalácii. Systém sa učí správanie budovy a jej reakciu na počasie a potom potrebu predbieha namiesto oneskorenej reakcie. Nemeníme zdroj tepla ani nezasahujeme do existujúcej automatiky."],
+["p", "Zúčtovanie vedieme v modeli ESCO: náklady na nasadenie a prevádzku znášame my a našou odmenou je podiel na hodnote úspory potvrdenej meraním. Ak úspora nie je, faktúra nie je."],
+["d", "Podrobnosti", [
+["p", "Hranicu merania určíme pred štartom a zapíšeme do meracieho protokolu: zúčtovaniu podlieha výhradne energia, ktorú zachytáva určené meradlo. Médiá merané samostatne — napríklad teplá úžitková voda — nevstupujú ani do bázového obdobia, ani do zúčtovania."],
+["p", "Ak sa súbežne zvažuje iná technológia (napríklad fyzikálna úprava vody), hodnotíme ju ako samostatný krok s vlastnou bázou. Efekty sa nesčítavajú do jedného ukazovateľa, aby sa každý z nich dal obhájiť osobitne."]
+]]
+]},
+{h: "Simulácia pred štartom — a prečo výsledok uvádzame až po skončení obdobia", b: [
+["p", "Skôr než sa čokoľvek podpíše, pripravíme <strong>simuláciu úspor založenú na vašich skutočných nákladoch</strong> — na faktúrach za energiu a odpočtoch meradla z posledných sezón. Simulácia ukazuje očakávaný rád veličiny: koľko energie môže v budove zostať, čo to znamená v peniazoch pri vašej cene a ako sa tento efekt delí medzi strany."],
+["cw", ["<strong>Simulácia je prognóza, nie sľub.</strong> Neuvádzame vopred garantované percento, pretože úspora závisí od faktorov, ktoré nikto úplne neovláda: od priebehu počasia v konkrétnej sezóne, spôsobu užívania objektu, zmien obsadenosti a prevádzkových hodín, stavu inštalácie aj od rozhodnutí prijímaných na mieste. Tvrdé číslo uvádzame až za uzavreté obdobie — odmerané z meradla a očistené o vplyv počasia.", "Riziko, že sa prognóza a výsledok rozídu, znášame my, nie vy: fakturujeme výhradne to, čo bolo odmerané. Ak úspora nie je, faktúra nie je."]],
+["d", "Podrobnosti · rozsah simulácie", [
+["h3", "Čo do simulácie vstupuje"],
+["ul", ["spotreba a náklady z posledných sezón — z faktúr alebo z odpočtov meradla,", "charakteristika objektu vyplývajúca z týchto údajov, prevedená na normové podmienky (TMR),", "cena energie, ktorú platíte dnes, a spôsob jej aktualizácie predpokladaný v zmluve,", "dohodnuté rozdelenie efektu medzi strany."]],
+["h3", "Čo simulácia nezahŕňa"],
+["ul", ["priebeh počasia v nadchádzajúcej sezóne — z definície neznámy,", "zmeny na vašej strane: obsadenosť, prevádzkové hodiny, nových nájomcov, stavebné práce,", "zmeny ceny energie nad rámec toho, čo je zapísané v zmluve,", "poruchy a odstávky inštalácie."]],
+["p", "Preto simuláciu uvádzame ako rozpätie, nie ako jediné číslo, a uvádzame, za akých predpokladov vznikla. Nie je podkladom pre zúčtovanie — slúži na rozhodnutie."],
+["c", ["<strong>Prognózu overujeme spätne.</strong> Po prvom uzavretom období postavíme simuláciu vedľa výsledku merania a ukážeme odchýlku aj s jej príčinou. Na tom istom podklade korigujeme prognózu na ďalšiu sezónu — a je z neho vidieť, či boli naše predpoklady poctivé."]]
+]]
+]},
+{h: "Odkiaľ sa berie číslo, za ktoré platíte", b: [
+["p", "Neporovnávame spotreby rok od roku, pretože taký výsledok hovorí predovšetkým o tom, ktorá zima bola miernejšia. Každé obdobie — bázové aj zúčtovacie — prepočítavame na tie isté normové poveternostné podmienky, teda na <strong>Typický meteorologický rok (TMR)</strong>. Až takto prevedené na spoločného menovateľa sú veličiny porovnateľné."],
+["ps", "Dôsledok je jednoznačný: miernejšia zima sa nemôže vykázať ako úspora a zima ostrejšia než norma nezaťažuje výsledok technológie."],
+["d", "Podrobnosti · označenia a vzorce", [
+["t", [["Symbol", "Význam"],
+["z", "počet dní s aktívnym vykurovaním v danom mesiaci"],
+["T<sub>i</sub>", "vnútorná teplota prijatá do výpočtu — zmluvný parameter, ten istý pre bázu aj pre každé zúčtovacie obdobie"],
+["t", "priemerná vonkajšia teplota počas vykurovacích dní daného mesiaca (skutočné údaje)"],
+["t<sub>TMR</sub>", "normová teplota toho istého mesiaca podľa Typického meteorologického roka"],
+["SD", "dennostupne — miera potreby tepla vyplývajúcej z počasia [°C·dni]"],
+["Q · Q<sub>s</sub>", "odmeraná spotreba a spotreba korigovaná na normové podmienky, vyjadrená v <strong>zúčtovacej jednotke [z.j.]</strong> — tej, v ktorej meria meradlo a fakturuje dodávateľ: kWh, MWh alebo GJ pri centrálnom teple, m<sup>3</sup> pri plyne"],
+["φ", "korekčný koeficient obdobia"],
+["E", "jednotkový ukazovateľ — spotreba na jeden normový dennostupeň [z.j./SD]"],
+["ΔQ", "odmeraná úspora, v tej istej zúčtovacej jednotke ako Q"]]],
+["f", [["Dennostupne", "SD = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·dni]"],
+["Korekčný koeficient", "φ = ΣSD<sub>štandardné</sub> / ΣSD<sub>skutočné</sub>"],
+["Korigovaná spotreba", "Q<sub>s</sub> = Q × φ"],
+["Jednotkový ukazovateľ", "E = Q<sub>s</sub> / ΣSD<sub>štandardné</sub>&nbsp;&nbsp;[z.j./SD]"],
+["Projekcia bázy", "Q<sub>báza→zúčt.</sub> = E<sub>báza</sub> × ΣSD<sub>štandardné, zúčtovacie obdobie</sub>"],
+["Úspora", "ΔQ = Q<sub>báza→zúčt.</sub> − Q<sub>s, zúčt.</sub>"]]],
+["fine", "Štandardné dennostupne počítame presne tak isto ako skutočné — s rovnakým počtom vykurovacích dní <em>z</em> a rovnakou teplotou T<sub>i</sub> — a dosadzujeme výhradne teploty Typického meteorologického roka namiesto skutočných. Rozdiel medzi nimi je teda čistý efekt počasia, nič viac."]
+]]
+]},
+{h: "Odkiaľ pochádza každá veličina", b: [
+["p", "Každé číslo vstupujúce do zúčtovania má pomenovaný zdroj a okamih určenia. To je podmienka reprodukovateľnosti — report sa musí dať prepočítať nezávisle, bez otázky na nás."],
+["d", "Podrobnosti · zdroje údajov", [
+["t3", [["Veličina", "Zdroj", "Kedy sa určuje"],
+["Skutočné teploty <span class=\"sym\">t</span>", "meteorologická stanica v lokalite objektu; v reporte uvádzame názov stanice a dátum stiahnutia údajov", "pre každé obdobie osobitne"],
+["Normály <span class=\"sym\">t<sub>TMR</sub></span>", "dlhoročný merací rad pre lokalitu; v reporte uvádzame rozsah rokov, z ktorých boli normály vypočítané", "raz — fixované v protokole TMR"],
+["Vykurovacie dni <span class=\"sym\">z</span>", "kalendár vykurovacej sezóny objektu; tá istá hodnota vstupuje do skutočných aj štandardných dennostupňov", "pre každý mesiac obdobia"],
+["Teplota <span class=\"sym\">T<sub>i</sub></span>", "zmluvný parameter zapísaný v meracom protokole", "raz — zhodná pre bázu aj všetky obdobia"],
+["Spotreba <span class=\"sym\">Q</span>", "fakturačné meradlo energie alebo faktúry od dodávateľa, vždy s uvedením hranice merania", "pre každé obdobie"],
+["Cena energie", "merací protokol; uvádzame, či ide o cenu fixnú, alebo skutočnú fakturačnú", "raz, so spôsobom aktualizácie zapísaným v zmluve"],
+["Podiel strán", "zmluva", "raz"]]]
+]],
+["psfine", "Po zapnutí podrobností uvidíte úplný prehľad: čo pochádza z meteorologickej stanice, čo z meradla a čo z meracieho protokolu."]
+]},
+{h: "Bázové obdobie — vzťažný bod", b: [
+["p", "Bázu určujeme z troch úplných vykurovacích sezón predchádzajúcich nasadeniu. Bázou však nie je spotreba vyjadrená v zúčtovacích jednotkách, ale <strong>jednotkový ukazovateľ E</strong> — spotreba pripadajúca na jeden štandardný dennostupeň. Táto veličina nezávisí ani od počasia, ani od dĺžky obdobia."],
+["d", "Podrobnosti · ako vzniká báza", [
+["ul", ["Každú z troch sezón prepočítame samostatne na TMR a určíme pre ňu ukazovateľ E.", "Bázou je aritmetický priemer ukazovateľov z týchto sezón.", "Kontrolujeme rozptyl ukazovateľov okolo priemeru — to je test kvality bázy."]],
+["p", "Malý rozptyl znamená, že sa objekt v tých rokoch prevádzkovo nemenil a báza je konzistentná. Výrazne väčší je signálom, že v rade nastala zmena — nájomca, plocha, prevádzkové hodiny — a vtedy bázu korigujeme alebo rad skracujeme. Bázu nepreberáme naslepo."]
+]]
+]},
+{h: "Priebeh zúčtovania obdobia", b: [
+["steps", [["Dennostupne obdobia", "Určíme skutočné a štandardné dennostupne. Otázka: aké počasie naozaj bolo a aké by bolo pri norme?"],
+["Korekcia spotreby", "Vypočítame koeficient φ a prevedieme odmeranú spotrebu na normové podmienky."],
+["Projekcia bázy", "Premietneme bázu do toho istého obdobia: koľko by objekt spotreboval teraz, keby si zachoval charakteristiku spred nasadenia?"],
+["Úspora", "Rozdiel oboch veličín je skutočne ušetrená energia."],
+["Kontrola druhou cestou", "Ten istý výsledok musí vyjsť aj cez pokles ukazovateľa E."]]],
+["d", "Podrobnosti · prečo práve takto", [
+["p", "<strong>Krok 3</strong> zároveň rieši problém rozdielnej dĺžky období. Báza sa premieta presne do obdobia, ktoré zúčtovávame, a neporovnáva sa s celým rokom — vďaka tomu možno zúčtovať aj sezónu skrátenú, posunutú alebo prerušenú bez skreslenia výsledku."],
+["p", "<strong>Krok 5</strong> je bezpodmienečný. Ak obe cesty nedajú ten istý výsledok, v reporte je chyba a report sa nevydá. Je to vnútorná kontrola na našej strane, nie formalita."],
+["c", ["<strong>Korekcia na TMR pôsobí vo váš prospech.</strong> Porovnanie samotných odmeraných spotrieb bez ohľadu na počasie ukáže v sezóne miernejšej než norma vyššiu úsporu, než je skutočná — pripisuje technológii to, čo urobilo počasie. My tento efekt z výsledku odstraňujeme, a fakturujeme tak nižšie číslo, než aké by dalo jednoduché porovnanie."]]
+]]
+]},
+{h: "Druhá, nezávislá kontrolná metóda — lineárna regresia", b: [
+["p", "Korekcia na TMR porovnáva <strong>obdobia</strong> prevedené na spoločné počasie. Regresia robí to isté na úrovni <strong>jednotlivých odpočtov</strong>: opisuje objekt rovnicou, v ktorej je vonkajšia teplota vysvetľujúcou premennou. Sú to dva na sebe nezávislé dôkazy toho istého efektu — a očakávame, že povedia to isté."],
+["ps", "Metóda navyše ukazuje, ako sa zmenil spôsob riadenia: o koľko nižšie pracuje teplota prívodu pri rovnakom počasí."],
+["d", "Podrobnosti · model a údaje", [
+["h3", "Vstupné údaje"],
+["p", "Záznam z meradla a regulátora v konštantnom časovom kroku. Do modelu vstupujú: časová značka odpočtu, vonkajšia teplota, teplota prívodu a spiatočky, prietok a výkon aj spotreba energie. Neagregujeme ich na mesiace — pracujeme so surovými odpočtami, pretože až tie ukazujú, ako sa objekt správa za konkrétnych podmienok."],
+["h3", "Model"],
+["f", [["Regresná priamka", "y = a · x + b"],
+["Rozdiel režimov", "Δ(x) = y<sub>ekvitermný</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Redukcia", "R(x) = Δ(x) / y<sub>ekvitermný</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Symbol", "Význam"],
+["x", "vonkajšia teplota v okamihu odpočtu [°C]"],
+["y", "sledovaná veličina: teplota prívodu [°C] alebo výkon / spotreba energie"],
+["a", "sklon priamky — citlivosť objektu na počasie, teda o koľko rastie <em>y</em> na každý stupeň poklesu vonkajšej teploty"],
+["b", "absolútny člen — úroveň pri 0 °C, teda zložka nezávislá od počasia: nastavenia, zotrvačnosť, straty okruhu"]]],
+["p", "Koeficienty <em>a</em> a <em>b</em> určujeme metódou najmenších štvorcov, osobitne pre dve množiny odpočtov: prevádzku v <strong>ekvitermnom režime</strong> (doterajšia vykurovacia krivka) a prevádzku v <strong>prediktívnom režime WaterAI</strong>. Vzniknú dve priamky, ktoré porovnávame pri tej istej vonkajšej teplote."],
+["chart", {alt: "Schematický graf: dve regresné priamky — ekvitermný režim hore, režim WaterAI dole, rozdiel medzi nimi je efekt riadenia", base: "ekvitermný režim", ai: "režim WaterAI", delta: "Δ(x) — efekt riadenia", xl: "nižšia vonkajšia teplota", xr: "vyššia →", cap: "Schematický graf. Odstup medzi priamkami nie je konštantný — preto výsledok uvádzame ako funkciu vonkajšej teploty, nie ako jedno číslo."}],
+["h3", "Čo sledujeme súbežne"],
+["ul", ["<strong>Teplota prívodu</strong> — dôkaz, že sa zmenil spôsob riadenia: pri rovnakom počasí ide objekt na nižšom parametri.", "<strong>Výkon a spotreba energie</strong> — dôkaz, že sa zmena riadenia premietla do energie."]],
+["p", "Obe veličiny musia byť konzistentné. Pokles teploty prívodu bez zodpovedajúceho poklesu odberu energie je varovný signál — znamená zvyčajne dlhší čas prevádzky alebo posunutý odber, nie úsporu."],
+["h3", "Podmienky správnosti porovnania"],
+["ul", ["ten istý rozsah vonkajších teplôt pre obe množiny — priamky porovnávame len tam, kde majú údaje obe,", "vylúčenie odpočtov mimo vykurovacej sezóny a období odstávok a servisných prác,", "vylúčenie prechodových stavov po nábehu, ktoré vzťah skresľujú,", "porovnateľný počet bodov v oboch množinách,", "kontrola tesnosti preloženia (koeficient determinácie) a rozptylu rezíduí — slabé preloženie znamená, že na objekt pôsobí faktor mimo modelu a výsledok si vyžaduje vysvetlenie,", "zhodná hranica merania a ten istý časový krok pre oba režimy."]],
+["c", ["<strong>Regresia nie je podkladom pre fakturáciu.</strong> Fakturujeme výhradne metódou TMR, z jednotiek odčítaných z fakturačného meradla. Regresia slúži na overenie tohto výsledku, na diagnostiku objektu a na kontrolu, či efekt v čase vydrží. Ak sa obe metódy rozchádzajú, hľadáme príčinu ešte pred vydaním reportu — a nevyberáme si priaznivejšie číslo."]]
+]]
+]},
+{h: "Zúčtovanie a faktúra", b: [
+["ul", ["Hodnota úspory je odmerané množstvo zúčtovacích jednotiek vynásobené dohodnutou cenou energie.", "Naša odmena je zmluvne stanovený podiel na tejto hodnote — a je jedinou položkou faktúry.", "Faktúra sa odvoláva na číslo reportu a na zúčtovacie obdobie, ktorého sa týka.", "Zúčtovávame výhradne uzavreté obdobia; ročné prognózy slúžia na plánovanie rozpočtu a nikdy nie sú podkladom pre fakturáciu."]],
+["d", "Podrobnosti · dohľadateľnosť reportu", [
+["p", "V každom zúčtovacom reporte sú výslovne uvedené:"],
+["ul", ["meteorologická stanica a zdroj teplôt spolu s dátumom stiahnutia údajov,", "rozsah rokov, z ktorých boli vypočítané normály TMR,", "číslo protokolu TMR a číslo analýzy — každý report sa dá spojiť so svojím zdrojovým podkladom,", "zdroj údajov o spotrebe, teda konkrétne meradlo alebo faktúry, vrátane hranice merania,", "teplota T<sub>i</sub> prijatá pre bázu aj pre zúčtovacie obdobie,", "cena energie a dohodnutý podiel s uvedením, či ide o cenu fixnú, alebo fakturačnú."]],
+["fine", "Všetky sumy v reporte sú netto; DPH sa počíta podľa sadzby platnej v deň vystavenia faktúry."]
+]]
+]},
+{h: "Kedy sa báza upravuje", b: [
+["cw", ["<strong>Bázu neprepisujeme dosiahnutou úsporou.</strong> Dosiahnutý výsledok sa nestáva novým vzťažným bodom — inak by efekt technológie rok čo rok zo zúčtovania mizol."]],
+["p", "Bázu upravujeme výhradne pri zmenách, ktoré s technológiou nesúvisia, ale ovplyvňujú spotrebu."],
+["d", "Podrobnosti · katalóg zmien", [
+["ul", ["zmena spôsobu využívania objektu alebo prevádzkových hodín,", "podstatná zmena obsadenosti alebo zmena nájomcov,", "zmena vykurovanej plochy,", "zásah do obálky budovy,", "výmena alebo doplnenie zdroja energie,", "nová technológia s vlastným odberom energie,", "zmena dohodnutej vnútornej teploty T<sub>i</sub>."]],
+["fine", "Úprava je obojsmerná — teda aj v náš neprospech. Ak zmena na objekte sama osebe znižuje spotrebu, báza sa o tento efekt zmenší a ten sa nezúčtuje ako úspora technológie."]
+]]
+]},
+{h: "Ako začíname", b: [
+["steps", [["Vstupné údaje", "Faktúry za energiu alebo odpočty meradla z posledných sezón — viac v tejto fáze netreba."],
+["Simulácia úspor", "Na vašich skutočných nákladoch ukážeme očakávaný efekt a rozdelenie prínosu. Je to prognóza, nie záväzok."],
+["Analýza a merací protokol", "Určíme bázu, stanovíme hranicu merania, T<sub>i</sub>, cenu energie a podiel strán."],
+["Montáž a prepnutie", "Inštalácia bez prerušenia prevádzky objektu, obdobie prevádzky v doterajšom režime, potom prechod do prediktívneho režimu. Od tohto dátumu beží zúčtovacie obdobie."],
+["Report a zúčtovanie", "Po uzavretí obdobia vydáme report s úplným výpočtom; faktúra sa odvoláva na jeho číslo."]]]
+]}
+]
+};
+
+
+window.LANDING["es"] = {
+label: "ES", htmlLang: "es",
+title: "WaterAI Energy Control — medición y liquidación de ahorros energéticos",
+desc: "Cómo medimos y liquidamos los ahorros de energía: corrección al Año Meteorológico Típico y regresión lineal como comprobación. Acceso al panel Energy Control.",
+eyebrow: "Energy Control · método de medición y liquidación",
+h1: "Ahorro de energía sin inversión propia",
+lede: "Usted paga únicamente por la energía que realmente se ahorra — medida en el contador, corregida por el efecto del clima y confirmada por un segundo método independiente. Antes de empezar preparamos una simulación basada en sus costes reales.",
+switchIntro: "<strong>¿Quiere saber exactamente cómo calculamos?</strong> Al activar los detalles se despliega en esta página la descripción completa del método: fórmulas, fuentes de datos, orden de los pasos de liquidación y el modelo de regresión.",
+toggleOff: "Información detallada",
+toggleOn: "Ocultar detalles",
+cards: [
+["Sin desembolso inicial", "Ninguna inversión por su parte y ninguna intervención en la regulación existente."],
+["Pago con el ahorro", "Nuestra retribución es una participación acordada en el valor del ahorro medido."],
+["Resultado inmune al clima", "Cada periodo se convierte a las mismas condiciones normalizadas (AMT)."]
+],
+login: {
+title: "Energy Control", sub: "Sistema de medición y liquidación de ahorros energéticos",
+email: "Usuario / correo", emailPh: "p. ej. admin@waterai.pl",
+pass: "Contraseña", passPh: "Introduzca la contraseña", submit: "Iniciar sesión",
+errEmpty: "Introduzca usuario y contraseña.",
+mock: "Maqueta — conecte este botón a la lógica de acceso de la aplicación.",
+powered: "Powered by WaterAI"
+},
+langLabel: "Idioma",
+aside: [
+["¿Todavía no tiene cuenta?", "Las cuentas las crea el administrador. En el panel se ven los resultados de sus instalaciones y, al lado, describimos el método del que salen esos resultados."],
+["¿Quiere saber cuánto podría suponer en su caso?", "Prepararemos una simulación de ahorro basada en sus costes reales — bastan las facturas de energía o las lecturas del contador de las últimas temporadas. La simulación es una previsión; liquidamos únicamente lo que muestre la medición al cerrar el periodo."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Esta descripción es informativa; las condiciones vinculantes las fijan el contrato y el protocolo de medición."],
+closing: "Al terminar el periodo contractual, todo el efecto de la tecnología queda para usted.",
+sections: [
+{h: "Qué proponemos", b: [
+["p", "Implantamos un control predictivo de la calefacción sobre la instalación existente. El sistema aprende el comportamiento del edificio y su respuesta al clima y se adelanta a la demanda en lugar de reaccionar con retraso. No sustituimos la fuente de calor ni intervenimos en la automatización actual."],
+["p", "La liquidación se realiza en modelo ESCO: nosotros asumimos el coste de la implantación y la explotación, y nuestra retribución es una participación en el valor del ahorro confirmado por la medición. Si no hay ahorro, no hay factura."],
+["d", "Detalles", [
+["p", "El límite de medición se fija antes de empezar y se recoge en el protocolo de medición: solo se liquida la energía que registra el contador designado. Los suministros medidos por separado — el agua caliente sanitaria, por ejemplo — no entran ni en el periodo base ni en la liquidación."],
+["p", "Si en paralelo se valora otra tecnología (por ejemplo, tratamiento físico del agua), la evaluamos como un paso independiente con su propia base. Los efectos no se suman en un único indicador, de modo que cada uno pueda defenderse por separado."]
+]]
+]},
+{h: "Simulación antes de empezar — y por qué la cifra llega solo al cerrar el periodo", b: [
+["p", "Antes de firmar nada, preparamos una <strong>simulación de ahorro basada en sus costes reales</strong> — a partir de las facturas de energía y de las lecturas del contador de las últimas temporadas. La simulación muestra el orden de magnitud esperable: cuánta energía puede quedarse en el edificio, qué significa eso en dinero a su precio y cómo se reparte ese efecto entre las partes."],
+["cw", ["<strong>Una simulación es una previsión, no una promesa.</strong> No indicamos de antemano un porcentaje garantizado, porque el ahorro depende de factores que nadie controla del todo: cómo transcurra el clima en cada temporada, el uso que se dé al edificio, los cambios de ocupación y de horario, el estado de la instalación y las decisiones que se toman sobre el terreno. La cifra firme la damos solo por un periodo cerrado — medida en el contador y corregida por el efecto del clima.", "El riesgo de que la previsión y el resultado se separen lo asumimos nosotros, no usted: facturamos únicamente lo que se ha medido. Si no hay ahorro, no hay factura."]],
+["d", "Detalles · alcance de la simulación", [
+["h3", "Qué entra en la simulación"],
+["ul", ["consumos y costes de las últimas temporadas — de facturas o de lecturas del contador,", "la característica del edificio derivada de esos datos, llevada a condiciones normalizadas (AMT),", "el precio de la energía que paga hoy y el mecanismo de actualización previsto en el contrato,", "el reparto acordado del efecto entre las partes."]],
+["h3", "Qué no cubre la simulación"],
+["ul", ["cómo transcurrirá el clima en la temporada que viene — desconocido por definición,", "los cambios en su lado: ocupación, horarios, nuevos inquilinos, obras,", "las variaciones del precio de la energía más allá de lo previsto en el contrato,", "las averías y paradas de la instalación."]],
+["p", "Por eso presentamos la simulación como un rango y no como una cifra única, e indicamos con qué supuestos se ha elaborado. No es base de liquidación — sirve para tomar la decisión."],
+["c", ["<strong>La previsión se verifica después.</strong> Tras el primer periodo cerrado contrastamos la simulación con el resultado medido y mostramos la desviación junto con su causa. Ese mismo material es el que usamos para ajustar la previsión de la temporada siguiente — y con el que se ve si nuestros supuestos eran sólidos."]]
+]]
+]},
+{h: "De dónde sale la cifra que usted paga", b: [
+["p", "No comparamos consumos año contra año, porque ese resultado dice sobre todo qué invierno fue más suave. Cada periodo — el base y el de liquidación — se convierte a las mismas condiciones climáticas normalizadas, es decir, al <strong>Año Meteorológico Típico (AMT)</strong>. Solo así, reducidas a un denominador común, las magnitudes son comparables."],
+["ps", "La consecuencia es inequívoca: un invierno más suave no puede declararse como ahorro, y un invierno más duro que la norma no penaliza el resultado de la tecnología."],
+["d", "Detalles · símbolos y fórmulas", [
+["t", [["Símbolo", "Significado"],
+["z", "número de días con calefacción activa en el mes"],
+["T<sub>i</sub>", "temperatura interior adoptada en el cálculo — parámetro contractual, idéntico para la base y para cada periodo de liquidación"],
+["t", "temperatura exterior media durante los días de calefacción del mes (datos reales)"],
+["t<sub>AMT</sub>", "temperatura normalizada del mismo mes según el Año Meteorológico Típico"],
+["GD", "grados-día — medida de la demanda de calor derivada del clima [°C·días]"],
+["Q · Q<sub>s</sub>", "consumo medido y consumo corregido a condiciones normalizadas, expresado en la <strong>unidad de liquidación [u.l.]</strong> — aquella en la que mide el contador y factura el suministrador: kWh, MWh o GJ para calor de red, m<sup>3</sup> para gas"],
+["φ", "coeficiente de corrección del periodo"],
+["E", "indicador unitario — consumo por cada grado-día normalizado [u.l./GD]"],
+["ΔQ", "ahorro medido, en la misma unidad de liquidación que Q"]]],
+["f", [["Grados-día", "GD = z × (T<sub>i</sub> − t)&nbsp;&nbsp;[°C·días]"],
+["Coeficiente de corrección", "φ = ΣGD<sub>normalizados</sub> / ΣGD<sub>reales</sub>"],
+["Consumo corregido", "Q<sub>s</sub> = Q × φ"],
+["Indicador unitario", "E = Q<sub>s</sub> / ΣGD<sub>normalizados</sub>&nbsp;&nbsp;[u.l./GD]"],
+["Proyección de la base", "Q<sub>base→liq.</sub> = E<sub>base</sub> × ΣGD<sub>normalizados, periodo de liquidación</sub>"],
+["Ahorro", "ΔQ = Q<sub>base→liq.</sub> − Q<sub>s, liq.</sub>"]]],
+["fine", "Los grados-día normalizados se calculan exactamente igual que los reales — con el mismo número de días de calefacción <em>z</em> y la misma temperatura T<sub>i</sub> — sustituyendo únicamente las temperaturas reales por las del Año Meteorológico Típico. La diferencia entre unos y otros es, por tanto, el efecto puro del clima, nada más."]
+]]
+]},
+{h: "De dónde procede cada magnitud", b: [
+["p", "Cada cifra que entra en la liquidación tiene una fuente nombrada y un momento de fijación definido. Es la condición de la reproducibilidad — el informe debe poder recalcularse de forma independiente, sin preguntarnos nada."],
+["d", "Detalles · fuentes de datos", [
+["t3", [["Magnitud", "Fuente", "Cuándo se fija"],
+["Temperaturas reales <span class=\"sym\">t</span>", "estación meteorológica en la ubicación del edificio; el informe indica el nombre de la estación y la fecha de descarga de los datos", "para cada periodo por separado"],
+["Normales <span class=\"sym\">t<sub>AMT</sub></span>", "serie de medición plurianual de la ubicación; el informe indica el rango de años con el que se calcularon las normales", "una vez — fijado en el protocolo AMT"],
+["Días de calefacción <span class=\"sym\">z</span>", "calendario de la temporada de calefacción del edificio; el mismo valor entra en los grados-día reales y normalizados", "para cada mes del periodo"],
+["Temperatura <span class=\"sym\">T<sub>i</sub></span>", "parámetro contractual recogido en el protocolo de medición", "una vez — idéntico para la base y todos los periodos"],
+["Consumo <span class=\"sym\">Q</span>", "contador de facturación o facturas del suministrador, siempre indicando el límite de medición", "para cada periodo"],
+["Precio de la energía", "protocolo de medición; indicamos si es un precio fijo o el precio real facturado", "una vez, con el mecanismo de actualización fijado en el contrato"],
+["Participación de las partes", "el contrato", "una vez"]]]
+]],
+["psfine", "Al activar los detalles verá el desglose completo: qué procede de la estación meteorológica, qué del contador y qué del protocolo de medición."]
+]},
+{h: "El periodo base — el punto de referencia", b: [
+["p", "La base se determina a partir de tres temporadas de calefacción completas anteriores a la implantación. Ahora bien, la base no es el consumo expresado en unidades de liquidación, sino el <strong>indicador unitario E</strong> — el consumo por cada grado-día normalizado. Esa magnitud no depende ni del clima ni de la duración del periodo."],
+["d", "Detalles · cómo se construye la base", [
+["ul", ["Cada una de las tres temporadas se convierte por separado al AMT y se determina su indicador E.", "La base es la media aritmética de los indicadores de esas temporadas.", "Comprobamos la dispersión de los indicadores en torno a la media — es la prueba de calidad de la base."]],
+["p", "Una dispersión pequeña significa que el edificio no cambió en su explotación durante esos años y que la base es consistente. Una claramente mayor indica que algo cambió en la serie — inquilino, superficie, horarios — y entonces corregimos la base o acortamos la serie. No aceptamos una base a ciegas."]
+]]
+]},
+{h: "Cómo se liquida un periodo", b: [
+["steps", [["Grados-día del periodo", "Determinamos los grados-día reales y los normalizados. La pregunta: ¿qué clima hubo realmente y cuál habría habido en la norma?"],
+["Corrección del consumo", "Calculamos el coeficiente φ y llevamos el consumo medido a condiciones normalizadas."],
+["Proyección de la base", "Proyectamos la base sobre el mismo periodo: ¿cuánto habría consumido el edificio ahora si hubiera mantenido su característica anterior a la implantación?"],
+["Ahorro", "La diferencia entre ambas magnitudes es la energía realmente ahorrada."],
+["Comprobación por otra vía", "El mismo resultado debe salir a través de la caída del indicador E."]]],
+["d", "Detalles · por qué exactamente así", [
+["p", "El <strong>paso 3</strong> resuelve además el problema de los periodos de distinta duración. La base se proyecta exactamente sobre el periodo que se liquida y no se compara con un año completo — lo que permite liquidar una temporada acortada, desplazada o interrumpida sin distorsionar el resultado."],
+["p", "El <strong>paso 5</strong> es incondicional. Si ambas vías no dan el mismo resultado, el informe contiene un error y no se emite. Es un control interno por nuestra parte, no una formalidad."],
+["c", ["<strong>La corrección al AMT actúa a su favor.</strong> Comparar los consumos medidos sin tener en cuenta el clima muestra, en una temporada más suave que la norma, un ahorro mayor que el real — atribuye a la tecnología lo que hizo el clima. Nosotros retiramos ese efecto del resultado, así que facturamos una cifra menor de la que daría la comparación simple."]]
+]]
+]},
+{h: "Segundo método de control independiente — regresión lineal", b: [
+["p", "La corrección al AMT compara <strong>periodos</strong> reducidos a un clima común. La regresión hace lo mismo a nivel de <strong>lecturas individuales</strong>: describe el edificio mediante una ecuación en la que la temperatura exterior es la variable explicativa. Son dos pruebas independientes entre sí del mismo efecto — y esperamos que digan lo mismo."],
+["ps", "El método muestra además cómo ha cambiado la forma de regular: cuánto más baja trabaja la temperatura de impulsión con el mismo clima."],
+["d", "Detalles · modelo y datos", [
+["h3", "Datos de entrada"],
+["p", "Registro del contador y del controlador con paso de tiempo constante. Al modelo entran: marca de tiempo de la lectura, temperatura exterior, temperaturas de impulsión y retorno, caudal, y potencia y consumo de energía. No los agregamos por meses — trabajamos con lecturas en bruto, porque solo ellas muestran cómo se comporta el edificio en condiciones concretas."],
+["h3", "Modelo"],
+["f", [["Recta de regresión", "y = a · x + b"],
+["Diferencia entre modos", "Δ(x) = y<sub>compensación</sub>(x) − y<sub>WaterAI</sub>(x)"],
+["Reducción", "R(x) = Δ(x) / y<sub>compensación</sub>(x) × 100&nbsp;&nbsp;[%]"]]],
+["t", [["Símbolo", "Significado"],
+["x", "temperatura exterior en el momento de la lectura [°C]"],
+["y", "magnitud estudiada: temperatura de impulsión [°C] o potencia / consumo de energía"],
+["a", "pendiente de la recta — sensibilidad del edificio al clima, es decir, cuánto sube <em>y</em> por cada grado de caída de la temperatura exterior"],
+["b", "término independiente — el nivel a 0 °C, es decir, la componente ajena al clima: consignas, inercia, pérdidas del circuito"]]],
+["p", "Los coeficientes <em>a</em> y <em>b</em> se ajustan por mínimos cuadrados, por separado para dos conjuntos de lecturas: el funcionamiento en <strong>modo de compensación climática</strong> (la curva de calefacción existente) y el funcionamiento en <strong>modo predictivo WaterAI</strong>. Resultan dos rectas que comparamos a la misma temperatura exterior."],
+["chart", {alt: "Gráfico esquemático: dos rectas de regresión — modo de compensación climática arriba, modo WaterAI abajo, y la separación entre ambas es el efecto de la regulación", base: "modo compensación", ai: "modo WaterAI", delta: "Δ(x) — efecto de la regulación", xl: "temperatura exterior más baja", xr: "más alta →", cap: "Gráfico esquemático. La separación entre las rectas no es constante — por eso presentamos el resultado como función de la temperatura exterior y no como una única cifra."}],
+["h3", "Qué seguimos en paralelo"],
+["ul", ["<strong>Temperatura de impulsión</strong> — prueba de que ha cambiado la regulación: con el mismo clima el edificio trabaja con un parámetro más bajo.", "<strong>Potencia y consumo de energía</strong> — prueba de que el cambio de regulación se tradujo en energía."]],
+["p", "Ambas magnitudes deben ser coherentes. Una caída de la temperatura de impulsión sin la correspondiente caída del consumo es una señal de alarma — suele significar tiempos de funcionamiento más largos o demanda desplazada, no ahorro."],
+["h3", "Condiciones para una comparación válida"],
+["ul", ["el mismo rango de temperaturas exteriores en ambos conjuntos — las rectas se comparan solo donde ambos tienen datos,", "exclusión de lecturas fuera de la temporada de calefacción y de los periodos de parada y mantenimiento,", "exclusión de los estados transitorios tras el arranque, que distorsionan la relación,", "un número comparable de puntos en ambos conjuntos,", "control del ajuste (coeficiente de determinación) y de la dispersión de los residuos — un ajuste débil significa que actúa un factor ajeno al modelo y que el resultado exige explicación,", "un límite de medición idéntico y el mismo paso de tiempo para ambos modos."]],
+["c", ["<strong>La regresión no es base de facturación.</strong> Facturamos exclusivamente por el método AMT, con las unidades leídas en el contador de facturación. La regresión sirve para verificar ese resultado, para diagnosticar el edificio y para comprobar si el efecto se mantiene en el tiempo. Si ambos métodos divergen, buscamos la causa antes de emitir el informe — y no elegimos la cifra más favorable."]]
+]]
+]},
+{h: "Liquidación y factura", b: [
+["ul", ["El valor del ahorro es la cantidad medida de unidades de liquidación multiplicada por el precio acordado de la energía.", "Nuestra retribución es la participación en ese valor fijada en el contrato — y es la única línea de la factura.", "La factura remite al número del informe y al periodo de liquidación al que corresponde.", "Solo liquidamos periodos cerrados; las previsiones anuales sirven para planificar el presupuesto y nunca son base de facturación."]],
+["d", "Detalles · trazabilidad del informe", [
+["p", "En cada informe de liquidación se nombran expresamente:"],
+["ul", ["la estación meteorológica y la fuente de temperaturas junto con la fecha de descarga de los datos,", "el rango de años con el que se calcularon las normales AMT,", "el número del protocolo AMT y el número del análisis — cada informe puede vincularse a su material de origen,", "la fuente de los datos de consumo, es decir, el contador concreto o las facturas, junto con el límite de medición,", "la temperatura T<sub>i</sub> adoptada para la base y para el periodo de liquidación,", "el precio de la energía y la participación acordada, indicando si el precio es fijo o el facturado."]],
+["fine", "Todos los importes del informe son netos; el IVA se aplica al tipo vigente el día de emisión de la factura."]
+]]
+]},
+{h: "Cuándo se ajusta la base", b: [
+["cw", ["<strong>La base nunca se reescribe con el ahorro conseguido.</strong> El resultado alcanzado no pasa a ser el nuevo punto de referencia — de lo contrario, el efecto de la tecnología desaparecería de la liquidación año tras año."]],
+["p", "Ajustamos la base únicamente ante cambios ajenos a la tecnología que, sin embargo, afectan al consumo."],
+["d", "Detalles · catálogo de cambios", [
+["ul", ["cambio en el uso del edificio o en los horarios de funcionamiento,", "cambio significativo de ocupación o cambio de inquilinos,", "cambio de la superficie calefactada,", "intervención en la envolvente del edificio,", "sustitución o ampliación de la fuente de energía,", "nueva tecnología con consumo propio de energía,", "cambio de la temperatura interior acordada T<sub>i</sub>."]],
+["fine", "El ajuste opera en ambos sentidos — también en nuestra contra. Si un cambio en el edificio reduce el consumo por sí mismo, la base se minora en ese efecto y este no se liquida como ahorro de la tecnología."]
+]]
+]},
+{h: "Cómo empezamos", b: [
+["steps", [["Datos de entrada", "Facturas de energía o lecturas del contador de las últimas temporadas — en esta fase no hace falta nada más."],
+["Simulación de ahorro", "Sobre sus costes reales mostramos el efecto esperable y el reparto del beneficio. Es una previsión, no un compromiso."],
+["Análisis y protocolo de medición", "Determinamos la base y fijamos el límite de medición, T<sub>i</sub>, el precio de la energía y la participación de las partes."],
+["Instalación y conmutación", "Montaje sin interrumpir la actividad del edificio, un periodo de funcionamiento en el modo actual y después el paso al modo predictivo. Desde esa fecha corre el periodo de liquidación."],
+["Informe y liquidación", "Al cerrarse el periodo emitimos un informe con el cálculo completo; la factura remite a su número."]]]
+]}
+]
+};
+
+
+/* Österreichische Variante.
+   Erbt alle Texte von "de" und überschreibt nur, was sich in Österreich unterscheidet.
+   Hier ist der Ort für AT-spezifische Terminologie und Rechtsformulierungen
+   (USt. statt MwSt., lokale Firmendaten, Heizkostenabrechnungsgesetz usw.). */
+window.LANDING["at"] = {
+extends: "de",
+label: "AT", htmlLang: "de-AT",
+title: "WaterAI Energy Control — Messung und Abrechnung von Energieeinsparungen (AT)",
+aside: [
+["Sie haben noch kein Konto?", "Konten legt der Administrator an. Im Panel sehen Sie die Ergebnisse für Ihre Objekte — daneben beschreiben wir die Methode, aus der diese Ergebnisse entstehen."],
+["Sie möchten wissen, was das bei Ihnen bringt?", "Wir erstellen eine Einsparsimulation auf Basis Ihrer tatsächlichen Kosten — Energierechnungen oder Zählerstände der letzten Heizperioden genügen. Die Simulation ist eine Prognose; abgerechnet wird ausschließlich, was die Messung nach Ablauf der Periode zeigt."]
+],
+footer: ["Water AI · waterai.sk · info@waterai.sk", "Die Darstellung dient der Information; verbindlich sind der Vertrag und das Messprotokoll."]
+};
+
+(function () {
+  "use strict";
+  var host = document.getElementById("landing-doc");
+  if (!host) return;
+  var detailed = false, current = null;
+
+  var CSS = [
+    '#landing-doc{background:#fff;border:1px solid rgba(42,109,181,.12);border-radius:14px;',
+    'box-shadow:0 10px 34px rgba(23,58,92,.09);padding:32px 34px 26px;text-align:left;',
+    'font-family:inherit;color:#1e2a36;max-width:none}',
+    '#landing-doc .eyebrow{font-size:10.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:#12a3a3;margin:0 0 6px}',
+    '#landing-doc h1{font-size:27px;line-height:1.2;font-weight:800;margin:0 0 5px;letter-spacing:-.5px;color:#1e2a36}',
+    '#landing-doc .lede{font-size:13.5px;color:#3c4956;margin:0 0 18px}',
+    '#landing-doc h2{font-size:14px;font-weight:800;color:#2a6db5;margin:20px 0 7px;display:flex;align-items:baseline;gap:9px}',
+    '#landing-doc h2 .num{font-size:13px;font-weight:400;color:#9fb6cd;margin-right:9px}',
+    '#landing-doc h3{font-size:12.5px;font-weight:800;color:#1e2a36;margin:14px 0 5px}',
+    '#landing-doc p{margin:0 0 9px;font-size:13px;line-height:1.5;color:#3c4956}',
+    '#landing-doc strong{color:#1e2a36}',
+    '#landing-doc ul{margin:0 0 10px;padding-left:18px}',
+    '#landing-doc li{font-size:13px;line-height:1.5;color:#3c4956;margin-bottom:4px}',
+    '#landing-doc .fine{font-size:11.5px;color:#6b7b8a;line-height:1.55}',
+    '#landing-doc table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12px}',
+    '#landing-doc th{background:#e8f0f8;color:#2a6db5;font-weight:800;text-align:left;padding:7px 9px;border-bottom:1.5px solid #2a6db5}',
+    '#landing-doc td{padding:7px 9px;border-bottom:1px solid #d8e2ec;color:#3c4956;vertical-align:top}',
+    '#landing-doc td.sym{font-family:Georgia,Cambria,serif;font-size:13px;color:#1e2a36;white-space:nowrap}',
+    '#landing-doc .sym{font-family:Georgia,Cambria,serif}',
+    '#landing-doc .formulas{background:#eef3f9;border-left:3px solid #2a6db5;padding:12px 16px;margin:8px 0 10px}',
+    '#landing-doc .formulas div{font-family:Georgia,Cambria,serif;font-size:14px;line-height:2;color:#1e2a36}',
+    '#landing-doc .formulas b{font-family:inherit;font-size:12px;font-weight:800;margin-right:8px}',
+    '#landing-doc .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 14px}',
+    '#landing-doc .card{background:#eef3f9;border-top:3px solid #2a6db5;padding:12px 13px;border-radius:0}',
+    '#landing-doc .card b{display:block;font-size:13px;color:#1d5290;margin-bottom:3px}',
+    '#landing-doc .card span{font-size:11.5px;color:#3c4956;line-height:1.5}',
+    '#landing-doc .callout{border:1px solid #d8e2ec;border-left:4px solid #2a6db5;background:#f8fbfe;padding:11px 14px;margin:10px 0 12px}',
+    '#landing-doc .callout.warn{border-left-color:#c4703a;background:#fdf4ed}',
+    '#landing-doc .callout p:last-child{margin-bottom:0}',
+    '#landing-doc .steps{counter-reset:s;margin:8px 0 12px;padding:0;list-style:none}',
+    '#landing-doc .steps>li{counter-increment:s;position:relative;padding:0 0 10px 34px;margin:0;font-size:13px}',
+    '#landing-doc .steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;',
+    'background:#2a6db5;color:#fff;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}',
+    '#landing-doc .steps b{display:block;font-size:12.5px;color:#1e2a36}',
+    '#landing-doc .steps span{font-size:12px;color:#3c4956}',
+    '#landing-doc .chartwrap{background:#fff;border:1px solid #d8e2ec;padding:10px 12px 6px;margin:10px 0 12px}',
+    '#landing-doc .chartwrap svg{width:100%;height:auto;display:block;font-family:inherit}',
+    '#landing-doc .switchbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;',
+    'background:#eef3f9;border:1px solid #d8e2ec;border-left:4px solid #2a6db5;padding:13px 16px;margin:0 0 20px}',
+    '#landing-doc .switchbar p{margin:0;font-size:12px;max-width:60ch}',
+    '#landing-doc .toggle{display:inline-flex;align-items:center;gap:10px;border:1.5px solid #2a6db5;background:#fff;',
+    'color:#1d5290;font:inherit;font-size:11.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;',
+    'padding:9px 15px;cursor:pointer;flex:none;border-radius:0}',
+    '#landing-doc .toggle[aria-pressed="true"]{background:#2a6db5;color:#fff}',
+    '#landing-doc .toggle .track{width:32px;height:16px;border-radius:9px;background:#c3d3e3;position:relative;flex:none}',
+    '#landing-doc .toggle[aria-pressed="true"] .track{background:rgba(255,255,255,.45)}',
+    '#landing-doc .toggle .knob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;',
+    'background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .18s ease}',
+    '#landing-doc .toggle[aria-pressed="true"] .knob{transform:translateX(16px)}',
+    '#landing-doc .detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease}',
+    '#landing-doc.detailed .detail{grid-template-rows:1fr}',
+    '#landing-doc .detail>.inner{overflow:hidden;min-height:0}',
+    '#landing-doc .detail>.inner>.wrap{border-left:2px solid #bcd3ea;padding:2px 0 2px 14px;margin:6px 0 14px}',
+    '#landing-doc .tag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;',
+    'color:#2a6db5;background:#e8f0f8;padding:3px 7px;margin-bottom:7px}',
+    '#landing-doc .short-only{display:block}',
+    '#landing-doc.detailed .short-only{display:none}',
+    '@media (prefers-reduced-motion:reduce){#landing-doc *{transition:none!important}}'
+  ].join('');
+  var st = document.createElement("style");
+  st.textContent = CSS;
+  document.head.appendChild(st);
+
+  function dict(code) {
+    var d = window.LANDING[code];
+    if (!d) return null;
+    if (d.extends && window.LANDING[d.extends]) {
+      var b = window.LANDING[d.extends], m = {}, k;
+      for (k in b) m[k] = b[k];
+      for (k in d) if (k !== "extends") m[k] = d[k];
+      return m;
+    }
+    return d;
+  }
+  function el(tag, cls, html) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+  function chart(c) {
+    var w = el("div", "chartwrap");
+    w.innerHTML =
+      '<svg viewBox="0 0 560 230" role="img" aria-label="' + c.alt.replace(/"/g, "&quot;") + '">' +
+      '<defs><linearGradient id="lgap" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#2a6db5" stop-opacity=".18"/><stop offset="100%" stop-color="#2a6db5" stop-opacity=".04"/>' +
+      '</linearGradient></defs>' +
+      '<line x1="52" y1="188" x2="536" y2="188" stroke="#c9d8e6"/><line x1="52" y1="18" x2="52" y2="188" stroke="#c9d8e6"/>' +
+      '<polygon points="70,42 512,150 512,178 70,86" fill="url(#lgap)"/>' +
+      '<line x1="70" y1="42" x2="512" y2="150" stroke="#1d5290" stroke-width="2.4"/>' +
+      '<line x1="70" y1="86" x2="512" y2="178" stroke="#12a3a3" stroke-width="2.4" stroke-dasharray="7 4"/>' +
+      '<line x1="270" y1="90" x2="270" y2="130" stroke="#c4703a" stroke-width="1.6"/>' +
+      '<path d="M270 90 l-3.5 6 h7 z" fill="#c4703a"/><path d="M270 130 l-3.5 -6 h7 z" fill="#c4703a"/>' +
+      '<text x="280" y="115" font-size="11" fill="#c4703a">' + c.delta + '</text>' +
+      '<text x="78" y="34" font-size="11" fill="#1d5290">' + c.base + '</text>' +
+      '<text x="78" y="103" font-size="11" fill="#0e8a8a">' + c.ai + '</text>' +
+      '<text x="52" y="207" font-size="10.5" fill="#6b7b8a">' + c.xl + '</text>' +
+      '<text x="536" y="207" text-anchor="end" font-size="10.5" fill="#6b7b8a">' + c.xr + '</text>' +
+      '</svg><p class="fine">' + c.cap + '</p>';
+    return w;
+  }
+  function table(rows, cols) {
+    var t = el("table"), h = el("thead"), b = el("tbody"), tr, i, j;
+    tr = el("tr");
+    for (j = 0; j < rows[0].length; j++) tr.appendChild(el("th", null, rows[0][j]));
+    h.appendChild(tr);
+    for (i = 1; i < rows.length; i++) {
+      tr = el("tr");
+      for (j = 0; j < rows[i].length; j++) tr.appendChild(el("td", (cols === 2 && j === 0) ? "sym" : null, rows[i][j]));
+      b.appendChild(tr);
+    }
+    t.appendChild(h); t.appendChild(b);
+    return t;
+  }
+  function block(x) {
+    var k = x[0], v = x[1], o, i;
+    if (k === "p") return el("p", null, v);
+    if (k === "ps") return el("p", "short-only", v);
+    if (k === "psfine") return el("p", "short-only fine", v);
+    if (k === "fine") return el("p", "fine", v);
+    if (k === "h3") return el("h3", null, v);
+    if (k === "ul") { o = el("ul"); for (i = 0; i < v.length; i++) o.appendChild(el("li", null, v[i])); return o; }
+    if (k === "t") return table(v, 2);
+    if (k === "t3") return table(v, 3);
+    if (k === "f") { o = el("div", "formulas"); for (i = 0; i < v.length; i++) o.appendChild(el("div", null, "<b>" + v[i][0] + "</b> " + v[i][1])); return o; }
+    if (k === "c" || k === "cw") { o = el("div", k === "cw" ? "callout warn" : "callout"); for (i = 0; i < v.length; i++) o.appendChild(el("p", null, v[i])); return o; }
+    if (k === "steps") { o = el("ol", "steps"); for (i = 0; i < v.length; i++) o.appendChild(el("li", null, "<b>" + v[i][0] + "</b><span>" + v[i][1] + "</span>")); return o; }
+    if (k === "chart") return chart(v);
+    if (k === "d") {
+      o = el("div", "detail");
+      var inner = el("div", "inner"), wrap = el("div", "wrap");
+      wrap.appendChild(el("span", "tag", v));
+      for (i = 0; i < x[2].length; i++) wrap.appendChild(block(x[2][i]));
+      inner.appendChild(wrap); o.appendChild(inner);
+      return o;
+    }
+    return el("p", null, String(v));
+  }
+
+  function render(code) {
+    var t = dict(code) || dict("pl");
+    if (!t) return;
+    current = window.LANDING[code] ? code : "pl";
+    host.innerHTML = "";
+    host.appendChild(el("p", "eyebrow", t.eyebrow));
+    host.appendChild(el("h1", null, t.h1));
+    host.appendChild(el("p", "lede", t.lede));
+
+    var bar = el("div", "switchbar");
+    bar.appendChild(el("p", null, t.switchIntro));
+    var btn = el("button", "toggle");
+    btn.type = "button";
+    btn.setAttribute("aria-pressed", String(detailed));
+    btn.innerHTML = '<span class="track"><span class="knob"></span></span><span>' +
+      (detailed ? t.toggleOn : t.toggleOff) + "</span>";
+    btn.addEventListener("click", function () {
+      detailed = !detailed;
+      btn.setAttribute("aria-pressed", String(detailed));
+      host.classList.toggle("detailed", detailed);
+      btn.lastChild.textContent = detailed ? t.toggleOn : t.toggleOff;
+    });
+    bar.appendChild(btn);
+    host.appendChild(bar);
+
+    var cards = el("div", "cards");
+    t.cards.forEach(function (c) { cards.appendChild(el("div", "card", "<b>" + c[0] + "</b><span>" + c[1] + "</span>")); });
+    host.appendChild(cards);
+
+    t.sections.forEach(function (s, i) {
+      var sec = el("section");
+      sec.appendChild(el("h2", null, '<span class="num">' + (i + 1) + "</span> " + s.h));
+      s.b.forEach(function (b) { sec.appendChild(block(b)); });
+      host.appendChild(sec);
+    });
+    host.appendChild(el("p", "fine", t.closing));
+    host.classList.toggle("detailed", detailed);
+  }
+
+  // podpięcie pod przełącznik języka aplikacji
+  var appSetLanguage = window.setLanguage;
+  if (typeof appSetLanguage === "function") {
+    window.setLanguage = function (code) {
+      var r = appSetLanguage.apply(this, arguments);
+      render(code);
+      return r;
+    };
+  }
+
+  function start() {
+    var saved = null;
+    try { saved = localStorage.getItem("waterai.lang") || localStorage.getItem("lang"); } catch (e) {}
+    var active = document.querySelector('.lang-switch button.active, #lang-switch button.active');
+    var code = saved || (active && active.id ? active.id.replace("lang-", "") : "pl");
+    render(window.LANDING[code] ? code : "pl");
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
