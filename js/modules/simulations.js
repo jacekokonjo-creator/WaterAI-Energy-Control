@@ -8,8 +8,8 @@
 //
 // v1.1 (2026-07-07): wydruk przebudowany na pełny dokument w stylistyce raportów
 // ESCO — okładka (osobna strona), podsumowanie wykonawcze, statyczna sekcja
-// metodyki (TYM / obłożenie / powierzchnia / intensywność / harmonogram /
-// niestandardowa + dowód regresją), założenia, wyniki, porównanie scenariuszy,
+// metodyki (TYM / obłożenie / intensywność + dowód regresją — zestaw zgodny
+// z AnalysesModule.TYPES), założenia, wyniki, porównanie scenariuszy,
 // mechanizm rozliczenia ESCO z osią czasu, zastrzeżenia. Numeracja SYM/rok/…
 // jak w raportach. Poprawki KPI dla inwestycji = 0 (czysty ESCO bez wkładu).
 //
@@ -1246,25 +1246,9 @@ function _simMethodsHtml() {
     </div>
 
     <div class="sim-method">
-      <h5>Korekta powierzchni</h5>
-      <p>Gdy między okresami zmienia się powierzchnia ogrzewana (rozbudowa, wyłączenie skrzydła, zmiana najemców), zużycie przelicza się na metr kwadratowy rzeczywiście ogrzewanej powierzchni.</p>
-      <div class="sim-formula">q = Q / m² powierzchni ogrzewanej</div>
-    </div>
-
-    <div class="sim-method">
       <h5>Korekta intensywności</h5>
       <p>Porównanie jednostkowego zużycia energii przypadającego na jeden standardowy stopniodzień. Pozwala zestawiać okresy o różnej długości i różnym przebiegu pogody na wspólnej, znormalizowanej bazie.</p>
       <div class="sim-formula">q = Qs / ΣSD<sub>std</sub></div>
-    </div>
-
-    <div class="sim-method">
-      <h5>Korekta harmonogramu</h5>
-      <p>Dla obiektów o zmiennym trybie pracy (szkoły, biura, hale produkcyjne) zużycie normalizuje się do rzeczywistych dni i godzin pracy instalacji — dni wolne, przerwy i zmiany harmonogramu nie zniekształcają wyniku.</p>
-    </div>
-
-    <div class="sim-method">
-      <h5>Metoda niestandardowa</h5>
-      <p>Uzgodniona umownie kombinacja powyższych korekt, dopasowana do specyfiki obiektu i dostępnych danych pomiarowych — stosowana tam, gdzie pojedyncza korekta nie oddaje charakteru eksploatacji.</p>
     </div>
 
     <div class="sim-method proof">
