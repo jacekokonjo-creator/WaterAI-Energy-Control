@@ -87,7 +87,10 @@ const SimulationsModule = {
   },
 
   DEFAULTS: {
-    settlementType: 'DEPOSIT',
+    // Domyślny wariant NOWEJ oferty: opłata wdrożeniowa spłacana w 2. roku (pkt 5.3–5.5 umowy).
+    // Uwaga: fallbacki `settlementType || 'DEPOSIT'` w dalszej części pliku ZOSTAJĄ —
+    // dotyczą starych, zapisanych ofert, które powstały, gdy domyślną była kaucja.
+    settlementType: 'FEE_Y2',
     years: 10,
     investment: 0,
     heatingCost: 0,
@@ -800,6 +803,11 @@ function simEdit(id) {
   if (!id && _simCurrentLang() !== 'pl' && (_simDraft.currency || 'PLN') === 'PLN') {
     _simDraft.currency = (_simCurrentLang() === 'cs') ? 'CZK' : 'EUR';
   }
+  // NOWA oferta w wariancie „opłata w 2. roku": wstaw sugerowaną kwotę opłaty
+  // (ta sama logika, co przy ręcznym przełączeniu wariantu). Kwota jest edytowalna.
+  if (!id && _simDraft.settlementType === 'FEE_Y2' && !Number(_simDraft.investment)) {
+    _simDraft.investment = _simSuggestedFee(_simDraft.currency || 'PLN');
+  }
 
   const clients = window.ClientsModule ? ClientsModule.getAll() : [];
 
@@ -1041,7 +1049,7 @@ function _simCurrentLang() {
 // wdrożeniowa w 2. roku" (kolejność jak w wymaganiu: najpierw bez opłaty).
 function _simAllowedSettlements() {
   return (_simCurrentLang() === 'pl')
-    ? ['DEPOSIT', 'FEE', 'FEE_Y2', 'FREE']
+    ? ['FEE_Y2', 'DEPOSIT', 'FEE', 'FREE']
     : ['FREE', 'FEE_Y2'];
 }
 
