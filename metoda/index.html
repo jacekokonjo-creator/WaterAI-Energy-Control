@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WaterAI Energy Control</title>
+<meta name="description" content="">
+<style>
+
+  :root{
+    --blue:#2a6db5;
+    --blue-dk:#1d5290;
+    --ink:#1e2a36;
+    --ink-2:#3c4956;
+    --grey:#6b7b8a;
+    --line:#d8e2ec;
+    --bg-soft:#eef3f9;
+    --bg-head:#e8f0f8;
+    --amber:#c4703a;
+    --amber-bg:#fdf4ed;
+    --page:#ffffff;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:#e9edf1;
+    color:var(--ink);
+    font-family:"Lato","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+  }
+  .sheet{
+    max-width:210mm;
+    margin:24px auto 60px;
+    background:var(--page);
+    padding:20mm 18mm 16mm;
+    box-shadow:0 2px 18px rgba(30,42,54,.13);
+  }
+
+  /* ---------- nagłówek dokumentu ---------- */
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+    border-bottom:2.5px solid var(--blue-dk);padding-bottom:10px}
+  .logo{display:flex;align-items:center;gap:9px;font-size:25px;font-weight:800;letter-spacing:-.4px;color:var(--ink)}
+  .logo .dot{margin-right:9px;width:19px;height:19px;border-radius:50%;background:var(--blue);position:relative;flex:none}
+  .logo .dot::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#fff;top:3px;left:3px}
+  .logo sup{font-size:9px;font-weight:600;vertical-align:super;color:var(--grey)}
+  .doc-meta{text-align:right;font-size:10.5px;line-height:1.65;color:var(--grey);text-transform:uppercase;letter-spacing:.3px}
+
+  h1{font-size:26px;line-height:1.2;font-weight:800;margin:22px 0 4px;letter-spacing:-.5px}
+  .lede{font-size:13.5px;color:var(--ink-2);margin:0 0 18px}
+
+  /* ---------- przełącznik ---------- */
+  .switchbar{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:var(--bg-soft);border:1px solid var(--line);border-left:4px solid var(--blue);
+    padding:13px 16px;margin:0 0 22px;
+  }
+  .switchbar p{margin:0;font-size:12px;color:var(--ink-2);max-width:60ch}
+  .switchbar strong{color:var(--ink)}
+  .toggle{
+    display:inline-flex;align-items:center;gap:10px;border:1.5px solid var(--blue);
+    background:#fff;color:var(--blue-dk);font:inherit;font-size:11.5px;font-weight:800;
+    letter-spacing:.7px;text-transform:uppercase;padding:9px 15px;cursor:pointer;flex:none;
+    transition:background .18s ease,color .18s ease;
+  }
+  .toggle:hover{background:#f2f7fc}
+  .toggle:focus-visible{outline:3px solid #9dc4ea;outline-offset:2px}
+  .toggle .track{width:32px;height:16px;border-radius:9px;background:#c3d3e3;position:relative;flex:none;
+    transition:background .18s ease}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .18s ease}
+  .toggle[aria-pressed="true"]{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .toggle[aria-pressed="true"] .track{background:rgba(255,255,255,.45)}
+  .toggle[aria-pressed="true"] .knob{transform:translateX(16px)}
+
+  /* ---------- sekcje ---------- */
+  section{margin:0 0 6px}
+  h2{font-size:14px;font-weight:800;color:var(--blue);margin:20px 0 7px;display:flex;align-items:baseline;gap:9px}
+  h2 .num{font-size:13px;font-weight:400;color:#9fb6cd;margin-right:9px}
+  h3{font-size:12.5px;font-weight:800;color:var(--ink);margin:14px 0 5px}
+  p{margin:0 0 9px;font-size:13px;color:var(--ink-2)}
+  strong{color:var(--ink)}
+  ul{margin:0 0 10px;padding-left:18px}
+  li{font-size:13px;color:var(--ink-2);margin-bottom:4px}
+  .fine{font-size:11.5px;color:var(--grey);line-height:1.55}
+
+  /* ---------- tabele ---------- */
+  table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12px}
+  thead th{background:var(--bg-head);color:var(--blue);font-weight:800;text-align:left;
+    padding:7px 9px;border-bottom:1.5px solid var(--blue)}
+  tbody td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  tbody tr:last-child td{border-bottom:1.5px solid var(--line)}
+  td.sym{font-family:Georgia,"Cambria",serif;font-size:13px;color:var(--ink);white-space:nowrap}
+
+  /* ---------- wzory ---------- */
+  .formulas{background:var(--bg-soft);border-left:3px solid var(--blue);padding:12px 16px;margin:8px 0 10px}
+  .formulas div{font-family:Georgia,"Cambria",serif;font-size:14px;line-height:2;color:var(--ink)}
+  .formulas b{font-family:"Lato","Segoe UI",system-ui,sans-serif;font-size:12px;font-weight:800;margin-right:8px}
+
+  /* ---------- kafelki ---------- */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0 14px}
+  .card{background:var(--bg-soft);border-top:3px solid var(--blue);padding:12px 13px}
+  .card b{display:block;font-size:13px;color:var(--blue-dk);margin-bottom:3px}
+  .card span{font-size:11.5px;color:var(--ink-2);line-height:1.5}
+
+  /* ---------- wykres ---------- */
+  .chartwrap{background:#fff;border:1px solid var(--line);padding:10px 12px 6px;margin:10px 0 12px}
+  .chartwrap svg{width:100%;height:auto;display:block}
+  .chartwrap .fine{margin:6px 0 4px}
+
+  /* ---------- ramki ---------- */
+  .callout{border:1px solid var(--line);border-left:4px solid var(--blue);background:#f8fbfe;
+    padding:11px 14px;margin:10px 0 12px}
+  .callout.warn{border-left-color:var(--amber);background:var(--amber-bg)}
+  .callout p:last-child{margin-bottom:0}
+
+  /* ---------- kroki ---------- */
+  .steps{counter-reset:s;margin:8px 0 12px;padding:0;list-style:none}
+  .steps>li{counter-increment:s;position:relative;padding:0 0 10px 34px;margin:0}
+  .steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;
+    background:var(--blue);color:#fff;font-size:11.5px;font-weight:800;display:flex;
+    align-items:center;justify-content:center}
+  .steps b{display:block;font-size:12.5px;color:var(--ink)}
+  .steps span{font-size:12px;color:var(--ink-2)}
+
+  /* ---------- blok szczegółowy ---------- */
+  .detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows .32s ease;margin:0}
+  .detail>.inner{overflow:hidden;min-height:0}
+  body.detailed .detail{grid-template-rows:1fr}
+  .detail>.inner>.wrap{
+    border-left:2px solid #bcd3ea;padding:2px 0 2px 14px;margin:6px 0 14px;
+  }
+  .tag{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+    color:var(--blue);background:var(--bg-head);padding:3px 7px;margin-bottom:7px}
+  .short-only{display:block}
+  body.detailed .short-only{display:none}
+
+  /* ---------- stopka ---------- */
+  footer{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--grey)}
+
+  @media (max-width:760px){
+    .sheet{padding:22px 18px;margin:0;box-shadow:none}
+    .cards{grid-template-columns:1fr}
+    .doc-head{flex-direction:column;gap:10px}
+    .doc-meta{text-align:left}
+    table{font-size:11.5px}
+    thead th,tbody td{padding:6px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important}
+  }
+  @media print{
+    body{background:#fff}
+    .sheet{box-shadow:none;margin:0;max-width:none;padding:0}
+    .switchbar{display:none}
+    .detail{display:block}
+    .detail>.inner{overflow:visible}
+    body:not(.detailed) .detail{display:none}
+    section{break-inside:auto}
+    h2{break-after:avoid}
+    table{break-inside:avoid}
+    @page{size:A4;margin:16mm}
+  }
+
+  /* ======================================================================
+     LANDING control.waterai.cloud — chrom strony wokół dokumentu
+     ====================================================================== */
+  :root{
+    --teal:#12a3a3;
+    --grad-a:#0f8fc4;
+    --grad-b:#12b0a8;
+  }
+  body{
+    background:
+      radial-gradient(1100px 520px at 78% -12%, #ffffff 0%, rgba(255,255,255,0) 62%),
+      linear-gradient(180deg,#d6eefb 0%,#e8f6fd 34%,#f6fbfe 68%,#ffffff 100%);
+    background-attachment:fixed;
+  }
+
+  /* --- pasek górny --- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:rgba(255,255,255,.86);backdrop-filter:blur(9px);
+    border-bottom:1px solid rgba(42,109,181,.14);
+  }
+  .topbar .inner{max-width:1180px;margin:0 auto;padding:10px 22px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .langs{display:flex;gap:5px;flex-wrap:wrap}
+  .langs button{
+    font:inherit;font-size:10.5px;font-weight:800;letter-spacing:.4px;
+    width:34px;height:26px;border-radius:13px;cursor:pointer;
+    border:1px solid rgba(42,109,181,.22);background:#fff;color:var(--blue-dk);
+  }
+  .langs button[aria-current="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+  .langs button:focus-visible{outline:3px solid #9dc4ea;outline-offset:2px}
+  .to-login{display:none;font:inherit;font-size:11.5px;font-weight:800;letter-spacing:.5px;
+    text-transform:uppercase;text-decoration:none;color:#fff;padding:8px 14px;border-radius:8px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b))}
+
+  /* --- układ dwukolumnowy --- */
+  .layout{max-width:1180px;margin:0 auto;padding:26px 22px 70px;
+    display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:26px;align-items:start}
+  .sheet{max-width:none;margin:0;padding:34px 38px 30px;border-radius:14px;
+    box-shadow:0 10px 34px rgba(23,58,92,.10);border:1px solid rgba(42,109,181,.10)}
+
+  /* --- panel logowania --- */
+  aside{position:sticky;top:74px;display:flex;flex-direction:column;gap:14px}
+  .login{
+    background:linear-gradient(180deg,#ffffff 0%,#f4fbfd 100%);
+    border:1px solid rgba(42,109,181,.14);border-radius:16px;padding:22px 20px;
+    box-shadow:0 10px 30px rgba(23,58,92,.12);text-align:center;
+  }
+  .login .logo{justify-content:center;font-size:22px;margin-bottom:2px}
+  .login h2{display:block;color:var(--ink);font-size:20px;font-weight:800;margin:4px 0 2px}
+  .login .sub{font-size:11px;color:var(--grey);margin:0 0 16px}
+  .field{text-align:left;margin-bottom:11px}
+  .field label{display:block;font-size:11.5px;font-weight:800;color:var(--ink);margin-bottom:4px}
+  .field input{width:100%;font:inherit;font-size:12.5px;padding:9px 11px;color:var(--ink);
+    border:1px solid #cfe0ee;border-radius:9px;background:#fff}
+  .field input::placeholder{color:#9fb0bf}
+  .field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(42,109,181,.16)}
+  .login button.submit{
+    width:100%;font:inherit;font-size:14px;font-weight:800;color:#fff;cursor:pointer;
+    border:0;border-radius:10px;padding:12px;margin-top:5px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    transition:filter .18s ease;
+  }
+  .login button.submit:hover{filter:brightness(1.06)}
+  .login button.submit:focus-visible{outline:3px solid #9dc4ea;outline-offset:2px}
+  .hint{font-size:11px;line-height:1.45;margin:9px 0 0;min-height:1em;color:var(--grey)}
+  .hint.err{color:#b4462a}
+  .powered{font-size:10.5px;font-weight:800;color:var(--blue);margin:14px 0 0}
+  .ver{font-size:10px;color:#9fb0bf;margin:1px 0 0}
+  .aside-note{
+    background:rgba(255,255,255,.72);border:1px solid rgba(42,109,181,.14);border-radius:12px;
+    padding:13px 15px;font-size:11.5px;line-height:1.5;color:var(--ink-2)
+  }
+  .aside-note b{display:block;color:var(--ink);font-size:12px;margin-bottom:3px}
+
+  /* --- nagłówek treści --- */
+  .eyebrow{font-size:10.5px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--teal);margin:0 0 6px}
+  h1{font-size:29px}
+
+  @media (max-width:940px){
+    .layout{grid-template-columns:1fr;padding:16px 14px 50px}
+    aside{position:static;order:-1}
+    .sheet{padding:24px 20px;border-radius:12px}
+    .to-login{display:none}
+  }
+  @media (max-width:620px){
+    .topbar .inner{padding:9px 14px}
+    .langs button{width:30px;height:24px}
+  }
+  @media print{
+    .topbar,aside,.to-login{display:none !important}
+    .layout{display:block;padding:0;max-width:none}
+    .sheet{border:0;border-radius:0;box-shadow:none;padding:0}
+  }
+
+  /* ---------- wykres regresji ---------- */
+  .chartwrap{background:#fff;border:1px solid var(--line);padding:10px 12px 6px;margin:10px 0 12px}
+  .chartwrap svg{width:100%;height:auto;display:block;font-family:"Lato","Segoe UI",system-ui,sans-serif}
+  .chartwrap .fine{margin:6px 0 4px}
+  .aside-note .sep{display:block;height:1px;background:rgba(42,109,181,.16);margin:11px 0}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="inner">
+    <div class="logo"><span class="dot"></span>Water AI<sup>®</sup></div>
+    <nav class="langs" id="langs" aria-label="Language"></nav>
+  </div>
+</header>
+
+<div class="layout">
+  <main class="sheet">
+    <p class="eyebrow" id="eyebrow"></p>
+    <h1 id="h1"></h1>
+    <p class="lede" id="lede"></p>
+
+    <div class="switchbar">
+      <p id="switchIntro"></p>
+      <button class="toggle" id="toggle" type="button" aria-pressed="false" aria-controls="doc">
+        <span class="track"><span class="knob"></span></span>
+        <span id="toggleLabel"></span>
+      </button>
+    </div>
+
+    <div class="cards" id="cards"></div>
+    <div id="doc"></div>
+    <p class="fine" id="closing"></p>
+
+    <footer id="footer"></footer>
+  </main>
+
+  <aside>
+    <section class="login" id="login" aria-labelledby="loginTitle">
+      <div class="logo"><span class="dot"></span>Water AI<sup>®</sup></div>
+      <h2 id="loginTitle"></h2>
+      <p class="sub" id="loginSub"></p>
+      <div class="field">
+        <label for="email" id="labEmail"></label>
+        <input id="email" type="email" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="pass" id="labPass"></label>
+        <input id="pass" type="password" autocomplete="current-password">
+      </div>
+      <!-- An die Anmeldelogik der Anwendung anbinden / connect to the app's sign-in logic -->
+      <button class="submit" type="button" id="loginBtn"></button>
+      <p class="hint" id="loginHint" role="status"></p>
+      <p class="powered" id="powered"></p>
+      <p class="ver">v0.7.0</p>
+    </section>
+    <div class="aside-note" id="asideNote"></div>
+  </aside>
+</div>
+
+<script src="i18n/pl.js"></script>
+<script src="i18n/en.js"></script>
+<script src="i18n/de.js"></script>
+<script src="i18n/cs.js"></script>
+<script src="i18n/sk.js"></script>
+<script src="i18n/es.js"></script>
+<script src="i18n/at.js"></script>
+<script>
+(function () {
+  "use strict";
+  var ORDER = ["pl", "en", "de", "cs", "sk", "es", "at"];
+  var STORE = "waterai.lang";
+  var detailed = false;
+  var current = null;
+
+  function dict(code) {
+    var d = window.I18N[code];
+    if (!d) return null;
+    if (d.extends && window.I18N[d.extends]) {
+      var base = window.I18N[d.extends], merged = {}, k;
+      for (k in base) merged[k] = base[k];
+      for (k in d) if (k !== "extends") merged[k] = d[k];
+      return merged;
+    }
+    return d;
+  }
+
+  function pick() {
+    var saved = null;
+    try { saved = localStorage.getItem(STORE); } catch (e) {}
+    if (saved && window.I18N[saved]) return saved;
+    var nav = (navigator.language || "pl").toLowerCase();
+    if (nav.indexOf("de-at") === 0) return "at";
+    var two = nav.slice(0, 2);
+    if (two === "cs") return "cs";
+    if (ORDER.indexOf(two) > -1) return two;
+    return "pl";
+  }
+
+  function el(tag, cls, html) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+
+  function chart(c) {
+    var w = el("div", "chartwrap");
+    w.innerHTML =
+      '<svg viewBox="0 0 560 230" role="img" aria-label="' + c.alt.replace(/"/g, "&quot;") + '">' +
+      '<defs><linearGradient id="gap" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#2a6db5" stop-opacity=".18"/>' +
+      '<stop offset="100%" stop-color="#2a6db5" stop-opacity=".04"/></linearGradient></defs>' +
+      '<line x1="52" y1="188" x2="536" y2="188" stroke="#c9d8e6"/>' +
+      '<line x1="52" y1="18" x2="52" y2="188" stroke="#c9d8e6"/>' +
+      '<polygon points="70,42 512,150 512,178 70,86" fill="url(#gap)"/>' +
+      '<line x1="70" y1="42" x2="512" y2="150" stroke="#1d5290" stroke-width="2.4"/>' +
+      '<line x1="70" y1="86" x2="512" y2="178" stroke="#12a3a3" stroke-width="2.4" stroke-dasharray="7 4"/>' +
+      '<circle cx="70" cy="42" r="3.2" fill="#1d5290"/><circle cx="512" cy="150" r="3.2" fill="#1d5290"/>' +
+      '<circle cx="70" cy="86" r="3.2" fill="#12a3a3"/><circle cx="512" cy="178" r="3.2" fill="#12a3a3"/>' +
+      '<line x1="270" y1="90" x2="270" y2="130" stroke="#c4703a" stroke-width="1.6"/>' +
+      '<path d="M270 90 l-3.5 6 h7 z" fill="#c4703a"/><path d="M270 130 l-3.5 -6 h7 z" fill="#c4703a"/>' +
+      '<text x="280" y="115" font-size="11" fill="#c4703a">' + c.delta + '</text>' +
+      '<text x="78" y="34" font-size="11" fill="#1d5290">' + c.base + '</text>' +
+      '<text x="78" y="103" font-size="11" fill="#0e8a8a">' + c.ai + '</text>' +
+      '<text x="52" y="207" font-size="10.5" fill="#6b7b8a">' + c.xl + '</text>' +
+      '<text x="536" y="207" text-anchor="end" font-size="10.5" fill="#6b7b8a">' + c.xr + '</text>' +
+      '</svg><p class="fine">' + c.cap + '</p>';
+    return w;
+  }
+
+  function table(rows, cols) {
+    var t = el("table"), thead = el("thead"), tbody = el("tbody"), tr, i, j;
+    tr = el("tr");
+    for (j = 0; j < rows[0].length; j++) tr.appendChild(el("th", null, rows[0][j]));
+    thead.appendChild(tr);
+    for (i = 1; i < rows.length; i++) {
+      tr = el("tr");
+      for (j = 0; j < rows[i].length; j++) {
+        tr.appendChild(el("td", (cols === 2 && j === 0) ? "sym" : null, rows[i][j]));
+      }
+      tbody.appendChild(tr);
+    }
+    t.appendChild(thead); t.appendChild(tbody);
+    return t;
+  }
+
+  function block(b) {
+    var type = b[0], v = b[1], out, i, li, box;
+    if (type === "p") return el("p", null, v);
+    if (type === "ps") return el("p", "short-only", v);
+    if (type === "psfine") return el("p", "short-only fine", v);
+    if (type === "fine") return el("p", "fine", v);
+    if (type === "h3") return el("h3", null, v);
+    if (type === "ul") {
+      out = el("ul");
+      for (i = 0; i < v.length; i++) { li = el("li", null, v[i]); out.appendChild(li); }
+      return out;
+    }
+    if (type === "t") return table(v, 2);
+    if (type === "t3") return table(v, 3);
+    if (type === "f") {
+      out = el("div", "formulas");
+      for (i = 0; i < v.length; i++) out.appendChild(el("div", null, "<b>" + v[i][0] + "</b> " + v[i][1]));
+      return out;
+    }
+    if (type === "c" || type === "cw") {
+      out = el("div", type === "cw" ? "callout warn" : "callout");
+      for (i = 0; i < v.length; i++) out.appendChild(el("p", null, v[i]));
+      return out;
+    }
+    if (type === "steps") {
+      out = el("ol", "steps");
+      for (i = 0; i < v.length; i++) {
+        li = el("li", null, "<b>" + v[i][0] + "</b><span>" + v[i][1] + "</span>");
+        out.appendChild(li);
+      }
+      return out;
+    }
+    if (type === "chart") return chart(v);
+    if (type === "d") {
+      out = el("div", "detail");
+      var inner = el("div", "inner"), wrap = el("div", "wrap");
+      wrap.appendChild(el("span", "tag", v));
+      for (i = 0; i < b[2].length; i++) wrap.appendChild(block(b[2][i]));
+      inner.appendChild(wrap); out.appendChild(inner);
+      return out;
+    }
+    return el("p", null, String(v));
+  }
+
+  function render(code) {
+    var t = dict(code);
+    if (!t) return;
+    current = code;
+    try { localStorage.setItem(STORE, code); } catch (e) {}
+
+    document.documentElement.lang = t.htmlLang;
+    document.title = t.title;
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", t.desc);
+
+    document.getElementById("eyebrow").textContent = t.eyebrow;
+    document.getElementById("h1").textContent = t.h1;
+    document.getElementById("lede").textContent = t.lede;
+    document.getElementById("switchIntro").innerHTML = t.switchIntro;
+    document.getElementById("toggleLabel").textContent = detailed ? t.toggleOn : t.toggleOff;
+
+    var cards = document.getElementById("cards");
+    cards.innerHTML = "";
+    t.cards.forEach(function (c) {
+      cards.appendChild(el("div", "card", "<b>" + c[0] + "</b><span>" + c[1] + "</span>"));
+    });
+
+    var doc = document.getElementById("doc");
+    doc.innerHTML = "";
+    t.sections.forEach(function (s, idx) {
+      var sec = el("section");
+      sec.appendChild(el("h2", null, '<span class="num">' + (idx + 1) + "</span> " + s.h));
+      s.b.forEach(function (b) { sec.appendChild(block(b)); });
+      doc.appendChild(sec);
+    });
+    document.getElementById("closing").textContent = t.closing;
+
+    var f = document.getElementById("footer");
+    f.innerHTML = "";
+    t.footer.forEach(function (x) { f.appendChild(el("span", null, x)); });
+
+    document.getElementById("loginTitle").textContent = t.login.title;
+    document.getElementById("loginSub").textContent = t.login.sub;
+    document.getElementById("labEmail").textContent = t.login.email;
+    document.getElementById("email").placeholder = t.login.emailPh;
+    document.getElementById("labPass").textContent = t.login.pass;
+    document.getElementById("pass").placeholder = t.login.passPh;
+    document.getElementById("loginBtn").textContent = t.login.submit;
+    document.getElementById("powered").textContent = t.login.powered;
+    document.getElementById("loginHint").textContent = "";
+
+    var note = document.getElementById("asideNote");
+    note.innerHTML = "";
+    t.aside.forEach(function (a, i) {
+      if (i) note.appendChild(el("span", "sep"));
+      note.appendChild(el("b", null, a[0]));
+      note.appendChild(document.createTextNode(a[1]));
+    });
+
+    document.getElementById("langs").setAttribute("aria-label", t.langLabel);
+    Array.prototype.forEach.call(document.querySelectorAll(".langs button"), function (b) {
+      if (b.dataset.code === code) b.setAttribute("aria-current", "true");
+      else b.removeAttribute("aria-current");
+    });
+  }
+
+  var langs = document.getElementById("langs");
+  ORDER.forEach(function (code) {
+    var d = dict(code);
+    if (!d) return;
+    var b = el("button", null, d.label);
+    b.type = "button";
+    b.dataset.code = code;
+    b.addEventListener("click", function () { render(code); });
+    langs.appendChild(b);
+  });
+
+  var toggle = document.getElementById("toggle");
+  toggle.addEventListener("click", function () {
+    detailed = !detailed;
+    toggle.setAttribute("aria-pressed", String(detailed));
+    document.body.classList.toggle("detailed", detailed);
+    var t = dict(current);
+    document.getElementById("toggleLabel").textContent = detailed ? t.toggleOn : t.toggleOff;
+  });
+
+  document.getElementById("loginBtn").addEventListener("click", function () {
+    var t = dict(current), hint = document.getElementById("loginHint");
+    var mail = document.getElementById("email").value.trim();
+    var pass = document.getElementById("pass").value;
+    if (!mail || !pass) { hint.className = "hint err"; hint.textContent = t.login.errEmpty; return; }
+    hint.className = "hint"; hint.textContent = t.login.mock;
+  });
+
+  render(pick());
+})();
+</script>
+</body>
+</html>
