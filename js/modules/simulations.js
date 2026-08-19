@@ -328,20 +328,30 @@ function _simUserName() {
   return p.fullName || p.full_name || ((p.firstName || '') + ' ' + (p.lastName || '')).trim() || p.email || '';
 }
 // Lista pracowników (admin/backOffice/energyAnalyst) dla pola „Sporządził".
+// Lista „Sporządził". Obejmuje WSZYSTKIE role, które mogą tworzyć oferty
+// (_simCanWrite) — czyli personel wewnętrzny ORAZ Sales Representative.
+// Wcześniej handlowców tu nie było, mimo że od 2026-07-13 sami wystawiają oferty:
+// w liście zostawali tylko admin/backOffice/energyAnalyst, więc handlowiec nie mógł
+// wskazać samego siebie jako autora. Dodatkowo do listy trafia zawsze osoba
+// zalogowana — nawet gdyby jej profil nie zdążył się wczytać.
 function _simPreparedOptions(selectedName) {
   let staff = [];
   if (typeof UsersModule !== 'undefined' && UsersModule.findByRole) {
-    ['admin', 'backOffice', 'energyAnalyst'].forEach(r => { staff = staff.concat(UsersModule.findByRole(r)); });
+    ['admin', 'backOffice', 'energyAnalyst', 'salesRepresentative']
+      .forEach(r => { staff = staff.concat(UsersModule.findByRole(r) || []); });
   }
   const names = [];
+  const dodaj = n => { const t = String(n || '').trim(); if (t && !names.includes(t)) names.push(t); };
   staff.forEach(u => {
-    const n = (u.fullName || ((u.firstName || '') + ' ' + (u.lastName || '')).trim()).trim();
-    if (n && !names.includes(n)) names.push(n);
+    if (u && u.status && u.status !== 'ACTIVE') return;   // konta wyłączone pomijamy
+    dodaj(u.fullName || ((u.firstName || '') + ' ' + (u.lastName || '')).trim());
   });
+  dodaj(_simUserName());                                   // osoba zalogowana zawsze dostępna
+  names.sort((a, b) => a.localeCompare(b, 'pl'));
   if (selectedName && !names.includes(selectedName)) names.unshift(selectedName); // zachowaj historyczną wartość
   const opts = names.map(n => `<option value="${escapeHtml(n)}" ${selectedName === n ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('');
   return `<option value="">— wybierz —</option>` + opts +
-    (names.length ? '' : `<option value="" disabled>brak użytkowników (admin / backOffice / energyAnalyst)</option>`);
+    (names.length ? '' : `<option value="" disabled>brak użytkowników uprawnionych do tworzenia ofert</option>`);
 }
 function _simBaseScenario(sim) {
   const sc = sim.scenarios || [];
