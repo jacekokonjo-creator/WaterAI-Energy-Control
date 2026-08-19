@@ -451,6 +451,20 @@
         padding-top: 20px;
       }
     }
+
+    /* --- opis metody obok karty logowania (js/landing.js) --- */
+    #login-screen { align-items: flex-start; }
+    .landing-wrap {
+      width: 100%; max-width: 1180px; margin: 0 auto;
+      display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 26px; align-items: start;
+    }
+    .landing-wrap .login-card { position: sticky; top: 84px; max-width: none; }
+    @media (max-width: 1040px) {
+      .landing-wrap { grid-template-columns: 1fr; max-width: 620px; }
+      .landing-wrap .login-card { position: static; order: -1; }
+      #landing-doc { padding: 22px 18px; }
+    }
   </style>
 </head>
 
@@ -466,6 +480,8 @@
   </div>
 
   <main id="login-screen" class="screen active">
+    <div class="landing-wrap">
+    <section class="landing-doc" id="landing-doc"></section>
     <section class="login-card">
       <img src="logo-waterai.png" alt="WaterAI" class="logo" />
 
@@ -485,6 +501,7 @@
         <div>v0.7.0</div>
       </div>
     </section>
+    </div>
   </main>
 
   <main id="dashboard-screen" class="screen dashboard-screen">
@@ -1651,6 +1668,7 @@
 <script src="js/modules/occupancy.js?v=1786574000"></script>
 <script src="js/modules/i18n-occupancy.js?v=1786570000"></script>
 <script src="js/modules/i18n-oferta.js?v=1787183000"></script>
+  <script src="js/landing.js"></script>
 </body>
 </html>
 
