@@ -90,7 +90,15 @@ const SLOWNIKI = [
   'js/modules/i18n-ui-core-4.js',
   'js/modules/i18n-instrukcja.js',
   'js/modules/i18n-ui-core-5.js',
-  'js/modules/i18n-ui-core-3.js'
+  'js/modules/i18n-ui-core-3.js',
+  // Doładowane 2026-08-19: te trzy słowniki index.html ładuje od dawna, a audyt
+  // ich NIE ładował — sprawdzał więc uboższy zestaw niż produkcja i pokazywał
+  // jako braki napisy, które w aplikacji są przetłumaczone (m.in. cała korekta
+  // obłożenia). Lista MUSI odpowiadać znacznikom <script> w index.html.
+  'js/modules/i18n-backfill-all.js',
+  'js/modules/i18n-parity-2026-08.js',
+  'js/modules/i18n-occupancy.js',
+  'js/modules/i18n-oferta.js'
 ];
 
 // ── Ładowanie silnika i słowników poza przeglądarką ──────────────────────────
@@ -195,7 +203,16 @@ const IGNORUJ = [
   /^[a-zA-Z_$][\w$]*\s*[:(=]/,               // fragment kodu: nazwa: wartość
   /^[-\w.]+\.(js|css|png|jpg|jpeg|svg|html|json|xlsx|pdf|md|sql)$/i,
   /^(https?|data|mailto|tel|blob|javascript):/i,
-  /^[#.]?[\w-]+$/,                           // selektory CSS, klasy, gołe identyfikatory
+  /^[#.][\w-]+$/,                            // selektory CSS: .klasa, #id
+  // WERSJA 3 (2026-08-19): stara reguła /^[#.]?[\w-]+$/ zjadała KAŻDY napis
+  // jednowyrazowy — razem z identyfikatorami leciały prawdziwe etykiety
+  // („Kwoty", „Wszystkie", „Robocze", „Odrzucona"). Audyt pokazywał więc 100%
+  // pokrycia modułu Oferta, podczas gdy chipy filtrów nad tabelą były po polsku.
+  // Teraz pomijamy gołe identyfikatory (active, ACCEPTED, fv_doc, 2d), ale NIE
+  // słowa pisane jak etykieta: Wielka litera + same małe litery.
+  t => /^[\w-]+$/.test(t) && !/^[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż]{2,}$/.test(t),
+  // techniczne słowa-etykiety, które przechodzą przez powyższy filtr
+  /^(Pragma|Expires|Escape|Enter|Gcal|Steuernummer|Sonstige)$/,
   /^[\d\s.,:;%/+()–—-]+$/,                   // same liczby i separatory
   /^(px|em|rem|vh|vw|fr|auto|none|flex|grid|block|inline|bold|left|right|center|middle|nowrap|pointer|hidden|visible|solid|dashed|dotted|absolute|relative|fixed|sticky|border-box|transparent|currentColor|inherit|initial|unset)\b/,
   // Fragment zaczynający się przecinkiem lub myślnikiem bywa DALSZYM CIĄGIEM zdania
@@ -252,7 +269,7 @@ const IGNORUJ = [
   // adresy i numery rejestrowe spółek grupy — dane, nie etykiety interfejsu
   /^(CH-\d{4} |Gartenstrasse |\d{8} \(IČO\))/
 ];
-const pomijac = t => IGNORUJ.some(re => re.test(t));
+const pomijac = t => IGNORUJ.some(re => (typeof re === 'function' ? re(t) : re.test(t)));
 
 // ── Zbieranie kandydatów ────────────────────────────────────────────────────
 function zbierzNapisy() {
@@ -340,8 +357,12 @@ function main() {
   const wynik = {};
   for (const lang of LANGS) {
     const d = dict[lang] || {};
+    // Napis sklejany dynamicznie ma w słowniku klucz ze spacją na końcu
+    // („Scenariusz ” + etykieta). Audyt normalizuje spacje, więc bez tego
+    // sprawdzenia zgłaszałby jako brak coś, co jest przetłumaczone.
+    const pokryty = t => (t in d) || ((t + ' ') in d) || ((' ' + t) in d);
     wynik[lang] = wszystkie
-      .filter(([t]) => !(t in d))
+      .filter(([t]) => !pokryty(t))
       .map(([t, pliki]) => ({ tekst: t, pliki: [...pliki] }));
   }
 
