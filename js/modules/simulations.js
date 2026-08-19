@@ -104,8 +104,15 @@ const SimulationsModule = {
 
   // Trwały numer porządkowy: nadawany raz, przy powstaniu oferty, i już się nie zmienia
   // (usunięcie innej oferty nie przenumerowuje pozostałych).
+  // UWAGA: oferty sprzed wprowadzenia `seq` nie mają go wcale i na liście dostają
+  // numer zastępczy z kolejności powstania (1..N). Samo max(seq) dawało wtedy 0,
+  // więc nowa oferta startowała od 1 i ZDERZAŁA SIĘ z numerem najstarszej —
+  // przy sortowaniu po „#" wpadała na początek listy zamiast na koniec.
+  // Dlatego licznik nigdy nie schodzi poniżej liczby istniejących ofert.
   nextSeq() {
-    return this.getAll().reduce((m, s) => Math.max(m, Number(s.seq) || 0), 0) + 1;
+    const items = this.getAll();
+    const maxSeq = items.reduce((m, s) => Math.max(m, Number(s.seq) || 0), 0);
+    return Math.max(maxSeq, items.length) + 1;
   },
 
   add(sim) {
@@ -590,6 +597,30 @@ const SIM_STYLE = `<style>
 
 // ── 5. LISTA ─────────────────────────────────────────────────────────────────
 
+// Jednorazowe uporządkowanie numeru porządkowego „#".
+// Oferty sprzed wprowadzenia `seq` go nie mają (na liście dostają numer zastępczy
+// z kolejności powstania), a te utworzone po jego wprowadzeniu dostały 1, 2, …
+// — stąd na liście powtarzały się te same numery i nowe oferty ginęły wśród starych.
+// Naprawa: numerujemy WSZYSTKIE oferty wg daty utworzenia, raz, i zapisujemy.
+// Tylko dla ról wewnętrznych — rola zewnętrzna widzi bazę przyciętą przez RLS,
+// więc przenumerowanie z jej widoku byłoby liczone na niepełnym zbiorze.
+function _simRepairSeq() {
+  if (!_simIsStaff()) return false;
+  const items = SimulationsModule.getAll();
+  if (!items.length) return false;
+  const seqs = items.map(s => Number(s.seq) || 0);
+  const dup = new Set(seqs.filter(v => v > 0)).size !== seqs.filter(v => v > 0).length;
+  const missing = seqs.some(v => !v);
+  if (!dup && !missing) return false;
+
+  const order = [...items].sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  const seqById = {};
+  order.forEach((s, i) => { seqById[String(s.id)] = i + 1; });
+  console.warn('[simulations] Porządkuję numerację „#" dla ' + items.length + ' ofert (były duplikaty lub braki).');
+  SimulationsModule.saveAll(items.map(s => ({ ...s, seq: seqById[String(s.id)] })));
+  return true;
+}
+
 function renderSimulationsModule() {
   const container = document.getElementById('module-content');
   if (!container) return;
@@ -597,6 +628,7 @@ function renderSimulationsModule() {
 
   const staff = _simIsStaff();
   const canWrite = _simCanWrite();
+  _simRepairSeq();
   const allSims = SimulationsModule.getAll();
 
   const q        = (window._simSearch || '').toLowerCase();
