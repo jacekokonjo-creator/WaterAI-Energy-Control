@@ -2,6 +2,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Zakładka „Instrukcja korzystania z WaterAI Energy Control".
 //
+// Wersja 3 (2026-08-19): dodane INSTRUKCJE KROK PO KROKU (klient, obiekt, oferta)
+// oraz sprostowane opisy, które rozjechały się z kodem: „Symulacje" to dziś „Oferta",
+// metod analizy są cztery (nie siedem), kartoteka klienta NIE ma pól rozliczeniowych,
+// a formularz obiektu nie ma pola powierzchni ogrzewanej.
+//
 // Wersja 2 (2026-08-10): treść jest teraz OSOBNA dla każdej z pięciu ról i opisuje
 // każdy moduł widoczny dla tej roli — po co jest, co w nim znajdziesz i jak dodać
 // nową pozycję. Wcześniej role wewnętrzne dostawały jeden wspólny tekst, a Klient
@@ -27,14 +32,14 @@ const InstructionsModule = {
     clients: {
       icon: '👥', name: 'Klienci',
       poCo: 'Kartoteka firm, dla których prowadzimy rozliczenia. To korzeń całej struktury — bez klienta nie da się dodać obiektu ani wystawić faktury.',
-      coZnajdziesz: 'Dane rejestrowe i adresowe, NIP/VAT ID, osoby kontaktowe, model rozliczenia i udział ESCO, termin płatności w dniach, e-mail do faktur oraz listę obiektów klienta.',
-      jakDodac: 'Przycisk „+ Nowy klient" nad listą. Wymagana jest nazwa, resztę można uzupełnić później. Termin płatności ustawiony w kartotece podpowiada się potem przy każdej fakturze tego klienta.'
+      coZnajdziesz: 'Nazwę, VAT ID / NIP, kraj i język korespondencji, adres, link do Google Maps, osoby kontaktowe oraz listę obiektów klienta. Warunki rozliczenia (model, udział ESCO, termin płatności, e-mail do faktur) ustawia się NIE tutaj, tylko na obiekcie.',
+      jakDodac: 'Przycisk „+ Nowy klient" nad listą. Wymagana jest wyłącznie nazwa — resztę można uzupełnić później. Język klienta decyduje o języku jego dokumentów, więc warto ustawić go od razu.'
     },
     objects: {
       icon: '🏢', name: 'Obiekty',
       poCo: 'Budynki klienta — hotel, szkoła, biurowiec. Każdy pomiar, analiza i raport dotyczy konkretnego obiektu, więc tutaj opisujemy, z czym pracujemy.',
-      coZnajdziesz: 'Adres i typ obiektu, powierzchnię ogrzewaną, źródła ciepła dla CO i CWU, cykl rozliczeniowy, daty umowy i uruchomienia, stację meteorologiczną oraz parametry energetyczne potrzebne do analiz.',
-      jakDodac: 'W kartotece klienta „+ Dodaj obiekt dla tego klienta" albo w module Obiekty. Uzupełnij przynajmniej nazwę, powierzchnię ogrzewaną i źródło ciepła — bez tego analizy nie policzą wskaźników jednostkowych.'
+      coZnajdziesz: 'Typ i status obiektu, adres, źródła ciepła dla CO i CWU, sposób odczytu zużycia, cykl rozliczeniowy, opiekunów (Back Office, Energy Analyst, Sales Rep), daty umowy i uruchomienia, warunki rozliczenia z udziałem ESCO, stację meteorologiczną oraz jednostkę energii, walutę i cenę.',
+      jakDodac: 'W module Obiekty „+ Nowy obiekt" albo z kartoteki klienta. Wymagane są klient i nazwa. To na obiekcie, a nie na kliencie, ustawia się model rozliczenia, udział ESCO, termin płatności i e-mail do faktur — te dane trafiają potem na fakturę.'
     },
     readings: {
       icon: '📟', name: 'Pomiary',
@@ -51,8 +56,8 @@ const InstructionsModule = {
     analyses: {
       icon: '📐', name: 'Analizy',
       poCo: 'Przeliczenie oszczędności wybraną metodą. Analiza odpowiada na pytanie, ile energii realnie zaoszczędzono po sprowadzeniu obu okresów do wspólnych warunków.',
-      coZnajdziesz: 'Metody: korekta TYM (stopniodni), regresja liniowa, korekta obłożenia, powierzchni, harmonogramu i intensywności. Do każdej równania, wykresy, wskaźnik jednostkowy i część dowodową.',
-      jakDodac: '„+ Nowa analiza" → wybierz typ, klienta, obiekt i okres bazowy, wprowadź dane okresu analizowanego, a na dole kliknij „Wykonaj analizę". Analizę może wykonać wyłącznie użytkownik z rolą Energy Analyst.'
+      coZnajdziesz: 'Cztery metody: korekta TYM (stopniodni), korekta obłożenia, korekta intensywności oraz regresja liniowa. Trzy pierwsze są rozliczeniowe — to one są podstawą faktury. Regresja jest metodą pomocniczą: stanowi dowód techniczny, ale nie zastępuje metody rozliczeniowej.',
+      jakDodac: '„+ Nowa analiza" → wybierz typ, klienta, obiekt i okres bazowy, wprowadź dane okresu analizowanego i kliknij „Wykonaj analizę". Analiza wymaga wcześniej przygotowanego okresu bazowego tego samego typu.'
     },
     reports: {
       icon: '📈', name: 'Raporty ESCO',
@@ -67,15 +72,15 @@ const InstructionsModule = {
       jakDodac: '„+ Nowa faktura" → wskaż podmiot wystawiający i klienta, a jako podstawę wybierz raport ESCO albo analizę. Kwota netto, okres i uwagi podpowiedzą się same; pola na żółtym tle to podpowiedzi, które możesz nadpisać. Termin płatności liczy się z kartoteki klienta.'
     },
     simulation: {
-      icon: '💡', name: 'Symulacje oszczędności',
-      poCo: 'Prognoza przed wdrożeniem — ile klient może zaoszczędzić i jak rozłoży się to między niego a WaterAI. Narzędzie ofertowe, nie rozliczeniowe.',
-      coZnajdziesz: 'Scenariusze wieloletnie, warianty rozliczenia (bez opłat, kaucja zwrotna, opłata wdrożeniowa), założenia cenowe i wykresy przepływów.',
-      jakDodac: '„+ Nowa symulacja" → wybierz klienta i obiekt, podaj koszt energii oraz zakładany procent oszczędności, wybierz wariant rozliczenia i horyzont w latach.'
+      icon: '📋', name: 'Oferta',
+      poCo: 'Dokument handlowy dla klienta przed wdrożeniem: ile może zaoszczędzić, jak rozłoży się to między niego a WaterAI i kiedy zwróci się opłata. Prognoza, nie rozliczenie — podstawą faktur są dopiero raporty ESCO.',
+      coZnajdziesz: 'Scenariusze wieloletnie z podziałem oszczędności, cztery warianty rozliczenia (opłata wdrożeniowa w 2. roku — domyślny, kaucja zwrotna, opłata wdrożeniowa z góry, bez opłat), wykresy przepływów, opis metod pomiaru oszczędności oraz gotowy dokument do druku ze zdjęciami obiektu na okładce.',
+      jakDodac: '„＋ Nowa oferta" → klient, obiekt, wariant rozliczenia, roczny koszt ogrzewania i scenariusze oszczędności. Szczegóły w instrukcji „Jak przygotować ofertę" niżej.'
     },
     visibility: {
       icon: '👁️', name: 'Widoczność',
       poCo: 'Sterowanie tym, kto widzi konkretny dokument. Klient i Sales Representative nie widzą niczego z samej roli — dostają dostęp wyłącznie tutaj, dokument po dokumencie.',
-      coZnajdziesz: 'Macierz: dokumenty w wierszach, użytkownicy w kolumnach. Kolumny są ułożone alfabetycznie, można je zawęzić do jednego typu konta albo wyszukać po nazwisku. Zakładki u góry przełączają typ dokumentu.',
+      coZnajdziesz: 'Macierz: dokumenty w wierszach, użytkownicy w kolumnach. Kolumny są ułożone alfabetycznie, można je zawęzić do jednego typu konta albo wyszukać po nazwisku. Zakładki u góry przełączają typ dokumentu: okresy bazowe, analizy, raporty ESCO, faktury i oferty.',
       jakDodac: 'Zaznacz „W" (widzi) albo „E" (edytuje) na przecięciu dokumentu i użytkownika. „E" automatycznie włącza „W", odznaczenie odbiera dostęp. Zmiana zapisuje się od razu.'
     },
     users: {
@@ -133,6 +138,88 @@ const InstructionsModule = {
       poCo: 'Faktury wystawione na podstawie wykazanych oszczędności.',
       coZnajdziesz: 'Numer, kwotę, termin płatności i status każdej faktury oraz wydruk do pobrania.',
       jakDodac: 'Faktury wystawia WaterAI. Pojawiają się tutaj po udostępnieniu.'
+    }
+  },
+
+  // ── Instrukcje krok po kroku ───────────────────────────────────────────────
+  // Klucz `modul` decyduje, komu przepis się pokaże: widzi go rola, która ma ten
+  // moduł na liście kafelków. Dzięki temu nie trzeba pilnować dwóch list naraz.
+  PRZEPISY: {
+    klient: {
+      modul: 'clients',
+      icon: '👥', tytul: 'Jak dodać klienta',
+      wstep: 'Klient to korzeń całej struktury — bez niego nie da się dodać obiektu, oferty ani faktury. Zajmuje minutę, bo wymagana jest tylko nazwa.',
+      kroki: [
+        ['Otwórz moduł Klienci i kliknij „+ Nowy klient"',
+         'Formularz rozwija się nad listą. Jeśli klient już istnieje, użyj wyszukiwarki zamiast zakładać drugi raz — duplikaty rozjeżdżają numerację i raporty.'],
+        ['Wypełnij dane podstawowe',
+         'Nazwa jest jedynym polem wymaganym; wpisz ją tak, jak ma widnieć na fakturze. VAT ID / NIP, kraj i język są opcjonalne, ale język ustaw od razu — decyduje o języku dokumentów wysyłanych do tego klienta.'],
+        ['Uzupełnij adres',
+         'Kod pocztowy, miasto, ulica, numer budynku i lokalu. Adres z kartoteki idzie na faktury, więc podaj adres rejestrowy firmy, a nie adres budynku — ten wpiszesz osobno przy obiekcie.'],
+        ['Dodaj osoby kontaktowe',
+         'Przycisk „+ Dodaj osobę kontaktową" dokłada wiersz: imię i nazwisko, rola, e-mail, telefon. Możesz dodać kilka osób. Pusty wiersz jest pomijany przy zapisie, więc nic się nie stanie, jeśli go zostawisz.'],
+        ['Zapisz',
+         'Klient pojawia się na liście, a system zakłada mu automatycznie folder na dokumenty. Kolejny krok to dodanie obiektu — bez niego kartoteka jest pusta.']
+      ],
+      uwagi: [
+        'Warunków rozliczenia (model, udział ESCO, termin płatności, e-mail do faktur) NIE ustawia się na kliencie, tylko na jego obiekcie — jeden klient może mieć obiekty na różnych warunkach.',
+        'Zmiana nazwy klienta zmienia też nazwę jego folderu dokumentów. Numer klienta (K-001, K-002…) wynika z kolejności dodania i nie zmienia się.'
+      ]
+    },
+
+    obiekt: {
+      modul: 'objects',
+      icon: '🏢', tytul: 'Jak dodać obiekt',
+      wstep: 'Obiekt to budynek, którego dotyczą pomiary, analizy i rozliczenia. Formularz jest długi, ale wymagane są tylko dwa pola — reszta to dane, które będą potrzebne później, na kolejnych etapach.',
+      kroki: [
+        ['Otwórz moduł Obiekty i kliknij „+ Nowy obiekt"',
+         'Możesz też wejść z kartoteki klienta — wtedy klient podpowie się sam. Klienta trzeba mieć wcześniej; obiektu nie da się dodać „w powietrzu".'],
+        ['Dane podstawowe obiektu',
+         'Wymagane: klient i nazwa obiektu. Do tego typ (hotel, szkoła, biurowiec, szpital, spółdzielnia, zakład…) i status: Oferta, Wdrożenie, Aktywny, Wstrzymany, Zakończony. Status Oferta oznacza obiekt, dla którego jeszcze nie ruszyło rozliczanie.'],
+        ['Dane umowne i rozliczeniowe',
+         'Tutaj — a nie w kartotece klienta — ustawiasz model rozliczenia, udział ESCO w procentach (domyślnie 50), termin płatności w dniach (domyślnie 14) i e-mail do faktur. Wpisz też opiekunów: Back Office, Energy Analyst i Sales Representative. Opiekun handlowy z tego pola pokazuje się potem w kolumnie „Sales Rep" na liście ofert.'],
+        ['Adres obiektu',
+         'Adres fizyczny budynku, niezależny od adresu rejestrowego klienta. Możesz dokleić link do Google Maps.'],
+        ['System grzewczy i rozliczeniowy',
+         'Źródło ciepła osobno dla CO i dla CWU, sposób odczytu zużycia (faktura albo licznik) i cykl rozliczeniowy z datą startu. Ustaw też, na ile dni przed terminem system ma przypominać o rozliczeniu (domyślnie 14).'],
+        ['Dane klimatyczne (TYM)',
+         'Stacja meteorologiczna, źródło danych i data ich pobrania oraz temperatura bazowa (domyślnie 21 °C). Z tych ustawień korzysta korekta TYM przy liczeniu stopniodni — bez nich analiza nie będzie miała do czego porównać sezonu.'],
+        ['Dane energetyczne i zapis',
+         'Jednostka energii (domyślnie GJ), waluta i cena jednostkowa energii. Zapisz — obiekt pojawi się na liście klienta, a jego terminy rozliczeń trafią do kalendarza.']
+      ],
+      uwagi: [
+        'Formularz nie ma pola powierzchni ogrzewanej — wskaźniki na m² nie są dziś liczone, więc nie szukaj tego pola.',
+        'Jednostka energii i waluta ustawione na obiekcie są dziedziczone przez analizy, raporty i faktury. Zmiana po fakcie nie przelicza dokumentów już wystawionych.'
+      ]
+    },
+
+    oferta: {
+      modul: 'simulation',
+      icon: '📋', tytul: 'Jak przygotować ofertę',
+      wstep: 'Oferta pokazuje klientowi, ile zaoszczędzi i kiedy zwróci mu się opłata. Powstaje w kilka minut, a wychodzi z niej gotowy dokument do druku lub PDF.',
+      kroki: [
+        ['Otwórz kafelek Oferta i kliknij „＋ Nowa oferta"',
+         'Klient i obiekt muszą już istnieć w systemie. Ofertę może przygotować personel wewnętrzny oraz Sales Representative.'],
+        ['Nagłówek: nazwa, numer, autor',
+         'Nazwę i numer możesz zostawić puste — przy zapisie system wstawi „Oferta — nazwa klienta" oraz numer w formacie OF/rok/nr klienta/nr obiektu/kolejny. W polu „Sporządził" wybierz siebie z listy.'],
+        ['Wybierz klienta i obiekt',
+         'Klient jest wymagany — bez niego zapis nie przejdzie. Obiekt jest opcjonalny, ale bez niego numer oferty będzie uboższy, a na okładce zabraknie nazwy budynku.'],
+        ['Ustaw wariant rozliczenia',
+         'Domyślny to „Opłata wdrożeniowa w 2. roku": rok 1 jest okresem weryfikacji bez opłat, a w 2. roku opłata spłaca się z wypracowanych oszczędności. Kwota podpowiada się według waluty i można ją nadpisać. Pozostałe warianty: kaucja zwrotna, opłata wdrożeniowa z góry, bez opłat.'],
+        ['Podaj założenia finansowe',
+         'Roczny koszt ogrzewania jest wymagany i musi być większy od zera — to od niego liczy się wszystko. Dalej: roczny wzrost cen energii (domyślnie 6,48%), horyzont w latach (domyślnie 10) i udział klienta w oszczędnościach (domyślnie 50%).'],
+        ['Dodaj scenariusze oszczędności',
+         'Domyślnie jest jeden wariant z oszczędnością 18%. Przyciskiem „＋ Dodaj wariant" dołóż kolejne — np. ostrożny, realny i optymistyczny — i zaznacz, który jest bazowy. Scenariusz bazowy trafia na okładkę i do podsumowania.'],
+        ['Dodaj zdjęcia obiektu (opcjonalnie)',
+         'Zdjęcia z sekcji „Zdjęcia obiektu (na okładkę)" pojawią się na pierwszej stronie dokumentu. Warto — oferta ze zdjęciem budynku wygląda jak dokument przygotowany pod konkretnego klienta.'],
+        ['Zapisz i otwórz podgląd',
+         'Przycisk „💾 Zapisz" odkłada ofertę na listę i podświetla świeżo zapisany wiersz. Ikoną 👁 otworzysz gotowy dokument — z okładką, podsumowaniem, metodami pomiaru oszczędności, tabelami lat i wykresami — do wydruku albo zapisania jako PDF.']
+      ],
+      uwagi: [
+        'Status oferty (Robocza → Zaprezentowana → Zaakceptowana / Odrzucona) prowadź na bieżąco: chipy nad listą filtrują po nim, a podsumowanie u góry liczy z niego przychód roczny w toku i zaakceptowany.',
+        'Kwoty w różnych walutach nigdy nie są sumowane razem — system nie zna kursów i pokazuje je osobno.',
+        'Oferta to prognoza. Rzeczywiste oszczędności liczy się później metodą zapisaną w umowie, a dokumentuje raportem ESCO.'
+      ]
     }
   },
 
@@ -229,6 +316,33 @@ const InstructionsModule = {
       items.map(function (i) { return '<li style="margin-bottom:6px;">' + i + '</li>'; }).join('') + '</ul>';
   },
 
+  // Blok jednej instrukcji krok po kroku: numerowane kroki + uwagi na końcu.
+  _przepis(klucz) {
+    var pz = this.PRZEPISY[klucz];
+    if (!pz) return '';
+    var self = this;
+    var kroki = pz.kroki.map(function (k, i) {
+      return '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+        '<div style="flex:0 0 24px;height:24px;border-radius:50%;background:#0C447C;color:#fff;' +
+          'font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:3px;">' +
+            self._esc(k[0]) + '</div>' +
+          '<div style="font-size:13px;color:var(--color-text-secondary);line-height:1.6;">' +
+            self._esc(k[1]) + '</div>' +
+        '</div></div>';
+    }).join('');
+    var uwagi = (pz.uwagi && pz.uwagi.length)
+      ? '<div style="margin-top:12px;padding:12px 14px;background:#FEF3DC;border-left:3px solid #E0A800;border-radius:6px;">' +
+          '<div style="font-size:12px;font-weight:600;color:#7A4A00;margin-bottom:6px;">Warto wiedzieć</div>' +
+          this._list(pz.uwagi.map(function (u) { return self._esc(u); })) + '</div>'
+      : '';
+    return '<div style="padding:16px 0;border-top:1px solid var(--color-border-tertiary);">' +
+      '<div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px;">' +
+        pz.icon + ' ' + this._esc(pz.tytul) + '</div>' +
+      this._p(this._esc(pz.wstep)) + kroki + uwagi + '</div>';
+  },
+
   // Blok jednego modułu: nazwa + trzy pytania, na które instrukcja ma odpowiadać.
   _modul(klucz) {
     var m = this.MODULY[klucz];
@@ -277,6 +391,16 @@ const InstructionsModule = {
       def.moduly.map(function (k) { return self._modul(k); }).join('')
     );
 
+    // Instrukcje krok po kroku — tylko te, których moduł rola faktycznie ma.
+    var dostepne = Object.keys(this.PRZEPISY)
+      .filter(function (k) { return def.moduly.indexOf(self.PRZEPISY[k].modul) !== -1; });
+    var przepisy = dostepne.length ? this._card(
+      this._h('Instrukcje krok po kroku') +
+      this._p('Najczęstsze zadania rozpisane po kolei. Kolejność ma znaczenie: klient musi istnieć przed obiektem, ' +
+        'a obiekt przed ofertą i rozliczeniem.') +
+      dostepne.map(function (k) { return self._przepis(k); }).join('')
+    ) : '';
+
     var widocznosc = this._card(
       this._h('Co widzisz') +
       this._p('Dostęp do danych wynika z dwóch niezależnych rzeczy. Pierwsza to <strong>rola</strong> — stała, ' +
@@ -289,7 +413,7 @@ const InstructionsModule = {
         'co widać w przeglądarce.')
     );
 
-    return '<div style="max-width:860px;">' + naglowek + struktura + moduly + widocznosc + '</div>';
+    return '<div style="max-width:860px;">' + naglowek + struktura + przepisy + moduly + widocznosc + '</div>';
   }
 };
 window.InstructionsModule = InstructionsModule;
