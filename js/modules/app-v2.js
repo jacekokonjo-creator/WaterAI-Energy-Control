@@ -3765,7 +3765,11 @@ function analRun() {
     return;
   }
   // Sprowadzenie bazy (PRZED) do długości/warunków okresu PO — stosunek standardowych stopniodni
-  const normF = (ANAL.type === 'TYM' && before.sumS > 0) ? after.sumS / before.sumS : 1;
+  // Rzutowanie bazy na okres PO (Zal. nr 3, rownanie 4a) - dla TYM i OCCUPANCY.
+  // VOLUME nie ma stopniodni, wiec projekcja po nich nie ma sensu.
+  // Warunek musi byc identyczny jak w _analReportData, inaczej kreator i raport ESCO
+  // pokazuja rozne kwoty dla tej samej analizy.
+  const normF = (ANAL.type !== 'VOLUME' && before.sumS > 0) ? after.sumS / before.sumS : 1;
   const qsBeforeNorm = before.qs * normF;
   const savedEnergy = qsBeforeNorm - after.qs;
   const savedPct = qsBeforeNorm > 0 ? savedEnergy / qsBeforeNorm * 100 : 0;

@@ -5,7 +5,7 @@
 
      ti,eff = f_wsp·ti + (1 − f_wsp)·[ O·ti + (1 − O)·ti,red ]        (2a)
      SDeff  = z₀ · (ti,eff − tme)                                      (2)
-     φ      = ΣSDeff,stand / ΣSDeff,rzecz                              (3)
+     φ      = ΣSDeff,ref / ΣSDeff,rzecz                              (3)
      Qs     = Qc.o. · φ                                                (1)
 
    Wzór 2a rozszerzony o udział powierzchni wspólnych (f_wsp) — korytarze,
@@ -167,7 +167,7 @@
         param('ti', 'tᵢ — pokoje użytkowane [°C]', 'projektowa, zwykle 20') +
         param('tiRed', 'tᵢ,red — pokoje puste [°C]', 'obniżona, zwykle 17') +
         param('fCommon', 'f_wsp — powierzchnie wspólne [%]', 'grzane niezależnie od obłożenia', '1') +
-        param('oRef', 'O_ref — obłożenie referencyjne [%]', 'dla sezonu standardowego', '1') +
+        param('oRef', 'O_ref — obłożenie referencyjne [%]', 'obłożenie okresu odniesienia', '1') +
       '</div>' +
       '<div style="margin-top:10px;"><label style="' + pl + '">Podstawa obłożenia <span style="opacity:.7;">(opcjonalne, trafia do wydruku)</span></label>' +
       '<input type="text" value="' + _occEsc(d.occBasis || '') + '" placeholder="np. % pokoi zajętych wg raportu recepcji / % m² użytkowanych / % godzin w trybie użytkowym" ' +
@@ -183,7 +183,7 @@
         '<tr style="background:var(--color-background-secondary);">' +
           '<th rowspan="2" style="' + th + '">Miesiąc</th>' +
           '<th colspan="5" style="padding:6px 8px;text-align:center;font-size:11px;color:#0C447C;">Okres rzeczywisty</th>' +
-          '<th colspan="2" style="padding:6px 8px;text-align:center;font-size:11px;color:#0C447C;border-left:2px solid #B5D4F4;">Sezon standardowy (TYM)</th>' +
+          '<th colspan="2" style="padding:6px 8px;text-align:center;font-size:11px;color:#0C447C;border-left:2px solid #B5D4F4;">Okres odniesienia (śr. 5 lat)</th>' +
         '</tr>' +
         '<tr style="background:var(--color-background-secondary);">' +
           '<th style="' + th + '">dni z₀</th>' +
@@ -191,8 +191,8 @@
           '<th style="' + th + '">O [%]</th>' +
           '<th style="' + thR + '">tᵢ,eff [°C]</th>' +
           '<th style="' + thR + '">SDeff,rzecz</th>' +
-          '<th style="' + th + 'border-left:2px solid #B5D4F4;">tme,std [°C]</th>' +
-          '<th style="' + thR + '">SDeff,stand</th>' +
+          '<th style="' + th + 'border-left:2px solid #B5D4F4;">tme,ref [°C]</th>' +
+          '<th style="' + thR + '">SDeff,ref</th>' +
         '</tr>' +
       '</thead>' +
       '<tbody>' + rows + '</tbody>' +
@@ -207,7 +207,7 @@
     '</table>' +
 
     '<div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:#E6F1FB;border:1px solid #B5D4F4;font-size:13px;color:#0C447C;">' +
-      'φ = ΣSDeff,stand / ΣSDeff,rzecz = <b id="occ-phi">' + (c.phi != null ? _occFmt(c.phi, 4) : '—') + '</b>' +
+      'φ = ΣSDeff,ref / ΣSDeff,rzecz = <b id="occ-phi">' + (c.phi != null ? _occFmt(c.phi, 4) : '—') + '</b>' +
       ' · Qs = Qc.o.·φ = <b id="occ-qs">' + (c.qs != null ? _occFmt(c.qs, 2) : '—') + '</b> ' + _occEsc(d.energyUnit || 'GJ') +
       '<div style="font-size:11px;opacity:0.8;margin-top:5px;">Miesiące z z₀ = 0 lub bez temperatury są wyszarzone i nie wchodzą do sum.</div>' +
     '</div>';
@@ -283,7 +283,7 @@
           '<thead><tr style="background:var(--color-background-secondary);">' +
             '<th style="' + td + 'text-align:left;">Miesiąc</th><th style="' + tdR + '">z₀</th><th style="' + tdR + '">tme</th>' +
             '<th style="' + tdR + '">O</th><th style="' + tdR + '">tᵢ,eff</th><th style="' + tdR + '">SDeff,rzecz</th>' +
-            '<th style="' + tdR + 'border-left:2px solid #B5D4F4;">tme,std</th><th style="' + tdR + '">SDeff,stand</th>' +
+            '<th style="' + tdR + 'border-left:2px solid #B5D4F4;">tme,ref</th><th style="' + tdR + '">SDeff,ref</th>' +
           '</tr></thead><tbody>' + body + '</tbody>' +
           '<tfoot><tr style="font-weight:700;font-size:13px;background:var(--color-background-secondary);">' +
             '<td style="' + td + '">Σ</td><td style="' + tdR + '">' + c.days + '</td><td colspan="3"></td>' +
@@ -292,7 +292,7 @@
           '</tr></tfoot></table></div>') +
 
       step(3, 'Współczynnik korekcyjny (równanie 3)',
-        box('φ = ΣSDeff,stand / ΣSDeff,rzecz = ' + _occFmt(c.sumS, 1) + ' / ' + _occFmt(c.sumR, 1) +
+        box('φ = ΣSDeff,ref / ΣSDeff,rzecz = ' + _occFmt(c.sumS, 1) + ' / ' + _occFmt(c.sumR, 1) +
             ' = <b style="font-size:15px;">' + (c.phi != null ? _occFmt(c.phi, 4) : '—') + '</b>')) +
 
       step(4, 'Zużycie skorygowane (równanie 1)',
@@ -451,7 +451,7 @@
         '<td class="calc" id="anw-' + key + '-tieff-' + idx + '">' + F(tiEff, 2) + '</td>' +
         '<td class="calc" id="anw-' + key + '-sdr-' + idx + '">' + (grzR ? F(sdR, 1) : '—') + '</td>' +
         '<td><input type="number" step="0.001" value="' + (mo.ded == null ? '' : mo.ded) + '" placeholder="0" oninput="ANAL.' + key + '.months[' + idx + '].ded=this.value;_analRecalcLive()"></td>' +
-        '<td class="anw-sep"><input type="number" step="0.1" value="' + stdM[0] + '" placeholder="tme,std" oninput="ANAL.std[' + mo.month + '][0]=this.value;_analRecalcLive()"></td>' +
+        '<td class="anw-sep"><input type="number" step="0.1" value="' + stdM[0] + '" placeholder="tme,ref" oninput="ANAL.std[' + mo.month + '][0]=this.value;_analRecalcLive()"></td>' +
         '<td class="calc" id="anw-' + key + '-sds-' + idx + '">' + F(sdS, 1) + '</td>' +
       '</tr>';
     }).join('') : '<tr><td colspan="9" style="text-align:center;padding:14px;">Ustaw zakres dat okresu.</td></tr>';
@@ -465,7 +465,7 @@
       '</div>' +
       '<table class="anw-t"><thead><tr>' +
         '<th>Miesiąc</th><th>dni z₀</th><th>tme [°C]</th><th>O [%]</th><th>tᵢ,eff</th><th>SDeff,rzecz</th><th>odlicz.</th>' +
-        '<th class="anw-sep">tme,std</th><th>SDeff,stand</th>' +
+        '<th class="anw-sep">tme,ref</th><th>SDeff,ref</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
       (function () { var miss = _occMissing(P); return miss.length
         ? '<div style="margin-top:10px;padding:9px 12px;border-radius:8px;background:#FFF7ED;border:1px solid #FDBA74;color:#7C2D12;font-size:12.5px;"><b>Brak obłożenia w ' + miss.length + ' mies.:</b> ' + miss.join(', ') + ' — te miesiące liczone są jak O = O_ref (' + _occAnalP().oRef + '%), czyli bez korekty obłożenia. Uzupełnij O, aby korekta zadziałała.</div>'
@@ -485,7 +485,7 @@
       '<div class="anw-row">' + f('ti', 'tᵢ [°C]') + f('tiRed', 'tᵢ,red [°C]') + f('fCommon', 'f_wsp [%]') + f('oRef', 'O_ref [%]') + '</div>' +
       '<div class="anw-row"><div class="anw-f" style="flex:1;"><label>Podstawa obłożenia <span style="opacity:.7;">(opcjonalne)</span></label>' +
       '<input type="text" value="' + String(ANAL.occBasis || '').replace(/"/g, '&quot;') + '" placeholder="np. % pokoi zajętych / % m² użytkowanych / % godzin pracy" oninput="ANAL.occBasis=this.value"></div></div>' +
-      '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme), gdzie z₀ = dni grzewcze wpisane ręcznie · φ = ΣSDeff,stand / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
+      '<div class="anw-muted" style="margin-top:8px;">tᵢ,eff = f_wsp·tᵢ + (1−f_wsp)·[O·tᵢ + (1−O)·tᵢ,red] · SDeff = z₀·(tᵢ,eff − tme), gdzie z₀ = dni grzewcze wpisane ręcznie · φ = ΣSDeff,ref / ΣSDeff,rzecz · Qs = Qc.o.netto·φ<br>' +
       'W kolumnie <b>O</b> podajesz udział procentowy (0–100) — z pokoi, osób, powierzchni lub godzin pracy, wedle uznania; przelicz przed wpisaniem.<br>O_ref obowiązuje identycznie w obu okresach — zmiana bazy odniesienia między PRZED a PO dałaby pozorną oszczędność.</div>' +
     '</div></div>';
   }
