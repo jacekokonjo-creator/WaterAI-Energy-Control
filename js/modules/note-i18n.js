@@ -46,9 +46,14 @@
       .replace(/"/g, '&quot;').replace(/\n/g, '&#10;');
   }
 
+  // Klucz cache liczony z tekstu sprowadzonego do samych znaków alfanumerycznych
+  // (małe litery). Odporny na spacje, łamanie wierszy i rodzaj myślnika — te rzeczy
+  // zmieniają się przy kopiowaniu opisu. Zmiana liczby daje nowy klucz i słusznie
+  // wymusza nowe tłumaczenie.
   async function hashOf(s) {
-    if (!(window.crypto && crypto.subtle)) return 'len' + s.length + ':' + s.slice(0, 64);
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    const norm = String(s).normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    if (!(window.crypto && crypto.subtle)) return 'len' + norm.length + ':' + norm.slice(0, 64);
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(norm));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
@@ -59,8 +64,14 @@
   }
 
   async function translate(text, lg) {
-    const key = (await hashOf(text)) + ':' + lg;
+    const h = await hashOf(text);
+    const key = h + ':' + lg;
     if (mem.has(key)) return mem.get(key);
+
+    // Tłumaczenia wgrane do repo (note-i18n-seed.js) — działają bez Edge Function.
+    const seed = window.NoteI18nSeed && window.NoteI18nSeed[h] && window.NoteI18nSeed[h][lg];
+    if (seed) { mem.set(key, seed); return seed; }
+
     const cached = lsGet(key);
     if (cached != null) { mem.set(key, cached); return cached; }
     if (pending.has(key)) return pending.get(key);
