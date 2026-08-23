@@ -2403,7 +2403,7 @@ function viewProtocol(id) {
       <!-- Notatka -->
       <div style="border:1px solid var(--color-border-tertiary);border-radius:10px;padding:14px;margin-bottom:16px;">
         <div style="font-size:11px;font-weight:600;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">📝 Notatka</div>
-        <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.note)}</div>
+        <div data-i18n-skip style="font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(p.note)}</div>
       </div>` : ""}
 
       <!-- Szczegóły protokołu -->
@@ -2418,7 +2418,7 @@ function viewProtocol(id) {
         ${p.protocolNotes ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--color-border-tertiary);">
           <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:4px;">Uwagi do protokołu</div>
-          <div style="font-size:14px;line-height:1.6;">${escapeHtml(p.protocolNotes)}</div>
+          <div data-i18n-skip style="font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(p.protocolNotes)}</div>
         </div>` : ""}
       </div>
 

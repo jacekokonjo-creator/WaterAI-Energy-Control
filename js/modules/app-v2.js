@@ -3996,7 +3996,10 @@ function _analClimateLine(data) {
 // Wielolinijkowy opis w metryce (1.1) — zachowuje akapity wpisane w protokole.
 function _analLongText(v) {
   const t = String(v == null ? '' : v).trim();
-  return t ? `<div style="white-space:pre-wrap;line-height:1.55;">${_escA(t)}</div>` : '';
+  // data-i18n-skip: to tekst analityka, nie napis interfejsu. Bez tego silnik i18n
+  // podmieniałby w nim pojedyncze słowa ze słownika („Gaz", „Opis", „Hotel", „Dni"…)
+  // i opis wychodziłby jako mieszanka językowa. Tłumaczenie treści = osobny mechanizm.
+  return t ? `<div data-i18n-skip style="white-space:pre-wrap;line-height:1.55;">${_escA(t)}</div>` : '';
 }
 
 function _analSourceRow(label, a, b) {
