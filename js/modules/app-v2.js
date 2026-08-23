@@ -3366,7 +3366,7 @@ function _analRegSourceCard(a, reg, bp, o, pfx, baseFrom, baseTo, derived) {
     _analSourceRow('Źródło temperatury zewnętrznej', clim || 'czujnik obiektowy'),
     _analSourceRow('Pomiar zużycia', meter || 'odczyt telemetryczny licznika (przyrost wskazań między odczytami)'),
     _analSourceRow('Odczytów w pliku', (an.rows && an.rows.length) ? _fmtA(an.rows.length, 0) : ''),
-    _analSourceRow('Uwagi analityka', _escA((bp && bp.notes) || ''))
+    _analSourceRow('Uwagi analityka', _analLongText((bp && bp.notes) || ''))
   ].join('');
   return `
   <div class="anw-step-card">
@@ -3993,6 +3993,12 @@ function _analClimateLine(data) {
 // policzono stopniodni i zużycie. Czyta WYŁĄCZNIE pola już zbierane przez aplikację:
 // protokół TYM (MeasurementsModule), dane klimatyczne obiektu/snapshotu, kartę obiektu
 // i parametry analizy. Nic nie wylicza — tylko pokazuje to, co dotąd zostawało na ekranie.
+// Wielolinijkowy opis w metryce (1.1) — zachowuje akapity wpisane w protokole.
+function _analLongText(v) {
+  const t = String(v == null ? '' : v).trim();
+  return t ? `<div style="white-space:pre-wrap;line-height:1.55;">${_escA(t)}</div>` : '';
+}
+
 function _analSourceRow(label, a, b) {
   if (b === undefined) return `<tr><td class="anw-src-l">${label}</td><td colspan="2">${a || '—'}</td></tr>`;
   return `<tr><td class="anw-src-l">${label}</td><td>${a || '—'}</td><td>${b || '—'}</td></tr>`;
@@ -4002,7 +4008,7 @@ function _analSourceCard(data, pfx) {
   let p = null;
   try {
     const bp = data.basePeriodId;
-    if (bp != null && bp !== 'manual' && !String(bp).startsWith('int:') && window.MeasurementsModule)
+    if (bp != null && bp !== 'manual' && !String(bp).startsWith('int:') && !String(bp).startsWith('occ:') && window.MeasurementsModule)
       p = MeasurementsModule.find(Number(bp));
   } catch (e) { p = null; }
   const c = (data && data._climate) || (data && data.object) || {};
@@ -4029,7 +4035,7 @@ function _analSourceCard(data, pfx) {
       ? (_fmtA(Number(data.energy.price || 0), 2) + ' ' + cur + ' — koszt zmienny całościowy')
       : (_fmtA(Number(data.energy.price || 0), 4) + ' ' + cur + '/' + u)),
     _analSourceRow('Udział WaterAI/ESCO', _fmtA(data.escoShare || 0, 0) + '%'),
-    _analSourceRow('Uwagi analityka', _escA((p && p.protocolNotes) || ''))
+    _analSourceRow('Uwagi analityka', _analLongText((p && (p.protocolNotes || p.note)) || ''))
   ].join('');
   return `
   <div class="anw-step-card">

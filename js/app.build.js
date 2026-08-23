@@ -2457,6 +2457,10 @@ function editMeasurement(id) {
 
   form.protocolDate.value = protocol.protocolDate || "";
   if (form.preparedBy) form.preparedBy.value = protocol.preparedBy || "";
+  // Bez tych dwóch linii edycja protokołu kasowała status i opis (formularz startuje pusty,
+  // a zapis nadpisuje rekord wartością z pustego pola).
+  if (form.protocolStatus) form.protocolStatus.value = protocol.protocolStatus || "DRAFT";
+  if (form.protocolNotes) form.protocolNotes.value = protocol.protocolNotes || "";
 
   form.weatherStation.value = protocol.weatherStation || "";
   if (form.weatherSource) form.weatherSource.value = protocol.weatherSource || "WeatherOnline / Robot Klimatu";
@@ -3048,8 +3052,8 @@ function renderMeasurementsModule() {
 
 
     <div style="margin-bottom:16px;">
-      <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatka</label>
-      <input name="note" placeholder="Uwagi do protokołu, źródło danych, nietypowy okres itd." style="width:100%;box-sizing:border-box;" />
+      <label style="font-size:12px;color:var(--color-text-secondary);display:block;margin-bottom:4px;">Notatka wewnętrzna (krótka)</label>
+      <input name="note" placeholder="Krótka notatka robocza — dłuższy opis wpisz w „Uwagi do protokołu” niżej." style="width:100%;box-sizing:border-box;" />
     </div>
 
     <div style="display:flex;gap:12px;align-items:center;">
@@ -3109,8 +3113,8 @@ function renderMeasurementsModule() {
             </div>
           </div>
           <div class="tym-field">
-            <label>Uwagi do protokołu</label>
-            <textarea name="protocolNotes" rows="3" placeholder="Dodatkowe uwagi, zastrzeżenia, źródło danych, nietypowy okres itp."
+            <label>Uwagi do protokołu <span style="font-weight:400;color:var(--color-text-secondary);">— trafiają do analizy (sekcja 1.1) i raportu ESCO</span></label>
+            <textarea name="protocolNotes" rows="6" placeholder="Metodyka, założenia, wydzielenie c.w.u., źródło danych, nietypowy okres itp."
               style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;padding:6px 8px;border:1px solid var(--color-border-tertiary);border-radius:6px;"></textarea>
           </div>
         </div>
