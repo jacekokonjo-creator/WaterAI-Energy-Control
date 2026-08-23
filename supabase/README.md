@@ -69,3 +69,40 @@
    kolejka „do zatwierdzenia" dla analityka.
 6. Macierz udostępnień (UI nad `resource_shares`).
 7. Edge Function `push-report-to-espocrm` + przycisk „Wyślij do CRM".
+
+---
+
+## Tłumaczenie treści analityka (`translate-note`)
+
+Silnik `i18n-domain.js` tłumaczy wyłącznie **napisy interfejsu** (klucz = dokładny
+tekst polski ze słownika). Swobodna proza wpisana przez analityka — „Uwagi do
+protokołu" w Protokole TYM, „Notatki / dane źródłowe" w okresie bazowym — do
+słownika nigdy nie trafi, a dopasowanie podłańcuchowe podmieniało w niej
+pojedyncze słowa i dawało mieszankę językową. Dlatego te bloki mają
+`data-i18n-skip`, a tłumaczy je maszynowo Edge Function.
+
+**Uruchomienie (jednorazowo):**
+
+1. Migracja — SQL Editor w Supabase, wklej `migration_010_note_translations.sql`
+   (idempotentna, tworzy tabelę cache `note_translations`).
+2. Sekret dostawcy — jeden z dwóch:
+   ```
+   supabase secrets set DEEPL_API_KEY=xxxxxxxx:fx
+   # albo
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
+   Przy obu ustawionych wygrywa DeepL (lepszy PL→CS/SK i terminologia techniczna).
+   Model Anthropic można podmienić przez `ANTHROPIC_MODEL`.
+3. Deploy:
+   ```
+   supabase functions deploy translate-note
+   ```
+
+**Koszt.** Wynik ląduje w `note_translations` pod kluczem
+`sha256(tekst) + ':' + język`, a przeglądarka trzyma jeszcze kopię w
+`localStorage`. Ten sam opis tłumaczy się **raz na język** — kolejne otwarcia
+analizy, raportu ESCO i wydruki idą z cache. Poprawka opisu = nowy hash = jedno
+nowe wywołanie.
+
+**Zachowanie bez wdrożenia funkcji.** Blok pokazuje oryginał po polsku i
+przypis „Translation unavailable — original text shown". Nic się nie wywraca.
