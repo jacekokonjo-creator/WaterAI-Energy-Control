@@ -1,42 +1,1523 @@
 // js/modules/sales-handbook.js
 // ─────────────────────────────────────────────────────────────────────────────
-// Zakładka „Podręcznik sprzedaży" (2026-09-07).
+// Zakładka „Podręcznik sprzedaży" — PLIK GENEROWANY, nie edytuj ręcznie.
+// Źródło: podrecznik/podrecznik-sprzedazy.html  →  python3 podrecznik/build-handbook.py
+// Wygenerowano: 2026-09-07
 //
-// Podręcznik jest samodzielną aplikacją HTML (własne style, wyszukiwarka,
-// akademia, kalkulator HDD, generator maili) i leży w podrecznik/podrecznik-sprzedazy.html.
-// Osadzamy go w ramce (iframe), a nie wklejamy do DOM aplikacji, bo:
-//   • ma własny CSS na elementach globalnych (body, h1, tabele) — kolidowałby ze stylem WaterAI,
-//   • ma własny JS ze zmiennymi globalnymi (SECTIONS, cur, esc…) — kolidowałby z modułami,
-//   • aktualizacja podręcznika = podmiana jednego pliku, bez dotykania kodu aplikacji.
-//
-// Kafelek 📕 mają role wewnętrzne (admin, backOffice, energyAnalyst) oraz
-// salesRepresentative — to narzędzie handlowca. Klient go NIE widzi (roleModules w index.html).
-// Moduł jest wyłącznie prezentacyjny: żadnych danych, żadnego zapisu.
-// Wpięcie jak w backup.js / instructions.js — rozszerza openModule.
+// Podręcznik jest natywną częścią aplikacji: jego HTML wchodzi do #module-content,
+// CSS jest zawężony do .wai-handbook, a cała logika (wyszukiwarka, akademia,
+// kalkulator HDD, generator maili) działa w zamknięciu bez globali.
+// Kontener ma data-i18n-skip — treść jest po polsku i nie przechodzi przez
+// silnik tłumaczeń aplikacji. Moduł jest wyłącznie prezentacyjny.
+// Kafelek 📕: admin, backOffice, energyAnalyst, salesRepresentative (roleModules w index.html).
 // ─────────────────────────────────────────────────────────────────────────────
-const SalesHandbookModule = {
-  SRC: 'podrecznik/podrecznik-sprzedazy.html',
-
-  // Wersja w URL wymusza pobranie nowego pliku po podmianie podręcznika.
-  VERSION: '2026-09-07',
-
-  render: function () {
-    const src = this.SRC + '?v=' + this.VERSION;
-    return (
-      '<div style="display:flex;justify-content:flex-end;gap:8px;margin:0 0 8px;">' +
-        '<a href="' + src + '" target="_blank" rel="noopener" class="small-button" ' +
-          'style="text-decoration:none;">↗ Otwórz w nowej karcie</a>' +
-      '</div>' +
-      '<iframe id="sales-handbook-frame" src="' + src + '" title="Podręcznik sprzedaży Water AI" ' +
-        'style="width:100%;height:calc(100vh - 220px);min-height:600px;border:1px solid #e0e0e0;' +
-        'border-radius:10px;background:#fff;"></iframe>'
-    );
-  }
-};
-window.SalesHandbookModule = SalesHandbookModule;
-
-// ── Wpięcie do routingu modułów ─────────────────────────────────────────────
 (function () {
+  const HB = {};
+  const CSS = ".wai-handbook{--ink:#132B3A;--ink-2:#4A6272;--line:#D5DEE4;--paper:#FFFFFF;--bg:#EEF3F5;--water:#1D7A8C;--water-soft:#DDEFF2;--heat:#C2542E;--heat-soft:#F8E6DE;--client:#F3EEE4;--ok:#2E7D4F;--warn:#9A6B00}.wai-handbook *{box-sizing:border-box}.wai-handbook{margin:0;border-radius:10px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:\"IBM Plex Sans\",system-ui,sans-serif;font-size:15px;line-height:1.5}.wai-handbook .hb-header{background:var(--paper);border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:relative;z-index:1}.wai-handbook .hb-header h1{font-size:18px;font-weight:600;margin:0}.wai-handbook .hb-header p{margin:0;color:var(--ink-2);font-size:13px}.wai-handbook .nav{display:flex;gap:4px;flex-wrap:wrap}.wai-handbook .nav button{border:1px solid transparent;border-radius:6px;padding:6px 11px;font:inherit;font-size:14px;background:none;color:var(--ink);cursor:pointer}.wai-handbook .nav button.on{background:var(--water-soft);border-color:var(--water);color:var(--water);font-weight:600}.wai-handbook .search{margin-left:auto;display:flex;gap:8px;align-items:center}.wai-handbook .search input{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font:inherit;font-size:14px;min-width:240px;color:var(--ink)}.wai-handbook .search input:focus{outline:2px solid var(--water);outline-offset:1px;border-color:var(--water)}.wai-handbook button:focus-visible{outline:2px solid var(--heat);outline-offset:2px}.wai-handbook .hb-main{display:grid;grid-template-columns:280px 1fr;min-height:60vh}.wai-handbook .hb-aside{background:var(--paper);border-right:1px solid var(--line);padding:18px 16px 40px;overflow:auto}.wai-handbook .hb-out{padding:24px 32px 64px;max-width:940px}.wai-handbook .grp{font-weight:600;font-size:12.5px;color:var(--ink-2);margin:14px 0 6px}.wai-handbook .grp:first-child{margin-top:0}.wai-handbook .plist{list-style:none;padding:0;margin:0}.wai-handbook .plist button{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:6px;padding:7px 10px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}.wai-handbook .plist button:hover{background:var(--bg)}.wai-handbook .plist button.on{background:var(--water-soft);border-color:var(--water);color:var(--water);font-weight:600}.wai-handbook .plist button small{display:block;color:var(--ink-2);font-weight:400;font-size:12px}.wai-handbook .plist button.on small{color:var(--water)}.wai-handbook .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}.wai-handbook .tabs button{border:1px solid var(--line);border-radius:6px;padding:6px 11px;font:inherit;font-size:13.5px;background:var(--paper);color:var(--ink);cursor:pointer}.wai-handbook .tabs button.on{border-color:var(--water);background:var(--water-soft);color:var(--water);font-weight:600}.wai-handbook .ptitle{margin:0 0 4px;font-size:24px;font-weight:600;line-height:1.2}.wai-handbook .psub{margin:0 0 18px;color:var(--ink-2);font-size:14.5px}.wai-handbook .paper{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:26px 30px;font-family:\"IBM Plex Serif\",Georgia,serif;font-size:15.5px;line-height:1.66;margin-bottom:16px}.wai-handbook .paper h3{font-family:\"IBM Plex Sans\",sans-serif;font-size:14px;font-weight:600;color:var(--ink-2);margin:22px 0 8px}.wai-handbook .paper h3:first-child{margin-top:0}.wai-handbook .paper p{margin:0 0 10px}.wai-handbook .paper ul,.wai-handbook .paper ol{margin:0 0 12px;padding-left:20px}.wai-handbook .paper li{margin-bottom:6px}.wai-handbook .meta{display:flex;gap:16px;flex-wrap:wrap;font-family:\"IBM Plex Sans\",sans-serif;font-size:13px;color:var(--ink-2);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}.wai-handbook .meta b{color:var(--ink);font-weight:600}.wai-handbook .line{display:grid;grid-template-columns:96px 1fr;gap:12px;margin:0 0 10px;align-items:start}.wai-handbook .line .who{font-family:\"IBM Plex Sans\",sans-serif;font-size:12.5px;font-weight:600;padding-top:6px;color:var(--water)}.wai-handbook .line.k .who{color:var(--heat)}.wai-handbook .line .txt{padding:6px 12px;border-radius:6px;background:var(--water-soft)}.wai-handbook .line.k .txt{background:var(--client)}.wai-handbook .line.n{grid-template-columns:1fr}.wai-handbook .line.n .txt{background:none;padding:2px 0;color:var(--ink-2);font-style:italic;font-size:14.5px}.wai-handbook details{border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--paper)}.wai-handbook summary{cursor:pointer;padding:10px 14px;font-family:\"IBM Plex Sans\",sans-serif;font-weight:500;font-size:14.5px;list-style:none;display:flex;gap:10px;align-items:center}.wai-handbook summary::before{content:\"\";width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:rotate(-45deg);transition:transform .15s;flex:none}.wai-handbook details[open] summary::before{transform:rotate(45deg)}.wai-handbook summary .tag{margin-left:auto;font-size:12px;color:var(--ink-2);font-weight:400;white-space:nowrap}.wai-handbook details .body{padding:0 16px 14px 32px;border-top:1px solid var(--line);font-family:\"IBM Plex Serif\",Georgia,serif;font-size:15px;line-height:1.62}.wai-handbook details .body p{margin:10px 0 0}.wai-handbook details .body .why,.wai-handbook details .body .lab{font-family:\"IBM Plex Sans\",sans-serif;font-size:13px;color:var(--ink-2)}.wai-handbook .badge{display:inline-block;font-family:\"IBM Plex Sans\",sans-serif;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:4px;margin-left:6px;vertical-align:middle;white-space:nowrap}.wai-handbook .b-ok{background:#E3F1E8;color:var(--ok)}.wai-handbook .b-warn{background:#FBF1D6;color:var(--warn)}.wai-handbook .b-heat{background:var(--heat-soft);color:var(--heat)}.wai-handbook .b-blue{background:var(--water-soft);color:var(--water)}.wai-handbook .small{font-family:\"IBM Plex Sans\",sans-serif;font-size:13px;color:var(--ink-2)}.wai-handbook .hb-main.wide .hb-out,.wai-handbook .hb-main.wide .hb-out{max-width:none}.wai-handbook .mailf{width:100%;border:0;min-height:900px;display:block;background:transparent}.wai-handbook .seq{font-family:\"IBM Plex Sans\",sans-serif;font-size:14px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}.wai-handbook .seq span{background:var(--water-soft);color:var(--water);border-radius:4px;padding:3px 9px;font-weight:600}.wai-handbook .seq i{color:var(--ink-2);font-style:normal}.wai-handbook .kalk{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;font-family:\"IBM Plex Sans\",sans-serif;font-size:13px}.wai-handbook .kalk label{display:flex;flex-direction:column;gap:4px;color:var(--ink-2)}.wai-handbook .kalk input,.wai-handbook textarea,.wai-handbook select{font:inherit;border:1px solid var(--line);border-radius:6px;padding:7px 9px;color:var(--ink);font-family:\"IBM Plex Sans\",sans-serif;font-size:14px}.wai-handbook textarea{width:100%;margin-top:10px}.wai-handbook .kout{margin-top:14px}.wai-handbook .card{text-align:center;min-height:220px;display:flex;flex-direction:column;justify-content:center}.wai-handbook .big{font-size:20px;line-height:1.4}.wai-handbook .opts{display:flex;flex-direction:column;gap:8px;margin-top:12px}.wai-handbook .opts button{font:inherit;font-family:\"IBM Plex Sans\",sans-serif;font-size:14.5px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer}.wai-handbook .opts button:hover{border-color:var(--water);background:var(--water-soft)}.wai-handbook table{border-collapse:collapse;width:100%;font-family:\"IBM Plex Sans\",sans-serif;font-size:14px;margin-bottom:12px}.wai-handbook th,.wai-handbook td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}.wai-handbook th{font-weight:600;color:var(--ink-2);font-size:13px}.wai-handbook .chk label{display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer;font-family:\"IBM Plex Sans\",sans-serif;font-size:14.5px}.wai-handbook .chk input{margin-top:5px;accent-color:var(--water)}.wai-handbook .chk label.done{color:var(--ink-2);text-decoration:line-through}.wai-handbook .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}.wai-handbook .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.wai-handbook .filters button{border:1px solid var(--line);border-radius:14px;padding:4px 11px;font:inherit;font-size:13px;background:var(--paper);cursor:pointer}.wai-handbook .filters button.on{border-color:var(--water);background:var(--water-soft);color:var(--water);font-weight:600}.wai-handbook .bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}.wai-handbook .bar button{font:inherit;font-size:14px;font-weight:600;border-radius:6px;padding:9px 14px;cursor:pointer;border:1px solid var(--water);background:var(--water);color:#fff}.wai-handbook .bar button.ghost{background:var(--paper);color:var(--water)}.wai-handbook .status{font-size:13px;color:var(--ink-2)}.wai-handbook .note{font-size:13px;color:var(--ink-2);margin-top:20px;border-left:3px solid var(--heat);padding-left:10px;font-family:\"IBM Plex Sans\",sans-serif}.wai-handbook mark{background:#FFE8A3;padding:0 2px}.wai-handbook .empty{color:var(--ink-2);font-family:\"IBM Plex Sans\",sans-serif;padding:12px 0}.wai-handbook .hits{font-family:\"IBM Plex Sans\",sans-serif}.wai-handbook .hits .hit{border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px;background:var(--paper);cursor:pointer}.wai-handbook .hits .hit b{color:var(--water)}.wai-handbook .hits .hit small{display:block;color:var(--ink-2);margin-bottom:4px}\n  @media (max-width:900px){.wai-handbook .hb-main{grid-template-columns:1fr}.wai-handbook .hb-aside{border-right:0;border-bottom:1px solid var(--line);padding:12px 14px 6px}.wai-handbook .plist{display:flex;gap:6px;overflow:auto;padding-bottom:6px}.wai-handbook .plist li{flex:none}.wai-handbook .plist button{border-color:var(--line);padding:6px 10px}.wai-handbook .plist button small{display:none}.wai-handbook .grp{margin:8px 0 4px}.wai-handbook .hb-out{padding:16px 14px 60px}.wai-handbook .paper{padding:18px}.wai-handbook .line{grid-template-columns:1fr;gap:2px}.wai-handbook .line .who{padding-top:0}.wai-handbook .cols{grid-template-columns:1fr}.wai-handbook .search{margin-left:0;width:100%}.wai-handbook .search input{flex:1;min-width:0}.wai-handbook .hb-header{position:static}\n  }\n  @media print{.wai-handbook .hb-header .search,.wai-handbook .hb-header .nav,.wai-handbook .hb-aside,.wai-handbook .tabs,.wai-handbook .bar,.wai-handbook .note,.wai-handbook .filters{display:none}.wai-handbook .hb-main{display:block}.wai-handbook .paper{border:0;padding:0}.wai-handbook details{break-inside:avoid}}\n  @media (prefers-reduced-motion:reduce){.wai-handbook summary::before{transition:none}}\n\n.wai-handbook button{box-shadow:none;text-transform:none;letter-spacing:0}\n.wai-handbook h1,.wai-handbook h2,.wai-handbook h3{color:inherit}\n@media print{body *{visibility:hidden}.wai-handbook,.wai-handbook *{visibility:visible}.wai-handbook{position:absolute;left:0;top:0;width:100%}}";
+  const HTML = "<div class=\"wai-handbook\" id=\"hb-root\" data-i18n-skip lang=\"pl\">\n<div class=\"hb-header\">\n  <div><h1>Podręcznik sprzedaży Water AI</h1><p>Scenariusze, prawo (stan: wrzesień 2026), obiekcje, narzędzia</p></div>\n  <div class=\"nav\" id=\"hb-nav\"></div>\n  <div class=\"search\"><input id=\"hb-q\" type=\"search\" placeholder=\"Szukaj w całym podręczniku…\" aria-label=\"Szukaj\"></div>\n</div>\n<div class=\"hb-main\">\n  <div class=\"hb-aside\" id=\"hb-side\"></div>\n  <div class=\"hb-out\">\n    <h2 class=\"ptitle\" id=\"hb-ptitle\"></h2>\n    <p class=\"psub\" id=\"hb-psub\"></p>\n    <div class=\"tabs\" id=\"hb-tabs\"></div>\n    <div id=\"hb-view\"></div>\n    <div class=\"bar\"><button id=\"hb-copy\">Kopiuj tekst</button><button class=\"ghost\" id=\"hb-print\">Drukuj</button><span class=\"status\" id=\"hb-status\"></span></div>\n    <p class=\"note\">Liczby [X] uzupełnij z materiałów Water AI / SCAT. Nie obiecuj procentów oszczędności przed symulacją. Status przepisów sprawdź przed spotkaniem – rozdział „Prawo” zawiera oznaczenia OBOWIĄZEK / PROJEKT / PRZYSZŁE.</p>\n  </div>\n</div>\n</div>";
+
+  // ── Dane podręcznika (segmenty, prawo, obiekcje, akademia, maile) ──────────
+
+/* ===== RDZEŃ ===== */
+const CORE = {
+  pitch: "Water AI to system optymalizacji zużycia energii cieplnej na centralne ogrzewanie i ciepłą wodę użytkową. Składa się z dwóch elementów: aktywatora SCAT, który poprawia wymianę ciepła w instalacji i chroni ją przed osadami, oraz sterownika Heat Saver AI, który przewidująco steruje temperaturą na podstawie danych pogodowych i zachowania budynku. Nie wymaga przebudowy instalacji, współpracuje z istniejącą automatyką i utrzymuje komfort użytkowników. Rozliczamy się w formule ESCO – z wygenerowanych oszczędności, więc płacą Państwo dopiero wtedy, gdy realnie oszczędzają. Oszczędność liczymy metodą stopniodni zgodną z IPMVP, więc wynik jest niezależny od tego, jaka będzie zima.",
+  askMeeting: "Proponuję 30-minutowe spotkanie – u Państwa albo online. Pokażę wyniki z wdrożeń, wyjaśnię, jak liczymy oszczędność, i ustalimy, jakich danych potrzebujemy do symulacji. Pasuje Panu/Pani wtorek rano czy czwartek po południu?",
+  method: [
+    "Model zużycia bazowego z danych sprzed uruchomienia (lub po montażu, przed aktywacją) – uwzględnia temperaturę zewnętrzną, nasłonecznienie, wiatr, wilgotność i sposób użytkowania budynku w poszczególnych minutach.",
+    "Stopniodni grzania: różnica między średnią dobową temperaturą a temperaturą bazową, przy której nie trzeba grzać. Liniowy model zależności zużycia od stopniodni (metoda Eurostatu), zgodny z Międzynarodowym Protokołem Pomiaru i Weryfikacji Efektywności Energetycznej (IPMVP).",
+    "Różnica między zużyciem prognozowanym z modelu a rzeczywistym = potwierdzona oszczędność. Od niej naliczamy opłatę według warunków umowy (załącznik nr 3)."
+  ],
+  dontSay: [
+    "Nie obiecuj konkretnego procentu oszczędności przed symulacją na danych klienta.",
+    "Nie tłumacz, jak działa „AI” – tłumacz, co się zmienia na fakturze i w pracy instalacji.",
+    "Nie podawaj warunków umowy (okres, procent, wyjście) z pamięci – odsyłaj do dokumentu.",
+    "Nie obiecuj integracji z konkretną automatyką przed wizją lokalną.",
+    "Nie powołuj się na przepis, którego artykułu nie potrafisz wskazać.",
+    "Nie mów „40 %” bez słowa „nawet” i bez „10–30 % w pilotażach” – nagłówek to nie oferta."
+  ],
+  product: [
+    "Aktywator SCAT – urządzenie działające polem elektromagnetycznym na wodę w obiegu grzewczym; efekt: usuwanie istniejących osadów i zapobieganie nowym, lepsza wymiana ciepła w wymiennikach i grzejnikach, dłuższa żywotność urządzeń. Działa samodzielnie, bez ingerencji w sterowanie.",
+    "Sterownik Heat Saver AI – predykcyjny regulator, który uczy się reakcji budynku na pogodę i użytkowanie i steruje temperaturą zasilania z wyprzedzeniem, zamiast reagować na to, co już się stało. Współpracuje z istniejącą automatyką (pogodówka, BMS) – nie zastępuje jej.",
+    "Razem: mniej energii na ten sam komfort. Bez modyfikacji infrastruktury, dane z instalacji dostępne w czasie rzeczywistym, rozliczenie w modelu ESCO z oszczędności.",
+    "Korzyści, które możesz nazwać wprost: niższy koszt ciepła, niższy ślad węglowy do raportu, dłuższa żywotność instalacji (osady), brak CAPEX."
+  ],
+  numbers: [
+    "Nagłówek ze strony: „nawet do 40 %”. W rozmowie mów: „w projektach pilotażowych osiągaliśmy 10–30 %, w zależności od budynku i stanu sterowania” – to zdanie jest zgodne z materiałami i nie jest obietnicą.",
+    "Zdanie z materiałów, które możesz powiedzieć: „w 14 obiektach uzyskaliśmy 10–38,6 %, średnio ok. 20 % – Lublin i Politechnika Lubelska to wyniki samego sterowania, bez SCAT”. Sam aktywator SCAT: 10,6–18 % (30 % z gwiazdką – sprawdź warunki).",
+    "Zawsze dodaj: „Ile wyjdzie u Państwa, pokaże symulacja na Państwa danych – i to od tej liczby, potwierdzonej stopniodniami, naliczymy wynagrodzenie.”",
+    "Nie tłumacz mechanizmu SCAT sformułowaniami ze strony typu „fizyka kwantowa” czy „zmiana struktury wody” – dla energetyka to sygnał ostrzegawczy. Mów o efekcie, który da się zmierzyć: osady, wymiana ciepła, zużycie. Jeśli klient pyta o mechanizm, odeślij do dokumentacji technicznej i CTO."
+  ],
+  refs: [
+    {name:"Premium Hotel, Bratislava", seg:"Hotel", result:"38,6 % (Water AI + SCAT)"},
+    {name:"PreLipe, Dohňany (SK)", seg:"Budynek mieszkalno-biurowy", result:"33,4 % (Water AI + SCAT)"},
+    {name:"Urząd Miasta Lublin – 3 budynki", seg:"Administracja publiczna / JST", result:"19,9 % / 30,4 % / 20,3 % (sam Water AI)"},
+    {name:"Politechnika Lubelska – 7 budynków", seg:"Uczelnia", result:"13,2 % – 28,0 % (sam Water AI)"},
+    {name:"Gmina Gostyń (OSiR)", seg:"JST / obiekt sportowy", result:"wdrożenie referencyjne (wynik – sprawdź w materiałach)"},
+    {name:"Administracja CEZ Skawina", seg:"Przemysł / energetyka", result:"15,0 % (sam SCAT)"},
+    {name:"AG Centrum Radom", seg:"Obiekt komercyjny", result:"10,6 % (sam SCAT)"},
+    {name:"Byttherm – Bánovce nad Bebravou (SK)", seg:"Ciepłownictwo komunalne", result:"18 % / 30 %* (sam SCAT)"},
+    {name:"ŠKO-ENERGO (Škoda Auto)", seg:"Przemysł", result:"eliminacja osadów, lepsza wymiana ciepła (bez podanego %)"}
+  ],
+  refsNote: "Źródła: waterai.pl (wrzesień 2026) i materiały referencyjne z generatora maili (14 obiektów w Polsce i na Słowacji, 2015–2025: 10–38,6 %, średnio ok. 20 %). Inne wdrożenia: ARTN (Warszawa), MIDAS GROUP (Wrocław), Janom Investments, Aplend, Panorama Servis. Opisy przypadków: waterai.pl/pl/referencie. Przed cytowaniem ustal osobę kontaktową.",
+  data: [
+    "Faktury za ciepło / gaz / paliwo za ostatnie 24–36 miesięcy (najlepiej miesięcznie)",
+    "Zużycie w GJ lub kWh w rozbiciu na C.O. i C.W.U., jeśli jest osobno opomiarowane",
+    "Rodzaj źródła ciepła: sieć ciepłownicza, kotłownia gazowa, olej, pompa ciepła, mix",
+    "Moc zamówiona (przy sieci) i taryfa; przy gazie – grupa taryfowa",
+    "Liczba i typ budynków, kubatura lub powierzchnia ogrzewana, rok budowy, stan ocieplenia",
+    "Sposób sterowania: automatyka pogodowa, harmonogramy, ręcznie, BMS/SCADA – producent, wiek",
+    "Godziny użytkowania budynków (szczególnie szkoły, urzędy, hotele, biura)",
+    "Kto podejmuje decyzję i w jakim trybie (zarząd, rada, walne, przetarg, centrala)",
+    "Termin, do którego chcą mieć decyzję lub efekt (np. przed sezonem grzewczym)"
+  ]
+};
+
+/* ===== NARZĘDZIA ===== */
+const TOOLKIT = {
+  before: [
+    "Wiem, kim jest rozmówca (rola, od ilu lat, co ostatnio robił) – 5 minut w internecie",
+    "Wiem, ile budynków i jakie źródło ciepła ma klient – jeśli nie, to jest pierwsze pytanie",
+    "Mam wydrukowane: materiały SCAT i Heat Saver AI, załącznik nr 3, jednostronicowe streszczenie",
+    "Mam przygotowaną symulację, jeśli dostałem dane – jeśli nie, mam przykład z podobnego obiektu",
+    "Znam 3 obiekcje, które najpewniej padną w tym segmencie, i odpowiedzi na nie",
+    "Wiem, jaki jest cel spotkania (dane? pilotaż? decydent?) i jaki jest minimalny akceptowalny wynik",
+    "Wiem, jaki przepis mogę przywołać dla tego klienta – i jaki jest jego status (obowiązek / projekt)",
+    "Mam propozycję dwóch terminów kolejnego spotkania",
+    "Telefon wyciszony, notes otwarty, kalendarz pod ręką"
+  ],
+  during: [
+    "Pierwsze 3 minuty: rozmówca mówi, nie ja – pytanie otwierające",
+    "Zanotowałem liczby, które padły (koszt roczny, liczba budynków, moc, źródło)",
+    "Zadałem pytania diagnostyczne przed prezentacją – nie odwrotnie",
+    "Zadałem co najmniej 2 pytania „prowadzące do wniosku” – klient sam nazwał problem",
+    "Pokazałem model rozliczenia (załącznik nr 3) dopiero po diagnozie",
+    "Każdą obiekcję potwierdziłem („rozumiem”), odpowiedziałem, sprawdziłem („czy to odpowiada na wątpliwość?”)",
+    "Nie obiecałem liczby, której nie ma w symulacji",
+    "Zapytałem, kto jeszcze bierze udział w decyzji i w jakim trybie",
+    "Ustaliłem następny krok z datą i osobą odpowiedzialną – i powtórzyłem go na głos",
+    "Zapytałem: „Co musiałoby się wydarzyć, żeby Państwo powiedzieli tak?”"
+  ],
+  after: [
+    "W ciągu 24 h: mail z podsumowaniem ustaleń, listą danych, terminem – 8 zdań, nie więcej",
+    "Załączniki: materiały SCAT, Heat Saver AI, załącznik nr 3, lista danych do symulacji",
+    "CRM / notatka: decydent, osoba operacyjna, kto zbiera dane, obiekcje, przepisy, na które reagowali",
+    "Kalendarz: follow-up (5–7 dni), przygotowanie symulacji, prezentacja symulacji",
+    "Jeśli padła obiekcja, której nie ma w banku – dopisz ją i odpowiedź, która zadziałała",
+    "Jeśli klient wskazał innego decydenta – poproś o wprowadzenie mailem (nie dzwoń „z zaskoczenia”)"
+  ],
+  m30: [
+    ["0–3 min","Otwarcie","Pytanie otwierające o budynki i koszty. Rozmówca mówi."],
+    ["3–5 min","Kim jesteśmy","Water AI / Blue Boson, dwie części technologii, polska myśl techniczna – 4 zdania."],
+    ["5–15 min","Diagnoza","8–10 pytań diagnostycznych + 2 pytania prowadzące do wniosku. Notuj liczby."],
+    ["15–22 min","Jak to działa i jak się rozliczamy","Predykcja + pogoda + współpraca z automatyką. ESCO, stopniodni, IPMVP, załącznik nr 3. Wynik z podobnego obiektu."],
+    ["22–27 min","Obiekcje","Zaproś do wątpliwości: „Co Pana/Panią w tym niepokoi?”"],
+    ["27–30 min","Następny krok","Dane do symulacji, osoba, termin. Powtórz ustalenia na głos."]
+  ],
+  m60: [
+    ["0–5 min","Otwarcie i agenda","Uzgodnij, na czym rozmówcy zależy; zapisz to i wróć do tego na końcu."],
+    ["5–10 min","Kim jesteśmy","Firma, technologia, referencje – krótko. Pytaj, co już wiedzą."],
+    ["10–25 min","Diagnoza","Pełna lista 12–15 pytań. Rysuj schemat: źródło → sieć wewnętrzna → sterowanie → użytkowanie."],
+    ["25–35 min","Prowadzenie do wniosku","Pytania „co się dzieje w nocy / w weekend / w ferie”. Klient nazywa stratę."],
+    ["35–45 min","Rozwiązanie","Technologia na tle ich instalacji. Co zostaje, co dokładamy, kto ma kontrolę."],
+    ["45–52 min","Ekonomia i prawo","ESCO, IPMVP, symulacja, przepisy istotne dla tego segmentu (z rozróżnieniem obowiązek/projekt)."],
+    ["52–57 min","Obiekcje i decyzja","„Kto jeszcze musi to zobaczyć? W jakim trybie? Do kiedy?”"],
+    ["57–60 min","Zamknięcie","Następny krok: wizja lokalna / dane / pilotaż. Data, osoba, forma."]
+  ],
+  q20: [
+    "Ile w ostatnim roku zapłacili Państwo za ciepło we wszystkich budynkach?",
+    "Które trzy budynki generują największy koszt i dlaczego akurat te?",
+    "Co dzieje się z ogrzewaniem po godzinie 16, w weekend i w ferie?",
+    "Kto dziś decyduje o nastawach ogrzewania – i skąd wie, że są właściwe?",
+    "Kiedy ostatni raz ktoś zmienił krzywą grzewczą? Na jakiej podstawie?",
+    "Ile zgłoszeń „za zimno” i ile „za gorąco” mieli Państwo w ostatnim sezonie?",
+    "Ile razy w zimie ktoś otwiera okno, bo jest za gorąco – i ile to kosztuje?",
+    "Gdyby rachunek za ciepło spadł, na co poszłyby te pieniądze?",
+    "Jak dziś udowodniliby Państwo radzie / zarządowi / audytorowi, że ogrzewanie jest efektywne?",
+    "Co się stanie z kosztem ciepła, gdy od 2028 r. do paliw dojdzie koszt emisji (ETS2)?",
+    "Jak Państwa obiekty wypadną w nowej skali klas energetycznych A+–G?",
+    "Czy termomodernizacja dała oszczędność, której się spodziewano? Skąd to wiadomo?",
+    "Jak Państwa automatyka reaguje na prognozę pogody na jutro – czy tylko na temperaturę teraz?",
+    "Co musiałoby się wydarzyć, żeby powiedzieli Państwo „tak”?",
+    "Kto poza Panem/Panią musi to zobaczyć i czego ta osoba będzie potrzebować?",
+    "Jeśli oszczędność byłaby zerowa, ile by Państwo zapłacili? (odpowiedź: zero – i dlatego pytam)",
+    "Jaki jest koszt niepodjęcia decyzji do następnego sezonu?",
+    "Jakie dane muszą Państwo zobaczyć, żeby uznać wynik za wiarygodny?",
+    "Kiedy jest najbliższy moment decyzyjny – sesja, rada, budżet, walne?",
+    "Który budynek wybraliby Państwo na pilotaż, gdyby miał pokazać wynik radzie?"
+  ],
+  avoid20: [
+    "„Gwarantujemy 20% oszczędności.” – nie gwarantujemy liczby, gwarantujemy model rozliczenia.",
+    "„Nasza sztuczna inteligencja…” – klient słyszy: czarna skrzynka.",
+    "„To rewolucyjne rozwiązanie.” – każdy tak mówi.",
+    "„Wystarczy podpisać.” – nic nie „wystarczy” w sektorze publicznym.",
+    "„Wszyscy nasi klienci są zadowoleni.” – podaj jednego z nazwiskiem albo nic.",
+    "„To nic nie kosztuje.” – kosztuje procent z oszczędności; mów to wprost.",
+    "„Wasza automatyka jest przestarzała.” – obrażasz człowieka, który ją ustawiał.",
+    "„Przepisy Was do tego zmuszą.” – jeśli nie wskażesz artykułu i statusu, tracisz wiarygodność.",
+    "„Możemy się zintegrować z każdym systemem.” – nie wiesz tego przed wizją lokalną.",
+    "„Prześlę ofertę i się odezwę.” – bez daty to nie jest następny krok.",
+    "„Konkurencja robi to gorzej.” – mów o sobie.",
+    "„Proszę mi zaufać.” – zaufanie buduje IPMVP, nie prośba.",
+    "„To standard w Europie.” – klient zapyta gdzie; jeśli nie wiesz, milcz.",
+    "„Rozumiem, ale…” – „ale” kasuje „rozumiem”. Użyj „i”.",
+    "„Szczerze mówiąc…” – sugeruje, że wcześniej nie mówiłeś szczerze.",
+    "„Umowa jest standardowa.” – dla klienta żadna umowa nie jest standardowa.",
+    "„Nie ma żadnego ryzyka.” – jest: ryzyko zmiany, integracji, czasu. Nazwij je i pokaż, jak je ograniczasz.",
+    "„Oszczędność sama się pojawi.” – pojawi się, jeśli klient przekaże dane i dostęp; powiedz, czego potrzebujesz.",
+    "„To działa wszędzie.” – działa tam, gdzie jest nadprodukcja ciepła; symulacja to sprawdza.",
+    "„Decyzję trzeba podjąć dziś.” – presja w sektorze publicznym kończy rozmowę."
+  ],
+  close20: [
+    "„Jeśli symulacja pokaże oszczędność, jaki byłby naturalny następny krok po Państwa stronie?”",
+    "„Proponuję zacząć od jednego budynku – tego, który najlepiej pokaże wynik radzie.”",
+    "„Zapiszmy dziś trzy rzeczy: kto przekazuje dane, do kiedy, i kiedy pokazuję symulację.”",
+    "„Nie proszę o decyzję o wdrożeniu. Proszę o dane do symulacji – to nic nie kosztuje i niczego nie przesądza.”",
+    "„Co musiałoby się znaleźć w symulacji, żeby uznali ją Państwo za wystarczającą do decyzji?”",
+    "„Kto jeszcze powinien być na spotkaniu, na którym pokażę wynik – żebyśmy nie musieli powtarzać?”",
+    "„Zróbmy pilotaż z rozliczeniem tylko z oszczędności – ryzyko jest po naszej stronie.”",
+    "„Sezon grzewczy zaczyna się za [X] tygodni. Jeśli zaczniemy teraz, po sezonie będą Państwo mieli liczby, nie plany.”",
+    "„Model bazowy zatwierdzają Państwo przed uruchomieniem. Jeśli się nie zgodzimy co do modelu – nie startujemy.”",
+    "„Rozumiem, że ostrożność jest tu obowiązkiem. Dlatego proponuję krok, który nie wymaga odwagi: dane i symulacja.”",
+    "„Czy jest coś, czego jeszcze nie powiedziałem, a co jest Państwu potrzebne do decyzji?”",
+    "„Jeśli za rok nic się nie zmieni w sposobie sterowania, ile zapłacą Państwo za ciepło? Tyle samo albo więcej. To jest koszt braku decyzji.”",
+    "„Proponuję dwa terminy prezentacji symulacji: [data] lub [data]. Który?”",
+    "„Przygotuję jednostronicowe streszczenie dla [decydenta] – w języku kosztów, nie technologii. Czy przekaże je Pan/Pani?”",
+    "„Umowę wyślę dziś do przeczytania – bez presji. Zadzwonię w [dzień] i odpowiem na pytania.”",
+    "„Wpiszmy pilotaż do budżetu na przyszły rok jako zmniejszenie wydatków bieżących – nie jako inwestycję.”",
+    "„Jeśli technik potwierdzi na wizji lokalnej, że da się to zrobić bez ryzyka dla produkcji – czy to wystarczy do zgody na pilotaż?”",
+    "„Zapytam wprost: co jest największą przeszkodą? Jeśli ją usunę, ruszamy?”",
+    "„Ustalmy, kiedy uznamy pilotaż za sukces – jaka liczba, jaki termin. Wtedy decyzja o rozszerzeniu będzie prosta.”",
+    "„Dziękuję za czas. Podsumuję mailem do jutra – z datami. Do zobaczenia [data].”"
+  ],
+  followupSchema: [
+    ["Dzień 0","Spotkanie","Notatka w ciągu godziny po wyjściu, dopóki pamiętasz liczby."],
+    ["Dzień 1","Mail podsumowujący","Ustalenia, lista danych, terminy, załączniki. Krótko. Prośba o potwierdzenie osoby do danych."],
+    ["Dzień 5–7","Telefon","Cel: dane, nie decyzja. „Czy udało się zebrać faktury?” Jeśli nie – zaproponuj pomoc: „Czy mogę zadzwonić do księgowości sam?”"],
+    ["Dzień 10–14","Symulacja","Prezentacja na spotkaniu (nie mailem). Zaproś decydenta. Załącz jednostronicowe streszczenie."],
+    ["Dzień 14–21","Umowa pilotażowa","Wysyłasz do przeczytania, dzwonisz po 3 dniach z pytaniem o pytania. Oferujesz rozmowę z ich prawnikiem."],
+    ["Dzień 21–45","Decyzja","Sektor publiczny: pilnujesz terminu sesji/rady. Prywatny: pilnujesz sezonu. Każdy kontakt kończysz datą."],
+    ["Cisza > 14 dni","Reaktywacja","Nie „czy jest jakaś decyzja?”, tylko nowa wartość: zmiana przepisu, wynik z podobnego obiektu, zbliżający się termin ETS2 / sezon."]
+  ],
+  stages: [
+    {t:"Pierwsze spotkanie (30 min)", g:"Cel: diagnoza, wiarygodność, dane.", items:["Rozmówca mówi 60% czasu.","Wychodzisz z: liczbami, nazwiskiem osoby od danych, datą.","Nie prezentujesz oferty cenowej – prezentujesz model rozliczenia.","Minimum: zgoda na przekazanie danych do symulacji."]},
+    {t:"Drugie spotkanie (45–60 min)", g:"Cel: symulacja przed decydentem, zgoda na pilotaż.", items:["Zaczynasz od ich liczb, nie od siebie.","Pokazujesz model bazowy i jak będzie liczona oszczędność na ich budynku.","Omawiasz zakres integracji z ich automatyką – po wizji lokalnej, nie z pamięci.","Kończysz: budynek pilotażowy, harmonogram, tryb decyzji, umowa do przeczytania."]},
+    {t:"Pilotaż", g:"Cel: wynik, który obroni się przed radą/zarządem/audytorem.", items:["Wybór budynku: wysoki koszt na m², dobre opomiarowanie, przychylny administrator.","Model bazowy zatwierdzony na piśmie przed aktywacją.","Comiesięczny raport dla klienta – ten sam format, który pójdzie do rady.","Ustalone z góry: co znaczy sukces (liczba, termin) i co po nim (rozszerzenie na X budynków)."]},
+    {t:"Zamknięcie sprzedaży", g:"Cel: umowa na całość zasobów lub etapowe rozszerzenie.", items:["Prezentujesz wynik pilotażu w formie, którą klient może przekazać dalej bez Ciebie.","Podajesz harmonogram rozszerzenia budynkami, nie „całością”.","Sektor publiczny: wspierasz w opisie przedmiotu zamówienia i metodyce (IPMVP).","Pytasz o referencję i o wprowadzenie do podobnych podmiotów."]}
+  ]
+};
+const SEGMENTS = [];
+
+SEGMENTS.push({
+  id:"urzad", group:"Sektor publiczny", name:"Urzędy miast i gmin, JST", short:"burmistrz, skarbnik, energetyk gminny",
+  who:"Wójt / burmistrz / prezydent (decyzja polityczna), skarbnik (budżet i klasyfikacja wydatku), naczelnik wydziału inwestycji lub gospodarki komunalnej (procedura), energetyk gminny / doradca energetyczny (jeśli jest – najlepsze wejście merytoryczne), sekretarz (obieg dokumentów).",
+  pain:[
+    "Koszty ciepła w kilkunastu–kilkudziesięciu budynkach rosną, a dochody własne nie; każda złotówka jest publiczna i widoczna",
+    "Budynki użytkowane 8–16 są ogrzewane jak 24/7; nikt nie ma czasu ręcznie zmieniać nastaw w 30 kotłowniach",
+    "Dyrektywa EED nakłada na sektor publiczny obowiązek redukcji zużycia energii końcowej o 1,9% rocznie względem 2021 r. (w Polsce w trakcie wdrażania – projekt UC77); gminy 50 tys.+ są objęte wcześniej",
+    "Brak środków inwestycyjnych, długie procedury, presja radnych na widoczne efekty przed wyborami"
+  ],
+  fear:"Zarzut niegospodarności, kontrola RIO / NIK, błędny tryb zamówienia, odpowiedzialność osobista (dyscyplina finansów publicznych), „kolejna firma, która obiecała i zniknęła”.",
+  angle:"Zero nakładu inwestycyjnego, zmniejszenie wydatków bieżących, rozliczenie według uznanego standardu (IPMVP) – gotowy argument do kontroli. Język budżetu i procedury, nie technologii. Umowa o poprawę efektywności energetycznej to środek wprost wymieniony w ustawie o efektywności energetycznej (art. 6) jako sposób realizacji obowiązku jednostek sektora publicznego.",
+  opening:"„Dzień dobry. Zanim cokolwiek pokażę – ile gmina zapłaciła w zeszłym roku za ogrzewanie wszystkich swoich budynków i który z nich kosztuje najwięcej na metr?”",
+  diag:[
+    "Ile budynków ogrzewa gmina bezpośrednio (urząd, szkoły, przedszkola, OSP, domy kultury, ośrodki zdrowia)? Kto płaci faktury – gmina czy jednostki?",
+    "Jakie źródła ciepła: sieć PEC, kotłownie gazowe, olejowe, pellet, pompy ciepła? Kto jest dostawcą?",
+    "Roczny koszt ciepła łącznie i dla 3 największych obiektów?",
+    "Kto ustawia parametry ogrzewania w poszczególnych budynkach – konserwator, dyrektor placówki, firma zewnętrzna?",
+    "Czy jest automatyka pogodowa? Harmonogramy tygodniowe? Kto je aktualizuje na ferie i święta?",
+    "Jak wyglądają godziny użytkowania – urząd, szkoły, świetlice wieczorem, sale wynajmowane?",
+    "Kiedy była termomodernizacja i czy po niej ktoś obniżył nastawy kotłowni?",
+    "Czy gmina ma energetyka gminnego / doradcę energetycznego / plan gospodarki niskoemisyjnej (PGN)?",
+    "Czy gmina raportuje zużycie energii (np. do planów, do sprawozdań z PGN)? Jak zbiera dane?",
+    "Czy gmina liczy powyżej 50 tys. mieszkańców? (ważne dla terminu obowiązku 1,9% z EED)",
+    "Jaki jest tryb decyzji: zarządzenie wójta, uchwała rady, zamówienie publiczne? Jaki próg?",
+    "Kiedy jest najbliższa sesja / komisja budżetowa / termin projektu budżetu?",
+    "Czy były wcześniej propozycje ESCO? Jak się skończyły i dlaczego?",
+    "Czy mają Państwo świadectwa charakterystyki energetycznej budynków i jakie klasy się spodziewają w nowej skali A+–G?"
+  ],
+  insight:[
+    "„Co się dzieje z ogrzewaniem w szkole w piątek o 17 i w sobotę rano?” – klient zwykle sam odpowiada: grzeje.",
+    "„Kto obniża nastawy na ferie? A na Boże Narodzenie? A kto je podnosi z powrotem – i kiedy?”",
+    "„Gdyby każdy budynek grzał tylko tyle, ile potrzeba w godzinach użytkowania – ile procent rachunku to mogłoby być? Nie musi Pan/Pani wiedzieć dokładnie, chodzi o rząd wielkości.”",
+    "„Jak dziś gmina udowodni kontrolerowi, że ogrzewanie jest prowadzone efektywnie? Czy jest jakikolwiek dokument?”",
+    "„Ile lat ma krzywa grzewcza w urzędzie i kto ją ustawił?”"
+  ],
+  args:{
+    tech:["Predykcja na podstawie prognozy pogody i historii budynku – system reaguje na jutro, nie na dziś","Współpraca z istniejącą automatyką: nie wymieniamy sterowników, korygujemy nastawy","Harmonogramy użytkowania wchodzą do modelu – ferie, weekendy, wynajem sali","Komfort utrzymany w godzinach użytkowania; parametry graniczne ustala gmina"],
+    econ:["Brak nakładu inwestycyjnego – nie obciąża budżetu ani limitu zadłużenia","Zmniejszenie wydatków bieżących w rozdziale ogrzewania – efekt widoczny w wykonaniu budżetu","Rozliczenie z oszczędności: zero oszczędności = zero faktury","Pilotaż na 2–3 obiektach daje liczby do budżetu na kolejny rok"],
+    board:["Wynik da się pokazać radnym i mieszkańcom: „obniżyliśmy koszty bez wydawania pieniędzy”","Dokument IPMVP = obrona przed zarzutem niegospodarności","Wspieranie polskiej technologii i polskich naukowców – argument publiczny"],
+    legal:["Ustawa o efektywności energetycznej, art. 6: jednostka sektora publicznego realizuje zadania, stosując co najmniej jeden ze środków poprawy efektywności – wśród nich umowa o poprawę efektywności energetycznej (ESCO) [OBOWIĄZEK]","Dyrektywa EED 2023/1791, art. 5: redukcja zużycia energii końcowej sektora publicznego o 1,9% rocznie vs 2021; gminy <50 tys. wyłączone do 31.12.2026, <5 tys. do 31.12.2029 [W TRAKCIE WDRAŻANIA – projekt UC77]","EED art. 6: renowacja 3% powierzchni budynków publicznych rocznie [W TRAKCIE WDRAŻANIA]","EED art. 7: zasada „efektywność energetyczna przede wszystkim” w zamówieniach publicznych [W TRAKCIE WDRAŻANIA]","EED art. 29: państwa mają usuwać bariery dla umów o poprawę efektywności energetycznej w sektorze publicznym – ESCO jest kierunkiem, nie wyjątkiem [KIERUNEK]"],
+    esg:["Redukcja zużycia = redukcja emisji do sprawozdań z PGN i przyszłego raportowania","Przygotowanie na ETS2 (od 2028 r. koszt emisji w cenie gazu/węgla) – mniej paliwa = mniejsze uderzenie","Nowa skala klas energetycznych A+–G (EPBD 2024/1275) – niższe zużycie poprawia pozycję budynków przy renowacji"]
+  },
+  objections:[
+    {q:"Musimy to zrobić w trybie zamówienia publicznego.", a:"Tak – i nie chcemy tego omijać. ESCO ma tę cechę, że wynagrodzenie zależy od efektu, więc zamówienie da się opisać wynikiem i metodyką pomiaru, a nie ceną z góry. Pomożemy przygotować opis przedmiotu zamówienia i metodykę IPMVP, którą Państwo załączą do postępowania.", why:"Procedura to nie przeszkoda – to Twoja rola, żeby ją ułatwić."},
+    {q:"Nie mamy tego w budżecie.", a:"To nie jest wydatek – nie ma nakładu. Płatność następuje wyłącznie z obniżonych faktur za ciepło, więc z pieniędzy, których gmina bez systemu i tak by nie miała. W klasyfikacji to zmniejszenie wydatków bieżących, nie inwestycja.", why:"Przeformułuj: nie „wydać”, tylko „wydać mniej”."},
+    {q:"Co powie RIO / NIK, jeśli oszczędność nie wystąpi?", a:"Wtedy gmina nie zapłaci nic – to jest w umowie. Model IPMVP daje dokument, że rozliczenie było weryfikowalne. Trudniej wytłumaczyć kontroli bezczynność przy rosnących kosztach i obowiązku z art. 6 ustawy o efektywności energetycznej niż działanie bez ryzyka finansowego.", why:"Odwróć ryzyko: bezczynność też jest decyzją."},
+    {q:"Radni zapytają, dlaczego akurat ta firma.", a:"Dlatego proponuję pilotaż w trybie właściwym dla wartości zamówienia i rozliczenie według standardu, który każdy audytor może sprawdzić. Radni dostaną wynik z własnego budynku, nie folder reklamowy.", why:"Polityka: daj im materiał, który mogą pokazać wyborcom."},
+    {q:"Mieszkańcy będą narzekać, że w szkole jest zimno.", a:"System nie obniża temperatur w godzinach użytkowania. Nie grzeje pustego budynku na pełnej mocy w nocy. Parametry ustala dyrektor z konserwatorem i można je zmienić w każdej chwili.", why:"Komfort dzieci to argument emocjonalny – odpowiadaj konkretnie i krótko."}
+  ],
+  offerMoment:"Po diagnozie, gdy padła liczba (roczny koszt) i klient sam nazwał budynki grzane „na pusto”. Nigdy przed. Pokaż model rozliczenia (załącznik nr 3), nie cennik.",
+  path:["Dane z 2–3 największych obiektów → symulacja (7–10 dni)","Prezentacja symulacji skarbnikowi + naczelnikowi + energetykowi","Wybór obiektu pilotażowego i trybu (wartość zamówienia → tryb)","Pomoc w OPZ i metodyce pomiaru","Umowa pilotażowa → model bazowy zatwierdzony → aktywacja przed sezonem"],
+  close:["„Proszę wskazać osobę, do której mogę napisać po faktury z urzędu, największej szkoły i basenu / hali – i termin, do którego realnie je dostanę.”","„Na następnym spotkaniu chciałbym mieć skarbnika – pokażę, jak to wygląda w wykonaniu budżetu.”","„Najbliższa sesja jest [data]. Jeśli symulacja będzie gotowa tydzień wcześniej, czy temat może wejść na komisję?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z panem naczelnikiem od inwestycji?"],
+    ["K","Tak, słucham."],
+    ["H","Zajmujemy się obniżaniem kosztów ogrzewania w budynkach gminnych – bez nakładów z budżetu, rozliczenie tylko z oszczędności. Zanim opowiem więcej: ile budynków gmina ogrzewa i z czego?"],
+    ["K","Dwadzieścia parę. Głównie gaz, dwie szkoły z PEC-u."],
+    ["H","A roczny koszt, tak w przybliżeniu?"],
+    ["K","Coś koło miliona, może więcej po podwyżkach."],
+    ["H","Kto dziś ustawia ogrzewanie w tych dwudziestu budynkach – konserwatorzy, dyrektorzy?"],
+    ["K","Każdy sobie. Konserwator ustawi jesienią i tyle."],
+    ["H","Czyli w piątek o 17 i w sobotę szkoła grzeje tak samo jak we wtorek rano?"],
+    ["K","No… w zasadzie tak. Nikt nie chodzi tego przestawiać."],
+    ["H","To jest dokładnie ten obszar, w którym działamy. System uczy się, jak każdy budynek reaguje na pogodę i użytkowanie, i steruje tak, żeby w godzinach pracy było ciepło, a poza nimi – nie grzać na pusto. Współpracuje z Państwa automatyką. Oszczędność liczymy metodą stopniodni według IPMVP – to ważne przy kontroli, bo to uznany standard. Rozliczamy się tylko z potwierdzonej oszczędności."],
+    ["K","Brzmi dobrze, ale my musimy wszystko przez zamówienia."],
+    ["H","Oczywiście. Pomagamy w opisie przedmiotu zamówienia – wynik i metodyka pomiaru zamiast ceny z góry. Proponuję 30 minut z Panem i skarbnikiem: pokażę wyniki wdrożeń, model rozliczenia i ustalimy, z których obiektów wziąć dane do symulacji. Wtorek czy czwartek?"],
+    ["K","Czwartek po dziesiątej."],
+    ["H","Zapisuję. Wyślę dziś krótkie potwierdzenie i listę danych – faktury za gaz i ciepło z dwóch sezonów dla urzędu i dwóch największych szkół. Do kogo mogę napisać po te faktury?"],
+    ["N","Cel osiągnięty: spotkanie z decydentem finansowym + osoba od danych."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"oswiata", group:"Sektor publiczny", name:"Szkoły, przedszkola, oświata", short:"dyrektor, organ prowadzący, CUW",
+  who:"Dyrektor placówki (użytkownik, wpływ na komfort i opinię), organ prowadzący – gmina / powiat / CUW (płatnik i decydent), kierownik gospodarczy / konserwator (obsługa kotłowni). Uwaga: dyrektor rzadko decyduje o umowie, ale bez niego pilotaż nie zadziała.",
+  pain:[
+    "Budynek pracuje 7–16, ogrzewany jest 24/7; ferie, wakacje, święta – często bez zmiany nastaw",
+    "Przegrzane klasy rano, zimne po południu; skargi rodziców w obie strony",
+    "Rachunki za ciepło płaci organ prowadzący – dyrektor nie ma narzędzia ani motywacji, konserwator nie ma czasu",
+    "Sale gimnastyczne i baseny szkolne – największe zużycie, najbardziej chaotyczne sterowanie"
+  ],
+  fear:"Dyrektor: skargi rodziców, kontrola sanepidu (temperatura w salach), „ktoś obcy będzie mi sterował”. Organ prowadzący: jak w segmencie JST.",
+  angle:"Do dyrektora – komfort i spokój: stałe temperatury w godzinach lekcji, koniec ręcznego przestawiania. Do organu – koszt i dokumentacja. Sprzedajesz organowi, wdrażasz z dyrektorem; obie strony muszą być „za”.",
+  opening:"„Kto w szkole decyduje, że rano jest ciepło – i co się dzieje z tym ogrzewaniem, kiedy dzieci wychodzą o 15?”",
+  diag:[
+    "Godziny pracy budynku: lekcje, świetlica, zajęcia popołudniowe, wynajem sali?",
+    "Jakie źródło ciepła i kto obsługuje kotłownię / węzeł?",
+    "Czy jest automatyka pogodowa? Kto zmienia harmonogram na ferie i kiedy to robi?",
+    "Ile zgłoszeń „za zimno” / „za gorąco” w sezonie? Czy nauczyciele otwierają okna w zimie?",
+    "Czy sala gimnastyczna / basen jest ogrzewany osobno? Jak sterowany?",
+    "Czy szkoła ma liczniki ciepła na obiegach (dydaktyka / sala / basen)?",
+    "Kto płaci faktury i kto je widzi – dyrektor, CUW, gmina?",
+    "Czy była termomodernizacja? Czy po niej ktoś zmienił nastawy kotłowni?",
+    "Jakie temperatury zadane w klasach? Czy są kontrole sanepidu dotyczące temperatury?",
+    "Czy szkoła ma świadectwo charakterystyki energetycznej? Jaki wynik?",
+    "Czy organ prowadzący ma kilka szkół o podobnej charakterystyce – potencjał skalowania?",
+    "Kto po stronie organu prowadzącego podejmuje decyzję o takiej umowie?"
+  ],
+  insight:[
+    "„O której rano jest w klasach ciepło? A o której zaczyna się grzanie? Czy ktoś to sprawdzał?”",
+    "„Ile trwają ferie i wakacje łącznie – 3 miesiące? Co w tym czasie robi kotłownia?”",
+    "„Kiedy nauczyciel otwiera okno w styczniu, to dlaczego – bo jest za gorąco czy za duszno? Jeśli za gorąco – kto za to płaci?”",
+    "„Gdyby sala gimnastyczna była grzana tylko przed zajęciami i wynajmem – ile to mogłoby zmienić?”"
+  ],
+  args:{
+    tech:["Harmonogram zajęć i kalendarz szkolny wchodzą do modelu – system „wie”, kiedy są ferie","Predykcja pozwala wystartować grzanie tak, by o 7:30 było ciepło – bez grzania od 4 rano","Utrzymanie zadanych temperatur w godzinach lekcji; brak spadków komfortu","Współpraca z istniejącym sterownikiem kotłowni – bez wymiany"],
+    econ:["Koszt ciepła to jeden z największych kosztów utrzymania placówki poza płacami","Zero nakładu; rozliczenie z oszczędności; efekt w budżecie organu prowadzącego","Skalowanie na kolejne szkoły po pilotażu – ten sam model"],
+    board:["Dla organu: wynik z jednej szkoły jako argument na kolejne","Dla dyrektora: koniec sporów z rodzicami o temperaturę – parametry są udokumentowane"],
+    legal:["Ustawa o efektywności energetycznej, art. 6 – obowiązek stosowania środków poprawy efektywności przez jednostki sektora publicznego [OBOWIĄZEK]","EED art. 5 (1,9%/rok) i art. 6 (3% renowacji) – dotyczy budynków instytucji publicznych, w tym oświaty [W TRAKCIE WDRAŻANIA]","Ustawa o charakterystyce energetycznej budynków – okresowe kontrole systemów ogrzewania (art. 23) i świadectwa [OBOWIĄZEK]"],
+    esg:["Szkoła jako przykład dla uczniów – projekt edukacyjny („ile zaoszczędziliśmy CO₂”)","Redukcja emisji do sprawozdań gminy"]
+  },
+  objections:[
+    {q:"Sanepid wymaga określonych temperatur – nie mogę ryzykować.", a:"System utrzymuje temperatury zadane w godzinach zajęć – to jest warunek brzegowy, nie opcja. Ogranicza grzanie, gdy w budynku nikogo nie ma. Zapis temperatur z czujników to dodatkowo dokument dla kontroli.", why:"Kontrola to argument ZA – masz dane, których dziś nie mają."},
+    {q:"Konserwator sobie z tym poradzi, nie potrzebujemy systemu.", a:"Konserwator ma jeden budynek i dwanaście innych obowiązków. System przestawia nastawy setki razy w sezonie, według prognozy pogody, o 4 rano i w niedzielę. To nie zastępuje konserwatora – zdejmuje z niego coś, czego fizycznie nie da się robić ręcznie.", why:"Nie deprecjonuj konserwatora – on jest Twoim sojusznikiem we wdrożeniu."},
+    {q:"To decyzja gminy, nie moja.", a:"Tak, i dlatego rozmawiam też z organem prowadzącym. Od Pana/Pani potrzebuję dwóch rzeczy: godzin użytkowania budynku i zgody na to, że pilotaż w tej szkole ma sens. Dyrektor, który chce – to połowa sukcesu.", why:"Zdobądź sojusznika, potem decydenta."}
+  ],
+  offerMoment:"Dyrektorowi nie przedstawiasz oferty – przedstawiasz mu, jak będzie wyglądał komfort i co się zmieni w jego pracy. Ofertę (model ESCO) przedstawiasz organowi prowadzącemu po symulacji.",
+  path:["Rozmowa z dyrektorem: godziny użytkowania, zgoda na pilotaż, kontakt do konserwatora","Dane o zużyciu od organu prowadzącego / CUW","Symulacja → prezentacja organowi z dyrektorem na sali","Pilotaż w 1 szkole → raport → rozszerzenie na kolejne placówki"],
+  close:["„Czy zgodziłby się Pan / zgodziłaby się Pani, żeby Państwa szkoła była pilotażowa, jeśli gmina zdecyduje? To pomaga mi w rozmowie z organem.”","„Proszę o kalendarz roku szkolnego i godziny pracy budynku – wchodzą do modelu.”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z panią dyrektor? Dzwonię w sprawie ogrzewania budynku – nie sprzedaję kotłów."],
+    ["K","Słucham, ale za ogrzewanie płaci gmina."],
+    ["H","Wiem, i z gminą też rozmawiam. Do Pani mam inne pytanie: o której rano w klasach jest ciepło i czy zdarza się, że nauczyciele otwierają okna, bo jest za gorąco?"],
+    ["K","Zdarza się. Na parterze jest gorąco, na drugim piętrze zimno."],
+    ["H","To klasyczny objaw sterowania ustawionego raz jesienią. Nasz system codziennie dopasowuje ogrzewanie do pogody i do planu lekcji – rano ciepło, po lekcjach nie grzejemy na pusto, ferie w kalendarzu. Dla Pani to mniej skarg i dokument z temperatur, gdyby ktoś pytał."],
+    ["K","A kto to obsługuje? Nasz konserwator ma dużo pracy."],
+    ["H","Konserwator zostaje przy swoich obowiązkach – system pracuje sam, a on ma podgląd. Chciałbym zaproponować gminie pilotaż właśnie w Państwa szkole. Czy byłaby Pani za, gdyby gmina zdecydowała?"],
+    ["K","Jeśli nie będzie zimniej, to tak."],
+    ["H","Warunek jest zapisany: temperatury w godzinach lekcji bez zmian. Poproszę o godziny pracy budynku i kalendarz roku – i kontakt do konserwatora, żeby zobaczyć kotłownię. Resztę załatwiam z gminą."],
+    ["N","Dyrektor nie decyduje, ale bez jego „tak” gmina nie wybierze tej szkoły."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"szpital", group:"Sektor publiczny", name:"Szpitale i ochrona zdrowia", short:"dyrektor techniczny, dyrektor ds. ekonomicznych",
+  who:"Dyrektor ds. technicznych / kierownik działu technicznego (bezpieczeństwo i ciągłość – najważniejszy sojusznik), dyrektor ds. ekonomiczno-finansowych (koszty, zadłużenie), dyrektor naczelny (decyzja), organ tworzący – powiat / marszałek / uczelnia (przy większych umowach).",
+  pain:[
+    "Ciepło i C.W.U. 24/7 – ale nie wszędzie: administracja, poradnie, oddziały dzienne, magazyny pracują w godzinach; szpital grzeje wszystko jak OIOM",
+    "Zadłużenie i presja NFZ – każdy koszt operacyjny jest analizowany",
+    "Ogromne zużycie ciepłej wody i ciepła technologicznego (sterylizacja, kuchnia, pralnia) – często bez opomiarowania",
+    "Stare instalacje, brak BMS lub BMS obejmujący tylko nowe skrzydło"
+  ],
+  fear:"Bezpieczeństwo pacjentów, ciągłość działania, sanepid, odpowiedzialność dyrektora technicznego za każdą awarię, „obcy system w instalacji szpitala”.",
+  angle:"Zakres: wyłącznie części nieszpitalne w pierwszym kroku (administracja, poradnie, budynki techniczne), z pełnym zachowaniem priorytetu dla oddziałów. Bezpieczeństwo jako pierwsze zdanie. Ekonomia jako drugie. Referencje techniczne, wizja lokalna z technikiem – zanim padnie słowo „umowa”.",
+  opening:"„Które budynki szpitala pracują 24 godziny, a które 8 – i czy ogrzewanie o tym wie?”",
+  diag:[
+    "Ile budynków / skrzydeł, jakie są ich funkcje i godziny pracy (oddziały, poradnie, administracja, technika)?",
+    "Źródło ciepła: własna kotłownia, sieć, kogeneracja? Rezerwa awaryjna?",
+    "Roczny koszt ciepła i gazu; udział C.W.U. i pary technologicznej – czy opomiarowane osobno?",
+    "Czy jest BMS? Jaki zakres obejmuje? Kto go obsługuje?",
+    "Czy poradnie i administracja mają osobne obiegi grzewcze? Można je sterować niezależnie?",
+    "Jakie temperatury muszą być utrzymane na oddziałach i w jakich pomieszczeniach (wymogi sanitarne)?",
+    "Czy szpital ma audyt energetyczny? Jakie rekomendacje, co wdrożono?",
+    "Jaki jest stan zadłużenia i czy dyrekcja ma program naprawczy (presja na OPEX)?",
+    "Kto podejmuje decyzję o umowie usługowej bez CAPEX – dyrektor czy organ tworzący? Jaki próg?",
+    "Czy szpital raportuje emisje / zużycie energii (organ tworzący, akredytacja, ESG)?",
+    "Kiedy planowane są remonty instalacji lub wymiana źródła?",
+    "Czy były wcześniej wdrożenia firm zewnętrznych w instalacjach? Jak przebiegły?"
+  ],
+  insight:[
+    "„Czy poradnia specjalistyczna, która zamyka się o 18, jest w nocy grzana tak samo jak oddział?”",
+    "„Ile ciepłej wody krąży w instalacji nocą i ile kosztuje utrzymanie jej temperatury w pustych skrzydłach?”",
+    "„Gdyby dział ekonomiczny dostał co miesiąc raport: oszczędność X GJ potwierdzona standardem – jak by to wyglądało w rozmowie z organem tworzącym?”"
+  ],
+  args:{
+    tech:["Zakres etapowy: najpierw budynki nieszpitalne, oddziały poza zakresem lub z priorytetem bezwzględnym","Współpraca z BMS tam, gdzie jest; niezależne sterowanie tam, gdzie go nie ma","Zapis parametrów jako dokument dla sanepidu i audytu","Powrót do dotychczasowych nastaw w każdej chwili – decyzja szpitala"],
+    econ:["Bez CAPEX – nie konkuruje z zakupem sprzętu medycznego","Obniżenie OPEX widoczne w programie naprawczym","Rozliczenie z oszczędności, standard IPMVP – akceptowalny dla organu tworzącego i biegłego"],
+    board:["Dla dyrektora naczelnego: oszczędność bez ryzyka finansowego i bez odpowiedzialności za technologię (jest po naszej stronie)","Dla organu tworzącego: dokument standardowy, brak zobowiązań kapitałowych"],
+    legal:["Ustawa o efektywności energetycznej, art. 6 – szpitale publiczne (SPZOZ) jako jednostki sektora finansów publicznych [OBOWIĄZEK – potwierdź status konkretnego podmiotu]","EED art. 5 i 6 – budynki instytucji publicznych [W TRAKCIE WDRAŻANIA]","Ustawa o charakterystyce energetycznej budynków – kontrole systemów ogrzewania (art. 23) [OBOWIĄZEK]","Jeśli szpital jest spółką (np. powiatowa sp. z o.o.) – sprawdź, czy nie podlega audytowi energetycznemu przedsiębiorstwa (art. 36 ustawy o EE; projekt UC77 zmienia kryterium na 10 TJ zużycia)"],
+    esg:["Szpitale w grupach kapitałowych i sieciach prywatnych raportują ESG – redukcja energii wprost do raportu","Przygotowanie na ETS2 (2028) przy własnej kotłowni gazowej"]
+  },
+  objections:[
+    {q:"Nie wpuszczę nikogo do instalacji szpitala – to bezpieczeństwo pacjentów.", a:"I dlatego proponuję zacząć wyłącznie od budynków administracyjnych i poradni, z pełną odrębnością od oddziałów. Zakres, punkty styku i procedurę awaryjną ustalamy z Panem na wizji lokalnej, na piśmie, zanim cokolwiek podłączymy. Pan zachowuje kontrolę i możliwość wyłączenia.", why:"Nie dyskutuj z bezpieczeństwem – zawęź zakres."},
+    {q:"Mamy program naprawczy, nie możemy podpisywać nowych umów.", a:"Program naprawczy to właśnie miejsce na umowę, która obniża koszty bez nakładów i bez zobowiązań kapitałowych. Nie zwiększa zadłużenia. Chętnie przygotuję notatkę dla działu ekonomicznego, jak to wygląda w klasyfikacji kosztów.", why:"Odpowiedz językiem programu naprawczego, nie technologii."},
+    {q:"Organ tworzący musi wyrazić zgodę.", a:"Rozumiem. Przygotuję jednostronicowe streszczenie w języku organu: brak CAPEX, brak zadłużenia, rozliczenie z oszczędności, standard IPMVP. Czy dyrektor zechce je przekazać, czy wolą Państwo, żebym przedstawił to osobiście?", why:"Zdejmij z dyrektora pracę tłumaczenia."}
+  ],
+  offerMoment:"Dopiero po wizji lokalnej z działem technicznym i po ustaleniu zakresu bezpiecznego. Wcześniej rozmawiasz tylko o bezpieczeństwie i danych.",
+  path:["Rozmowa z dyrektorem technicznym → wizja lokalna → zakres bezpieczny na piśmie","Dane o zużyciu (dział techniczny + ekonomiczny) → symulacja dla zakresu","Prezentacja dyrekcji: technika + ekonomia w jednym spotkaniu","Notatka dla organu tworzącego → umowa pilotażowa → model bazowy → aktywacja"],
+  close:["„Proszę o godzinę z Panem w kotłowni i w węzłach – chcę zobaczyć, co da się wydzielić bez ryzyka. Wcześniej nie składam żadnej oferty.”","„Kto z działu ekonomicznego powinien zobaczyć symulację razem z Panem?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem technicznym? Dzwonię w sprawie kosztów ciepła – i od razu powiem: nie proponuję niczego na oddziałach."],
+    ["K","To dobrze, bo bym nie rozmawiał. O co chodzi?"],
+    ["H","Obniżamy zużycie ciepła i ciepłej wody w budynkach, które nie pracują 24 godziny – administracja, poradnie, technika. Rozliczamy się tylko z oszczędności. Ile takich budynków ma szpital?"],
+    ["K","Administracja, dwa budynki poradni, pralnia, magazyny. Wszystko z jednej kotłowni gazowej."],
+    ["H","Czy te budynki mają osobne obiegi, czy wszystko idzie na jednej krzywej z oddziałami?"],
+    ["K","Osobne obiegi, ale sterowane tak samo. Nie ma kto tego rozdzielać."],
+    ["H","To jest potencjał: poradnia zamyka się o 18, a jest grzana jak OIOM. Zanim cokolwiek zaproponuję, chciałbym z Panem zobaczyć kotłownię i węzły – godzina. Ustalimy, co da się wydzielić bez żadnego ryzyka dla oddziałów, i zapiszemy to. Potem policzę na Państwa danych, czy jest o co walczyć."],
+    ["K","Godzinę mogę dać. Ale decyzje podejmuje dyrekcja i starostwo."],
+    ["H","Rozumiem. Po wizji przygotuję dla dyrekcji jedną stronę: zakres, bezpieczeństwo, ekonomia bez CAPEX. Pan będzie miał gotowy materiał, a nie kolejną prezentację. Kiedy w przyszłym tygodniu?"],
+    ["N","Sojusznik techniczny najpierw; ekonomia dopiero po zdefiniowaniu zakresu."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"hotel", group:"Komercja", name:"Hotele", short:"właściciel, GM, chief engineer",
+  who:"Właściciel / GM (decyzja, marża), dyrektor techniczny / chief engineer (wdrożenie, sojusznik lub bloker), CFO w sieciach (P&L, ESG), asset manager przy hotelach w funduszach.",
+  pain:[
+    "Ciepło, C.W.U., basen i SPA to duży koszt operacyjny przy zmiennym obłożeniu – grzeje się cały obiekt niezależnie od liczby gości",
+    "Presja na GOP i na raportowanie ESG dla banków, funduszy, klientów korporacyjnych (RFP z pytaniami o CO₂)",
+    "Komfort gościa jest święty – opinie online karzą za zimny pokój, nie za wysoki rachunek za gaz",
+    "Mały dział techniczny, obciążony bieżącą obsługą"
+  ],
+  fear:"Negatywne opinie gości, awaria w sezonie, „projekt IT” pochłaniający czas, długa umowa na obiekcie, który może zostać sprzedany.",
+  angle:"Marża i ESG w jednym. Ciepło dopasowane do obłożenia i prognozy pogody. Bez CAPEX, płatność z wyniku – CFO to rozumie od razu. Komfort gościa jako warunek brzegowy, nie ryzyko. Wdrożenie bez zamykania obiektu.",
+  opening:"„Ile pokoi było zajętych w zeszły wtorek – i czy kotłownia o tym wiedziała?”",
+  diag:[
+    "Liczba pokoi, powierzchnia konferencyjna, basen / SPA / restauracja?",
+    "Roczny koszt gazu / ciepła; udział C.W.U., basenu, wentylacji?",
+    "Źródło ciepła, wiek instalacji, kogeneracja? BMS – jaki, jaki zakres, kto obsługuje?",
+    "Obłożenie w tygodniu i w roku – sezonowość, eventy, konferencje?",
+    "Czy skrzydła / piętra można zamykać sezonowo? Czy są osobne obiegi?",
+    "Jak sterowana jest C.W.U. – cyrkulacja 24/7, temperatura zasobników, legionella?",
+    "Kto ustawia parametry – technik, firma serwisowa, BMS automatycznie?",
+    "Ile zgłoszeń gości dotyczy temperatury w pokojach (za zimno / za gorąco)?",
+    "Czy hotel raportuje ESG / ślad węglowy – dla sieci, banku, klientów korporacyjnych, certyfikatów (Green Key, LEED)?",
+    "Kto decyduje: właściciel, GM, sieć (standardy marki), fundusz?",
+    "Planowane remonty, sprzedaż, refinansowanie w ciągu 2–3 lat?",
+    "Czy były już audyty energetyczne / propozycje ESCO? Efekt?"
+  ],
+  insight:[
+    "„Przy obłożeniu 35% w listopadzie – ile z rachunku za gaz idzie na pokoje, w których nikogo nie ma?”",
+    "„Czy basen jest grzany tak samo o 3 w nocy jak o 10 rano?”",
+    "„Gdyby bank przy refinansowaniu poprosił o dane o efektywności energetycznej – co by Państwo pokazali?”",
+    "„Ile w ciągu roku kosztuje utrzymywanie ciepłej wody w obiegu skrzydła, które w tygodniu jest zamknięte?”"
+  ],
+  args:{
+    tech:["Predykcja z prognozy pogody + dane o obłożeniu = produkcja ciepła dopasowana do jutra","Współpraca z BMS: nie wymieniamy, korygujemy nastawy; przy braku BMS – sterowanie niezależne","Parametry komfortu i C.W.U. (w tym wymogi dot. legionelli) jako warunki brzegowe","Wdrożenie bez zamykania obiektu"],
+    econ:["Bez CAPEX – nie konkuruje z remontem pokoi czy SPA","Efekt bezpośrednio w GOP; rozliczenie tylko z potwierdzonej oszczędności","Skalowanie na kolejne obiekty sieci po pilotażu"],
+    board:["Dla właściciela: wyższa wartość obiektu przy sprzedaży (niższy OPEX, udokumentowana efektywność)","Dla CFO: zero ryzyka finansowego, raport miesięczny w standardzie IPMVP","Dla GM: mniej zgłoszeń o temperaturze, dokument z parametrów"],
+    legal:["EPBD 2024/1275: minimalne normy charakterystyki dla budynków niemieszkalnych – renowacja 16% najgorszych do 2030 i 26% do 2033 (progi krajowe po transpozycji, termin minął 29.05.2026) [KIERUNEK – Polska nie wdrożyła w terminie]","EPBD: nowa skala świadectw A+–G przy sprzedaży / najmie [PO TRANSPOZYCJI]","Ustawa o charakterystyce energetycznej budynków – świadectwo przy sprzedaży/najmie, kontrole ogrzewania [OBOWIĄZEK]","Jeśli hotel w dużej firmie / grupie: audyt energetyczny przedsiębiorstwa co 4 lata (art. 36 ustawy o EE) [OBOWIĄZEK dla dużych; projekt UC77: próg 10 TJ]"],
+    esg:["Dane o redukcji energii i emisji do raportów dla sieci, banków, RFP korporacyjnych","Certyfikaty (Green Key, LEED, BREEAM In-Use) – punkty za zarządzanie energią","ETS2 od 2028 – koszt emisji w cenie gazu; mniejsze zużycie = mniejsza ekspozycja"]
+  },
+  objections:[
+    {q:"Goście zauważą różnicę – nie możemy ryzykować opinii.", a:"Cel to utrzymać dokładnie ten sam komfort mniejszym kosztem. Temperatury w pokojach i ciepła woda pozostają w zadanych granicach, które ustalamy z Państwa technikiem. Zmienia się to, co dzieje się w kotłowni, nie to, co czuje gość.", why:"Opinie gości to pieniądze – odpowiedz bez wahania."},
+    {q:"Mamy BMS, on już to optymalizuje.", a:"BMS realizuje harmonogramy i nastawy, które ktoś ustawił. Nasz system uczy się reakcji budynku na pogodę i obłożenie i koryguje te nastawy na bieżąco – współpracuje z BMS. Symulacja pokaże, ile zostaje do zebrania; jeśli nic – powiem to.", why:"Nie podważaj BMS, dołóż warstwę."},
+    {q:"Właściciel nie chce długiej umowy na obiekcie, który może sprzedać.", a:"Umowa nie tworzy zobowiązań kapitałowych ani stałych opłat, więc nie obciąża wyceny – a niższe koszty operacyjne i udokumentowana efektywność zwykle pomagają przy sprzedaży. Warunki przeniesienia lub wyjścia pokażę w umowie.", why:"Myśl jak asset manager."},
+    {q:"Odezwiemy się po sezonie.", a:"Sezon jest wtedy, gdy oszczędność jest największa i gdy system się uczy. Wdrożenie nie przeszkadza w pracy obiektu. Jeśli zaczniemy teraz, po sezonie będą Państwo mieli liczby, a nie plany.", why:"Koszt zwłoki = utracona oszczędność."}
+  ],
+  offerMoment:"Po pytaniu o obłożenie i po tym, jak technik potwierdzi, że pokoje grzeją się niezależnie od gości. Model ESCO pokazujesz GM/CFO – technikowi pokazujesz, co się zmieni w jego pracy.",
+  path:["Faktury za gaz + dane o obłożeniu miesięcznym → symulacja","Wizja lokalna z chief engineerem (kotłownia, BMS, C.W.U.)","Prezentacja GM + technik (+ CFO w sieci) → pilotaż w jednym obiekcie","Raport po sezonie → rozszerzenie na sieć"],
+  close:["„Potrzebuję faktur za gaz z dwóch lat i przybliżonego obłożenia miesięcznego. Czy technik może umówić się ze mną na godzinę w kotłowni?”","„Prezentację symulacji chciałbym zrobić przed sezonem – [data] lub [data]?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Mogę prosić dyrektora technicznego?"],
+    ["K","Przy telefonie."],
+    ["H","Obniżamy koszty ciepła i ciepłej wody w hotelach bez CAPEX-u, rozliczamy się z oszczędności. Ile pokoi ma obiekt i z czego Państwo grzeją?"],
+    ["K","120 pokoi, gaz, do tego basen i SPA."],
+    ["H","A obłożenie w listopadzie versus lipcu?"],
+    ["K","Listopad 30–40%, lato pod 90%."],
+    ["H","I kotłownia w listopadzie pracuje tak samo jak w lipcu?"],
+    ["K","Mniej więcej. BMS ma harmonogram, ale nikt go nie zmienia pod obłożenie."],
+    ["H","To jest dokładnie to, co robimy: system dopasowuje produkcję ciepła do prognozy pogody i rzeczywistego zapotrzebowania, współpracuje z BMS. Pokoje i woda – bez zmian dla gościa. Chciałbym zobaczyć kotłownię i BMS – godzina – i policzyć na Państwa fakturach, ile jest do zebrania. Rozliczenie tylko z potwierdzonej oszczędności, standard IPMVP – CFO to zwykle lubi."],
+    ["K","GM będzie pytał o gwarancje komfortu."],
+    ["H","Parametry komfortu i temperatury C.W.U. zapisujemy jako warunki brzegowe – to jest w umowie, nie w obietnicach. Kiedy mogę wpaść z technikiem? I poproszę faktury za gaz z dwóch lat na maila, żebym przyszedł z liczbami."],
+    ["N","Technik jako sojusznik; GM/CFO na prezentację symulacji."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"spoldzielnia", group:"Mieszkalnictwo", name:"Spółdzielnie mieszkaniowe", short:"prezes, zarząd, dział techniczny, RN",
+  who:"Prezes / zarząd (decyzja operacyjna, pilotaż), kierownik działu technicznego / GZM (wdrożenie), rada nadzorcza (akceptacja większych umów), walne zgromadzenie (rzadko bezpośrednio, ale zarząd o nim myśli).",
+  pain:[
+    "Koszty ciepła to największa pozycja w opłatach – każda podwyżka to konflikt z mieszkańcami i tematem na walnym",
+    "Kilkadziesiąt węzłów, zróżnicowane budynki, rozliczenia po sezonie, podzielniki, reklamacje",
+    "Mieszkańcy skarżą się jednocześnie na zimno i na wysokie rachunki; otwierają okna w styczniu",
+    "Fundusz remontowy ma długą kolejkę; automatyka węzłów często z lat 90./2000."
+  ],
+  fear:"Reakcja mieszkańców i RN, odpowiedzialność zarządu, skargi na komfort, „kolejna firma, która obiecuje 20%”, niejasne rozliczenie z mieszkańcami.",
+  angle:"Oszczędność w opłatach bez ruszania funduszu remontowego. Pilotaż na 1–2 węzłach jako bezpieczne wejście w kompetencji zarządu. Język: „niższe zaliczki na ciepło”, nie „AI”. Rozliczenie z mieszkańcami wyjaśnione operacyjnie.",
+  opening:"„Który budynek w zasobach ma najwyższy koszt ciepła na metr – i czy wiadomo dlaczego?”",
+  diag:[
+    "Ile budynków i węzłów, jakie źródło (PEC, własne kotłownie), kto dostawcą?",
+    "Roczny koszt ciepła; koszt na m² w najlepszym i najgorszym budynku?",
+    "Jak działa sterowanie węzłów – automatyka pogodowa (jaka, jak stara), kto zmienia nastawy, jak często?",
+    "Jak rozliczane jest ciepło z mieszkańcami – podzielniki, liczniki, ryczałt? Kiedy rozliczenie?",
+    "Ile reklamacji rozliczeń i ile zgłoszeń „za zimno” / „za gorąco” w sezonie?",
+    "Które budynki są po termomodernizacji i czy po niej obniżono krzywe grzewcze?",
+    "Czy jest zdalny odczyt / monitoring węzłów? Kto go ogląda?",
+    "Jak wygląda ścieżka decyzji: zarząd → RN → walne? Jaki próg dla zarządu?",
+    "Kiedy jest najbliższe posiedzenie RN i walne? Co musi być gotowe, żeby temat wszedł?",
+    "Czy były wcześniej propozycje ESCO / optymalizacji? Jak się skończyły?",
+    "Czy mieszkańcy pytają o koszty ciepła na walnym? Jak zarząd na to odpowiada?",
+    "Moc zamówiona w PEC – kiedy ostatnio weryfikowana?"
+  ],
+  insight:[
+    "„Ile razy w styczniu mieszkańcy otwierają okna? Kto płaci za to ciepło, które wylatuje?”",
+    "„Kiedy ostatni raz ktoś zmienił krzywą grzewczą w węźle nr [X]? Po termomodernizacji?”",
+    "„Gdyby na walnym zarząd mógł powiedzieć: obniżyliśmy koszt ciepła bez ruszania funduszu remontowego – jak by to zmieniło rozmowę?”",
+    "„Czy automatyka w węźle wie, że jutro będzie 10 stopni cieplej?”"
+  ],
+  args:{
+    tech:["Predykcja pogodowa + uczenie się reakcji budynku – eliminacja przegrzewania i „okien w styczniu”","Współpraca z istniejącą automatyką węzłów; przy starej automatyce – sterowanie niezależne","Parametry graniczne ustala administracja; zdalny podgląd dla działu technicznego","Możliwość korekty mocy zamówionej po sezonie na podstawie danych"],
+    econ:["Fundusz remontowy nietknięty – to nie konkuruje z windami, dachami, dociepleniem","Efekt w rozliczeniu ciepła z mieszkańcami – konkret, nie abstrakcja","Rozliczenie ESCO zawsze niższe niż potwierdzona oszczędność – spółdzielnia nie dokłada","Pilotaż na 1–2 węzłach, potem skalowanie"],
+    board:["Dla zarządu: wynik z własnego budynku jako argument na RN i walne","Dla RN: brak ryzyka finansowego, standard rozliczenia, możliwość wyjścia","Dla mieszkańców: niższe zaliczki, mniej reklamacji"],
+    legal:["Prawo energetyczne, art. 45a – zasady rozliczania kosztów ciepła w budynkach wielolokalowych; obowiązek regulaminu rozliczeń [OBOWIĄZEK – uwzględnij przy rozliczaniu efektu z mieszkańcami]","Ustawa o charakterystyce energetycznej budynków – świadectwa przy sprzedaży/najmie lokali, kontrole ogrzewania (art. 23) [OBOWIĄZEK]","EPBD 2024/1275: nowa skala A+–G, krajowa trajektoria renowacji budynków mieszkalnych [PO TRANSPOZYCJI – termin minął 29.05.2026]","ETS2 od 1.01.2028 – koszt emisji w cenie gazu/węgla; dotyczy spółdzielni z własnymi kotłowniami, pośrednio PEC-ów opalanych paliwami kopalnymi [PRZYSZŁE]"],
+    esg:["Spółdzielnie z kredytami / obligacjami: banki pytają o efektywność","Argument na walnym: mniej emisji, mniej kosztów, bez inwestycji"]
+  },
+  objections:[
+    {q:"Mieszkańcy będą się skarżyć, że jest zimno.", a:"System nie obniża temperatury w mieszkaniach – eliminuje przegrzewanie i nadprodukcję, czyli sytuacje, w których ludzie otwierają okna w styczniu. Parametry ustalamy z administracją i można je korygować. W pilotażu zobaczą Państwo liczbę zgłoszeń przed i po.", why:"Skargi to realny koszt zarządu – pokaż, że je mierzysz."},
+    {q:"Musimy przejść przez RN / walne, to potrwa.", a:"Dlatego proponuję pilotaż na jednym węźle – zwykle w kompetencji zarządu. Wynik z własnego budynku to najlepszy materiał na walne. My przygotujemy prezentację i odpowiemy na pytania członków.", why:"Skróć ścieżkę do tego, co zarząd może zrobić sam."},
+    {q:"Dostawca ciepła mówi, że nie da się już nic zaoszczędzić.", a:"Dostawca odpowiada za dostarczenie ciepła do węzła, nie za to, ile budynek pobiera w czasie. My działamy po stronie odbioru. Symulacja na Państwa danych pokaże, czy jest potencjał; jeśli nie, powiemy to wprost.", why:"Rozdziel role dostawcy i odbiorcy."},
+    {q:"Jak to pogodzić z rozliczeniem ciepła z mieszkańcami po sezonie?", a:"Nasze rozliczenie jest według umowy (kwartalne lub sezonowe) i zawsze niższe niż potwierdzona oszczędność – mieszkańcy widzą różnicę w rozliczeniu, spółdzielnia nie dokłada. Sposób ujęcia w regulaminie rozliczeń (art. 45a PE) omówimy z działem rozliczeń.", why:"Pytanie operacyjne – odpowiedź operacyjna."},
+    {q:"Mamy podzielniki, mieszkańcy sami regulują.", a:"Podzielniki dzielą koszt, nie zmniejszają produkcji ciepła w węźle. Jeśli węzeł podaje za wysoką temperaturę, mieszkańcy zakręcają zawory albo otwierają okna – a spółdzielnia i tak płaci za GJ na liczniku głównym. Optymalizujemy to, co jest przed podzielnikami.", why:"Podzielniki ≠ optymalizacja."}
+  ],
+  offerMoment:"Po pytaniu o koszt na m² i o wiek automatyki. Gdy prezes sam powie „nikt tego nie przestawia” – pokazujesz model rozliczenia i propozycję pilotażu.",
+  path:["Rozliczenia ciepła z 2 sezonów dla 2–3 budynków (najwyższy koszt/m²) → symulacja","Wizja lokalna w węzłach z działem technicznym","Prezentacja zarządowi + kierownikowi technicznemu → pilotaż na 1–2 węzłach","Raport po sezonie → materiał na RN / walne → rozszerzenie"],
+  close:["„Proponuję pilotaż na węźle [X] – tym z najwyższym kosztem na m². Potrzebuję rozliczeń ciepła z dwóch sezonów. Kto z działu technicznego może mi je przesłać?”","„Kiedy jest posiedzenie RN? Przygotuję symulację tydzień wcześniej.”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Dzwonię do zarządu w sprawie kosztów ciepła w zasobach – trafiłem dobrze?"],
+    ["K","Tak, prezes przy telefonie."],
+    ["H","Pomagamy spółdzielniom obniżać zużycie ciepła na C.O. i ciepłą wodę bez ruszania funduszu remontowego – rozliczamy się z oszczędności. Ile budynków mają Państwo w zasobach i z czego grzeją?"],
+    ["K","Czterdzieści dwa budynki, wszystko z PEC-u."],
+    ["H","Który ma najwyższy koszt na metr i czy wiadomo dlaczego?"],
+    ["K","Stare bloki na [ulica], jeszcze bez docieplenia. Ale wszędzie jest drogo."],
+    ["H","A automatyka w węzłach – jak stara i kto zmienia nastawy?"],
+    ["K","Różna. Część z 2005. Konserwator ustawia na sezon."],
+    ["H","Czyli w marcu, przy 12 stopniach w dzień, węzeł grzeje według krzywej ustawionej w październiku?"],
+    ["K","No tak, chyba że ktoś zadzwoni, że gorąco."],
+    ["H","I wtedy ludzie otwierają okna. Nasz system codziennie dopasowuje pracę węzła do prognozy pogody i do tego, jak budynek reaguje – współpracuje z tym, co Państwo mają. Oszczędność liczymy metodą stopniodni według IPMVP, więc ciepła zima nie zafałszuje wyniku. Proponuję pilotaż na dwóch węzłach – zarząd ma wynik do pokazania radzie, a jeśli oszczędności nie ma, nie ma faktury."],
+    ["K","Rada nadzorcza jest ostrożna."],
+    ["H","Pilotaż zwykle mieści się w kompetencji zarządu, a raport z niego to najlepszy materiał na radę. Proponuję 30 minut z Panem i kierownikiem technicznym. Poproszę wcześniej rozliczenia ciepła z dwóch sezonów dla bloków na [ulica] – przyjdę z liczbami. Wtorek czy czwartek?"],
+    ["N","Pilotaż w kompetencji zarządu; dane z najgorszych budynków."]
+  ]
+});
+SEGMENTS.push({
+  id:"wspolnota", group:"Mieszkalnictwo", name:"Wspólnoty i zarządcy nieruchomości", short:"zarządca, zarząd wspólnoty, TBS",
+  who:"Zarządca (licencjonowany / firma zarządzająca – wpływ i rekomendacja, zwykle nie decyzja), zarząd wspólnoty (decyzja w zakresie zwykłego zarządu), zebranie właścicieli (uchwała przy większych zobowiązaniach), TBS / SIM – zarząd spółki.",
+  pain:[
+    "Zarządca obsługuje kilkadziesiąt wspólnot i nie ma czasu na optymalizację każdego węzła",
+    "Właściciele porównują rachunki z sąsiednim budynkiem i pytają, dlaczego drożej",
+    "Decyzje wymagają uchwał; zebrania raz w roku; frekwencja niska",
+    "Zarządca odpowiada za koszty, a nie ma narzędzia do ich obniżenia bez wydatku"
+  ],
+  fear:"Zarządca: utrata wspólnoty na rzecz konkurencji, odpowiedzialność za nieudane wdrożenie, dodatkowa praca. Zarząd wspólnoty: „co powiedzą sąsiedzi”, uchwała, skargi.",
+  angle:"Do zarządcy – narzędzie, które daje mu przewagę wobec wspólnot („obniżyłem koszty bez wydatku”) i skalowanie na cały portfel. Do zarządu wspólnoty – konkret: niższe zaliczki na ciepło, brak wydatku z funduszu. Uchwała: przygotuj projekt treści.",
+  opening:"„Ile wspólnot Państwo obsługują i w ilu z nich ktoś w tym sezonie zmieniał nastawy węzła?”",
+  diag:[
+    "Ile wspólnot / budynków w zarządzaniu? Ile z nich z własnym węzłem / kotłownią?",
+    "Które budynki mają najwyższy koszt ciepła na m²? Czy właściciele o to pytają?",
+    "Kto obsługuje węzły – serwis zewnętrzny, konserwator zarządcy, PEC?",
+    "Jaki jest tryb decyzji: zarząd wspólnoty czy uchwała? Jaki próg zwykłego zarządu w umowie o zarządzanie?",
+    "Kiedy są zebrania roczne? Czy da się zebrać uchwałę w trybie indywidualnego zbierania głosów?",
+    "Czy zarządca ma narzędzie do zdalnego podglądu węzłów?",
+    "Jak zarządca rozlicza ciepło – zaliczki, rozliczenie roczne, podzielniki?",
+    "Czy zarządca chce zaoferować to jako własną usługę wszystkim wspólnotom (model partnerski)?",
+    "Czy były skargi na komfort lub reklamacje rozliczeń? Ile?",
+    "Czy któraś wspólnota planuje termomodernizację lub kredyt (bank pyta o efektywność)?"
+  ],
+  insight:[
+    "„Ile godzin w sezonie Państwa konserwator spędza na przestawianiu nastaw w 40 węzłach? A ile powinien?”",
+    "„Gdy właściciel pyta, dlaczego u niego drożej niż w bloku obok – jaka jest dziś odpowiedź?”",
+    "„Gdyby zarządca mógł na zebraniu powiedzieć: obniżyliśmy koszt ciepła bez wydatku – ile wspólnot by chciało to samo?”"
+  ],
+  args:{
+    tech:["Jeden system dla całego portfela – zdalny podgląd wszystkich węzłów w jednym miejscu","Współpraca z istniejącą automatyką; nastawy pod prognozę pogody i reakcję budynku","Parametry graniczne ustala zarządca; dokument z pracy węzła przy reklamacjach"],
+    econ:["Zero wydatku dla wspólnoty – bez uchwały o funduszu remontowym","Niższe zaliczki na ciepło = widoczny efekt dla właścicieli","Dla zarządcy: przewaga konkurencyjna i możliwy udział w modelu partnerskim"],
+    board:["Dla zarządu wspólnoty: gotowy projekt uchwały i materiał na zebranie","Dla zarządcy: argument przy przedłużaniu umowy o zarządzanie"],
+    legal:["Ustawa o własności lokali – rozróżnienie czynności zwykłego zarządu i przekraczających (art. 22): umowa bez wydatków i bez zobowiązań kapitałowych może mieścić się w zwykłym zarządzie – ale to ocenia zarządca / prawnik wspólnoty; nie przesądzaj [OBOWIĄZEK – ustal tryb]","Prawo energetyczne, art. 45a – rozliczanie ciepła w budynkach wielolokalowych [OBOWIĄZEK]","Ustawa o charakterystyce energetycznej budynków – świadectwa, kontrole ogrzewania [OBOWIĄZEK]","EPBD 2024/1275 – trajektoria renowacji, skala A+–G [PO TRANSPOZYCJI]"],
+    esg:["Banki finansujące termomodernizację pytają o zużycie – dane z systemu wprost do wniosku","ETS2 (2028) przy własnych kotłowniach gazowych"]
+  },
+  objections:[
+    {q:"Każda wspólnota musi to przegłosować – to nierealne.", a:"Dlatego zaczynamy od jednej–dwóch wspólnot, gdzie zarząd jest aktywny, w trybie, który Państwo uznają za właściwy. Przygotujemy projekt uchwały i jednostronicowe uzasadnienie. Wynik z pierwszej wspólnoty ułatwia głosowanie w kolejnych.", why:"Skaluj po sukcesie, nie od razu."},
+    {q:"Nie mam z tego nic jako zarządca, tylko dodatkową pracę.", a:"Ma Pan / Pani: argument przy przedłużaniu umowy o zarządzanie, mniej reklamacji rozliczeń, zdalny podgląd węzłów i – jeśli chcą Państwo oferować to jako własną usługę – model partnerski. Pracę wdrożeniową bierzemy my.", why:"Zarządca musi widzieć własny interes."},
+    {q:"Serwis węzłów robi firma X i nie chce nikogo obcego.", a:"Serwis odpowiada za sprawność urządzeń, my za nastawy według pogody i użytkowania – to się nie wyklucza. Chętnie spotkam się z serwisem, żeby ustalić zakres i punkt styku. Bez ich zgody na zakres nie ruszamy.", why:"Serwisant to potencjalny bloker – włącz go."}
+  ],
+  offerMoment:"Zarządcy – po pytaniu o liczbę wspólnot i model decyzji; propozycja: pilotaż w 1–2 wspólnotach + model partnerski. Zarządowi wspólnoty – po pokazaniu kosztu na m² vs sąsiedni budynek.",
+  path:["Zarządca wskazuje 2 wspólnoty (wysoki koszt/m², aktywny zarząd) → dane → symulacja","Projekt uchwały / decyzja zarządu wspólnoty","Pilotaż → raport na zebranie roczne → rozszerzenie na portfel"],
+  close:["„Proszę wskazać dwie wspólnoty, w których zarząd jest aktywny i koszt ciepła jest wysoki. Przygotuję symulację i projekt uchwały.”","„Czy chce Pan / Pani, żebym był na zebraniu i odpowiadał na pytania właścicieli?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z zarządcą nieruchomości? Dzwonię w sprawie kosztów ciepła we wspólnotach, które Państwo obsługują."],
+    ["K","Tak, obsługujemy około 60 wspólnot."],
+    ["H","W ilu z nich w tym sezonie ktoś zmieniał nastawy węzła pod pogodę?"],
+    ["K","Szczerze? W żadnej. Serwis ustawia jesienią."],
+    ["H","I potem właściciele pytają, dlaczego u nich drożej niż obok. Nasz system codziennie dopasowuje węzeł do prognozy i do budynku, Państwo mają zdalny podgląd wszystkich węzłów, wspólnota nic nie wydaje – rozliczamy się z oszczędności. Dla zarządcy to argument przy przedłużaniu umowy: obniżyliśmy koszty bez wydatku."],
+    ["K","Wspólnoty musiałyby to przegłosować."],
+    ["H","Zacznijmy od dwóch, gdzie zarząd jest aktywny. Przygotuję symulację na ich rozliczeniach i projekt uchwały z uzasadnieniem. Jeśli Państwo chcą, mogę być na zebraniu. Które dwie wspólnoty mają najwyższy koszt na metr?"],
+    ["N","Zarządca to kanał do wielu wspólnot – potraktuj go jak partnera, nie klienta końcowego."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"biurowiec", group:"Komercja", name:"Biurowce", short:"property / facility manager, asset manager, najemcy",
+  who:"Property manager (koszty eksploatacyjne, relacja z najemcami), facility manager / dział techniczny (BMS, wdrożenie), asset manager / fundusz (wartość, ESG, certyfikaty), duży najemca (gdy płaci za media i naciska na ESG).",
+  pain:[
+    "Koszty eksploatacyjne (service charge) rosną, najemcy je kwestionują, a rynek najmu jest konkurencyjny",
+    "Budynek pracuje 7–19, w weekend prawie pusty; wentylacja i ogrzewanie często na pełnych harmonogramach",
+    "Fundusze wymagają certyfikatów (BREEAM In-Use, LEED) i danych ESG; banki – taksonomii",
+    "BMS jest, ale nastawy ustawiono przy odbiorze budynku i nikt ich nie rewidował"
+  ],
+  fear:"Skargi najemców na komfort (to koszt relacji), ingerencja w BMS pod gwarancją, ryzyko przy certyfikacji, długość umowy vs plan sprzedaży budynku.",
+  angle:"Service charge w dół bez CAPEX = argument przy negocjacjach z najemcami i przy sprzedaży. Dane do BREEAM/LEED i ESG. Współpraca z BMS, nie jego wymiana. Rozliczenie z oszczędności zdejmuje ryzyko z asset managera.",
+  opening:"„Kiedy ostatni raz ktoś zrewidował harmonogramy w BMS – przy odbiorze budynku?”",
+  diag:[
+    "Powierzchnia, liczba najemców, godziny pracy, poziom wykorzystania (praca hybrydowa!)?",
+    "Źródło ciepła: sieć, gaz, pompy ciepła, chłód? Roczny koszt?",
+    "BMS – producent, wiek, zakres, kto obsługuje (FM zewnętrzny?)",
+    "Jak rozliczane są media z najemcami – w service charge, refaktura, ryczałt?",
+    "Czy najemcy kwestionują service charge? Czy są klauzule ESG w umowach najmu?",
+    "Certyfikaty budynku: BREEAM, LEED, WELL – planowana recertyfikacja?",
+    "Kto decyduje: property manager, asset manager, fundusz? Jaki próg?",
+    "Plany sprzedaży / refinansowania w ciągu 2–3 lat?",
+    "Czy wentylacja pracuje wg harmonogramu czy wg obecności (CO₂)?",
+    "Ile zgłoszeń o komfort w sezonie? Jak obsługiwane?",
+    "Czy był audyt energetyczny / raport ESG dla funduszu?",
+    "Czy jest zdalny dostęp do BMS i logi historyczne (dane do modelu)?"
+  ],
+  insight:[
+    "„Przy pracy hybrydowej biuro w piątek jest zapełnione w 30% – czy BMS to wie?”",
+    "„Gdyby service charge spadł o kwotę odpowiadającą oszczędności na cieple – jak by to wyglądało w rozmowie z najemcą przy przedłużaniu umowy?”",
+    "„Co pokażą Państwo przy recertyfikacji BREEAM w punkcie zarządzanie energią?”"
+  ],
+  args:{
+    tech:["Warstwa predykcyjna nad BMS: prognoza pogody + rzeczywiste wykorzystanie budynku","Korekty nastaw i harmonogramów bez wymiany systemu; zachowana gwarancja producenta BMS (zakres uzgadniany)","Parametry komfortu jako warunki brzegowe; log z pracy do reklamacji najemców"],
+    econ:["Niższy service charge bez CAPEX – argument w najmie i w wycenie","Rozliczenie z oszczędności; brak obciążeń kapitałowych","Efekt widoczny w NOI"],
+    board:["Dla asset managera: wyższa wartość, dane ESG, zero ryzyka finansowego","Dla PM: mniej sporów o service charge","Dla FM: zdjęcie ręcznej pracy przy harmonogramach"],
+    legal:["EPBD 2024/1275: renowacja 16% najgorszych budynków niemieszkalnych do 2030 i 26% do 2033 – progi krajowe nieznane (Polska nie wdrożyła w terminie 29.05.2026) [KIERUNEK]","Świadectwa charakterystyki energetycznej w nowej skali A+–G przy sprzedaży/najmie [PO TRANSPOZYCJI]","Raportowanie zrównoważonego rozwoju (CSRD) – dla dużych właścicieli / funduszy; zakres podmiotowy po uproszczeniach „omnibus” zweryfikuj dla konkretnego klienta [OBOWIĄZEK ZALEŻNY OD PODMIOTU]","Taksonomia UE – kryteria dla nieruchomości (efektywność energetyczna) przy finansowaniu [ZALEŻNE OD FINANSOWANIA]"],
+    esg:["Dane do BREEAM In-Use / LEED O+M, GRESB, raportów CSRD","Klauzule zielone w umowach najmu – dostarczasz najemcy dane","ETS2 od 2028 przy ogrzewaniu gazowym"]
+  },
+  objections:[
+    {q:"BMS jest pod gwarancją integratora – nie możemy nic zmieniać.", a:"Zakres współpracy ustalamy z integratorem: korekty nastaw w dozwolonych granicach lub sterowanie równoległe bez ingerencji w logikę BMS. Zanim cokolwiek zaproponuję, spotkam się z integratorem i FM. Bez ich zgody na zakres nie ruszamy.", why:"Włącz integratora, nie omijaj go."},
+    {q:"Najemcy płacą za media – to nie nasz koszt.", a:"To Państwa argument w negocjacjach: niższy service charge to niższa całkowita cena najmu dla najemcy bez obniżania czynszu. Przy przedłużeniach i przy klauzulach ESG to realna przewaga. I dane do certyfikacji budynku, która jest po stronie właściciela.", why:"Koszt najemcy = konkurencyjność właściciela."},
+    {q:"Budynek idzie na sprzedaż w ciągu roku.", a:"Umowa bez CAPEX i bez stałych opłat nie obciąża wyceny, a udokumentowana efektywność i niższy OPEX wprost ją podnoszą. Warunki przeniesienia umowy na nabywcę pokażę w dokumencie.", why:"Sprzedaż to argument ZA, nie przeciw."}
+  ],
+  offerMoment:"Po pytaniu o service charge i certyfikaty. Ofertę ESCO pokazujesz asset/property managerowi; FM-owi pokazujesz zakres techniczny po wizji z integratorem.",
+  path:["Dane z BMS (logi) + faktury → symulacja","Spotkanie z FM i integratorem BMS → zakres na piśmie","Prezentacja PM + AM → pilotaż (cały budynek lub wybrane obiegi)","Raport + dane do certyfikacji → rozszerzenie na portfel funduszu"],
+  close:["„Poproszę o kontakt do FM i integratora BMS – chcę ustalić zakres, zanim złożę ofertę.”","„Czy asset manager powinien być na prezentacji symulacji? Kiedy jest najbliższy przegląd portfela?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z property managerem budynku [nazwa]?"],
+    ["K","Tak."],
+    ["H","Obniżamy koszty ciepła w biurowcach – bez CAPEX, rozliczenie z oszczędności, współpraca z BMS. Pytanie na start: kiedy ostatni raz ktoś rewidował harmonogramy w BMS?"],
+    ["K","Chyba przy odbiorze. FM coś poprawia, jak są zgłoszenia."],
+    ["H","A obłożenie biur w piątki przy pracy hybrydowej?"],
+    ["K","Niskie, może 30%."],
+    ["H","Czyli budynek jest grzany i wentylowany na 100% dla 30% ludzi. Nasz system dokłada nad BMS warstwę, która uwzględnia prognozę i rzeczywiste wykorzystanie – zakres uzgadniamy z integratorem, żeby nie ruszać gwarancji. Efekt: niższy service charge i dane do BREEAM. Płatność tylko z potwierdzonej oszczędności."],
+    ["K","Najemcy będą pytać o komfort."],
+    ["H","Parametry komfortu są warunkiem brzegowym w umowie, a log z pracy systemu to Państwa dokument przy reklamacjach. Proponuję spotkanie z FM i integratorem, żebym ustalił zakres, i faktury za ciepło z dwóch lat do symulacji. Kto po stronie asset managera powinien zobaczyć wynik?"],
+    ["N","Trzy strony: PM (relacje), FM/integrator (zakres), AM (decyzja i ESG)."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"galeria", group:"Komercja", name:"Galerie i centra handlowe", short:"dyrektor centrum, FM, asset manager",
+  who:"Dyrektor centrum (operacje, najemcy), facility manager / dział techniczny (BMS, kotłownia, wentylacja), asset manager / właściciel (wartość, ESG, service charge), duże sieci-najemcy (naciskają na ESG i koszty wspólne).",
+  pain:[
+    "Ogromne kubatury, pasaże, wentylacja z ogrzewaniem powietrza – koszt ciepła zależny od pogody i frekwencji",
+    "Godziny otwarcia 9–21, ale rozruch od 5 rano i praca techniczna nocą; niedziele handlowe / niehandlowe",
+    "Najemcy kwestionują koszty wspólne; asset manager chce NOI i danych ESG",
+    "BMS duży, ale ustawiony „bezpiecznie” – z zapasem na komfort, kosztem energii"
+  ],
+  fear:"Skargi najemców i klientów (zimny pasaż = mniej ruchu), ingerencja w wentylację (jakość powietrza, przepisy), integracja z BMS pod serwisem zewnętrznym.",
+  angle:"Koszty wspólne w dół bez CAPEX; dane ESG dla właściciela i sieci-najemców; współpraca z BMS w uzgodnionym zakresie; niedziele niehandlowe i noce jako oczywisty potencjał.",
+  opening:"„Co robi ogrzewanie pasażu w niedzielę niehandlową?”",
+  diag:[
+    "Powierzchnia GLA, kubatura pasaży, liczba central wentylacyjnych z nagrzewnicami?",
+    "Źródło ciepła: sieć, gaz, kogeneracja? Roczny koszt ciepła; udział wentylacji?",
+    "BMS – producent, zakres, kto serwisuje? Czy jest zdalny dostęp i logi?",
+    "Harmonogramy: rozruch, otwarcie, zamknięcie, niedziele niehandlowe, święta?",
+    "Jak rozliczane są koszty wspólne z najemcami? Czy są spory?",
+    "Czy właściciel raportuje ESG / GRESB / ma certyfikat BREEAM In-Use?",
+    "Czy nagrzewnice pracują wg temperatury zewnętrznej czy stałych nastaw?",
+    "Frekwencja w tygodniu vs weekend – czy sterowanie o tym wie?",
+    "Kto decyduje o umowie bez CAPEX – dyrektor, AM, fundusz?",
+    "Plany remontów central / wymiany źródła w 2–3 lata?",
+    "Czy były audyty energetyczne i co wdrożono?",
+    "Czy duzi najemcy (sieci) naciskają na koszty wspólne lub ESG?"
+  ],
+  insight:[
+    "„Ile godzin w tygodniu centrum jest zamknięte, a ile z nich wentylacja z ogrzewaniem pracuje?”",
+    "„Gdy jest –5° i pasaż ma 22°, klienci są w kurtkach – czy 19° nie wystarczy? Kto to ustalił?”",
+    "„Jak wyglądałaby rozmowa z sieciowym najemcą, gdyby koszty wspólne spadły, a Państwo mieli dane o emisjach?”"
+  ],
+  args:{
+    tech:["Predykcja pogody + kalendarz handlowy + frekwencja → nastawy nagrzewnic i rozruchu","Współpraca z BMS w zakresie uzgodnionym z serwisem; bez zmiany logiki bezpieczeństwa","Parametry jakości powietrza i komfortu jako warunki brzegowe"],
+    econ:["Koszty wspólne niżej bez CAPEX – argument wobec najemców","Rozliczenie z oszczędności; efekt w NOI","Skalowanie na portfel centrów"],
+    board:["Dla AM: NOI, ESG, GRESB, wartość","Dla dyrektora: mniej sporów o koszty wspólne, dokument z parametrów"],
+    legal:["EPBD 2024/1275 – minimalne normy dla budynków niemieszkalnych (16%/26%), skala A+–G [KIERUNEK / PO TRANSPOZYCJI]","Ustawa o charakterystyce energetycznej budynków – kontrole ogrzewania i wentylacji/klimatyzacji (art. 23) [OBOWIĄZEK]","CSRD dla dużych właścicieli – zakres zweryfikuj [ZALEŻNE OD PODMIOTU]","Audyt energetyczny przedsiębiorstwa (art. 36 ustawy o EE) dla dużych; projekt UC77 – próg 10 TJ [OBOWIĄZEK / PROJEKT]"],
+    esg:["GRESB, BREEAM In-Use, raporty CSRD właściciela i sieci-najemców","ETS2 2028 przy gazie"]
+  },
+  objections:[
+    {q:"Wentylacja to jakość powietrza – nie będziemy tego ruszać.", a:"Nie ruszamy krotności wymian ani parametrów jakości powietrza – to warunki brzegowe. Optymalizujemy temperaturę nawiewu i harmonogramy w godzinach, gdy centrum jest zamknięte lub puste, w zakresie uzgodnionym z serwisem BMS.", why:"Zawęź zakres do tego, co nie budzi obaw."},
+    {q:"Serwis BMS ma umowę na wyłączność.", a:"To znaczy, że serwis musi być przy stole – i chcę tego. Uzgodnimy z nim, co robimy my, a co oni; często to oni wdrażają nasze korekty w swoim systemie. Nie omijamy serwisu.", why:"Serwis jako wykonawca, nie konkurent."},
+    {q:"Najemcy i tak płacą koszty wspólne.", a:"A potem negocjują czynsz i przedłużenie z tymi kosztami w ręku. Niższe koszty wspólne to Państwa argument w negocjacjach i punkt w ESG, o który pytają sieci.", why:"Koszty najemców wracają do właściciela w negocjacjach."}
+  ],
+  offerMoment:"Po pytaniu o niedziele niehandlowe i o BMS. Model ESCO – dyrektorowi i AM; zakres – FM i serwisowi po wizji.",
+  path:["Logi BMS + faktury → symulacja","Wizja lokalna: FM + serwis BMS → zakres na piśmie","Prezentacja dyrektor + AM → pilotaż (wybrane centrale / cały obiekt)","Raport + dane ESG → portfel"],
+  close:["„Poproszę o godzinę z FM i serwisem BMS w maszynowni – bez tego nie składam oferty.”","„Czy AM chce zobaczyć symulację razem z Panem, żebyśmy nie powtarzali spotkania?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Mogę prosić dyrektora technicznego centrum?"],
+    ["K","Słucham."],
+    ["H","Obniżamy koszty ciepła w centrach handlowych – współpraca z BMS, bez CAPEX, rozliczenie z oszczędności. Pytanie: co robi ogrzewanie pasażu i central w niedzielę niehandlową?"],
+    ["K","Jest tryb obniżony, ale szczerze – nie wiem, czy zawsze się włącza."],
+    ["H","A rozruch rano – od której i czy zależy od prognozy?"],
+    ["K","Od piątej, stała godzina."],
+    ["H","Czyli w marcu przy 10° rozruch trwa tyle samo co w styczniu przy –10°. To jest potencjał: system dopasowuje rozruch i nastawy nagrzewnic do prognozy i kalendarza, jakość powietrza bez zmian. Chcę to uzgodnić z serwisem BMS, żeby nikt nie miał wątpliwości, kto co robi. Efekt: niższe koszty wspólne i dane do GRESB dla właściciela."],
+    ["K","Serwis ma wyłączność."],
+    ["H","Bardzo dobrze – zaprośmy ich na wizję. Godzina w maszynowni z Panem i serwisem, potem symulacja na fakturach z dwóch lat. Kiedy to możliwe?"],
+    ["N","Serwis BMS przy stole od początku."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"przemysl", group:"Przemysł i energetyka", name:"Zakłady przemysłowe", short:"główny energetyk, UR, dyrektor zakładu",
+  who:"Główny energetyk (merytoryka, dane – wejście), kierownik utrzymania ruchu (bloker lub sojusznik), dyrektor zakładu / operacyjny (decyzja lokalna), CFO / centrala (przy grupach), pełnomocnik ds. ISO 50001 / ESG (jeśli jest).",
+  pain:[
+    "Energia to koszt stały hal, biur, magazynów, szatni – rzadko analizowany, bo uwaga jest na procesie",
+    "Obowiązek audytu energetycznego (duże firmy co 4 lata; projekt UC77 przesuwa kryterium na zużycie >10 TJ) i cele redukcji od grupy / klientów",
+    "Zespół techniczny sceptyczny wobec „AI”, przywiązany do własnych rozwiązań, obciążony awariami",
+    "Klienci korporacyjni (automotive, FMCG) żądają danych o emisjach w łańcuchu dostaw"
+  ],
+  fear:"Zakłócenie produkcji, obcy system w automatyce/SCADA, bezpieczeństwo OT, brak integracji, „my to sami umiemy”.",
+  angle:"Zakres: wyłącznie budynki nieprocesowe i C.W.U. socjalna; ciepło procesowe poza zakresem, chyba że klient sam poprosi. Twarde dane, IPMVP jako dokument do audytu i raportu emisji. Pilotaż tam, gdzie zero ryzyka dla produkcji. Wizja lokalna z UR przed jakąkolwiek obietnicą.",
+  opening:"„Ile ciepła zużywają hale, biura i szatnie – osobno od procesu – i kto to ostatnio analizował?”",
+  diag:[
+    "Roczny koszt ciepła na budynki (bez procesu)? Czy w ogóle jest rozdzielony?",
+    "Źródło ciepła: własna kotłownia, sieć, ciepło odpadowe z procesu, kogeneracja?",
+    "Jakie budynki: hale (jakie ogrzewanie – nagrzewnice, promienniki, nadmuch?), biura, magazyny, szatnie/C.W.U.?",
+    "Harmonogram: zmiany, weekendy, przestoje, sezonowość produkcji?",
+    "Automatyka: SCADA/BMS – producent, kto obsługuje, polityka OT (dostęp zdalny?)?",
+    "Czy jest ISO 50001 lub audyt energetyczny przedsiębiorstwa? Rekomendacje, co wdrożono?",
+    "Cele redukcji emisji od grupy / klientów? Raportowanie (CSRD, CDP, wymogi klientów)?",
+    "Kto decyduje o pilotażu bez CAPEX: zakład czy centrala? Jaki próg?",
+    "Czy były wcześniej wdrożenia firm zewnętrznych w automatyce? Doświadczenia?",
+    "Czy liczniki ciepła są na obiegach budynkowych (dane do modelu)?",
+    "Plany inwestycyjne: wymiana źródła, odzysk ciepła, PV?",
+    "Czy zużycie energii finalnej przekracza 10 TJ/rok (próg audytu w projekcie UC77)?"
+  ],
+  insight:[
+    "„Na trzeciej zmianie w hali jest 12 osób na 200 – czy ogrzewanie o tym wie?”",
+    "„Audytor za dwa lata zapyta, co wdrożono z rekomendacji – co dziś jest do pokazania?”",
+    "„Gdyby klient z automotive poprosił o redukcję emisji o X% w Scope 1 – z czego by ją Państwo wzięli?”",
+    "„Ile kosztuje ogrzewanie magazynu, w którym nikt nie pracuje po 22?”"
+  ],
+  args:{
+    tech:["Zakres nieprocesowy: hale, biura, magazyny, szatnie – bez wpływu na produkcję","Współpraca z istniejącą automatyką w uzgodnionym zakresie; polityka OT respektowana (zakres dostępu ustalany na wizji)","Predykcja pogody + harmonogram zmian → nastawy nagrzewnic i C.W.U.","Powrót do własnych nastaw w każdej chwili"],
+    econ:["Redukcja kosztu stałego bez CAPEX; rozliczenie z wyniku","Dokument IPMVP wprost do audytu energetycznego i raportu emisji","Pilotaż na jednym budynku → skalowanie na zakład i inne zakłady grupy"],
+    board:["Dla dyrektora zakładu: efekt w kosztach bez ryzyka produkcyjnego","Dla centrali: udokumentowana redukcja Scope 1 bez inwestycji","Dla pełnomocnika ISO 50001: działanie do rejestru i przeglądu"],
+    legal:["Ustawa o efektywności energetycznej, art. 36: audyt energetyczny przedsiębiorstwa co 4 lata dla dużych przedsiębiorców; kara do 5% przychodu (art. 39) [OBOWIĄZEK]","Projekt UC77: kryterium zużycia >10 TJ/rok zamiast wielkości firmy; pierwszy audyt planowany do 11.10.2026 wg projektu – projekt nadal w legislacji (stan: maj–wrzesień 2026) [PROJEKT – nie prawo]","EED 2023/1791, art. 11: audyty / systemy zarządzania energią wg zużycia (>10 TJ audyt, >85 TJ SZE) [W TRAKCIE WDRAŻANIA]","CSRD / ESRS E1 – dla dużych przedsiębiorstw w zakresie po zmianach „omnibus” [ZALEŻNE OD PODMIOTU]","ETS1 – jeśli zakład ma instalacje spalania >20 MW: mniej paliwa = mniej uprawnień [OBOWIĄZEK dla objętych]"],
+    esg:["Scope 1 (gaz, olej) lub Scope 2 (ciepło sieciowe) w dół – dane do raportu i do klientów","ETS2 od 2028 dla paliw w budynkach (jeśli nie w ETS1)","ISO 50001 – działanie z udokumentowanym efektem"]
+  },
+  objections:[
+    {q:"Nie wpuścimy obcego systemu do naszej automatyki / SCADA.", a:"Nie prosimy o dostęp do sterowania procesem. Zakres to budynki nieprocesowe i uzgodniony z UR punkt styku – może to być nawet sterownik równoległy bez połączenia z SCADA. Politykę OT omawiamy na wizji, zanim cokolwiek zaproponuję.", why:"Ogranicz zakres, oddaj kontrolę, respektuj OT."},
+    {q:"Nasi inżynierowie sami mogą to zrobić.", a:"Zapewne mogą – pytanie, czy mają na to czas między awariami. My robimy to jako usługę, na naszym ryzyku, z rozliczeniem z wyniku. Jeśli ich nastawy są już optymalne, symulacja to pokaże i nie będziemy zajmować czasu.", why:"Nie rywalizuj z zespołem – odciążaj go."},
+    {q:"Ciepło budynków to ułamek naszego zużycia – nie warto.", a:"Ułamek dużej liczby bywa dużą liczbą. Proszę o roczne zużycie na budynki – policzę. Jeśli to naprawdę zbyt mało, powiem to i nie wrócę. Ale często to kilkaset tysięcy złotych rocznie, których nikt nie analizuje, bo uwaga jest na procesie.", why:"Weź liczbę i policz, zamiast dyskutować."},
+    {q:"Potrzebujemy integracji i pełnej dokumentacji.", a:"Dokumentację i zakres integracji ustalamy przed wdrożeniem, z UR i IT/OT. Dlatego proszę o godzinę z technikiem, zanim cokolwiek obiecam.", why:"Nie obiecuj integracji z pamięci."}
+  ],
+  offerMoment:"Po wizji lokalnej z UR i po ustaleniu zakresu bezpiecznego. Wcześniej: dane, diagnoza, bezpieczeństwo.",
+  path:["Rozmowa z energetykiem → dane z budynków nieprocesowych → wstępna symulacja","Wizja lokalna z UR (kotłownia, nagrzewnice, automatyka, polityka OT) → zakres na piśmie","Prezentacja dyrektorowi zakładu (+ pełnomocnik ISO/ESG) → pilotaż na biurze/szatni/magazynie","Raport → rozszerzenie na hale → inne zakłady grupy"],
+  close:["„Zacznijmy od budynku biurowego i szatni – tam nie ma ryzyka dla produkcji. Potrzebuję zużycia z dwóch sezonów i godziny z UR.”","„Czy pełnomocnik ISO 50001 powinien być na prezentacji – to działanie do rejestru?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z głównym energetykiem?"],
+    ["K","Tak, słucham."],
+    ["H","Obniżamy zużycie ciepła w budynkach zakładów – hale, biura, szatnie – bez wchodzenia w proces i bez CAPEX, rozliczenie z oszczędności. Czy ciepło na budynki jest u Państwa rozliczane osobno od procesu?"],
+    ["K","Częściowo. Hale i biura z kotłowni gazowej, proces z pary."],
+    ["H","Ile zużywa kotłownia gazowa rocznie?"],
+    ["K","Koło 15 tysięcy MWh."],
+    ["H","A na trzeciej zmianie i w weekend hale są grzane tak samo?"],
+    ["K","Trochę obniżamy, ręcznie. Ale nie zawsze ktoś pamięta."],
+    ["H","To jest ten obszar. System dopasowuje nagrzewnice i C.W.U. do prognozy i harmonogramu zmian, w zakresie uzgodnionym z utrzymaniem ruchu – nie wchodzimy w SCADA procesu. Oszczędność liczona według IPMVP to dokument do audytu z art. 36 i do raportu emisji dla klientów. Proponuję godzinę z UR w kotłowni, żeby ustalić zakres i politykę OT, zanim cokolwiek obiecam."],
+    ["K","UR będzie sceptyczne."],
+    ["H","Dlatego chcę z nimi rozmawiać osobiście i zacząć od biura i szatni, gdzie nie ma ryzyka. Jeśli po pilotażu uznają, że to działa, rozszerzymy na hale. Poproszę zużycie gazu miesięcznie z dwóch lat i termin z UR. Przyszły tydzień?"],
+    ["N","UR to bloker – spotkaj się z nimi twarzą w twarz; zakres bez ryzyka."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"siec", group:"Komercja", name:"Sieci handlowe i właściciele wielu obiektów", short:"dyrektor ds. nieruchomości, energy manager, CFO",
+  who:"Dyrektor ds. nieruchomości / ekspansji, energy manager lub dział zakupów energii (dane, decyzja o pilotażu), CFO (model rozliczenia), dyrektor ESG / zrównoważonego rozwoju (raport), regionalni kierownicy techniczni (wdrożenie).",
+  pain:[
+    "Setki obiektów o podobnej charakterystyce – małe oszczędności × wiele lokalizacji = duża kwota, ale każdy obiekt osobno to za mało uwagi",
+    "Centralne zakupy energii są zrobione; lokalne sterowanie ogrzewaniem jest chaotyczne (kierownik sklepu, czujnik, „jak zimno to podkręć”)",
+    "CSRD / cele SBTi / wymogi inwestorów – potrzeba udokumentowanej redukcji w Scope 1 i 2",
+    "Standaryzacja: sieć chce jednego rozwiązania, nie 300 lokalnych"
+  ],
+  fear:"Wdrożenie w 300 lokalizacjach jako projekt bez końca; koszty ukryte; komfort klientów i pracowników; różnorodność instalacji.",
+  angle:"Program, nie projekt: pilotaż na 5–10 obiektach reprezentatywnych (typy: własny gaz, sieć, pompy ciepła; klimat północ/południe), jeden model rozliczenia, jeden raport dla ESG. Skalowanie po sukcesie w kwartalnych falach.",
+  opening:"„Ile lokalizacji ogrzewają Państwo gazem, a ile z sieci – i kto decyduje o temperaturze w sklepie o 6 rano?”",
+  diag:[
+    "Liczba obiektów, typy (sklepy, magazyny, biura), formaty (własne/wynajmowane – kto płaci za ciepło)?",
+    "Miks źródeł ciepła i roczny koszt łącznie oraz na obiekt?",
+    "Czy jest centralny system monitoringu energii / BMS w obiektach? Jaki?",
+    "Kto lokalnie steruje ogrzewaniem – kierownik, sterownik, centrala?",
+    "Cele ESG (SBTi, CSRD), raportowanie Scope 1/2 – kto odpowiada?",
+    "Czy były wcześniej programy efektywności (LED, chłodnictwo)? Jak wdrażano – pilotaż → skalowanie?",
+    "Jak wygląda decyzja o pilotażu vs o programie – kto, jaki próg, jaki tryb (RFP)?",
+    "Które obiekty są reprezentatywne dla typów (klimat, format, źródło)?",
+    "Czy sieć ma dane godzinowe zużycia (liczniki zdalne)?",
+    "Godziny otwarcia, dostawy nocne, harmonogramy?",
+    "Standardy komfortu dla klientów i pracowników – kto je ustala?",
+    "Kiedy jest cykl budżetowy / planowanie CAPEX/OPEX na kolejny rok?"
+  ],
+  insight:[
+    "„Jeśli w jednym sklepie da się obniżyć koszt ciepła o X zł – ile to jest razy 300?”",
+    "„Kiedy audytor CSRD zapyta o działania redukcyjne w Scope 1 – co jest na liście poza LED?”",
+    "„Ile z Państwa 300 sklepów jest grzanych na tej samej nastawie od otwarcia obiektu?”"
+  ],
+  args:{
+    tech:["Jeden system, wiele lokalizacji – centralny podgląd, lokalne modele budynków","Współpraca z tym, co jest w obiekcie (od prostego sterownika po BMS)","Standardowe parametry komfortu sieci jako warunki brzegowe"],
+    econ:["Program bez CAPEX, rozliczenie z oszczędności na poziomie portfela lub obiektu","Pilotaż reprezentatywny → ekstrapolacja na sieć z danymi, nie z obietnic","Miesięczny raport dla energy managera i ESG w jednym formacie"],
+    board:["Dla CFO: zero CAPEX, efekt w OPEX, brak ryzyka finansowego","Dla ESG: udokumentowana redukcja Scope 1/2 według IPMVP","Dla nieruchomości: standard w całej sieci, mniej lokalnych problemów"],
+    legal:["Ustawa o efektywności energetycznej, art. 36 – audyt przedsiębiorstwa (duże firmy) [OBOWIĄZEK]; projekt UC77 – próg 10 TJ [PROJEKT]","CSRD / ESRS E1 dla dużych spółek – zakres po zmianach „omnibus” zweryfikuj [ZALEŻNE OD PODMIOTU]","EPBD 2024/1275 – budynki niemieszkalne (16%/26%), skala A+–G [KIERUNEK / PO TRANSPOZYCJI]","ETS2 od 2028 – gaz w setkach obiektów = istotna ekspozycja [PRZYSZŁE]"],
+    esg:["SBTi / CSRD: redukcja w Scope 1 (gaz) i 2 (ciepło) z dokumentacją","Argument w RFP i wobec inwestorów: program efektywności bez nakładów"]
+  },
+  objections:[
+    {q:"Mamy 300 lokalizacji – wdrożenie będzie trwało lata.", a:"Dlatego proponuję program falami: 5–10 obiektów reprezentatywnych w pilotażu, potem kwartalne fale po kilkadziesiąt. Każda fala ma ten sam model i ten sam raport. Harmonogram ustalamy po pilotażu, na danych.", why:"Program, nie projekt."},
+    {q:"Zrobiliśmy już zakupy energii i LED – ciepło to mały temat.", a:"Zakupy obniżyły cenę, LED obniżył prąd. Ciepło w budynkach nikt nie ruszał, bo jest lokalne i rozproszone. Proszę o roczny koszt gazu i ciepła sieciowego w całej sieci – jeśli to mało, powiem to.", why:"Weź liczbę portfela."},
+    {q:"Każdy obiekt ma inną instalację.", a:"Tak – i dlatego model budynku jest lokalny, a system centralny. Pilotaż na typach (gaz / sieć / pompy ciepła; północ / południe) pokaże, gdzie działa najlepiej i od czego zacząć fale.", why:"Różnorodność = argument za pilotażem reprezentatywnym."}
+  ],
+  offerMoment:"Po pytaniu o koszt portfela i o cele ESG. Propozycja: pilotaż reprezentatywny 5–10 obiektów, jeden model rozliczenia, harmonogram fal po pilotażu.",
+  path:["Energy manager: lista obiektów, źródła, koszty → wybór 5–10 reprezentatywnych","Dane z liczników zdalnych → symulacja portfelowa","Prezentacja: nieruchomości + CFO + ESG → pilotaż","Raport po sezonie → decyzja o falach → program 12–24 mies."],
+  close:["„Proszę o listę obiektów z rocznym kosztem ciepła i źródłem – wybierzemy razem 8 reprezentatywnych na pilotaż.”","„Kiedy jest planowanie budżetu na przyszły rok? Chciałbym, żeby wynik pilotażu był wcześniej.”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z energy managerem sieci [nazwa]?"],
+    ["K","Tak."],
+    ["H","Obniżamy koszty ciepła w wielu obiektach jednocześnie – bez CAPEX, rozliczenie z oszczędności, jeden raport dla ESG. Ile lokalizacji grzeją Państwo gazem?"],
+    ["K","Około 200 z 320. Reszta z sieci albo pompy ciepła."],
+    ["H","Kto ustawia temperaturę w sklepie o 6 rano przed otwarciem?"],
+    ["K","Sterownik lokalny, kierownik może zmienić. Centralnie tego nie widzimy."],
+    ["H","Czyli 320 różnych decyzji o ogrzewaniu, żadnej centralnej. Nasz system daje centralny podgląd i lokalne modele – prognoza pogody, godziny otwarcia, dostawy. Proponuję pilotaż na 8 obiektach reprezentatywnych: gaz, sieć, pompy ciepła, północ i południe. Po sezonie mają Państwo dane do ekstrapolacji na sieć i dokument IPMVP do CSRD."],
+    ["K","CFO zapyta o koszt programu."],
+    ["H","Zero CAPEX, wynagrodzenie tylko z potwierdzonej oszczędności, warunki w umowie. Poproszę o listę obiektów z kosztem ciepła i źródłem – wybierzemy razem osiem. I termin na 45 minut z Panem, nieruchomościami i CFO. Kiedy planują Państwo budżet na przyszły rok?"],
+    ["N","Pilotaż reprezentatywny → program; CFO i ESG na jednym spotkaniu."]
+  ]
+});
+SEGMENTS.push({
+  id:"pec", group:"Przemysł i energetyka", name:"Przedsiębiorstwa ciepłownicze (PEC)", short:"prezes, dyr. techniczny, dyr. ds. sprzedaży ciepła",
+  who:"Prezes (strategia, właściciel – zwykle gmina), dyrektor techniczny / główny inżynier (sieć, źródła, straty, temperatury powrotu), dyrektor ds. sprzedaży / obsługi odbiorców (retencja klientów, oferta), dział taryf (URE, koszty uzasadnione). Właściciel (gmina) – przy strategicznych decyzjach.",
+  pain:[
+    "Rosnące koszty paliwa i uprawnień EU ETS (ETS1 – instalacje >20 MW); taryfa zatwierdzana przez URE nie nadąża",
+    "Presja dekarbonizacji: definicja „efektywnego systemu ciepłowniczego” w EED (art. 26) zaostrza się etapami (2028, 2035, 2040…) – bez spełnienia trudniej o wsparcie i o nowe przyłączenia",
+    "Wysokie temperatury powrotu, słabe schłodzenie u odbiorców, duże przepływy, straty sieciowe, szczyty poranne",
+    "Odbiorcy (spółdzielnie, gmina) szukają oszczędności – albo z PEC-em, albo obok niego (własne źródła, pompy ciepła, odłączenia)"
+  ],
+  fear:"Spadek sprzedaży GJ i przychodu; utrata odbiorców; konflikt z właścicielem; „firma z zewnątrz będzie sterować naszymi węzłami”; odpowiedzialność za komfort u odbiorcy.",
+  angle:"Nie sprzedajesz PEC-owi „mniej ciepła”. Sprzedajesz: (1) partnerstwo – PEC oferuje odbiorcom usługę efektywności z udziałem w rozliczeniu, zamiast patrzeć, jak robi to ktoś obcy lub jak odbiorca odchodzi; (2) korzyści sieciowe – niższa temperatura powrotu, mniejsze przepływy, niższe szczyty, lepsze prognozowanie – które są prawdziwe pod warunkami (patrz rozdział „Ciepłownie”); (3) argument w taryfie i w dekarbonizacji. Zawsze mów, które korzyści są pewne, a które zależą od układu.",
+  opening:"„Jaka jest średnia temperatura powrotu w sezonie – i ile by Państwo dali, żeby była o 5 stopni niższa?”",
+  diag:[
+    "Moc zamówiona łączna, sprzedaż GJ rocznie, struktura odbiorców (spółdzielnie, gmina, przemysł)?",
+    "Źródła: węgiel, gaz, biomasa, kogeneracja, pompy ciepła? Udział w ETS1?",
+    "Parametry sieci: temperatura zasilania/powrotu w sezonie, ΔT, przepływy, straty sieciowe (%)?",
+    "Czy PEC jest właścicielem węzłów u odbiorców? Jaka automatyka, jaki monitoring (telemetria)?",
+    "Jak wygląda szczyt poranny – czy PEC ma problem z mocą w szczycie? Czy ogranicza przyłączenia?",
+    "Status „efektywnego systemu ciepłowniczego” – spełniony? Plan na 2028+?",
+    "Czy PEC ma ofertę usług dodatkowych dla odbiorców (audyty, ESCO, serwis węzłów)?",
+    "Czy odbiorcy pytają o oszczędności / odłączają się / instalują własne źródła?",
+    "Jak prognozują Państwo zapotrzebowanie – dobowe, sezonowe? Jakie narzędzia?",
+    "Jak liczona jest taryfa – jakie koszty uzasadnione są pod presją?",
+    "Kto podejmuje decyzję o partnerstwie – zarząd, rada nadzorcza, właściciel (gmina)?",
+    "Czy PEC realizuje projekty z dofinansowaniem (NFOŚiGW, FEnIKS) wymagające efektów po stronie odbiorców?",
+    "Czy PEC ma odbiorców z wysokim powrotem, na których mógłby chcieć zacząć?"
+  ],
+  insight:[
+    "„Jeśli spółdzielnia X obniży zużycie o 10% z firmą obcą – co PEC z tego ma? A jeśli zrobi to z PEC-em?”",
+    "„Ile kosztuje Państwa każdy stopień temperatury powrotu – w sprawności źródła i w stratach?”",
+    "„Gdyby szczyt poranny był o 5% niższy, ilu nowych odbiorców dałoby się przyłączyć bez inwestycji w źródło?”",
+    "„Kiedy właściciel zapyta o plan dekarbonizacji – co jest po stronie odbiorców?”"
+  ],
+  args:{
+    tech:["Sterowanie predykcyjne u odbiorcy → mniejsze pobory, przy prawidłowym układzie węzła niższa temperatura powrotu (lepsze schłodzenie) – WARUNKOWO: zależy od typu węzła i regulacji","Redukcja szczytów porannych przez rozłożenie rozruchu wg prognozy (peak shaving) – WARUNKOWO: gdy system steruje rozruchem, a nie tylko obniżeniem nocnym","Mniejsze przepływy → niższa energia pompowania, rezerwa hydrauliczna sieci – PRAWDZIWE przy niższym zapotrzebowaniu i regulacji ilościowej","Dane godzinowe z węzłów → lepsza prognoza zapotrzebowania dla dyspozytora – PRAWDZIWE przy udostępnieniu danych","Współpraca z automatyką węzłów PEC – w uzgodnionym zakresie"],
+    econ:["Model partnerski: PEC oferuje usługę odbiorcom, ma udział w rozliczeniu z oszczędności – nowa linia przychodu kompensująca część spadku GJ","ETS1: mniej paliwa = mniej uprawnień – bezpośrednia oszczędność kosztu PEC (dla instalacji objętych)","Niższy powrót = wyższa sprawność źródeł kondensacyjnych / kogeneracji / pomp ciepła","Retencja odbiorców: klient, który oszczędza z PEC-em, nie odchodzi do własnego źródła"],
+    board:["Dla prezesa: odpowiedź na pytanie właściciela „co robimy dla mieszkańców w sprawie kosztów ciepła”","Dla RN / gminy: PEC jako dostawca efektywności, nie tylko GJ – zgodnie z kierunkiem EED","Dla dyrektora technicznego: narzędzie do poprawy parametrów sieci bez inwestycji w źródło"],
+    legal:["EED 2023/1791, art. 26: definicja efektywnego systemu ciepłowniczego zaostrzana etapami (od 2028 wyższe udziały OZE / ciepła odpadowego / kogeneracji) – wpływa na wsparcie i status [W TRAKCIE WDRAŻANIA]","EED art. 25: ocena i planowanie ciepłownictwa, obowiązki lokalne [W TRAKCIE WDRAŻANIA]","EED art. 29: promowanie usług energetycznych i ESCO – PEC jako naturalny dostawca [KIERUNEK]","Prawo energetyczne – taryfy dla ciepła zatwierdzane przez URE na podstawie kosztów uzasadnionych; rozporządzenie taryfowe [OBOWIĄZEK – nie interpretuj wpływu na taryfę bez działu taryf]","EU ETS (ETS1) – instalacje >20 MW [OBOWIĄZEK dla objętych]; ETS2 od 2028 dla paliw poza ETS1 [PRZYSZŁE]"],
+    esg:["Mniej paliwa i emisji w źródle; status efektywnego systemu","Argument do wniosków o dofinansowanie (efekt ekologiczny po stronie odbiorców)"]
+  },
+  objections:[
+    {q:"Przecież będziemy sprzedawać mniej ciepła.", a:"Odbiorcy i tak szukają oszczędności – pytanie, czy zrobią to z Państwem, czy z kimś obcym, albo odejdą do własnego źródła. W modelu partnerskim PEC ma udział w rozliczeniu z oszczędności, zatrzymuje klienta i pozycjonuje się jako dostawca efektywności – to kierunek, który wymusza EED. Do tego dochodzą korzyści sieciowe: powrót, przepływy, szczyt, ETS.", why:"Zamień konflikt interesów w argument o retencji i o sieci."},
+    {q:"Niższe zużycie u odbiorcy nie obniży mi powrotu – to zależy od węzła.", a:"Ma Pan rację, że to zależy od układu węzła i sposobu regulacji – dlatego nie obiecuję tego wszędzie. Tam, gdzie system steruje regulacją ilościową po stronie pierwotnej, schłodzenie rośnie. Proponuję sprawdzić to na 3 węzłach z najgorszym powrotem i zmierzyć.", why:"Przyznaj warunkowość – to buduje wiarygodność u inżyniera."},
+    {q:"Węzły są nasze, nikt obcy nie będzie nimi sterował.", a:"Zgoda – i dlatego model partnerski: to Państwa węzły, Państwa dostęp, uzgodniony zakres. Możemy dostarczać korekty nastaw, które wdraża Państwa automatyka, albo pracować na Państwa telemetrii. Kto steruje – ustalamy w umowie.", why:"Własność węzłów = argument za partnerstwem."},
+    {q:"Taryfa jest zatwierdzana przez URE – spadek sprzedaży to problem.", a:"To pytanie do działu taryf i nie będę go rozstrzygał za nich. Widzę trzy rzeczy: koszt paliwa i uprawnień spada wraz ze sprzedażą, udział w rozliczeniu ESCO to przychód z działalności dodatkowej, a poprawa parametrów sieci obniża koszty uzasadnione. Proponuję policzyć to razem z Państwa działem taryf na danych.", why:"Nie udawaj eksperta od taryf – zaproś ich do stołu."},
+    {q:"Odpowiadamy za komfort u odbiorcy – jak coś pójdzie nie tak, będą dzwonić do nas.", a:"Parametry komfortu są warunkami brzegowymi, a PEC ma podgląd i możliwość powrotu do nastaw. Zapis z pracy węzła jest dokumentem przy reklamacji – dziś zwykle go nie ma.", why:"Reklamacje = dane, których dziś brak."}
+  ],
+  offerMoment:"Po rozmowie o powrocie/szczytach z dyrektorem technicznym i o retencji z dyrektorem sprzedaży. Propozycja: pilotaż u 2–3 odbiorców (wysoki powrót lub aktywnie szukających oszczędności) w modelu partnerskim + pomiar parametrów sieci.",
+  path:["Spotkanie techniczne: parametry sieci, węzły, telemetria → wybór 3 węzłów","Spotkanie handlowe: retencja, oferta dla odbiorców, udział w rozliczeniu","Wspólna prezentacja zarządowi (+ dział taryf) → umowa partnerska / pilotaż","Pilotaż u 2–3 odbiorców z pomiarem powrotu, przepływu, szczytu → raport → oferta PEC dla wszystkich odbiorców"],
+  close:["„Wskażmy 3 węzły z najgorszym powrotem i 2 odbiorców, którzy pytają o oszczędności. Zmierzmy sezon.”","„Kto po stronie PEC prowadziłby ofertę dla odbiorców, gdyby pilotaż się udał?”","„Czy dział taryf może być na prezentacji – chcę, żeby policzyli to ze mną, nie po mnie.”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem technicznym PEC?"],
+    ["K","Tak."],
+    ["H","Nie dzwonię, żeby sprzedać Państwu system, który zmniejszy Wam sprzedaż. Dzwonię, bo optymalizujemy pobór ciepła u odbiorców i widzimy, że PEC-e mogą na tym zarabiać i poprawiać sieć – albo patrzeć, jak robi to ktoś obcy. Jaka jest u Państwa średnia temperatura powrotu w sezonie?"],
+    ["K","Za wysoka. Koło 55–60 przy zasilaniu 90."],
+    ["H","A szczyt poranny – jest problemem?"],
+    ["K","Tak, o 6 rano wszystko rusza naraz. Mamy odbiorców, których nie możemy przyłączyć."],
+    ["H","Nasz system u odbiorcy steruje rozruchem według prognozy i reakcji budynku – rozkłada szczyt, zmniejsza pobór i przy regulacji ilościowej poprawia schłodzenie. Nie obiecuję tego w każdym węźle – to zależy od układu. Dlatego proponuję pilotaż na trzech węzłach z najgorszym powrotem i pomiar przez sezon."],
+    ["K","A co z tym, że sprzedamy mniej?"],
+    ["H","Model partnerski: PEC oferuje usługę odbiorcom i ma udział w rozliczeniu z oszczędności, a klient, który oszczędza z Wami, nie idzie do pompy ciepła. Plus mniej paliwa i uprawnień. Chciałbym, żeby na spotkaniu był też dyrektor sprzedaży i ktoś z taryf – policzymy to razem. Kiedy w przyszłym tygodniu?"],
+    ["N","Technika (powrót, szczyt) + handel (retencja) + taryfy – jedno spotkanie."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"operator", group:"Przemysł i energetyka", name:"Operatorzy systemów ciepłowniczych i dostawcy ciepła", short:"duże grupy ciepłownicze, operatorzy sieci, dostawcy ciepła przemysłowego",
+  who:"Dyrektor ds. sieci / operacyjny (dyspozycja, bilans, straty), dyrektor ds. rozwoju / klientów (przyłączenia, retencja, oferta), dział regulacji i taryf, zarząd grupy (strategia dekarbonizacji), dział innowacji (jeśli jest – częste wejście dla pilotaży).",
+  pain:[
+    "Zarządzanie bilansem dużej sieci: szczyty, temperatura powrotu, straty, ograniczenia hydrauliczne w niektórych rejonach",
+    "Duże programy dekarbonizacji (odejście od węgla, pompy ciepła wielkoskalowe, ciepło odpadowe) wymagają niższych temperatur sieci – a niskotemperaturowa sieć wymaga dobrze regulowanych odbiorców",
+    "Regulacja URE, cele grupy, raportowanie ESG, wymogi finansowania (banki, EBI)",
+    "Klienci komercyjni i samorządowi oczekują od dostawcy usług efektywności, nie tylko GJ"
+  ],
+  fear:"Ryzyko operacyjne w dużej sieci, odpowiedzialność za dostawy, integracja z SCADA dyspozytorni, precedens prawny (dostęp do węzłów), cannibalizacja sprzedaży.",
+  angle:"Strategia niskotemperaturowa: bez dobrze regulowanych odbiorców nie da się obniżyć temperatur sieci ani włączyć pomp ciepła i ciepła odpadowego. Water AI po stronie odbiorcy jako element programu dekarbonizacji sieci. Pilotaż w rejonie z ograniczeniami hydraulicznymi. Dane z odbiorców do prognozy dyspozytora. Model partnerski / white label.",
+  opening:"„W którym rejonie sieci brakuje Państwu mocy w szczycie – i co dziś blokuje obniżenie temperatury zasilania?”",
+  diag:[
+    "Wielkość sieci, liczba węzłów, struktura źródeł, plan dekarbonizacji (daty)?",
+    "Które rejony mają ograniczenia hydrauliczne / zbyt wysokie powroty?",
+    "Jakie temperatury sieci dziś i docelowo? Co blokuje obniżenie?",
+    "Telemetria węzłów: zasięg, częstotliwość odczytów, kto ma dostęp?",
+    "Jak prognozują zapotrzebowanie – narzędzia, dokładność, koszt błędu (uruchamianie szczytowych źródeł)?",
+    "Straty sieciowe (%) i ich koszt roczny?",
+    "Udział w ETS1, koszt uprawnień rocznie?",
+    "Czy operator ma ofertę usług dla odbiorców (audyty, ESCO, serwis)? Jak sprzedaje?",
+    "Czy jest program pilotaży / dział innowacji? Jak wybiera projekty?",
+    "Kto decyduje o partnerstwie technologicznym – zarząd, grupa, właściciel?",
+    "Wymogi finansowania (EBI, banki) dotyczące efektywności po stronie odbiorców?",
+    "Jak odbiorcy komercyjni / samorządowi pytają o oszczędności – kto im odpowiada?"
+  ],
+  insight:[
+    "„Jeśli za 5 lat sieć ma pracować na 70° zamiast 100°, to które węzły dziś to uniemożliwiają i kto je wyreguluje?”",
+    "„Ile kosztuje uruchomienie szczytowego kotła gazowego z powodu błędu prognozy o 3%?”",
+    "„Gdy duży odbiorca komercyjny prosi o ofertę efektywności – czy dziś dostaje ją od Was, czy od kogoś obcego?”"
+  ],
+  args:{
+    tech:["Dobrze regulowani odbiorcy = niższe temperatury sieci = warunek dla pomp ciepła i ciepła odpadowego (fizyka: sprawność pomp ciepła i odzysk rosną przy niższym powrocie)","Peak shaving przez rozłożenie rozruchów u wielu odbiorców – WARUNKOWO, wymaga koordynacji i sterowania rozruchem","Dane godzinowe z odbiorców do prognozy dyspozytora – PRAWDZIWE przy integracji danych","Mniejsze przepływy → rezerwa hydrauliczna w rejonach z ograniczeniami – PRAWDZIWE","Integracja z SCADA dyspozytorni tylko na poziomie danych, nie sterowania – zakres do ustalenia"],
+    econ:["Mniej paliwa szczytowego, mniej uprawnień ETS1","Uniknięte / odroczone inwestycje sieciowe w rejonach z ograniczeniami","Nowa linia przychodu: usługa efektywności dla odbiorców (partnerstwo / white label)","Retencja odbiorców komercyjnych i samorządowych"],
+    board:["Dla zarządu grupy: element programu dekarbonizacji po stronie popytu, bez CAPEX","Dla regulacji: argument do kosztów uzasadnionych (poprawa parametrów) – do weryfikacji z działem","Dla rozwoju: oferta, która odróżnia dostawcę"],
+    legal:["EED 2023/1791, art. 25–26: planowanie ciepłownictwa, efektywny system ciepłowniczy, zaostrzenia od 2028 [W TRAKCIE WDRAŻANIA]","EED art. 29: usługi energetyczne / ESCO [KIERUNEK]","Prawo energetyczne i taryfy URE [OBOWIĄZEK – zakres wpływu do ustalenia z działem regulacji]","EU ETS – źródła >20 MW [OBOWIĄZEK]","EPBD 2024/1275 – wpływa na odbiorców (renowacje), a więc na profil zapotrzebowania sieci [KIERUNEK]"],
+    esg:["Redukcja emisji w źródłach, raportowanie grupy, wymogi banków / EBI","Efekt po stronie odbiorców jako składnik programu dekarbonizacji"]
+  },
+  objections:[
+    {q:"Mamy własny dział R&D i własne narzędzia prognostyczne.", a:"Świetnie – nie proponuję ich zastąpienia. Proponuję dane z odbiorców, których dziś nie mają, i regulację po stronie popytu, na którą nie mają zasobów. Pilotaż w jednym rejonie z ograniczeniami hydraulicznymi pokaże, czy to się uzupełnia.", why:"Uzupełnienie, nie konkurencja."},
+    {q:"Precedens: jak damy dostęp do węzłów jednej firmie, przyjdą inne.", a:"Dlatego model partnerski / white label: to Państwa usługa dla odbiorców, my jesteśmy dostawcą technologii pod Państwa marką i na Państwa zasadach dostępu. Precedens jest wtedy Państwa, nie nasz.", why:"White label rozwiązuje precedens."},
+    {q:"Nie mamy czasu na pilotaże, mamy program dekarbonizacji do wdrożenia.", a:"Ten pilotaż jest częścią programu: bez regulacji odbiorców nie obniżą Państwo temperatur sieci. Proponuję wpisać go do harmonogramu programu jako działanie po stronie popytu, w rejonie, gdzie i tak planujecie zmianę.", why:"Włącz się w istniejący program, nie dokładaj nowego."}
+  ],
+  offerMoment:"Po rozmowie o temperaturach docelowych i rejonach z ograniczeniami. Propozycja: pilotaż rejonowy (10–20 węzłów) z pomiarem parametrów + model partnerski.",
+  path:["Dział sieci: rejon, węzły, telemetria → hipoteza (powrót / szczyt / hydraulika)","Dział rozwoju: oferta dla odbiorców, model partnerski","Zarząd + regulacja: prezentacja → umowa pilotażowa rejonowa","Sezon pomiarowy → raport → włączenie do programu dekarbonizacji / oferta dla odbiorców"],
+  close:["„Wybierzmy jeden rejon z ograniczeniami hydraulicznymi i 10–20 węzłów. Zmierzmy sezon: powrót, przepływ, szczyt.”","„Czy dział innowacji ma ścieżkę dla pilotaży – w jakim trybie i z jakim budżetem czasu?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem ds. sieci?"],
+    ["K","Tak, o co chodzi?"],
+    ["H","Regulujemy pobór ciepła u odbiorców – predykcyjnie, według prognozy i reakcji budynku. Dla operatora to niższe powroty i szczyty tam, gdzie węzły na to pozwalają. Pytanie: w którym rejonie brakuje Państwu mocy w szczycie?"],
+    ["K","Rejon [X], stara zabudowa, wysokie powroty, nie możemy przyłączać."],
+    ["H","A docelowa temperatura zasilania w planie dekarbonizacji?"],
+    ["K","Chcemy zejść do 75–80, ale odbiorcy tego nie udźwigną."],
+    ["H","Bo węzły są ustawione raz na sezon i nikt ich nie reguluje. To jest dokładnie warstwa, którą dokładamy – po stronie popytu, bez CAPEX. Proponuję pilotaż w rejonie [X]: 15 węzłów, sezon pomiaru powrotu, przepływu i szczytu. Jeśli chcecie, jako Wasza usługa dla odbiorców, pod Waszą marką."],
+    ["K","To wymaga zgody zarządu i regulacji."],
+    ["H","Przygotuję materiał dla zarządu i chciałbym, żeby dział regulacji był na spotkaniu – nie chcę interpretować taryf za nich. Kiedy mogę pokazać hipotezę dla rejonu [X] na Waszych danych z telemetrii?"],
+    ["N","Rejon z problemem hydraulicznym = najlepszy pilotaż; white label = odpowiedź na precedens."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"esco", group:"Partnerzy", name:"Firmy ESCO", short:"partner technologiczny lub konkurent",
+  who:"Prezes / dyrektor rozwoju (portfel projektów, marża), dyrektor techniczny (technologie w ofercie), kierownicy projektów (wdrożenia u klientów), dział M&V (pomiar i weryfikacja – ważny sojusznik lub sceptyk).",
+  pain:[
+    "Portfel klientów po termomodernizacji / wymianie oświetlenia – „nisko wiszące owoce” zebrane, potrzebują nowych źródeł oszczędności bez CAPEX",
+    "Długie umowy z klientami, w których marża maleje; szukają dodatkowych efektów w istniejących kontraktach",
+    "Ryzyko M&V – potrzebują metod rozliczenia akceptowanych przez klientów publicznych",
+    "Konkurencja o klientów publicznych; potrzeba wyróżnika technologicznego"
+  ],
+  fear:"Kanibalizacja własnej oferty, uzależnienie od dostawcy technologii, odpowiedzialność wobec klienta za cudzy system, podział marży.",
+  angle:"Partnerstwo: Water AI jako moduł sterowania predykcyjnego w ofercie ESCO – dodatkowa oszczędność w istniejących kontraktach i wyróżnik w nowych. Jasny podział ról: ESCO ma klienta, umowę i finansowanie; my technologię i wsparcie M&V (IPMVP). Uczciwie o konflikcie: tam, gdzie ESCO sama sprzedaje sterowanie – jesteśmy konkurentem; wybierz partnerstwo lub omijaj.",
+  opening:"„Ile projektów w Państwa portfelu ma jeszcze rezerwę oszczędności po stronie sterowania – i kto ją dziś zbiera?”",
+  diag:[
+    "Struktura portfela: ile kontraktów, jakie technologie (termomodernizacja, oświetlenie, źródła, sterowanie)?",
+    "Czy ESCO oferuje własne sterowanie / BMS / optymalizację? Jakie?",
+    "Jakie metody M&V stosują (IPMVP opcja A/B/C)? Kto weryfikuje?",
+    "Klienci publiczni vs prywatni – proporcje, tryby zamówień?",
+    "Ile kontraktów jest w fazie, w której dodatkowa oszczędność podnosi marżę?",
+    "Jak pozyskują klientów – przetargi, bezpośrednio, partnerzy?",
+    "Czy finansują sami czy z partnerem finansowym? Warunki dla dodatkowych modułów?",
+    "Kto decyduje o włączeniu nowej technologii do oferty? Jaki proces (pilotaż, due diligence)?",
+    "Czy mieli partnerów technologicznych? Jak to działało, dlaczego się skończyło?",
+    "Jakie segmenty klientów są dla nich najtrudniejsze (np. PEC, szpitale)?"
+  ],
+  insight:[
+    "„Jeśli w kontrakcie z gminą jest jeszcze 5–10% do zebrania sterowaniem – ile to jest w marży na 8 lat?”",
+    "„Kiedy przegrywają Państwo przetarg – czy różnica bywa w technologii, czy tylko w cenie?”",
+    "„Jak dziś rozliczają Państwo efekt pogody – stopniodni? Jakie spory z klientami z tego wynikają?”"
+  ],
+  args:{
+    tech:["Moduł predykcyjny nad istniejącą automatyką – uzupełnia termomodernizację i źródła, nie konkuruje","Wsparcie M&V zgodne z IPMVP – wspólny język z ich działem","Szybkie wdrożenie bez robót budowlanych"],
+    econ:["Dodatkowa oszczędność w istniejących kontraktach = dodatkowa marża bez nowego CAPEX","Wyróżnik w nowych przetargach","Elastyczny podział wynagrodzenia z oszczędności"],
+    board:["Dla zarządu ESCO: więcej efektu z tego samego portfela; niższe ryzyko M&V dzięki stopniodniom","Dla działu technicznego: technologia, której nie muszą rozwijać sami"],
+    legal:["Ustawa o efektywności energetycznej, art. 7 – umowa o poprawę efektywności energetycznej (definicja, elementy) [OBOWIĄZEK]","EED art. 29 i załącznik XV – minimalne elementy umów o poprawę efektywności energetycznej z sektorem publicznym [W TRAKCIE WDRAŻANIA]","Świadectwa efektywności energetycznej („białe certyfikaty”) – art. 20 ustawy o EE: zweryfikuj, czy przedsięwzięcie sterowaniem może kwalifikować się w konkretnym przypadku – nie obiecuj [DO WERYFIKACJI]"],
+    esg:["Dla klientów ESCO: udokumentowana redukcja do raportów"]
+  },
+  objections:[
+    {q:"Mamy własne sterowanie – jesteście konkurencją.", a:"Jeśli sprzedają Państwo własny system predykcyjny – tak, i wtedy nie ma sensu udawać partnerstwa. Jeśli własne sterowanie to harmonogramy i pogodówka – nasz moduł dokłada predykcję i uczenie się budynku. Sprawdźmy na jednym kontrakcie, czy jest różnica.", why:"Bądź uczciwy: konkurent albo partner."},
+    {q:"Klient nie chce kolejnej firmy w łańcuchu.", a:"Klient ma umowę z Państwem – my jesteśmy Państwa podwykonawcą technologicznym, pod Państwa umową i odpowiedzialnością, w zakresie, który ustalimy. Klient widzi jedną firmę.", why:"Model white label / podwykonawstwo."},
+    {q:"Podział marży nam się nie opłaci.", a:"Podział dotyczy oszczędności dodatkowej, której dziś nie ma – nie Państwa obecnej marży. Policzmy na jednym kontrakcie: ile zostaje do zebrania i jak dzielimy. Jeśli liczby nie pasują, nie ma partnerstwa.", why:"Marża z tego, czego nie ma – to nie jest strata."}
+  ],
+  offerMoment:"Po pytaniu o portfel i o własne sterowanie. Propozycja: pilotaż na 1–2 istniejących kontraktach z rezerwą po stronie sterowania.",
+  path:["Rozmowa z dyrektorem rozwoju → wybór 1–2 kontraktów","Dział techniczny + M&V: zakres, metodyka","Umowa partnerska ramowa → pilotaż → włączenie do oferty"],
+  close:["„Wybierzmy jeden kontrakt, w którym po termomodernizacji nikt nie ruszył sterowania. Policzmy, ile zostało.”","„Kto z działu M&V powinien zobaczyć naszą metodykę stopniodni?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem rozwoju?"],
+    ["K","Tak."],
+    ["H","Powiem wprost: możemy być dla Państwa partnerem albo konkurentem – zależy, co macie w ofercie. Czy sprzedajecie własne sterowanie predykcyjne?"],
+    ["K","Mamy automatykę pogodową i BMS w projektach, predykcji nie."],
+    ["H","To jesteśmy modułem, który dokłada predykcję i uczenie się budynku nad tym, co wdrażacie. Ile kontraktów macie po termomodernizacji, gdzie sterowanie zostało jak przed?"],
+    ["K","Większość. Kilkadziesiąt."],
+    ["H","Tam zwykle zostaje rezerwa. Proponuję pilotaż na jednym–dwóch kontraktach, pod Waszą umową, z rozliczeniem M&V według IPMVP – Wasz dział M&V zna ten język. Jeśli liczby są, ustalamy podział oszczędności dodatkowej i włączacie to do oferty."],
+    ["K","Musimy zobaczyć technologię."],
+    ["H","Oczywiście – due diligence techniczne u nas, wizja na Waszym kontrakcie. Który kontrakt ma największą rezerwę i najbardziej życzliwego klienta?"],
+    ["N","Uczciwość o konflikcie + white label + M&V jako wspólny język."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"fm", group:"Partnerzy", name:"Firmy facility management", short:"partner kanałowy, obsługa techniczna obiektów",
+  who:"Dyrektor operacyjny / regionalny (portfel obiektów, KPI), dyrektor rozwoju biznesu (nowe usługi, upsell u klientów), kierownicy obiektów (wdrożenie, dane), dział techniczny (BMS, serwis).",
+  pain:[
+    "Umowy FM rozliczane za utrzymanie, nie za efekt – klienci naciskają na dodatkową wartość i na ESG",
+    "KPI komfortu i reakcji na zgłoszenia; brak narzędzi do proaktywnego sterowania energią",
+    "Presja cenowa w przetargach FM – potrzebują wyróżnika i dodatkowych przychodów",
+    "Technicy obsługują wiele obiektów; nastawy ustawiane „bezpiecznie”"
+  ],
+  fear:"Odpowiedzialność za komfort (kary umowne), ingerencja w BMS klienta, konflikt z własnym serwisem, marża.",
+  angle:"FM jako kanał: oferuje klientom usługę optymalizacji z udziałem w rozliczeniu; my dostarczamy technologię i M&V; technicy FM wdrażają korekty. Wyróżnik w przetargach, przychód z efektu, mniej zgłoszeń o komfort.",
+  opening:"„Ile obiektów obsługujecie i w ilu z nich klient pyta Was o oszczędności energii – i co mu dziś odpowiadacie?”",
+  diag:[
+    "Portfel: liczba obiektów, typy, kto płaci za media (klient czy FM w ryczałcie)?",
+    "Czy FM ma w umowach KPI energetyczne lub udział w oszczędnościach?",
+    "Jakie BMS obsługują, czy mają zdalny dostęp, jaki zespół automatyków?",
+    "Jak klienci pytają o ESG / efektywność? Kto odpowiada?",
+    "Czy FM oferuje audyty energetyczne / usługi ESCO? Jak sprzedaje?",
+    "Jakie kary umowne za komfort? Ile zgłoszeń dotyczy temperatury?",
+    "Kto decyduje o włączeniu nowej usługi do oferty? Proces?",
+    "Czy mają klientów z wieloma obiektami (sieci, fundusze), gdzie skalowanie jest naturalne?",
+    "Jak rozliczają się z klientami – czy da się dołożyć komponent za efekt?",
+    "Czy technicy mogą wdrażać korekty nastaw w BMS klienta w ramach umowy?"
+  ],
+  insight:[
+    "„Gdy klient pyta w przetargu o innowacje i ESG – co jest w Waszej odpowiedzi poza LED?”",
+    "„Ile zgłoszeń o temperaturę zniknęłoby, gdyby nastawy zależały od prognozy, a nie od tego, kto ostatni dzwonił?”",
+    "„Gdybyście mogli zaoferować klientowi obniżkę kosztu ciepła bez CAPEX – w ilu przetargach by to ważyło?”"
+  ],
+  args:{
+    tech:["Warstwa predykcyjna nad BMS obsługiwanym przez FM – technicy FM pozostają operatorem","Centralny podgląd wielu obiektów; log z pracy jako dokument przy KPI komfortu","M&V IPMVP dla rozliczeń z klientem"],
+    econ:["Udział FM w rozliczeniu z oszczędności – nowy przychód bez CAPEX","Wyróżnik w przetargach FM","Mniej zgłoszeń o komfort = niższy koszt obsługi"],
+    board:["Dla zarządu FM: usługa oparta na efekcie w ofercie, dane ESG dla klientów","Dla operacji: narzędzie dla techników, mniej gaszenia pożarów"],
+    legal:["Ustawa o efektywności energetycznej, art. 7 – umowa o poprawę efektywności energetycznej; FM może być stroną jako dostawca usługi [OBOWIĄZEK – konstrukcja umowy]","Ustawa o charakterystyce energetycznej budynków – kontrole systemów ogrzewania, które FM często realizuje dla klienta (art. 23) [OBOWIĄZEK]","CSRD klientów FM – dostawcy proszeni o dane [ZALEŻNE OD KLIENTA]"],
+    esg:["Dane dla klientów do raportów; FM jako dostawca danych, nie tylko usług"]
+  },
+  objections:[
+    {q:"Odpowiadamy za komfort w umowach z karami – nie będziemy ryzykować.", a:"Parametry komfortu są warunkami brzegowymi systemu, a log z pracy jest Waszym dowodem przy sporze o karę – dziś zwykle go nie macie. Zaczynamy od obiektu, gdzie kary są najniższe, i mierzymy zgłoszenia.", why:"Log = obrona przed karami."},
+    {q:"Nasi automatycy sami to zrobią.", a:"Wasi automatycy obsługują 40 obiektów i reagują na zgłoszenia. System pracuje na każdym obiekcie codziennie, oni go nadzorują. To ich narzędzie, nie ich zastępstwo.", why:"Narzędzie dla techników."},
+    {q:"Klient nie zgodzi się na kolejną firmę w BMS.", a:"Klient ma umowę z Wami. My jesteśmy Waszą technologią, wdrażaną przez Waszych techników, w zakresie, który uzgodnicie z klientem. Jedna firma, jedna odpowiedzialność.", why:"White label przez FM."}
+  ],
+  offerMoment:"Po pytaniu o portfel i o pytania klientów o ESG/oszczędności. Propozycja: pilotaż na 2–3 obiektach u życzliwego klienta, model partnerski.",
+  path:["Dyrektor rozwoju: model partnerski, wybór klienta/obiektów","Dział techniczny FM: zakres, BMS, technicy","Pilotaż → raport → oferta FM dla klientów z udziałem w efekcie"],
+  close:["„Wybierzmy klienta z 3 obiektami, który pyta o ESG. Zróbmy pilotaż pod Waszą marką.”","„Kto z Waszych automatyków powinien zobaczyć, jak to wygląda po stronie BMS?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem rozwoju?"],
+    ["K","Tak."],
+    ["H","Dostarczamy technologię optymalizacji ciepła, którą firmy FM oferują swoim klientom jako własną usługę z rozliczeniem z efektu. Ile obiektów obsługujecie i czy klienci pytają Was o oszczędności energii?"],
+    ["K","Ponad sto. Pytają coraz częściej, zwłaszcza fundusze."],
+    ["H","I co dziś dostają w odpowiedzi?"],
+    ["K","Audyt i rekomendacje. Wdrożenie to CAPEX klienta, rzadko idzie."],
+    ["H","Nasz system nie wymaga CAPEX: warstwa predykcyjna nad BMS, którą wdrażają Wasi technicy, rozliczenie z oszczędności według IPMVP, udział dla Was. Dla klienta: niższy koszt ciepła i dane do ESG. Dla Was: wyróżnik w przetargu i przychód z efektu."],
+    ["K","Mamy kary za komfort."],
+    ["H","Komfort jest warunkiem brzegowym, a log z systemu to Wasz dowód przy sporze. Zacznijmy od klienta z 2–3 obiektami, który pyta o ESG – pilotaż pod Waszą marką. Kto z automatyków powinien to zobaczyć?"],
+    ["N","FM = kanał z technikami na miejscu; log jako obrona przed karami."]
+  ]
+});
+
+SEGMENTS.push({
+  id:"inne", group:"Partnerzy", name:"Inne grupy perspektywiczne", short:"baseny, uczelnie, parafie, sport, obiekty wojskowe, DPS",
+  who:"Baseny i aquaparki (dyrektor, gmina/spółka), uczelnie (kanclerz, dział techniczny – kampusy z własnymi sieciami), parafie i diecezje (proboszcz, ekonom diecezji – duże, rzadko używane kubatury), hale sportowe i OSiR (dyrektor, gmina), domy pomocy społecznej i internaty (dyrektor, powiat), obiekty wojskowe i służb (rejonowe zarządy infrastruktury – tryby specjalne), banki i sieci oddziałów (nieruchomości), magazyny logistyczne (operator, deweloper).",
+  pain:[
+    "Baseny/aquaparki: ogromna C.W.U. i wentylacja, koszt energii decyduje o rentowności, gmina dopłaca",
+    "Uczelnie: kampusy z własnymi sieciami i kotłowniami, budynki użytkowane sesyjnie (wakacje, sesje), obowiązki sektora publicznego",
+    "Kościoły/parafie: kubatura ogrzewana na kilka godzin w tygodniu, kosztem parafian; diecezje z setkami obiektów",
+    "Hale sportowe/OSiR: harmonogramy wynajmu, ogrzewanie całodobowe","DPS/internaty: 24/7 jak szpital, ale prostsze instalacje; powiat płaci",
+    "Magazyny: duże kubatury, pracują wg zmian, nagrzewnice na stałych nastawach"
+  ],
+  fear:"Jak w odpowiednich segmentach bazowych: komfort użytkowników, procedury publiczne, ingerencja w instalację.",
+  angle:"Użyj najbliższego scenariusza bazowego: baseny i OSiR → jak JST/hotel; uczelnie i DPS → jak JST/szpital; parafie → jak wspólnoty (decyzja proboszcza/rady parafialnej; diecezja jako portfel); magazyny → jak przemysł/sieci. Wspólny mianownik: kubatura ogrzewana niezależnie od użytkowania.",
+  opening:"„Ile godzin w tygodniu ten budynek jest naprawdę używany – i ile godzin jest ogrzewany?”",
+  diag:[
+    "Godziny rzeczywistego użytkowania vs godziny ogrzewania?",
+    "Źródło ciepła, roczny koszt, kto płaci, kto decyduje?",
+    "Automatyka – jest, jaka, kto ją zmienia?",
+    "Czy podmiot jest jednostką sektora publicznego (art. 6 ustawy o EE)?",
+    "Czy jest portfel podobnych obiektów (diecezja, uczelnia, powiat, operator logistyczny)?",
+    "Baseny: temperatura wody i hali, wentylacja, odzysk ciepła?",
+    "Uczelnie: kalendarz akademicki, sesje, akademiki latem?",
+    "Magazyny: strefy temperaturowe, zmiany, bramy?",
+    "Kiedy jest moment decyzyjny (budżet, rada, kapituła, zarząd)?",
+    "Czy były wcześniej oferty ESCO? Efekt?"
+  ],
+  insight:[
+    "„Kościół jest ogrzewany od piątku do niedzieli dla 6 godzin nabożeństw – ile to kosztuje parafię w sezonie?”",
+    "„Akademik w lipcu ma 20% obłożenia – czy kotłownia o tym wie?”",
+    "„Hala sportowa ma wynajem od 16 do 22 – co robi ogrzewanie od 22 do 16?”"
+  ],
+  args:{
+    tech:["Harmonogram użytkowania (nabożeństwa, sesje, wynajem, zmiany) jako wejście do modelu","Predykcja pozwala grzać „na czas”, nie „na wszelki wypadek”","Współpraca z prostą automatyką – często wystarczy sterowanie niezależne"],
+    econ:["Bez CAPEX; rozliczenie z oszczędności; szczególnie ważne tam, gdzie płaci społeczność (parafia, gmina)","Portfelowe skalowanie (diecezja, uczelnia, powiat, operator)"],
+    board:["Dla decydenta społecznego (proboszcz, dyrektor DPS): oszczędność, którą można pokazać wspólnocie / powiatowi","Dla operatora logistycznego: OPEX i ESG dla najemców"],
+    legal:["Jednostki publiczne (uczelnie publiczne, OSiR, DPS jako jednostki JST): art. 6 ustawy o EE [OBOWIĄZEK]; EED art. 5–6 [W TRAKCIE WDRAŻANIA]","Parafie, podmioty prywatne: przepisy o charakterystyce energetycznej budynków (kontrole ogrzewania) [OBOWIĄZEK]; EPBD w zakresie, jaki ustali transpozycja [PO TRANSPOZYCJI]","Obiekty wojskowe / służb: tryby zamówień w dziedzinie obronności – osobna ścieżka, nie improwizuj [SPECJALNE]"],
+    esg:["Dla uczelni i operatorów logistycznych – raportowanie; dla parafii – argument wspólnotowy (oszczędność dla parafian)"]
+  },
+  objections:[
+    {q:"Nasz obiekt jest specyficzny.", a:"Każdy jest – i dlatego model buduje się z Państwa danych, nie z założeń. Wspólny mianownik: budynek ogrzewany niezależnie od tego, czy ktoś w nim jest. Symulacja pokaże, czy u Państwa to występuje.", why:"Specyfika = dane, nie wyjątek."},
+    {q:"Nie mamy automatyki, tylko kocioł i termostat.", a:"To bywa najprostszy przypadek: sterowanie niezależne z prognozą pogody i harmonogramem. Zakres ustalimy na wizji.", why:"Prosta instalacja = szybkie wdrożenie."}
+  ],
+  offerMoment:"Po ustaleniu godzin użytkowania vs ogrzewania i kto płaci. Model ESCO jak w segmencie bazowym.",
+  path:["Rozmowa z decydentem lokalnym → godziny użytkowania, dane","Wizja lokalna → zakres","Symulacja → pilotaż → (portfel: diecezja / uczelnia / powiat / operator)"],
+  close:["„Proszę o faktury z dwóch sezonów i kalendarz użytkowania obiektu – wracam z symulacją za tydzień.”","„Czy w Państwa strukturze (diecezja / uczelnia / powiat / operator) jest osoba, z którą warto rozmawiać o wszystkich obiektach naraz?”"],
+  dialog:[
+    ["H","Dzień dobry, [Imię] z Water AI. Rozmawiam z dyrektorem OSiR-u?"],
+    ["K","Tak."],
+    ["H","Obniżamy koszty ciepła w halach i basenach bez nakładów, rozliczenie z oszczędności. Ile godzin w tygodniu hala jest używana?"],
+    ["K","Od 8 do 22, z przerwami. Basen podobnie."],
+    ["H","A ogrzewanie i wentylacja hali od 22 do 8?"],
+    ["K","Obniżamy trochę, ręcznie. Basen grzeje cały czas."],
+    ["H","System dopasowuje halę do harmonogramu wynajmu i prognozy, a na basenie optymalizuje wentylację i C.W.U. bez zmiany temperatury wody. Gmina to jednostka publiczna – rozliczenie według IPMVP to dokument, który przyda się przy kontroli. Poproszę faktury z dwóch sezonów i harmonogram – wracam z symulacją za tydzień. Kto w gminie decyduje o takich umowach?"],
+    ["N","Dobierz scenariusz bazowy (tu: JST + hotel/basen)."]
+  ]
+});
+/* ===== PRAWO – stan na wrzesień 2026, do ponownej weryfikacji przed każdym użyciem ===== */
+const LEGAL_NOTE = "Status oznaczony przy każdym przepisie. OBOWIĄZEK = obowiązujące prawo. PROJEKT / W TRAKCIE WDRAŻANIA = dyrektywa przyjęta w UE, ale polska ustawa wdrażająca nie została uchwalona (stan: wrzesień 2026 – projekt UC77 nadal w legislacji; EPBD nie wdrożona w terminie 29.05.2026, KE wszczęła postępowanie 15.07.2026). PRZYSZŁE = termin w przyszłości. Zasada: powołuj się na obowiązek tylko przy statusie OBOWIĄZEK; przy pozostałych mów „kierunek, który nadchodzi”. Przed spotkaniem sprawdź, czy status się nie zmienił.";
+const LEGAL = [
+  {act:"Ustawa o efektywności energetycznej (2016, z późn. zm.)", art:"art. 6", status:"OBOWIĄZEK", who:"Jednostki sektora publicznego (JST i ich jednostki, uczelnie publiczne, SPZOZ, instytucje kultury itd.)", what:"Jednostka sektora publicznego realizuje swoje zadania, stosując co najmniej jeden ze środków poprawy efektywności energetycznej. Katalog środków obejmuje m.in.: umowę o poprawę efektywności energetycznej (ESCO), nabycie urządzeń i budynków o niskim zużyciu energii, wymianę lub modernizację urządzeń i instalacji, termomodernizację, audyt energetyczny.", use:"Do samorządu: „Państwa obowiązek z art. 6 można zrealizować m.in. umową ESCO – to nie jest egzotyczne narzędzie, tylko środek wymieniony w ustawie.” Nie mów, że ustawa nakazuje konkretny procent oszczędności – nie nakazuje.", trap:"Ustawa nie nakłada obowiązku redukcji zużycia w określonej wielkości ani obowiązku zawarcia umowy ESCO – nakazuje stosować co najmniej jeden środek."},
+  {act:"Ustawa o efektywności energetycznej", art:"art. 7", status:"OBOWIĄZEK", who:"Strony umów o poprawę efektywności energetycznej", what:"Definiuje umowę o poprawę efektywności energetycznej: określa w szczególności środki, uzgodnione oszczędności energii, sposób ich pomiaru i weryfikacji, warunki płatności powiązane z oszczędnościami.", use:"Do prawnika klienta: „Nasza umowa jest zbudowana zgodnie z elementami z art. 7 – pomiar i weryfikacja to IPMVP, płatność z oszczędności.” Pokaż mapowanie elementów umowy na artykuł.", trap:"Nie twierdź, że umowa ESCO jest zwolniona z Prawa zamówień publicznych – nie jest; tryb zależy od wartości i przedmiotu."},
+  {act:"Ustawa o efektywności energetycznej", art:"art. 36–39", status:"OBOWIĄZEK", who:"Duzi przedsiębiorcy (≥250 pracowników lub obrót >50 mln EUR i suma bilansowa >43 mln EUR) – z wyłączeniem posiadających certyfikowany system zarządzania energią (ISO 50001) / środowiskowy (EMAS) obejmujący audyt", what:"Obowiązek przeprowadzenia audytu energetycznego przedsiębiorstwa co 4 lata; zawiadomienie Prezesa URE o audycie w 30 dni; kara pieniężna do 5% przychodu.", use:"Do przemysłu / sieci / hoteli w dużych grupach: „Audytor zapyta, co wdrożono z rekomendacji – nasze rozliczenie IPMVP to gotowy dowód działania.”", trap:"Audyt to obowiązek wykonania audytu, nie wdrożenia rekomendacji – nie mów, że firma „musi wdrożyć”."},
+  {act:"Projekt nowelizacji ustawy o efektywności energetycznej (UC77) – wdrożenie EED 2023/1791", art:"projekt", status:"PROJEKT – nie prawo", who:"Sektor publiczny, przedsiębiorstwa wg zużycia energii", what:"Wg projektu: obowiązek redukcji zużycia energii finalnej przez instytucje publiczne o 1,9% rocznie względem 2021 r.; kryterium audytu przedsiębiorstwa zmienione z wielkości firmy na zużycie >10 TJ/rok (pierwszy audyt wg projektu do 11.10.2026); >85 TJ – system zarządzania energią. Projekt opublikowany 30.09.2025 (RCL), na etapie prac legislacyjnych; termin transpozycji dyrektywy (11.10.2025) minął.", use:"„To nadchodzi – dyrektywa jest przyjęta, polska ustawa jest w pracach. Klient, który zacznie liczyć oszczędności teraz, będzie miał bazę do raportu, gdy obowiązek wejdzie.” Mów „projekt”, nigdy „obowiązek”.", trap:"Nie podawaj daty wejścia w życie – nie jest znana. Nie mów, że MŚP „muszą” robić audyt – jeszcze nie muszą."},
+  {act:"Dyrektywa (UE) 2023/1791 w sprawie efektywności energetycznej (EED recast)", art:"art. 5", status:"W TRAKCIE WDRAŻANIA", who:"Instytucje publiczne (wszystkie szczeble)", what:"Łączne zużycie energii końcowej instytucji publicznych ma spadać o co najmniej 1,9% rocznie względem 2021 r. Wyłączenia: gminy <50 tys. mieszkańców do 31.12.2026, <5 tys. do 31.12.2029. Transport publiczny i siły zbrojne mogą być wyłączone.", use:"Do dużych miast: „Od 2027 obowiązek obejmie Państwa w pełni; potrzebujecie działań z mierzalnym efektem – nasze rozliczenie jest mierzalne z definicji.” Do małych gmin: „Macie czas do 2027/2030 – zaczynajcie od tego, co nie kosztuje.”", trap:"Obowiązek wiąże państwo członkowskie i będzie przeniesiony na jednostki polską ustawą – dopóki nie ma ustawy, nie ma sankcji dla konkretnej gminy."},
+  {act:"Dyrektywa (UE) 2023/1791 (EED recast)", art:"art. 6", status:"W TRAKCIE WDRAŻANIA", who:"Budynki będące własnością instytucji publicznych", what:"Rocznie co najmniej 3% całkowitej powierzchni ogrzewanych/chłodzonych budynków instytucji publicznych ma być renowane do standardu co najmniej niemal zeroenergetycznego lub zeroemisyjnego (z alternatywami).", use:"„Renowacja 3% rocznie to CAPEX, którego nie ma. Sterowanie predykcyjne obniża zużycie w budynkach, które na renowację czekają – bez CAPEX.”", trap:"Nie mów, że nasze rozwiązanie „zastępuje” obowiązek renowacji – nie zastępuje."},
+  {act:"Dyrektywa (UE) 2023/1791 (EED recast)", art:"art. 7", status:"W TRAKCIE WDRAŻANIA", who:"Zamawiający publiczni (powyżej progów unijnych)", what:"Zasada „efektywność energetyczna przede wszystkim” w zamówieniach publicznych; nabywanie produktów, usług, budynków i robót o wysokiej charakterystyce energetycznej; uwzględnianie umów o poprawę efektywności energetycznej.", use:"Do wydziału zamówień: „Kierunek unijny to opisywanie zamówień efektem energetycznym – tak właśnie konstruuje się zamówienie ESCO.”", trap:"Nie twierdź, że art. 7 nakazuje wybór ESCO."},
+  {act:"Dyrektywa (UE) 2023/1791 (EED recast)", art:"art. 11", status:"W TRAKCIE WDRAŻANIA", who:"Przedsiębiorstwa wg zużycia", what:"Zużycie >85 TJ/rok – system zarządzania energią; >10 TJ/rok – audyt energetyczny co 4 lata (jeśli brak SZE). Kryterium zużycia zamiast wielkości firmy.", use:"Do przemysłu i sieci: „Kryterium będzie zużycie, nie wielkość – proszę policzyć, czy przekraczacie 10 TJ (2 778 MWh) łącznie we wszystkich nośnikach.”", trap:"Projekt UC77 przenosi to do prawa polskiego – dopóki nie uchwalony, obowiązuje stare kryterium (art. 36)."},
+  {act:"Dyrektywa (UE) 2023/1791 (EED recast)", art:"art. 25–26", status:"W TRAKCIE WDRAŻANIA", who:"Systemy ciepłownicze, państwa członkowskie", what:"Art. 25: ocena i planowanie ciepłownictwa (w tym lokalne plany dla większych gmin). Art. 26: definicja „efektywnego systemu ciepłowniczego” zaostrzana etapami – od 2028 r. m.in. min. 50% OZE / 50% ciepła odpadowego / 50% OZE+odpadowe / 80% ciepła z wysokosprawnej kogeneracji lub kombinacje, dalej 2035, 2040, 2045, 2050 (aż do OZE + odpadowe).", use:"Do PEC: „Status efektywnego systemu decyduje o wsparciu i pozycji. Niższe temperatury i lepiej regulowani odbiorcy to warunek włączenia pomp ciepła i ciepła odpadowego.”", trap:"Nie interpretuj, czy konkretny PEC spełni kryteria – to ich analiza."},
+  {act:"Dyrektywa (UE) 2023/1791 (EED recast)", art:"art. 29 i zał. XV", status:"KIERUNEK / W TRAKCIE WDRAŻANIA", who:"Państwa członkowskie, sektor publiczny, rynek usług energetycznych", what:"Promowanie rynku usług energetycznych; usuwanie barier regulacyjnych dla umów o poprawę efektywności energetycznej w sektorze publicznym; minimalne elementy takich umów (zał. XV): oszczędności gwarantowane, sposób pomiaru, podział korzyści, okres, warunki.", use:"„Unia wprost chce, żeby sektor publiczny korzystał z ESCO – wytyczne KE (2024) opisują, jak państwa mają to ułatwiać.” Pokaż, że umowa Water AI ma elementy z zał. XV.", trap:"Zał. XV to minimalne elementy, nie wzór umowy."},
+  {act:"Dyrektywa (UE) 2024/1275 w sprawie charakterystyki energetycznej budynków (EPBD recast)", art:"art. 9, 16–19, 30–31 (m.in.)", status:"PO TRANSPOZYCJI – termin 29.05.2026 minął, Polska nie wdrożyła; postępowanie KE od 15.07.2026", who:"Właściciele budynków, państwa członkowskie", what:"Minimalne normy charakterystyki dla budynków niemieszkalnych: renowacja 16% najgorszych do 2030 i 26% do 2033 (progi ustala państwo). Trajektoria renowacji budynków mieszkalnych. Nowa skala świadectw A+–G (ważność 10 lat; nowe świadectwa wg nowego wzoru po transpozycji). Nowe budynki publiczne zeroemisyjne od 2028, wszystkie nowe od 2030. Fotowoltaika etapowo (nowe publiczne/niemieszkalne >250 m² od 2027). Krajowe plany renowacji.", use:"Do komercji i mieszkalnictwa: „Nadchodzi obowiązek renowacji najgorszych budynków – niższe zużycie z lepszego sterowania poprawia pozycję budynku i daje dane do planu renowacji.” Do JST: „Nowe budynki publiczne od 2028 muszą być zeroemisyjne – istniejące trzeba obniżać zużyciem.”", trap:"Krajowe progi (które budynki są „najgorsze”) nie są znane. Nie strasz klasą G, dopóki nie ma polskiego rozporządzenia."},
+  {act:"Ustawa o charakterystyce energetycznej budynków (2014, z późn. zm.)", art:"art. 3, 11, 23", status:"OBOWIĄZEK", who:"Właściciele / zarządcy budynków", what:"Świadectwo charakterystyki energetycznej przy sprzedaży / najmie (i dla budynków publicznych >250 m² – wywieszenie). Okresowe kontrole systemów ogrzewania (kotły, w zależności od mocy i paliwa – co 2–5 lat) oraz systemów klimatyzacji (>12 kW co 5 lat).", use:"„Kontrola systemu ogrzewania z art. 23 to okazja: protokół często wskazuje nieefektywne sterowanie – my to naprawiamy bez CAPEX.” Poproś o ostatni protokół kontroli.", trap:"Nie twierdź, że świadectwo wymusza modernizację – nie wymusza."},
+  {act:"Prawo energetyczne", art:"art. 45a", status:"OBOWIĄZEK", who:"Właściciele / zarządcy budynków wielolokalowych", what:"Zasady rozliczania kosztów ciepła w budynkach wielolokalowych; obowiązek regulaminu rozliczeń; wymogi dotyczące urządzeń pomiarowych i podziału kosztów.", use:"Do spółdzielni / zarządców: „Rozliczenie efektu z mieszkańcami odbywa się w ramach Państwa regulaminu z art. 45a – pomożemy to ująć.”", trap:"Nie doradzaj, jak zmienić regulamin – to ich prawnik."},
+  {act:"Prawo energetyczne + rozporządzenie taryfowe dla ciepła", art:"art. 45–47", status:"OBOWIĄZEK", who:"Przedsiębiorstwa ciepłownicze", what:"Taryfy dla ciepła zatwierdzane przez Prezesa URE na podstawie kosztów uzasadnionych; stawki za moc zamówioną i za ciepło.", use:"Do PEC: „Wpływ na taryfę policzmy z Państwa działem taryf – nie będę tego rozstrzygał.” Do odbiorców z sieci: „Po sezonie dane pozwolą zweryfikować moc zamówioną.”", trap:"Nie obiecuj odbiorcy obniżenia mocy zamówionej – to procedura z PEC-em na podstawie danych."},
+  {act:"Prawo zamówień publicznych", art:"tryby wg wartości (art. 275 tryb podstawowy, procedury unijne), art. 99–103 opis przedmiotu", status:"OBOWIĄZEK", who:"Zamawiający publiczni", what:"Wybór trybu zależy od wartości szacunkowej; przedmiot zamówienia można opisać wymaganiami funkcjonalnymi / efektem (w tym efektem energetycznym).", use:"„Pomożemy przygotować opis przedmiotu zamówienia oparty na efekcie i metodyce pomiaru (IPMVP) – zgodnie z zasadą efektywność energetyczna przede wszystkim.”", trap:"Nigdy nie sugeruj sposobu „ominięcia” PZP ani dzielenia zamówienia."},
+  {act:"EU ETS (dyrektywa 2003/87/WE z późn. zm.) – ETS1", art:"zał. I", status:"OBOWIĄZEK", who:"Instalacje spalania >20 MW (m.in. ciepłownie, duże zakłady)", what:"Obowiązek umarzania uprawnień do emisji; brak darmowych uprawnień dla ciepłownictwa w rosnącym zakresie.", use:"Do PEC / dużego przemysłu: „Mniej paliwa u Was = mniej uprawnień. Oszczędność odbiorcy jest też Waszą oszczędnością kosztu ETS.”", trap:"Nie szacuj ceny uprawnień – zmienna."},
+  {act:"EU ETS2 (budynki i transport drogowy)", art:"dyrektywa 2023/959; decyzja o przesunięciu 2026", status:"PRZYSZŁE – start 1.01.2028", who:"Dostawcy paliw (koszt przenoszony na odbiorców gazu, węgla, oleju w budynkach)", what:"Rozszerzenie handlu emisjami na paliwa w budynkach i transporcie; start przesunięty z 2027 na 2028 (porozumienie UE 2026, z rewizją zasad i mechanizmami kontroli cen). Obowiązki raportowe od 2025/2026 pozostają.", use:"„Od 2028 do ceny gazu dojdzie koszt emisji. Każdy GJ, którego nie spalicie, to podwójna oszczędność – dziś na paliwie, od 2028 na emisji.”", trap:"Nie podawaj konkretnej ceny/tony ani konkretnego wzrostu rachunku – szacunki są rozbieżne."},
+  {act:"CSRD / ESRS (dyrektywa 2022/2464) po pakiecie „omnibus”", art:"ESRS E1", status:"OBOWIĄZEK ZALEŻNY OD PODMIOTU", who:"Duże spółki (progi podniesione pakietem omnibus; zakres i terminy zmieniane w 2025–2026)", what:"Raportowanie m.in. zużycia energii, emisji Scope 1–3, celów i działań redukcyjnych.", use:"Do sieci, funduszy, przemysłu: „Do raportu potrzebujecie działań z udokumentowanym efektem – IPMVP to udokumentowany efekt.”", trap:"Sprawdź, czy konkretny klient jest objęty i od kiedy – zakres zmieniał się w 2025–2026."}
+];
+
+/* ===== CIEPŁOWNIE – analiza konfliktu interesów i weryfikacja argumentów ===== */
+const PEC_CHAPTER = {
+  intro:"Water AI zmniejsza pobór ciepła u odbiorcy. Przedsiębiorstwo ciepłownicze sprzedaje ciepło. Naiwna wersja: PEC nie chce Water AI. Rzeczywistość: przychód PEC jest regulowany (taryfa z kosztów uzasadnionych), koszty paliwa i emisji rosną, odbiorcy szukają oszczędności bez pytania PEC-u o zgodę, a dekarbonizacja sieci wymaga niżej regulowanych odbiorców. Poniżej argumenty – z oceną, kiedy są prawdziwe.",
+  conflict:[
+    "Sprzedaż GJ spada → przychód ze składnika zmiennego spada. To fakt. Nie ukrywaj go.",
+    "Moc zamówiona: jeśli odbiorca po sezonie obniży moc zamówioną, spada też składnik stały. Też fakt – ale odbiorca może to zrobić i bez Water AI (po termomodernizacji).",
+    "Taryfa regulowana: przy niższych kosztach paliwa i emisji koszty uzasadnione spadają; przy stałych kosztach sieci jednostkowy koszt GJ może rosnąć – wpływ netto liczy dział taryf, nie handlowiec.",
+    "Alternatywa dla PEC nie jest „status quo”, tylko: odbiorca oszczędza z kimś obcym, odbiorca stawia własne źródło (pompa ciepła, gaz) lub odbiorca ociepla i obniża moc – we wszystkich PEC traci więcej, bez żadnej rekompensaty."
+  ],
+  args:[
+    {t:"Obniżenie temperatury powrotu / poprawa ΔT", v:"PRAWDZIWE WARUNKOWO", why:"Schłodzenie wody sieciowej zależy od tego, jak węzeł reguluje pobór. Przy regulacji ilościowej po stronie pierwotnej (zawór regulacyjny dławi przepływ przy mniejszym zapotrzebowaniu) niższe zapotrzebowanie wtórne → mniejszy przepływ pierwotny → dłuższy czas wymiany → niższy powrót. Przy węzłach z bypassem, złą hydrauliką lub przewymiarowanym przepływem efekt może nie wystąpić. System po stronie wtórnej (obniżenie zasilania C.O. wg predykcji) zwykle obniża też powrót wtórny, a więc i pierwotny – ale to trzeba zmierzyć.", how:"Pilotaż na 3–5 węzłach z najgorszym powrotem, pomiar przed/po."},
+    {t:"Mniejsze przepływy → niższe koszty pompowania", v:"PRAWDZIWE", why:"Mniejsze zapotrzebowanie przy tej samej ΔT = mniejszy przepływ; moc pompowania rośnie ~ z sześcianem przepływu, więc nawet kilka procent mniej przepływu to zauważalnie mniej energii elektrycznej pomp. Warunek: sieć regulowana ilościowo (pompy z falownikami).", how:"Dane z pomp sieciowych przed/po sezonie."},
+    {t:"Redukcja mocy szczytowej (poranny szczyt)", v:"PRAWDZIWE WARUNKOWO", why:"Uwaga: samo obniżenie nocne u odbiorców ZWIĘKSZA poranny szczyt (wszyscy ruszają naraz). Sterowanie predykcyjne obniża szczyt tylko wtedy, gdy rozkłada rozruchy w czasie (start wg prognozy i bezwładności budynku) i ogranicza „dogrzewanie” po nocy. Efekt sieciowy wymaga wielu odbiorców i koordynacji.", how:"Nie obiecuj bez danych. Zaproponuj pomiar szczytu w rejonie pilotażowym; ustal z dyspozytorem okno rozruchu."},
+    {t:"Stabilizacja sieci / rezerwa hydrauliczna / więcej odbiorców na tej samej infrastrukturze", v:"PRAWDZIWE", why:"Mniejszy przepływ i niższy szczyt w rejonie z ograniczeniami hydraulicznymi zwalniają przepustowość – można przyłączyć nowych odbiorców bez inwestycji w rurociąg lub źródło szczytowe. To jeden z najmocniejszych argumentów dla operatora, który odmawia przyłączeń.", how:"Wybierz rejon, w którym PEC dziś odmawia przyłączeń."},
+    {t:"Ograniczenie strat sieciowych", v:"CZĘŚCIOWO PRAWDZIWE", why:"Straty ciepła z rurociągów zależą głównie od temperatury czynnika i długości sieci, nie od ilości przesyłanego ciepła. Niższy powrót obniża straty na rurociągu powrotnym (mniejszy udział). Realna redukcja strat pojawia się, gdy operator dzięki lepiej regulowanym odbiorcom obniży temperaturę zasilania – to efekt pośredni i strategiczny.", how:"Mów o tym jako o warunku obniżenia temperatur sieci, nie jako o bezpośrednim efekcie."},
+    {t:"Lepsze prognozowanie zapotrzebowania", v:"PRAWDZIWE", why:"System u odbiorcy ma model budynku i prognozę poboru na jutro. Udostępnienie tych danych dyspozytorowi (zagregowanych po rejonach) poprawia prognozę i ogranicza uruchamianie źródeł szczytowych z powodu błędu prognozy. Warunek: integracja danych (nie sterowania) i wystarczająca liczba odbiorców.", how:"Zaoferuj interfejs danych; ustal format z dyspozytornią."},
+    {t:"Optymalizacja źródeł / mniej paliwa szczytowego", v:"PRAWDZIWE WARUNKOWO", why:"Niższy szczyt i lepsza prognoza → rzadziej uruchamiane drogie źródła szczytowe (gaz, olej). Niższy powrót → wyższa sprawność kondensacji spalin, kogeneracji i pomp ciepła wielkoskalowych. Warunek: takie źródła istnieją w systemie.", how:"Zapytaj o strukturę źródeł i koszt uruchomienia szczytu."},
+    {t:"Ograniczenie kosztów paliwa i emisji (ETS1)", v:"PRAWDZIWE", why:"Mniej sprzedanego ciepła = mniej spalonego paliwa = mniej uprawnień do umorzenia. Dla ciepłowni węglowej w ETS1 koszt uprawnień jest istotną częścią kosztu GJ – oszczędność odbiorcy obniża koszt PEC bezpośrednio. Warunek: instalacja w ETS1 (>20 MW).", how:"Poproś o koszt uprawnień rocznie i udział w koszcie GJ."},
+    {t:"Warunek dla dekarbonizacji sieci (obniżenie temperatur, pompy ciepła, ciepło odpadowe)", v:"PRAWDZIWE STRATEGICZNIE", why:"Sieci niskotemperaturowe i wielkoskalowe pompy ciepła / odzysk ciepła odpadowego wymagają odbiorców, którzy działają przy niższym zasilaniu i schładzają czynnik. Bez regulacji po stronie popytu operator nie obniży temperatur. To argument dla zarządu grupy i dla wniosków o dofinansowanie.", how:"Wpisz pilotaż jako działanie po stronie popytu w programie dekarbonizacji."},
+    {t:"Retencja odbiorców i nowa linia przychodu (partnerstwo / white label)", v:"PRAWDZIWE BIZNESOWO", why:"Odbiorca, który oszczędza z PEC-em, ma powód zostać w sieci. Udział PEC w rozliczeniu z oszczędności to przychód z działalności dodatkowej, który częściowo kompensuje spadek GJ. PEC pozycjonuje się jako dostawca efektywności – kierunek EED art. 29.", how:"Zaproponuj model: PEC sprzedaje, Water AI dostarcza, podział z oszczędności."},
+    {t:"„Sprzedamy mniej ciepła” – co odpowiadać", v:"FAKT, ALE NIEPEŁNY", why:"Tak – ale: (1) odbiorca i tak obniży zużycie, pytanie tylko z kim; (2) koszt paliwa i ETS spada; (3) udział w rozliczeniu; (4) parametry sieci; (5) status efektywnego systemu. Netto liczy dział taryf. Handlowiec ma doprowadzić do policzenia, nie do wygrania sporu.", how:"Zaproś dział taryf na spotkanie z danymi z pilotażu."}
+  ],
+  roles:[
+    ["Dyrektor techniczny","Powrót, ΔT, przepływy, szczyt, hydraulika. Mów językiem pomiaru: „zmierzmy na 3 węzłach”. Przyznawaj warunkowość – to buduje wiarygodność."],
+    ["Dyrektor sprzedaży / obsługi odbiorców","Retencja, oferta dla odbiorców, odpowiedź na pytania spółdzielni i gminy o oszczędności. Model partnerski."],
+    ["Dział taryf / regulacji","Nie interpretuj taryfy. Dostarcz dane i poproś o policzenie. Zapytaj, jakie koszty uzasadnione są pod presją."],
+    ["Prezes","Właściciel (gmina) pyta o koszty ciepła dla mieszkańców i o dekarbonizację. Water AI jako odpowiedź na oba pytania bez CAPEX. Precedens? – white label."],
+    ["Właściciel (gmina)","Ciepło dla mieszkańców taniej + PEC z nową usługą + dekarbonizacja. Nie omijaj zarządu PEC – idź do gminy razem z nim."]
+  ]
+};
+
+/* ===== KTO NAPRAWDĘ PODEJMUJE DECYZJĘ ===== */
+const DECIDERS = {
+  intro:"Trzy typy rozmówców w każdej organizacji: techniczny (czy to zadziała i czy mi nie zaszkodzi), finansowy (ile, kiedy, jakie ryzyko, jak zaksięgować) i decyzyjny (czy warto, co powiedzą inni, kto ponosi odpowiedzialność). Technik może zablokować, finansista może opóźnić, decydent może powiedzieć „tak”. Sprzedaż wymaga wszystkich trzech – w tej kolejności: najpierw technik (żeby nie blokował), potem finansista (żeby wiedział, jak to ująć), na końcu decydent (z gotowym materiałem).",
+  types:[
+    {t:"Osoba techniczna", wants:"Zrozumieć zakres, punkty styku, bezpieczeństwo, kto ma kontrolę, co się stanie w razie awarii. Chce mieć rację, że jego instalacja jest dobrze prowadzona.", do:"Pytaj o instalację szczegółowo. Przyznawaj warunkowość. Proponuj wizję lokalną i zakres na piśmie. Nie mów o pieniądzach, zanim nie zapyta.", dont:"Nie krytykuj obecnych nastaw. Nie mów „AI”. Nie obiecuj integracji z pamięci."},
+    {t:"Osoba finansowa", wants:"Zero CAPEX, klasyfikacja wydatku, brak zobowiązań kapitałowych, przewidywalność, sposób weryfikacji, warunki wyjścia, wpływ na budżet / P&L / zadłużenie.", do:"Pokaż załącznik nr 3 i mapowanie na art. 7 ustawy o EE. Mów „zmniejszenie wydatków bieżących”, „rozliczenie z potwierdzonej oszczędności”, „IPMVP”. Podaj przykład miesięcznego raportu.", dont:"Nie mów o technologii dłużej niż 2 minuty. Nie podawaj procentów bez symulacji."},
+    {t:"Osoba decyzyjna", wants:"Bezpieczeństwo decyzji (co powiedzą radni / RN / właściciel / audytor), widoczny efekt, brak ryzyka osobistego, prostotę. Ma mało czasu.", do:"Jedna strona: problem, rozwiązanie, ryzyko (kto ponosi), efekt, następny krok. Odwołaj się do tego, co technik i finansista już potwierdzili. Zapytaj, co musi się wydarzyć, żeby powiedział „tak”.", dont:"Nie zaczynaj od zera. Nie wysyłaj 40-slajdowej prezentacji. Nie wywieraj presji czasowej."}
+  ],
+  people:[
+    {t:"Burmistrz / wójt / prezydent", how:"Język: mieszkańcy, budżet, radni, kontrola. Otwarcie: „Ile gmina wydaje na ciepło i co by Pan/Pani zrobił(a) z X zł rocznie mniej?” Argument: efekt bez wydatku, dokument dla kontroli, polska technologia. Pułapka: obiecanie czegoś, co skarbnik potem zakwestionuje – miej skarbnika wcześniej. Następny krok: wskazanie osoby prowadzącej i obiektów do symulacji."},
+    {t:"Skarbnik", how:"Język: klasyfikacja, wykonanie budżetu, zobowiązania, dyscyplina finansów. Pokaż, że to zmniejszenie wydatków bieżących, brak zobowiązań wieloletnich kapitałowych, płatność wyłącznie z oszczędności. Zapytaj, jak chciałby to ująć w budżecie i w WPF. Pułapka: użycie słowa „inwestycja”."},
+    {t:"Prezes spółdzielni", how:"Język: mieszkańcy, walne, rada nadzorcza, opłaty. Otwarcie: „Który budynek ma najwyższy koszt na m²?” Argument: pilotaż w kompetencji zarządu, fundusz remontowy nietknięty, wynik na walne. Pułapka: obietnica procentu – mieszkańcy zapamiętają."},
+    {t:"Dyrektor hotelu (GM)", how:"Język: gość, opinie, GOP, sezon. Otwarcie: „Ile pokoi było zajętych w zeszły wtorek?” Argument: komfort jako warunek brzegowy, efekt w GOP, ESG dla sieci. Pułapka: rozmowa techniczna – GM odeśle do technika i zniknie; miej technika wcześniej."},
+    {t:"CFO", how:"Język: P&L, OPEX, CAPEX, ryzyko, weryfikacja, wyjście. Jedna strona z modelem rozliczenia, przykładem raportu, mapowaniem na standard. Zapytaj o kryteria akceptacji dostawców usług opartych na efekcie. Pułapka: entuzjazm zamiast liczb."},
+    {t:"Dyrektor techniczny / chief engineer", how:"Język: instalacja, zakres, kontrola, awaria, serwis. Wizja lokalna przed ofertą. Zakres na piśmie. Przyznaj, że nie wiesz, dopóki nie zobaczysz. Pułapka: „zintegrujemy się ze wszystkim”."},
+    {t:"Główny energetyk", how:"Język: dane, liczniki, audyt, ISO 50001, GJ/MWh. Twoje naturalne wejście w przemyśle – daj mu narzędzie do audytu i raportu. Poproś o dane i o wprowadzenie do UR. Pułapka: traktowanie go jak decydenta – zwykle nim nie jest."},
+    {t:"Prezes przedsiębiorstwa ciepłowniczego", how:"Język: właściciel, taryfa, dekarbonizacja, odbiorcy, precedens. Nie zaczynaj od „obniżamy zużycie”. Zacznij od: „odbiorcy oszczędzają – z Wami czy bez Was?” i „sieć niskotemperaturowa potrzebuje regulowanych odbiorców”. Zaproś dział taryf. Pułapka: udawanie eksperta od taryf."},
+    {t:"Asset manager / fundusz", how:"Język: NOI, wycena, ESG, GRESB, exit. Umowa bez CAPEX nie obciąża wyceny; udokumentowana efektywność ją podnosi. Warunki przeniesienia umowy. Pułapka: długość umowy bez pokazania warunków wyjścia."},
+    {t:"Zarządca nieruchomości", how:"Język: wspólnoty, uchwały, reklamacje, przedłużenie umowy o zarządzanie. Partner kanałowy, nie klient końcowy. Daj mu projekt uchwały i argument dla właścicieli. Pułapka: brak jego własnego interesu w rozmowie."}
+  ]
+};
+
+/* ===== BIBLIOTEKA OBIEKCJI (60) ===== */
+const OBJ_LIB = [
+  {c:"Technika", q:"Nasza automatyka już to robi.", s:"Automatyka realizuje nastawy, które ktoś ustawił. My te nastawy codziennie dopasowujemy do prognozy i do budynku.", l:"Automatyka pogodowa reaguje na temperaturę teraz; nie wie, że jutro będzie o 8 stopni cieplej, że w piątek budynek będzie w 30% pusty ani że po nocy budynek potrzebuje mniej dogrzewania, niż zakłada krzywa. Sterowanie predykcyjne dokłada tę wiedzę nad Państwa automatyką – nie wymienia jej. Symulacja na Państwa danych pokaże, ile zostaje do zebrania; jeśli nic, powiem to i nie wrócę."},
+  {c:"Technika", q:"Mamy pogodówkę.", s:"Pogodówka to krzywa ustawiona raz. My ją korygujemy codziennie.", l:"Krzywa grzewcza jest kompromisem ustawionym jesienią na cały sezon – zwykle z zapasem na najzimniejszy dzień. Predykcja pozwala grzać na jutro, nie na najgorszy przypadek. Pytanie: kiedy ostatnio ktoś zmieniał krzywą i na jakiej podstawie?"},
+  {c:"Technika", q:"Mamy BMS.", s:"Świetnie – BMS jest tym, z czym współpracujemy, nie tym, co zastępujemy.", l:"BMS wykonuje harmonogramy i nastawy. Nasz system dostarcza korekty: kiedy startować, jakie temperatury zasilania, jak reagować na prognozę i obłożenie. Zakres uzgadniamy z integratorem BMS, żeby nie ruszać gwarancji ani logiki bezpieczeństwa."},
+  {c:"Technika", q:"Nie chcę nikogo wpuszczać do sterowania węzłem / kotłownią.", s:"Zakres i punkt styku ustalamy z Państwa technikiem na piśmie. Państwo zachowują kontrolę i możliwość wyłączenia.", l:"Rozumiem – to Państwa instalacja i odpowiedzialność. Dlatego nie proponuję dostępu bez wizji lokalnej. Możliwe warianty: korekty nastaw wdrażane przez Państwa serwis, sterownik równoległy w ustalonych granicach, lub sterowanie z podglądem i przyciskiem „wróć do moich nastaw”. Wybierają Państwo."},
+  {c:"Technika", q:"Co, jeśli system przestanie działać?", s:"Instalacja wraca do własnych nastaw. Nie ma stanu „bez sterowania”.", l:"System działa jako warstwa nad Państwa automatyką; przy braku sygnału automatyka pracuje jak przed wdrożeniem. Procedurę awaryjną i osoby kontaktowe zapisujemy w umowie. Zapis z pracy systemu pokazuje, co i kiedy się działo."},
+  {c:"Technika", q:"Kto zagwarantuje komfort?", s:"Parametry komfortu są warunkiem brzegowym w umowie, nie obietnicą.", l:"Ustalamy z Państwem temperatury zadane w godzinach użytkowania i temperatury C.W.U. – system ich nie przekracza w dół. Optymalizacja dotyczy tego, jak i kiedy produkować ciepło, nie tego, czy w budynku jest ciepło. Log z czujników jest dokumentem przy każdej reklamacji."},
+  {c:"Technika", q:"Nasz budynek jest specyficzny.", s:"Dlatego model budujemy z Państwa danych, nie z założeń.", l:"Każdy budynek jest inny – dlatego system uczy się reakcji konkretnego budynku na pogodę i użytkowanie. Wspólny mianownik to ogrzewanie niezależne od tego, czy ktoś w budynku jest. Symulacja pokaże, czy u Państwa to występuje."},
+  {c:"Technika", q:"Mamy nowoczesną kotłownię / nowe źródło.", s:"Nowe źródło spala efektywnie; sterowanie decyduje, ile w ogóle wyprodukować.", l:"Sprawność źródła i ilość produkowanego ciepła to dwie różne rzeczy. Kondensacyjny kocioł na krzywej z zapasem nadal grzeje pusty budynek. Do tego niższe temperatury pracy poprawiają sprawność kondensacji i pomp ciepła – więc nowe źródło zyskuje na dobrym sterowaniu."},
+  {c:"Technika", q:"Po termomodernizacji już nic nie da się zaoszczędzić.", s:"Ocieplenie zmniejsza straty; my zmniejszamy nadprodukcję. Po termomodernizacji nastawy zwykle zostają stare.", l:"Częsty przypadek: budynek ocieplony, krzywa grzewcza jak przed ociepleniem, mieszkańcy otwierają okna. Sterowanie po termomodernizacji to „drugi etap”, o którym rzadko ktoś pamięta. Zapytam: kto obniżył nastawy po odbiorze prac?"},
+  {c:"Technika", q:"Nie mamy liczników / danych.", s:"Zaczniemy od faktur i modelu z danych pogodowych; opomiarowanie doprecyzuje model.", l:"Do modelu bazowego wystarczą faktury miesięczne i dane pogodowe. Jeśli brakuje liczników na obiegach, ustalimy, co dołożyć, żeby rozliczenie było precyzyjne – często to niewielki koszt po naszej stronie w pilotażu."},
+  {c:"Technika", q:"Integracja z naszą automatyką będzie problemem.", s:"Może być – dlatego wizja lokalna przed ofertą.", l:"Nie obiecuję integracji, zanim nie zobaczę sterowników, protokołów i dostępu. Warianty: integracja, sterownik równoległy, korekty wdrażane przez Państwa serwis. Zakres i odpowiedzialność ustalamy na piśmie."},
+  {c:"Technika", q:"Zimą będzie zimno w budynku.", s:"System nie obniża temperatur w godzinach użytkowania.", l:"Zmiana dotyczy nadprodukcji: grzania na zapas, na pusto, na najgorszy dzień. W godzinach użytkowania temperatura zadana jest utrzymana. W pilotażu porównamy liczbę zgłoszeń „za zimno” i „za gorąco” przed i po."},
+  {c:"Finanse", q:"Nie mamy budżetu.", s:"To nie jest wydatek – to zmniejszenie wydatku. Nie ma nakładu.", l:"Płatność następuje wyłącznie z potwierdzonej oszczędności, więc z pieniędzy, których bez systemu Państwo by nie mieli. Nie obciąża budżetu inwestycyjnego, limitu zadłużenia ani CAPEX-u. W klasyfikacji to obniżenie kosztów bieżących."},
+  {c:"Finanse", q:"Nie wierzę w 20% oszczędności.", s:"Ja też nie – dopóki nie policzę na Państwa danych. Nie obiecuję procentu.", l:"Wynik zależy od budynku, sterowania i użytkowania. Dlatego najpierw symulacja z faktur, potem model bazowy zatwierdzony przez Państwa, potem rozliczenie tylko z tego, co się potwierdzi. Jeśli symulacja pokaże 4% – powiem 4%."},
+  {c:"Finanse", q:"Ile to naprawdę kosztuje?", s:"Procent z potwierdzonej oszczędności, warunki w załączniku nr 3. Bez oszczędności – bez faktury.", l:"Nie ma opłaty wdrożeniowej ani abonamentu. Wynagrodzenie to ustalony udział w oszczędności potwierdzonej metodą IPMVP. Pokażę przykład miesięcznego rozliczenia na liczbach z podobnego obiektu."},
+  {c:"Finanse", q:"Kto weryfikuje oszczędności – wy sami?", s:"Metoda stopniodni wg IPMVP, model bazowy zatwierdzony przez Państwa, dane dostępne dla obu stron.", l:"Nie wymyślamy własnego wzoru. Model bazowy uzgadniamy przed startem, dane pogodowe są publiczne, odczyty liczników są Państwa. Mogą Państwo zlecić weryfikację niezależnemu audytorowi – wskażemy, jak."},
+  {c:"Finanse", q:"A jak zima będzie ciepła?", s:"Dlatego liczymy stopniodni, nie rok do roku.", l:"Model uwzględnia temperaturę, nasłonecznienie, wiatr, wilgotność. Ciepła zima obniża zużycie bazowe w modelu tak samo jak rzeczywiste – naliczamy tylko różnicę wynikającą z pracy systemu. Zimna zima działa symetrycznie."},
+  {c:"Finanse", q:"A jak zmieni się cena ciepła / gazu?", s:"Rozliczamy energię (GJ/kWh), a cena jest parametrem umowy.", l:"Oszczędność energetyczną liczymy w jednostkach energii; przeliczenie na złote odbywa się według zasad z umowy (np. cena z faktury w danym okresie lub cena referencyjna). Sposób ustalamy tak, żeby zmiana ceny nie zmieniała procentu oszczędności."},
+  {c:"Finanse", q:"Na ile lat umowa i jak wyjść?", s:"Warunki w umowie – pokażę je, nie będę cytować z pamięci.", l:"Umowa nie tworzy kosztów stałych, więc nie ma sytuacji, w której Państwo płacą, a nie oszczędzają. Okres i warunki wyjścia oraz przeniesienia na nabywcę omówimy na dokumencie – chętnie z Państwa prawnikiem."},
+  {c:"Finanse", q:"Podpisaliśmy już umowę z inną firmą ESCO.", s:"Sprawdźmy, czy tamta umowa obejmuje sterowanie predykcyjne – często nie.", l:"Umowy ESCO zwykle dotyczą termomodernizacji, oświetlenia lub źródła. Sterowanie po tych działaniach bywa niezagospodarowane. Możemy działać jako uzupełnienie – także w porozumieniu z tamtą firmą, żeby rozliczenia się nie nakładały."},
+  {c:"Finanse", q:"Wolimy kupić system na własność.", s:"Możemy porozmawiać o modelu – ale ESCO zdejmuje z Państwa ryzyko wyniku.", l:"W modelu z oszczędności ryzyko, że system nie zadziała, jest po naszej stronie. Przy zakupie – po Państwa. Jeśli po pilotażu wolą Państwo inny model, porozmawiamy; dziś proponuję ten, w którym Państwo nic nie ryzykują."},
+  {c:"Finanse", q:"To za tanie / za dobre, żeby było prawdziwe.", s:"Dlatego nie proszę o zaufanie – proszę o dane do symulacji i zatwierdzenie modelu bazowego.", l:"Model ESCO istnieje właśnie po to, żeby klient nie musiał wierzyć na słowo. Jeśli oszczędności nie ma, nie ma faktury. Sprawdźmy to na jednym budynku."},
+  {c:"Procedura", q:"Muszę zrobić przetarg.", s:"Tak. Pomożemy w opisie przedmiotu zamówienia opartym na efekcie i metodyce pomiaru.", l:"Nie omijamy PZP. Zamówienie ESCO opisuje się wymaganiami funkcjonalnymi (efekt energetyczny) i metodyką weryfikacji (IPMVP). Mamy doświadczenie w takiej dokumentacji. Tryb zależy od wartości – to ocenia Państwa dział zamówień."},
+  {c:"Procedura", q:"Decyduje rada / walne / organ tworzący / centrala.", s:"Przygotuję jednostronicowy materiał w języku tej osoby. Kto go przekaże?", l:"Nie proszę, żeby Pan/Pani decydował(a) za nich. Proszę o pomoc w dotarciu z właściwym materiałem: problem, rozwiązanie, ryzyko po naszej stronie, efekt, następny krok. Chętnie przedstawię to osobiście."},
+  {c:"Procedura", q:"Musimy najpierw zrobić audyt energetyczny.", s:"Audyt i nasze wdrożenie się nie wykluczają – symulacja jest szybsza, a rozliczenie IPMVP zasili audyt.", l:"Audyt pokaże szerokie rekomendacje, w tym zwykle sterowanie. Możemy działać równolegle: symulacja w tydzień, pilotaż w sezonie, a wynik jako udokumentowane działanie w audycie. Jeśli wolą Państwo najpierw audyt – ustalmy termin powrotu."},
+  {c:"Procedura", q:"Proszę wysłać ofertę mailem.", s:"Wyślę dziś. Żeby była konkretna, potrzebuję dwóch liczb – mogę zapytać teraz?", l:"Ogólna oferta nic nie mówi. Roczne zużycie i rodzaj źródła pozwolą mi wysłać symulację zamiast folderu. Potem 20 minut telefonu, żeby ją omówić – kiedy pasuje?"},
+  {c:"Procedura", q:"Nie mamy czasu na kolejny projekt.", s:"Od Państwa potrzebujemy faktur i godziny z technikiem. Resztę robimy my.", l:"Wdrożenie nie wymaga wyłączania instalacji ani przerw w ogrzewaniu. Pierwsze spotkanie to 30 minut. Wiem, że czas jest najdroższy – dlatego nie proszę o więcej, niż potrzeba."},
+  {c:"Procedura", q:"Wracajmy do tematu po sezonie / po wyborach / po budżecie.", s:"Rozumiem. Co możemy zrobić teraz, żeby wtedy decyzja była prosta?", l:"Sezon jest wtedy, gdy oszczędność jest największa – jeśli zaczniemy teraz, po sezonie będą liczby. Jeśli to niemożliwe, zróbmy teraz to, co nie wymaga decyzji: dane i symulacja. Umówmy datę powrotu – konkretną."},
+  {c:"Procedura", q:"Mamy politykę bezpieczeństwa IT/OT.", s:"Respektujemy ją. Zakres dostępu ustalamy z IT/OT przed wdrożeniem.", l:"Warianty bez połączenia z siecią produkcyjną istnieją (sterownik równoległy, dane przez wydzielony kanał). Proszę o spotkanie z osobą od OT – zanim cokolwiek zaproponuję."},
+  {c:"Procedura", q:"Serwis węzłów / BMS ma wyłączność.", s:"To znaczy, że serwis musi być przy stole – zaprośmy go.", l:"Serwis odpowiada za sprawność, my za nastawy według pogody i użytkowania. Często to serwis wdraża nasze korekty. Bez ich zgody na zakres nie ruszamy."},
+  {c:"Zaufanie", q:"Kim jesteście? Nie znam tej firmy.", s:"Water AI z grupy Blue Boson – polska technologia, polscy inżynierowie. Prześlę materiały i kontakt do referencji.", l:"Materiały pokazują wyniki dwóch części technologii: SCAT i Water AI. Referencje: [obiekt, osoba, telefon – uzupełnij]. Wspierają Państwo polską myśl techniczną – to również argument dla radnych i mieszkańców."},
+  {c:"Zaufanie", q:"Już ktoś nam obiecywał oszczędności i nic z tego nie wyszło.", s:"Rozumiem. Dlatego nie obiecuję – proponuję model, w którym płacą Państwo tylko za to, co się potwierdzi.", l:"Co poszło nie tak wtedy? [słuchaj] Zwykle: brak modelu bazowego, brak weryfikacji, płatność z góry. U nas: model zatwierdzony przez Państwa, IPMVP, płatność z oszczędności. To jest różnica strukturalna, nie obietnica."},
+  {c:"Zaufanie", q:"Proszę o referencje z podobnego obiektu.", s:"Podam nazwisko i telefon, nie folder.", l:"Najbliższe segmentowi: JST – Urząd Miasta Lublin (19,9–30,4 %), Gmina Gostyń; uczelnie/szkoły – Politechnika Lubelska (13–28 %, 7 budynków); hotele – Premium Hotel Bratislava (38,6 %); przemysł – ŠKO-ENERGO, CEZ Skawina; ciepłownictwo – Byttherm. Osobę kontaktową ustal przed rozmową. Jeśli w tym segmencie nie mamy jeszcze referencji, powiem to i zaproponuję pilotaż na warunkach, które to uwzględniają."},
+  {c:"Zaufanie", q:"Co, jeśli zbankrutujecie w trakcie umowy?", s:"Instalacja wraca do własnych nastaw; nie mają Państwo zobowiązań kapitałowych.", l:"W umowie bez opłat stałych ryzyko finansowe klienta przy naszym zniknięciu jest zerowe – tracą Państwo oszczędność, nie pieniądze. Zapisy o przekazaniu dokumentacji i dostępów są w umowie."},
+  {c:"Zaufanie", q:"Będziecie mieli dostęp do naszych danych.", s:"Dane o zużyciu i pracy instalacji – tak, w zakresie umowy, z klauzulami poufności.", l:"Nie zbieramy danych osobowych mieszkańców ani danych procesowych. Zakres danych, ich przechowywanie i poufność opisujemy w umowie – chętnie z Państwa IOD / prawnikiem."},
+  {c:"Zaufanie", q:"AI to moda. Za dwa lata was nie będzie.", s:"Nie sprzedaję mody – sprzedaję rozliczenie z wyniku. Jeśli wyniku nie będzie, faktury też nie.", l:"Technologia predykcyjna w ciepłownictwie to fizyka budynku i statystyka pogody, nie moda. Ale rozumiem sceptycyzm i dlatego model ESCO: Państwo nic nie ryzykują, sprawdzając."},
+  {c:"Rynek", q:"Dostawca ciepła mówi, że nic więcej nie da się zaoszczędzić.", s:"Dostawca odpowiada za dostawę do węzła, nie za to, ile budynek pobiera w czasie.", l:"Działamy po stronie odbioru. Symulacja pokaże potencjał. Jeśli dostawca chce – możemy działać z nim w modelu partnerskim; wielu PEC-om zależy na niższych powrotach i szczytach."},
+  {c:"Rynek", q:"Konkurencja oferuje to taniej / za darmo.", s:"Proszę porównać, za co płacicie: za system czy za wynik.", l:"Jeśli ktoś oferuje sterowanie „za darmo”, zapytajcie o abonament, o metodę weryfikacji i o to, kto ponosi ryzyko braku efektu. Nasz model: płatność tylko z potwierdzonej oszczędności. Chętnie usiądę do porównania obu ofert punkt po punkcie."},
+  {c:"Rynek", q:"Planujemy wymianę źródła / pompę ciepła – po co nam to teraz?", s:"Dobre sterowanie jest warunkiem, żeby pompa ciepła działała efektywnie – i obniża zużycie do czasu wymiany.", l:"Pompa ciepła potrzebuje niskich temperatur zasilania i stabilnego zapotrzebowania – sterowanie predykcyjne to zapewnia. Dane z systemu pomogą też dobrać moc nowego źródła bez przewymiarowania."},
+  {c:"Rynek", q:"Nasi mieszkańcy / pracownicy / goście będą się skarżyć.", s:"Skargi mierzymy. W pilotażu porównamy przed i po.", l:"Najczęściej skargi wynikają z przegrzewania i wahań, nie z niedogrzania. Stabilne temperatury i brak „okien w styczniu” zwykle zmniejszają liczbę zgłoszeń. Parametry ustalają Państwo i można je zmienić."},
+  {c:"Rynek", q:"To nie jest priorytet.", s:"Rozumiem. Co jest? Może to się łączy.", l:"[słuchaj] Jeśli priorytetem jest budżet, ESG, audyt, dekarbonizacja, przyłączenia lub retencja odbiorców – pokażę, jak to się łączy. Jeśli nie – ustalmy datę powrotu."},
+  {c:"Rynek", q:"Za mały obiekt, żeby się opłacało.", s:"Policzmy. Jeśli za mały, powiem to.", l:"Próg opłacalności zależy od kosztu ciepła i sterowania. Proszę o roczny koszt – odpowiem w dwóch dniach, czy to ma sens. Czasem sens ma dopiero portfel kilku obiektów."},
+  {c:"Rynek", q:"Za duży / za skomplikowany obiekt.", s:"Zaczynamy od wydzielonej części – tam, gdzie zero ryzyka.", l:"Szpital: administracja i poradnie. Zakład: biura i szatnie. Kampus: jeden budynek. Pilotaż w części, potem rozszerzenie na podstawie wyniku."},
+  {c:"Sektor publiczny", q:"Radni zapytają, dlaczego ta firma.", s:"Bo tryb był właściwy, a rozliczenie jest według standardu, który każdy może sprawdzić.", l:"Radni dostaną wynik z własnego budynku i dokument IPMVP, nie folder. Pomożemy w materiale na komisję."},
+  {c:"Sektor publiczny", q:"Co, jeśli kontrola zakwestionuje umowę?", s:"Umowa ma elementy z art. 7 ustawy o EE, rozliczenie wg IPMVP, tryb wg PZP.", l:"To są trzy rzeczy, o które kontrola pyta. Mamy je udokumentowane. Chętnie pokażemy mapowanie umowy na art. 7 Państwa prawnikowi."},
+  {c:"Sektor publiczny", q:"Nie mamy energetyka gminnego, nikt się tym nie zajmie.", s:"My się tym zajmujemy – od Państwa potrzebujemy faktur i osoby do kontaktu.", l:"Wdrożenie i obsługa są po naszej stronie. Osoba kontaktowa po Państwa stronie to zwykle ktoś z wydziału inwestycji lub konserwator. Raport miesięczny dostają Państwo gotowy."},
+  {c:"Sektor publiczny", q:"To wygląda jak zobowiązanie wieloletnie – WPF, uchwała.", s:"Bez opłat stałych nie ma zobowiązania kapitałowego; jak to ująć w WPF – pytanie do skarbnika, chętnie z nim porozmawiam.", l:"Nie doradzam w sprawie WPF – to kompetencja skarbnika i RIO. Dostarczę dokumenty i wyjaśnię model; klasyfikację ustalają Państwo."},
+  {c:"Sektor publiczny", q:"Mamy plan termomodernizacji z dofinansowaniem – to koliduje?", s:"Nie – termomodernizacja zmniejsza straty, my nadprodukcję; efekty się sumują, rozliczenie rozdzielamy w modelu.", l:"Model bazowy uwzględnia zmiany w budynku (renowacja = korekta bazy zgodnie z IPMVP). Ustalimy to w umowie, żeby efekty nie nakładały się w rozliczeniu z instytucją finansującą."},
+  {c:"Mieszkalnictwo", q:"Mamy podzielniki – mieszkańcy sami regulują.", s:"Podzielniki dzielą koszt; nie zmniejszają produkcji ciepła w węźle.", l:"Jeśli węzeł podaje za wysoką temperaturę, mieszkańcy zakręcają zawory lub otwierają okna, a spółdzielnia płaci za GJ na liczniku głównym. Optymalizujemy to, co jest przed podzielnikami."},
+  {c:"Mieszkalnictwo", q:"Rozliczenie z mieszkańcami po sezonie – jak to pogodzić?", s:"Nasze rozliczenie jest zawsze niższe niż potwierdzona oszczędność; różnica trafia do rozliczenia z mieszkańcami.", l:"Sposób ujęcia w regulaminie (art. 45a PE) omówimy z działem rozliczeń. Spółdzielnia nie dokłada z własnych środków."},
+  {c:"Mieszkalnictwo", q:"Każda wspólnota musi to przegłosować.", s:"Zacznijmy od dwóch, gdzie zarząd jest aktywny; przygotujemy projekt uchwały.", l:"Umowa bez wydatków może mieścić się w zwykłym zarządzie – to ocenia zarządca / prawnik. Wynik z pierwszej wspólnoty ułatwia głosowanie w kolejnych."},
+  {c:"Komercja", q:"Najemcy płacą za media – to nie nasz koszt.", s:"Niższy service charge to Państwa argument w negocjacjach i punkt w ESG.", l:"Najemca liczy całkowity koszt najmu. Niższe koszty wspólne bez obniżki czynszu to przewaga przy przedłużeniach i w klauzulach zielonych. Certyfikacja budynku jest po stronie właściciela."},
+  {c:"Komercja", q:"Budynek idzie na sprzedaż.", s:"Umowa bez CAPEX nie obciąża wyceny; udokumentowana efektywność ją podnosi.", l:"Warunki przeniesienia umowy na nabywcę są w dokumencie. Niższy OPEX i dane ESG to argument w due diligence."},
+  {c:"Komercja", q:"Goście / klienci zauważą różnicę.", s:"Zauważą stabilniejsze temperatury. Komfort jest warunkiem brzegowym.", l:"Zmiana zachodzi w kotłowni i w harmonogramach, nie w odczuciu gościa. Parametry ustalamy z technikiem; log potwierdza ich utrzymanie."},
+  {c:"Przemysł", q:"Ciepło budynków to ułamek naszego zużycia.", s:"Ułamek dużej liczby bywa dużą liczbą. Proszę o liczbę – policzę.", l:"Często to kilkaset tysięcy złotych rocznie, których nikt nie analizuje. Jeśli po policzeniu to za mało – powiem i nie wrócę."},
+  {c:"Przemysł", q:"Nasi inżynierowie sami to zrobią.", s:"Jeśli mają czas między awariami – świetnie. My robimy to jako usługę na naszym ryzyku.", l:"Symulacja pokaże, czy ich nastawy są już optymalne. Jeśli tak – nie będziemy zajmować czasu. Jeśli nie – dajemy im narzędzie, nie zastępstwo."},
+  {c:"Przemysł", q:"Nie wpuścimy obcego systemu do SCADA.", s:"Nie prosimy o dostęp do sterowania procesem.", l:"Zakres: budynki nieprocesowe, uzgodniony punkt styku, możliwy sterownik równoległy bez połączenia ze SCADA. Politykę OT omawiamy na wizji lokalnej."},
+  {c:"Ciepłownictwo", q:"Będziemy sprzedawać mniej ciepła.", s:"Odbiorcy i tak obniżą zużycie – z Wami czy bez Was. Z Wami: udział w rozliczeniu, retencja, sieć, ETS.", l:"Patrz rozdział „Ciepłownie”. Alternatywą nie jest status quo, tylko odbiorca oszczędzający z kimś obcym lub odchodzący do własnego źródła. Policzmy netto z działem taryf."},
+  {c:"Ciepłownictwo", q:"Niższe zużycie u odbiorcy nie obniży nam powrotu.", s:"Zależy od węzła i regulacji – ma Pan rację. Zmierzmy na 3 węzłach.", l:"Przy regulacji ilościowej po stronie pierwotnej schłodzenie rośnie; przy bypassach i złej hydraulice – nie. Nie obiecuję tego wszędzie. Pilotaż z pomiarem rozstrzyga."},
+  {c:"Ciepłownictwo", q:"Węzły są nasze – nikt obcy nimi nie steruje.", s:"Zgoda – dlatego model partnerski: Wasze węzły, Wasz dostęp, uzgodniony zakres.", l:"Możemy dostarczać korekty nastaw wdrażane przez Waszą automatykę lub pracować na Waszej telemetrii. Kto steruje – zapisujemy w umowie. White label rozwiązuje też problem precedensu."},
+  {c:"Ciepłownictwo", q:"Odpowiadamy za komfort odbiorcy – będą dzwonić do nas.", s:"Parametry komfortu są warunkami brzegowymi; zapis z węzła to Wasz dokument przy reklamacji.", l:"Dziś przy reklamacji nie ma danych z pracy węzła. Z systemem są. PEC ma podgląd i możliwość powrotu do nastaw."}
+];
+
+/* ===== AKADEMIA (z WaterAI Handlowiec MASTER FULL + Academy) ===== */
+const RIPOSTES=[{"q":"Mamy pogodówkę.","a":"Po czym poznają Państwo, że obecna krzywa jest optymalna ekonomicznie?"},{"q":"Mamy BMS.","a":"Świetnie. Jakie decyzje optymalizacyjne BMS podejmuje sam, a jakie tylko wykonuje według reguł?"},{"q":"Mamy nową automatykę.","a":"Nowa nie znaczy automatycznie zoptymalizowana pod realne użytkowanie i prognozę."},{"q":"Mamy nowy węzeł.","a":"Nowy sprzęt rozwiązuje część problemu. Jak została dobrana strategia sterowania?"},{"q":"Jesteśmy po termomodernizacji.","a":"To dobry moment, by sprawdzić, czy sterowanie dostosowano do nowej charakterystyki budynku."},{"q":"Mamy fotowoltaikę.","a":"PV dotyczy głównie energii elektrycznej. Sprawdźmy osobno koszt ciepła."},{"q":"Mamy pompę ciepła.","a":"Tym bardziej ważny jest punkt pracy, temperatury i harmonogram."},{"q":"Wszystko działa dobrze.","a":"Pytanie nie brzmi tylko czy działa, ale czy działa najefektywniej ekonomicznie."},{"q":"Nikt się nie skarży.","a":"To dobra informacja o komforcie. Teraz sprawdźmy koszt utrzymania tego komfortu."},{"q":"Nie mamy przegrzania.","a":"Oszczędność nie musi wynikać wyłącznie z przegrzewania."},{"q":"Nie wierzę w 20%.","a":"Bez analizy też bym nie wierzył. Najpierw baseline i dane."},{"q":"Konkurencja gwarantuje 30%.","a":"30% względem czego i jak normalizują pogodę oraz użytkowanie?"},{"q":"Ile dokładnie zaoszczędzimy?","a":"Na tym etapie uczciwa odpowiedź brzmi: jeszcze nie wiem. Najpierw analiza."},{"q":"Dacie gwarancję?","a":"Najpierw trzeba zdefiniować, co dokładnie gwarantujemy i jak to mierzymy."},{"q":"Kto gwarantuje komfort?","a":"Komfort powinien być parametrem granicznym projektu."},{"q":"Co jeśli będą skargi?","a":"Ustalamy progi, monitoring i procedurę reakcji przed startem."},{"q":"Co jeśli system się zepsuje?","a":"Projekt musi mieć fallback, tryb ręczny i jasną odpowiedzialność."},{"q":"Co jeśli nie będzie internetu?","a":"Trzeba określić zachowanie układu przy utracie komunikacji."},{"q":"Nie chcę chmury.","a":"Sprawdźmy, które funkcje wymagają chmury i jakie są wymagania IT."},{"q":"Nie chcę nikogo w węźle.","a":"Najpierw pokażmy dokładnie zakres ingerencji i granice odpowiedzialności."},{"q":"Cyberbezpieczeństwo.","a":"To temat do uzgodnienia z IT: komunikacja, dostęp, konta, logi, segmentacja."},{"q":"IT tego nie zaakceptuje.","a":"Włączmy IT przed ofertą, nie po podpisie."},{"q":"Nie damy wam danych.","a":"Bez danych nie będziemy udawać, że potrafimy policzyć wiarygodny efekt."},{"q":"Nie mamy budżetu.","a":"Czy problemem jest CAPEX, czy ekonomika projektu?"},{"q":"Nie mamy pieniędzy w tym roku.","a":"Sprawdźmy termin budżetowy, pilot lub model oparty na efekcie."},{"q":"Za drogo.","a":"W porównaniu z czym: konkurencją, budżetem czy wartością oszczędności?"},{"q":"Zwrot jest za długi.","a":"Jaki maksymalny okres zwrotu jest dla Państwa akceptowalny?"},{"q":"Mamy tańszą ofertę.","a":"Porównajmy zakres, pomiar efektu, serwis i odpowiedzialność, nie tylko cenę."},{"q":"Nie chcemy abonamentu.","a":"Możemy rozmawiać o architekturze modelu handlowego, jeśli ekonomika się broni."},{"q":"Nie chcemy długiej umowy ESCO.","a":"Jaki okres byłby akceptowalny i jaki podział ryzyka za tym stoi?"},{"q":"Nie chcemy dzielić oszczędności.","a":"Wtedy porównajmy zakup CAPEX z ESCO."},{"q":"Wolimy kupić za własne środki.","a":"To może być najlepszy wariant, jeśli koszt kapitału i zwrot są korzystne."},{"q":"Musimy zrobić przetarg.","a":"Rozumiem. Ustalmy najpierw zakres i kryteria, żeby procedura dotyczyła realnego rozwiązania."},{"q":"Musimy mieć trzy oferty.","a":"W porządku. Ważne, aby były porównywane według tych samych kryteriów."},{"q":"Musi zatwierdzić centrala.","a":"Kto w centrali i jakich danych potrzebuje?"},{"q":"Musi zatwierdzić prezes.","a":"Zróbmy krótkie spotkanie wspólnie."},{"q":"Energetyk jest przeciw.","a":"Chcę zrozumieć jego argumenty techniczne, nie omijać go."},{"q":"Instalator mówi, że to niepotrzebne.","a":"Zapytajmy, po czym weryfikuje optymalność obecnego sterowania."},{"q":"Producent regulatora mówi, że wystarczy jego algorytm.","a":"Porównajmy funkcje i dane, zamiast dyskutować markami."},{"q":"Mamy za dużo systemów.","a":"WaterAI nie powinien dokładać chaosu; integracja musi mieć sens operacyjny."},{"q":"Nie chcemy kolejnego panelu.","a":"Panel nie jest wartością. Wartością jest automatyzacja i wynik."},{"q":"Nie mamy ludzi do obsługi.","a":"Projekt powinien zmniejszać, a nie zwiększać obciążenie personelu."},{"q":"Nie mamy danych historycznych.","a":"Sprawdźmy faktury, licznik, operatora i możliwość zbudowania okresu bazowego."},{"q":"Nie mamy podliczników.","a":"Można zacząć od całego obiektu, ale dokładność i diagnostyka będą ograniczone."},{"q":"Mamy tylko miesięczne faktury.","a":"Do części analiz wystarczą, ale dokładniejsza diagnostyka może wymagać częstszych danych."},{"q":"Nie mamy faktur.","a":"Najpierw zdobądźmy dane; bez nich nie budujmy business case."},{"q":"Nie chcemy pilota.","a":"Co dokładnie jest problemem: czas, koszt, ryzyko czy brak potrzeby dowodu?"},{"q":"Pilot niczego nie udowodni.","a":"Ustalmy z góry kryterium sukcesu, okres i metodę M&V."},{"q":"Nie macie referencji identycznych jak my.","a":"Nie potrzebujemy identycznego budynku, ale musimy wykazać podobieństwo techniczne i metodologiczne."},{"q":"Nasz budynek jest wyjątkowy.","a":"Możliwe. Dlatego najpierw analiza, a nie obietnica procentu."},{"q":"Budynek jest stary.","a":"Wiek nie przesądza o potencjale; ważna jest instalacja i sterowalność."},{"q":"Budynek jest nowy.","a":"Nowy budynek też może pracować na nieoptymalnych nastawach."},{"q":"Za rok robimy remont.","a":"Wtedy trzeba ocenić, czy pilot ma sens przed remontem, czy dopiero po nim."},{"q":"Zmieniamy źródło ciepła.","a":"Baseline trzeba będzie przebudować; nie ukrywajmy tego."},{"q":"Gaz jest tani.","a":"Pytanie brzmi, czy warto płacić za energię, której nie trzeba zużywać."},{"q":"Energia nie jest priorytetem.","a":"Co dziś jest priorytetem i kiedy energia wróci na agendę?"},{"q":"Oszczędność będzie za mała.","a":"Jeśli tak wyjdzie z analizy, powinniśmy zrezygnować."},{"q":"Sezon jest za krótki.","a":"Możemy przygotować dane i technikę przed kolejnym sezonem."},{"q":"Jest już po sezonie.","a":"To dobry moment na analizę i przygotowanie wdrożenia."},{"q":"Zadzwońcie za pół roku.","a":"Co konkretnie zmieni się za pół roku?"},{"q":"Nie jesteśmy zainteresowani.","a":"Czy dlatego, że nie ma problemu, czy dlatego, że rozwiązanie nie przekonuje?"},{"q":"Wyślijcie prezentację.","a":"Wyślę, ale najpierw dwie informacje, żeby była o Państwa obiekcie."},{"q":"Wyślijcie cennik.","a":"Cena zależy od zakresu; podam warianty po podstawowej kwalifikacji."},{"q":"Nie mamy czasu na spotkanie.","a":"Zróbmy 15 minut: koszt, technika, dane i decyzja czy warto iść dalej."},{"q":"Operator nie pozwoli.","a":"Włączmy operatora i ustalmy granice odpowiedzialności."},{"q":"Veolia/dostawca steruje węzłem.","a":"Trzeba sprawdzić własność regulatora, umowę i dopuszczalny punkt integracji."},{"q":"Dostawca już optymalizuje.","a":"Jak mierzy efekt po stronie budynku i jakie ma cele?"},{"q":"Ciepłownia nie chce mniejszej sprzedaży.","a":"Dlatego projekt dla ciepłowni musi tworzyć wartość po jej stronie."},{"q":"Sieć działa dobrze.","a":"Czy są mimo to węzły z wysokim powrotem lub piki?"},{"q":"Powrót nie jest problemem.","a":"W takim razie nie sprzedawajmy tego argumentu. Poszukajmy innej wartości."},{"q":"Nie chcemy sterować klientami.","a":"Można zacząć od analityki i pilota dobrowolnego."},{"q":"Nie wierzę w AI.","a":"Nie trzeba wierzyć w nazwę. Trzeba zweryfikować dane, wynik i zabezpieczenia."},{"q":"AI popełnia błędy.","a":"Dlatego system musi mieć ograniczenia, fallback i monitoring."},{"q":"AI to marketing.","a":"Zgoda, jeśli nie ma mierzalnego efektu. Rozmawiajmy o danych."},{"q":"Nie oddam AI pełnej kontroli.","a":"Nie zakładamy pełnej kontroli bez analizy architektury."},{"q":"Prognoza pogody się myli.","a":"Tak. Pytanie, jak system reaguje na błąd prognozy i aktualizuje decyzję."},{"q":"Obłożenie jest nieprzewidywalne.","a":"To argument za wykorzystaniem aktualnych danych i bezpiecznych ograniczeń."},{"q":"Nie chcemy śledzić ludzi.","a":"Optymalizacja nie musi oznaczać profilowania osób; zakres danych trzeba projektować minimalnie."},{"q":"Nie mamy czujników pokojowych.","a":"Można analizować inne sygnały, ale komfort i dokładność trzeba ocenić."},{"q":"Mieszkańcy zaprotestują.","a":"Nie sprzedajemy obniżenia temperatury, tylko eliminację zbędnego zużycia przy uzgodnionym komforcie."},{"q":"Zarząd nie weźmie ryzyka.","a":"Pokażmy pilot, metodę pomiaru, fallback i ograniczenie ekspozycji."},{"q":"Umowa jest za długa.","a":"Który element długości tworzy problem: ryzyko, elastyczność czy ekonomika?"},{"q":"Możemy sprzedać budynek.","a":"Trzeba przewidzieć cesję/rozwiązanie i wartość pozostałego kontraktu."},{"q":"Taryfa może się zmienić.","a":"Oddzielmy oszczędność energii od zmiany ceny jednostkowej."},{"q":"Zima była ciepła.","a":"Dlatego normalizujemy pogodę."},{"q":"Było mniej ludzi.","a":"Dlatego potrzebne są korekty użytkowania."},{"q":"Zwiększyliśmy powierzchnię.","a":"Baseline trzeba skorygować."},{"q":"Nie ufamy waszym wyliczeniom.","a":"Ustalmy metodę wspólnie i zapewnijmy audytowalne źródła danych."},{"q":"Chcemy liczyć tylko z faktury.","a":"Można, jeśli metodologia i rozdzielenie kosztów stałych/zmiennych są poprawne."},{"q":"Chcemy gwarancję kwotową.","a":"Najpierw trzeba ustalić ceny energii, baseline i ryzyka niezależne od wykonawcy."},{"q":"Nie chcemy zmieniać krzywej grzewczej.","a":"Możliwe są różne strategie; najpierw sprawdźmy punkt integracji."},{"q":"Nie chcemy dotykać regulatora.","a":"Możemy ocenić inne punkty wpływu lub uznać projekt za niewykonalny."},{"q":"Mamy własny algorytm.","a":"Świetnie. Porównajmy wyniki i zakres funkcji."},{"q":"Nasz automatyk zrobi to sam.","a":"Możliwe. Pytanie o koszt, czas, M&V i utrzymanie algorytmu."},{"q":"To za mały obiekt.","a":"Jeśli koszt energii jest mały, projekt może rzeczywiście nie mieć sensu."},{"q":"Mamy tylko jeden sezon danych.","a":"Można analizować, ale nie wolno udawać takiej samej pewności jak przy dłuższej bazie."},{"q":"Nie chcemy ryzyka komfortu.","a":"Ustalmy twarde limity komfortu i procedurę wyłączenia optymalizacji."},{"q":"Najpierw chcemy zobaczyć urządzenie.","a":"Pokażemy, ale najpierw upewnijmy się, że problem ekonomiczny istnieje."},{"q":"Czy to obniża temperaturę w budynku?","a":"Celem jest ograniczenie zbędnego zużycia przy zachowaniu uzgodnionych warunków."},{"q":"Czy WaterAI zastępuje BMS?","a":"Nie musi. W wielu projektach sensowniejsza jest współpraca z istniejącą automatyką."},{"q":"Czy WaterAI zastępuje energetyka?","a":"Nie. Powinien być narzędziem zwiększającym jego możliwości."},{"q":"Czy można wyłączyć system?","a":"Projekt powinien przewidywać bezpieczny tryb ręczny/fallback zgodnie z architekturą."},{"q":"Kto odpowiada za awarię?","a":"Zakres odpowiedzialności trzeba jasno opisać w umowie i procedurze technicznej."},{"q":"Co jeśli dane są błędne?","a":"Walidacja danych i zasady postępowania z brakami muszą być częścią metodologii."},{"q":"Nie chcemy eksperymentu na budynku.","a":"Pilot powinien mieć ograniczony zakres, kryteria i możliwość powrotu."},{"q":"Nie podpiszemy bez prawnika.","a":"To normalne; dostarczmy prawnikowi jasny zakres, M&V, odpowiedzialność i dane."},{"q":"Musimy poczekać na sezon.","a":"Analizę i integrację można przygotować wcześniej, żeby nie tracić kolejnej zimy."}];
+const FLASH=[["Co naprawdę sprzedajemy?","Mierzalne ograniczenie zbędnego kosztu ogrzewania przy zachowaniu uzgodnionych warunków."],["Schemat rozmowy?","Diagnoza → Problem → Koszt → Przyczyna → Możliwość → Dowód → Następny krok."],["Cel pierwszego spotkania?","Kwalifikacja + dane + właściwe osoby + konkretny następny krok."],["Baseline?","Zużycie, które wystąpiłoby bez WaterAI w porównywalnych warunkach."],["Wzór oszczędności?","Zużycie referencyjne po normalizacji minus zużycie rzeczywiste."],["Po co HDD/TMR?","Aby oddzielić wpływ pogody od efektu optymalizacji."],["Kiedy regresja?","Gdy prosta korekta pogodowa nie opisuje wystarczająco dobrze budynku."],["20% mniej energii = 20% mniej faktury?","Nie zawsze. Część opłat może być stała."],["Klient: mamy BMS.","Jakie decyzje optymalizacyjne BMS podejmuje dziś samodzielnie?"],["Klient: mamy pogodówkę.","Po czym poznajecie, że krzywa jest optymalna ekonomicznie?"],["Klient: za drogo.","W porównaniu z czym?"],["Klient: brak budżetu.","Brak CAPEX czy słaba ekonomika projektu?"],["CFO chce wiedzieć?","Cash flow, zwrot, metodologia oszczędności, ryzyko."],["Techniczny chce wiedzieć?","Integracja, fallback, bezpieczeństwo, odpowiedzialność."],["Champion?","Osoba wewnątrz klienta, która chce projektu i potrafi go obronić."],["Ciepłownia - główna zasada?","Nie sprzedawaj mniejszej sprzedaży; znajdź wartość po stronie sieci lub źródła."],["Czy mniejsze zużycie obniża powrót?","Nie automatycznie."],["ESCO?","Model, w którym efekt i sposób jego pomiaru są centralne."],["Najważniejsza zasada M&V?","Metodę ustalamy przed rozliczeniem."],["Najważniejsze pytanie zamykające?","Co jeszcze mogłoby zablokować decyzję?"],["Rabat?","Tylko za wzajemną koncesję."],["Prawo?","Kontekst, nie straszak; nie twórz obowiązku zakupu WaterAI."],["Termomodernizacja?","Czy po niej ponownie zoptymalizowano sterowanie?"],["Błąd prognozy?","System musi aktualizować decyzję i mieć bezpieczne ograniczenia."],["Zła hydraulika?","Nie maskuj jej algorytmem. Najpierw napraw/równoważ."],["Hotel?","Czy system wie, że obłożenie zmieniło się z 40% na 90%?"],["Szkoła?","Czy instalacja wie, że jutro szkoła jest zamknięta?"],["Szpital?","Najpierw strefy krytyczne i bezpieczeństwo."],["Multi-site?","Benchmarking → ranking → pilot → rollout."],["Najgorsze zakończenie?","„Będziemy w kontakcie.”"]];
+const EXAM=[["Co jest celem pierwszego spotkania?",["Podpis","Kwalifikacja + dane + następny krok","Prezentacja AI"],1],["Po co HDD/TMR?",["Korekta pogody","Cena GJ","Moc zamówiona"],0],["Klient ma BMS. Co robisz?",["Atakujesz BMS","Pytasz, co realnie optymalizuje","Mówisz, że WaterAI go zastąpi"],1],["Czy 20% mniej energii = 20% mniej całej faktury?",["Tak","Nie zawsze"],1],["Czy mniejsze zużycie gwarantuje niższy powrót?",["Tak","Nie"],1],["ESCO to przede wszystkim…",["rata","efekt i sposób pomiaru","leasing urządzenia"],1],["Najlepsza odpowiedź na „za drogo”?",["Daję rabat","W porównaniu z czym?","To najlepsza technologia"],1],["Czy prawo wymaga WaterAI?",["Tak","Nie"],1],["Co robisz przy złej hydraulice?",["Maskuję algorytmem","Najpierw rozwiązuję problem hydrauliczny"],1],["Jak kończysz spotkanie?",["Będziemy w kontakcie","Dane + odpowiedzialność + data"],1],["Co powinno być ustalone przed pilotażem?",["Tylko cena","Baseline, M&V, komfort i kryterium sukcesu","Tylko termin"],1],["Czy termomodernizacja kończy temat optymalizacji?",["Tak","Nie, trzeba sprawdzić nastawy po modernizacji"],1],["CFO najbardziej interesuje…",["algorytm AI","cash flow, zwrot, metodologia i ryzyko","kolor panelu"],1],["Techniczny najbardziej obawia się…",["zbyt niskiej ceny","awarii i odpowiedzialności","za krótkiej prezentacji"],1],["Najlepszy pilot dla ciepłowni zaczyna się od…",["obietnicy niższego powrotu","danych o przepływie, ΔT, pikach i węzłach","ulotki"],1],["Czy bez danych historycznych wolno obiecać procent oszczędności?",["Tak","Nie"],1],["Co to champion?",["konkurencja","osoba u klienta, która broni projektu","najtańszy wariant"],1],["Rabat powinien być…",["automatyczny","za wzajemną koncesję","zawsze 20%"],1],["Czy BMS jest przeciwnikiem WaterAI?",["Tak","Nie musi być; może być warstwą wykonawczą/integracyjną"],1],["Najmocniejsze pytanie zamykające?",["Czy podoba się prezentacja?","Co jeszcze mogłoby zablokować decyzję?","Czy mam zadzwonić kiedyś?"],1]];
+const SIMS=[{"name":"Dyrektor hotelu","diff":"Średnia","goal":"Zdobyć dane i drugie spotkanie","role":"Dyrektor:","line":"„Mam tylko 15 minut. Mamy BMS i niedawno zrobiliśmy modernizację. Co właściwie chcecie sprzedać?”","good":["najpierw","zrozum","sprawdzi","koszt","bms","dane","optymal"],"bad":["gwarant","30%","zastąpi"]},{"name":"Prezes spółdzielni","diff":"Trudna","goal":"Nie wywołać lęku mieszkańców","role":"Prezes:","line":"„Mieszkańcy mnie zjedzą, jeśli zaczniecie obniżać temperaturę.”","good":["komfort","nie obniż","zbęd","pilot","pomiar"],"bad":["nie zauważą","wychłod"]},{"name":"Dyrektor techniczny","diff":"Trudna","goal":"Zrobić z technicznego sojusznika","role":"Techniczny:","line":"„Ja się tym zajmuję 20 lat. Nie potrzebuję algorytmu.”","good":["pańsk","jak","wspólnie","mierzy","zabezpiec"],"bad":["pan się myli","przestarza"]},{"name":"Prezes ciepłowni","diff":"Bardzo trudna","goal":"Znaleźć wartość sieciową","role":"Prezes:","line":"„Czyli chcecie, żebym pomagał odbiorcom kupować ode mnie mniej?”","good":["nie","sieci","przepływ","pik","powrót","prognoz","korzyść"],"bad":["ekologia","musi pan"]},{"name":"CFO","diff":"Średnia","goal":"Przejść od ceny do wartości","role":"CFO:","line":"„Ile to kosztuje? Bez prezentacji.”","good":["podam","koszt ciepła","wartość","zwrot","baseline"],"bad":["rabat","najtańs"]},{"name":"Burmistrz","diff":"Średnia","goal":"Wciągnąć skarbnika i technicznego","role":"Burmistrz:","line":"„Wyślijcie ofertę na sekretariat.”","good":["dane","skarbnik","technicz","ranking","termin"],"bad":["będziemy w kontakcie"]}];
+/* ===== FUNDAMENT / SEKWENCJA ===== */
+const SEQUENCE = {
+  steps: ["Diagnoza","Problem","Koszt","Przyczyna","Możliwość","Dowód","Następny krok"],
+  opening: "„Chciałbym najpierw zrozumieć, jak dzisiaj zarządzają Państwo ogrzewaniem i ile ono Państwa kosztuje. Dopiero później będziemy mogli powiedzieć, czy w tym obiekcie w ogóle jest przestrzeń do optymalizacji.”",
+  principle: "Handlowiec Water AI nie sprzedaje sterownika ani hasła „AI”. Sprzedaje zmniejszenie kosztu ogrzewania przy zachowaniu uzgodnionych warunków komfortu, bezpieczeństwa i ciągłości pracy.",
+  coldCall: "„Dzwonię w jednej konkretnej sprawie: optymalizacji kosztu ogrzewania istniejących budynków bez zaczynania od wymiany całej automatyki. Chciałbym w 30 sekund sprawdzić, czy temat w ogóle ma u Państwa sens.”",
+  closeTest: "„Załóżmy, że analiza pokaże ekonomicznie sensowną oszczędność, techniczny nie zgłosi ryzyka, a sposób rozliczenia będzie akceptowalny. Co jeszcze mogłoby zablokować decyzję?”"
+};
+
+/* ===== LICZENIE OSZCZĘDNOŚCI ===== */
+const CALC = {
+  intro: "Najpierw liczymy, ile obiekt powinien zużyć w danych warunkach bez Water AI (zużycie referencyjne). Potem porównujemy to z rzeczywistym zużyciem. Różnica po korektach to oszczędność.",
+  formulas: [
+    "Oszczędność energii = zużycie referencyjne po normalizacji − zużycie rzeczywiste",
+    "Oszczędność % = oszczędność energii / zużycie referencyjne × 100 %",
+    "Normalizacja pogodowa (prosta): zużycie referencyjne = zużycie bazowe × HDD rozliczeniowe / HDD bazowe",
+    "Regresja: Q = a + b × HDD (dla obiektów z istotnym wpływem użytkowania model rozszerza się o obłożenie, harmonogram i inne czynniki). Model musi być stabilny, zrozumiały i uzgodniony przed rozliczeniem.",
+    "Wartość oszczędności [zł] = oszczędność energii [GJ] × koszt zmienny [zł/GJ] – opłaty stałe (moc zamówiona, przesył stały) nie spadają z zużyciem"
+  ],
+  corrections: [
+    ["Obłożenie","hotel 55 % → 85 %","uwzględnić w modelu, jeśli istotne"],
+    ["Powierzchnia","dobudowa skrzydła","korekta lub nowy baseline"],
+    ["Harmonogram","biuro 8–16 → 7–20","uwzględnić dłuższy czas użytkowania"],
+    ["Termomodernizacja","ocieplenie, okna","oddzielić efekt modernizacji od efektu sterowania"],
+    ["Źródło ciepła","wymiana kotła","oddzielić efekt źródła"],
+    ["Cena nośnika","podwyżka taryfy","rozliczać energię, nie złotówki z faktury"]
+  ],
+  dont: [
+    "Nie licz surowej różnicy dwóch faktur.",
+    "Nie mieszaj zmiany ceny z efektywnością.",
+    "Nie ignoruj opłat stałych – 20 % mniej energii to nie 20 % mniej faktury.",
+    "Nie wybieraj modelu po zobaczeniu wyniku."
+  ],
+  example: [["Referencja po normalizacji","2 000 GJ"],["Rzeczywiste","1 600 GJ"],["Oszczędność","400 GJ = 20 %"],["Koszt zmienny","120 zł/GJ"],["Wartość oszczędności","48 000 zł"]]
+};
+
+/* ===== ESCO – PLAYBOOK ===== */
+const ESCO = {
+  intro: "ESCO to nie „rata za urządzenie”. Centralny jest mierzalny efekt, metodologia pomiaru i weryfikacji (M&V), podział ryzyka i sposób rozliczenia.",
+  when: ["Wysoki i mierzalny koszt energii","Dostępne dane bazowe (min. 2 sezony)","Technicznie sterowalny obiekt","Klient chce ograniczyć CAPEX lub powiązać koszt z efektem"],
+  contract: ["Baseline i źródła danych","Metoda M&V (u nas: stopniodni wg IPMVP – załącznik nr 3)","Korekty rutynowe i nierutynowe","Komfort i ograniczenia jako warunki brzegowe","Awarie, braki danych, tryb awaryjny","Podział oszczędności","Ceny do rozliczenia (zł/GJ, zł/kWh)","Czas trwania","Własność urządzeń (SCAT, sterownik)","Serwis i zakończenie umowy"],
+  cfo: "Dla CFO: pokazujesz nie sterownik, tylko przepływ pieniężny. Najpierw uzgodnij sposób liczenia efektu, potem rozmawiaj o podziale.",
+  publicNote: "[DO WERYFIKACJI] Wpływ umowy ESCO na dług JST i klasyfikację budżetową – nie mów „ESCO nie wpływa na dług”. Odsyłaj do skarbnika i opinii prawnej; przy umowach o poprawę efektywności energetycznej (art. 7 ustawy o EE) zasady klasyfikacji zależą od konstrukcji umowy."
+};
+
+/* ===== WIZJA TECHNICZNA (do TOOLKIT) ===== */
+TOOLKIT.site = [
+  "Źródło ciepła i węzeł: typ, moc, wiek, producent",
+  "Regulator: producent, model, kto ma dostęp, czy jest zdalny dostęp",
+  "Czujnik temperatury zewnętrznej: gdzie, czy działa poprawnie",
+  "Temperatury zasilania i powrotu – odczyt teraz i historia",
+  "Zawory regulacyjne i siłowniki – stan, sterowanie",
+  "Pompy: sterowanie, falowniki",
+  "Hydraulika i równoważenie – czy są znane problemy (jeśli tak, naprawa przed optymalizacją)",
+  "BMS / protokoły komunikacji (Modbus, BACnet, inne), wymagania IT/OT",
+  "Licznik ciepła / gazu: typ, odczyt, możliwość eksportu danych",
+  "Tryb awaryjny (fallback): co się dzieje przy utracie komunikacji",
+  "Właściciel infrastruktury i osoba autoryzująca zmiany nastaw"
+];
+TOOLKIT.process = [
+  ["Cold call","właściwa osoba + problem","zgoda na diagnozę"],
+  ["1. spotkanie","problem, koszt, technika, decyzja","dane + osoby + termin"],
+  ["Analiza","ocena potencjału","wiarygodny baseline"],
+  ["2. spotkanie","business case","zgoda na pilotaż / wizję"],
+  ["Wizja techniczna","wykonalność i ryzyka","architektura + fallback"],
+  ["Pilotaż","dowód","KPI + M&V"],
+  ["Oferta","model handlowy","zakres + cena + odpowiedzialność"],
+  ["Negocjacje","usunąć blokady","warunki końcowe"],
+  ["Umowa","decyzja","termin wdrożenia"],
+  ["Rollout","skalowanie","lista kolejnych obiektów"]
+];
+
+/* ===== DODATKOWE PRZEPISY ===== */
+LEGAL.push(
+  {act:"Prawo zamówień publicznych – nowelizacja z 25.07.2025 (Dz.U. poz. 1173)", art:"art. 2 ust. 1 pkt 1 (próg 170 000 zł netto od 1.01.2026)", status:"OBOWIĄZEK", who:"Zamawiający publiczni (JST, jednostki budżetowe, szpitale publiczne)", what:"Od 1 stycznia 2026 r. ustawę stosuje się do zamówień klasycznych o wartości szacunkowej równej lub wyższej niż 170 000 zł netto (wcześniej 130 000 zł). Postępowania wszczęte przed tą datą – po staremu. Poniżej progu obowiązują regulaminy wewnętrzne zamawiającego.", use:"„Wartość szacunkową zamówienia ESCO liczy się z całego okresu umowy, więc proszę nie zakładać, że pilotaż na jednym budynku jest automatycznie poza ustawą. Pomożemy przygotować dokumentację w takim trybie, jaki wskaże Państwa dział zamówień.”", trap:"Nie mów „poniżej 170 tys. możecie kupić od ręki” – regulaminy wewnętrzne nadal obowiązują, a dzielenie zamówienia w celu uniknięcia ustawy jest niedopuszczalne."},
+  {act:"EPBD 2018/844 (art. 14 ust. 4, art. 15 ust. 4) → EPBD 2024/1275 (art. 13) – systemy automatyki i sterowania budynków (BACS)", art:"art. 14–15 (2018) / art. 13 (2024)", status:"DO WERYFIKACJI", who:"Właściciele budynków niemieszkalnych z systemami ogrzewania/klimatyzacji o mocy > 290 kW (dyrektywa 2018: termin 31.12.2024); EPBD 2024 rozszerza obowiązek na > 70 kW od 2029/2030 r.", what:"Dyrektywa wymaga, aby takie budynki były wyposażone w systemy automatyki i sterowania zdolne do monitorowania, analizy i regulacji zużycia energii oraz komunikacji z połączonymi systemami. Stopień i sposób transpozycji do prawa polskiego sprawdź przed rozmową – nie zakładaj, że w Polsce obowiązuje sankcjonowany obowiązek.", use:"„Czy mają Państwo budynki z mocą grzewczą powyżej 290 kW? Wymogi dyrektywy dotyczące automatyki idą w kierunku ciągłego monitorowania i regulacji – nasz system dostarcza tę warstwę bez wymiany istniejącej automatyki.”", trap:"Nie twierdź, że Water AI „spełnia wymagania BACS” w całości ani że polskie prawo już karze za brak BACS – to wymaga weryfikacji stanu transpozycji."}
+);
+/* ===== GENERATOR MAILI (v4, osadzony) ===== */
+const MAIL_DOC="<!DOCTYPE html>\n<html lang=\"pl\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Generator maili v4 – WaterAI / Blue Boson<\/title>\n<link href=\"https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;500&display=swap\" rel=\"stylesheet\">\n<style>\n  :root{--ink:#132B3A;--ink-2:#4A6272;--line:#D5DEE4;--paper:#FFF;--bg:#EEF3F5;--water:#1D7A8C;--water-soft:#DDEFF2;--heat:#C8562A}\n  *{box-sizing:border-box}\n  body{margin:0;background:transparent;color:var(--ink);font-family:\"IBM Plex Sans\",system-ui,sans-serif;font-size:15px;line-height:1.5}\n  header{padding:22px 28px 14px;border-bottom:1px solid var(--line);background:var(--paper)}\n  header h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}\n  header p{margin:4px 0 0;color:var(--ink-2);font-size:14px}\n  main{display:grid;grid-template-columns:340px 1fr;min-height:0}\n  aside{background:var(--paper);border-right:1px solid var(--line);padding:16px 18px 30px;overflow:visible}\n  section.out{padding:20px 24px 40px;max-width:none}\n  fieldset{border:0;padding:0;margin:0 0 20px}\n  legend{font-weight:600;font-size:13px;color:var(--ink-2);margin-bottom:8px;padding:0}\n  .seg{display:flex;flex-wrap:wrap;gap:6px}\n  .seg label{border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px;background:var(--paper)}\n  .seg input{position:absolute;opacity:0;pointer-events:none}\n  .seg input:checked + span{color:var(--water);font-weight:600}\n  .seg label:has(input:checked){border-color:var(--water);background:var(--water-soft)}\n  .seg label:has(input:focus-visible){outline:2px solid var(--water);outline-offset:2px}\n  .field{margin-bottom:10px}\n  .field label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:3px}\n  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;font-size:14px;color:var(--ink);background:var(--paper)}\n  .field input:focus,.field select:focus{outline:2px solid var(--water);outline-offset:1px;border-color:var(--water)}\n  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}\n  .check{display:flex;align-items:flex-start;gap:8px;font-size:14px;margin:6px 0;cursor:pointer}\n  .check input{margin-top:4px;accent-color:var(--water)}\n  .hint{font-size:12.5px;color:var(--ink-2);margin:2px 0 8px}\n  .subject{display:flex;gap:10px;align-items:center;margin-bottom:14px}\n  .subject strong{font-size:13px;color:var(--ink-2);flex:none}\n  .subject input{flex:1;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit;font-size:15px;font-weight:500}\n  .paper{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:28px 32px;font-family:\"IBM Plex Serif\",Georgia,serif;font-size:15.5px;line-height:1.62;white-space:pre-wrap;min-height:400px}\n  .paper:focus{outline:2px solid var(--water);outline-offset:2px}\n  .bar{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}\n  button{font:inherit;font-size:14px;font-weight:600;border-radius:6px;padding:9px 14px;cursor:pointer;border:1px solid var(--water);background:var(--water);color:#fff}\n  button.ghost{background:var(--paper);color:var(--water)}\n  button:focus-visible{outline:2px solid var(--heat);outline-offset:2px}\n  .status{font-size:13px;color:var(--ink-2)}\n  .note{font-size:13px;color:var(--ink-2);margin-top:20px;border-left:3px solid var(--heat);padding-left:10px}\n  @media (max-width:720px){main{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}section.out{padding:20px 16px}.paper{padding:20px}}\n<\/style>\n<\/head>\n<body>\n<main>\n<aside>\n  <fieldset>\n    <legend>Od kogo<\/legend>\n    <div class=\"seg\">\n      <label><input type=\"radio\" name=\"sender\" value=\"waterai\" checked><span>WaterAI<\/span><\/label>\n      <label><input type=\"radio\" name=\"sender\" value=\"blueboson\"><span>Blue Boson / HeatSaverAI<\/span><\/label>\n    <\/div>\n  <\/fieldset>\n\n  <fieldset>\n    <legend>O czym<\/legend>\n    <div class=\"seg\">\n      <label><input type=\"radio\" name=\"type\" value=\"cold\" checked><span>Pierwszy kontakt<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"jst\"><span>Obowiązek analizy ESCO w gminie (UC77)<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"housingmail\"><span>Wspólnota / spółdzielnia – obowiązki i oszczędności<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"summary\"><span>Podsumowanie spotkania<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"technical\"><span>Podsumowanie techniczne (BMS, integracja)<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"tech\"><span>Opis technologii<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"calc\"><span>Wysyłka kalkulatora<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"offer\"><span>Warunki umowy<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"white\"><span>Białe certyfikaty<\/span><\/label>\n      <label><input type=\"radio\" name=\"type\" value=\"followup\"><span>Przypomnienie<\/span><\/label>\n    <\/div>\n  <\/fieldset>\n\n  <fieldset>\n    <legend>Do kogo<\/legend>\n    <div class=\"field\"><select id=\"recipient\">\n      <option value=\"general\">Ogólny (firma / zarządca)<\/option>\n      <option value=\"hotel\">Hotel / sieć hotelowa<\/option>\n      <option value=\"housing\">Wspólnota mieszkaniowa (zarząd / zarządca)<\/option>\n      <option value=\"coop\">Spółdzielnia mieszkaniowa / zarządca wielu budynków<\/option>\n      <option value=\"gminaL\">Gmina / miasto powyżej 50 tys. mieszkańców<\/option>\n      <option value=\"gminaM\">Gmina 5–50 tys. mieszkańców<\/option>\n      <option value=\"gminaS\">Gmina poniżej 5 tys. mieszkańców<\/option>\n      <option value=\"powiat\">Powiat / województwo / jednostka podległa<\/option>\n      <option value=\"university\">Uczelnia / szkoła / szpital<\/option>\n      <option value=\"industry\">Zakład przemysłowy / obiekt technologiczny<\/option>\n    <\/select><\/div>\n    <div class=\"field\"><label for=\"company\">Nazwa firmy / gminy / obiektu (opcjonalnie)<\/label><input id=\"company\" placeholder=\"np. Gmina Gostyń\"><\/div>\n    <div class=\"field\"><label for=\"person\">Zwrot grzecznościowy<\/label><input id=\"person\" value=\"Szanowni Państwo\"><\/div>\n    <div class=\"field\"><label for=\"date\">Data spotkania / termin (opcjonalnie)<\/label><input id=\"date\" placeholder=\"np. 12 września\"><\/div>\n    <div class=\"field\" id=\"baseRow\"><label for=\"base2021\">Zużycie energii finalnej w 2021 r. (MWh, opcjonalnie – dla JST)<\/label><input id=\"base2021\" placeholder=\"np. 12 500\" inputmode=\"numeric\"><\/div>\n  <\/fieldset>\n\n  <fieldset>\n    <legend>Model rozliczenia<\/legend>\n    <div class=\"field\"><select id=\"pay\">\n      <option value=\"year2\">Opłata wdrożeniowa spłacana w 2. roku (rok 1 = weryfikacja)<\/option>\n      <option value=\"deposit\">Kaucja zwrotna<\/option>\n      <option value=\"fee\">Jednorazowa opłata wdrożeniowa<\/option>\n      <option value=\"none\">Brak opłat<\/option>\n    <\/select><\/div>\n    <div class=\"row\">\n      <div class=\"field\"><label for=\"amount\">Kwota (zł netto)<\/label><input id=\"amount\" value=\"24 900\"><\/div>\n      <div class=\"field\"><label for=\"share\">Udział klienta docelowy (%)<\/label><input id=\"share\" value=\"50\" type=\"number\" min=\"1\" max=\"99\"><\/div>\n    <\/div>\n    <div class=\"field\" id=\"depositRow\"><label for=\"shareTemp\">Udział klienta do zwrotu kaucji (%)<\/label><input id=\"shareTemp\" value=\"25\" type=\"number\" min=\"1\" max=\"99\"><\/div>\n    <p class=\"hint\">Dla gmin zwykle: „brak opłat” lub „spłata w 2. roku” – nie obciążają budżetu na starcie.<\/p>\n  <\/fieldset>\n\n  <fieldset>\n    <legend>Elementy dodatkowe<\/legend>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optEsco\" checked><span>Formuła ESCO – rozliczenie z oszczędności (stopniodni, IPMVP)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optUc77\"><span>Blok regulacyjny: nowelizacja UEE (UC77) / dyrektywa EED 2023/1791<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optDebt\"><span>Dług publiczny i uproszczona procedura zamówień dla EPC<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optHousing\"><span>Blok: obowiązki wspólnot/spółdzielni (art. 45a PE, kontrole, EPBD, ETS2)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optPlatform\" checked><span>Platforma WaterAI Energy Control (control.waterai.cloud)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optRefs\"><span>Szczegółowe referencje (Bratislava, Lublin, Politechnika)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optSafety\"><span>Scenariusze awaryjne i wymagania bezpieczeństwa<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optVisit\"><span>Wizyta delegacji na Politechnice Lubelskiej<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optData\"><span>Lista danych do analizy obiektów<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optAudit\"><span>Zwolnienie z okresowych kontroli (ustawa z 29.08.2014)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optWhite\"><span>Białe certyfikaty (akapit)<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optEsg\"><span>Korzyści ESG / CSRD<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optPolish\"><span>Akapit „polska technologia”<\/span><\/label>\n    <label class=\"check\"><input type=\"checkbox\" id=\"optScale\"><span>Wzmianka o ~50% w silnie zakamienionych układach<\/span><\/label>\n  <\/fieldset>\n<\/aside>\n\n<section class=\"out\">\n  <div class=\"subject\"><strong>Temat:<\/strong><input id=\"subject\" aria-label=\"Temat wiadomości\"><\/div>\n  <div class=\"paper\" id=\"body\" contenteditable=\"true\" spellcheck=\"false\" aria-label=\"Treść wiadomości\"><\/div>\n  <div class=\"bar\">\n    <button id=\"copyAll\">Kopiuj temat i treść<\/button>\n    <button class=\"ghost\" id=\"copyBody\">Kopiuj samą treść<\/button>\n    <button class=\"ghost\" id=\"reset\">Wygeneruj ponownie<\/button>\n    <span class=\"status\" id=\"status\"><\/span>\n  <\/div>\n  <p class=\"note\">Blok regulacyjny opisuje nowelizację UEE (UC77) jako projekt – przed wysyłką sprawdź aktualny status legislacyjny i numerację artykułów (9a – cel 1,9%; 9d – plan i analiza EPC) w wersji uchwalonej. Blok dla wspólnot opisuje EPBD jako przepisy w trakcie wdrażania (bez progów krajowych) – nie zawiera niepotwierdzonego „obowiązkowego audytu do 2026 r.”. Wyniki: 10–38,6%, średnio ok. 20%.<\/p>\n<\/section>\n<\/main>\n\n<script>\nconst SENDERS = {\n  waterai: {\n    brand:\"WaterAI\", product:\"WaterAI\", legal:\"WaterAI P.S.A.\",\n    system:\"sterowania predykcyjnego WaterAI oraz technologii SCAT (aktywacja wody)\",\n    intro:\"jako firma technologiczna WaterAI\",\n    sig:\"Z wyrazami szacunku,\\nmgr inż. Jacek Okoń\\nCTO WaterAI Global\\nCOO WaterAI P.S.A.\\n📞 +48 665 245 933\\n📞 +1 929 567 6277\\n📞 +44 7408 837 333\\n📧 j.okon@waterai.cloud\\n🌐 www.waterai.pl | www.waterai.cz | www.waterai.sk | www.waterai.cloud\"\n  },\n  blueboson: {\n    brand:\"Blue Boson\", product:\"HeatSaverAI\", legal:\"Blue Boson Tech S.A.\",\n    system:\"sterowania predykcyjnego HeatSaverAI oraz aktywacji wody w instalacji\",\n    intro:\"reprezentując firmę technologiczną Blue Boson, która od kilkunastu lat wspiera przedsiębiorców w optymalizacji kosztów energii i ciepła\",\n    sig:\"Z wyrazami szacunku,\\nmgr inż. Jacek Okoń\\nCTO Blue Boson Global\\nCOO Blue Boson Tech S.A.\\n📞 +48 665 245 933\\n📞 +1 929 567 6277\\n📞 +44 7408 837 333\\n📧 j.okon@blueboson.eu\\n🌐 www.bluebosonpolska.pl | www.blueboson.eu | www.heatsaverai.eu\"\n  }\n};\n\nconst RECIP = {\n  general:{ hook:\"Rozwiązanie sprawdza się wszędzie tam, gdzie zużycie ciepła jest wysokie, a instalacja pracuje od lat bez gruntownej modernizacji.\", unit:\"Państwa obiektach\", jst:false,\n    safety:\"mogą to być np. wymagania dotyczące minimalnych temperatur w wybranych strefach, priorytetu C.W.U., ochrony przeciwzamrożeniowej lub zachowania instalacji przy utracie komunikacji z regulatorem\" },\n  hotel:{ hook:\"Hotele mają bardzo wysokie i zmienne zużycie ciepła – na ogrzewanie i na C.W.U. – dlatego to w nich uzyskujemy jedne z najwyższych oszczędności (Premium Hotel w Bratysławie: 38,6%), bez wpływu na komfort gości.\", unit:\"Państwa obiektach hotelowych\", jst:false,\n    safety:\"mogą to być np. minimalne temperatury w pokojach lub strefach, parametry w SPA, wellness, na basenie, w restauracji czy salach konferencyjnych, priorytet przygotowania C.W.U., ochrona przeciwzamrożeniowa albo określone zachowanie instalacji przy utracie komunikacji między systemem a BMS lub regulatorem\" },\n  housing:{ hook:\"W budynkach wielorodzinnych źródło ciepła często pracuje ze stałą temperaturą zasilania lub według prostej krzywej grzewczej, co oznacza przegrzewanie przez dużą część sezonu – koszt, który trafia bezpośrednio na zaliczki mieszkańców. Wdrożenie nie wymaga wchodzenia do lokali, przebudowy instalacji ani uchwały o remoncie; działa w węźle lub kotłowni.\", unit:\"Państwa budynku\", jst:false, housing:true,\n    safety:\"mogą to być np. minimalne temperatury zasilania, priorytet C.W.U. i ochrona przeciwzamrożeniowa\" },\n  coop:{ hook:\"Spółdzielnie i zarządcy wielu budynków mają z reguły dziesiątki węzłów o różnym wieku, sposobie sterowania i stopniu zakamienienia – to właśnie tam rozpiętość potencjału jest największa. Wdrożenie można prowadzić etapami, od budynków o najwyższym koszcie ciepła na m², a wszystkie obiekty rozliczać i raportować z jednego konta.\", unit:\"Państwa zasobach mieszkaniowych\", jst:false, housing:true,\n    safety:\"mogą to być np. minimalne temperatury zasilania, priorytet C.W.U., ochrona przeciwzamrożeniowa oraz zachowanie węzłów przy utracie komunikacji\" },\n  gminaL:{ hook:\"Duże miasta i gminy powyżej 50 tys. mieszkańców zostały objęte wymogami planowania i analiz w pierwszej kolejności – a jednocześnie dysponują największym portfelem budynków (szkoły, przedszkola, urzędy, obiekty sportowe, domy kultury), w których wdrożenie rozliczane z oszczędności nie wymaga środków inwestycyjnych. Wyniki potwierdził m.in. Urząd Miasta Lublin (19,9–30,4% w trzech budynkach).\", unit:\"budynkach gminnych\", jst:true,\n    tier:\"Jako gmina powyżej 50 tys. mieszkańców zostali Państwo objęci obowiązkami planowania i analiz w pierwszej kolejności – każdy sezon grzewczy bez działań to utracony rok w rozliczeniu trzyletnim.\",\n    safety:\"mogą to być np. minimalne temperatury w salach lekcyjnych, przedszkolach i obiektach obsługi mieszkańców, harmonogramy pracy budynków oraz zachowanie instalacji przy utracie komunikacji\" },\n  gminaM:{ hook:\"Gminy od 5 do 50 tys. mieszkańców pełny obowiązek analizy wykonalności umów EPC i wdrażania planów zużycia energii finalnej obejmie od 1 stycznia 2027 r. To dobry moment, aby pierwsze wdrożenia rozliczane z oszczędności były już w toku i mogły zostać wykazane w planie jako działanie zrealizowane, a nie planowane. Wyniki potwierdziła m.in. Gmina Gostyń (OSiR) i Urząd Miasta Lublin.\", unit:\"budynkach gminnych\", jst:true,\n    tier:\"Jako gmina od 5 do 50 tys. mieszkańców pełny obowiązek analizy wykonalności umów EPC i realizacji planu zużycia energii finalnej obejmie Państwa od 1 stycznia 2027 r. – analiza konkretnych obiektów przeprowadzona teraz stanie się gotowym elementem tego planu.\",\n    safety:\"mogą to być np. minimalne temperatury w salach lekcyjnych, przedszkolach i obiektach obsługi mieszkańców, harmonogramy pracy budynków oraz zachowanie instalacji przy utracie komunikacji\" },\n  gminaS:{ hook:\"Najmniejsze gminy dostają na przygotowanie się najwięcej czasu, ale cel redukcji zużycia energii dotyczy całego sektora publicznego, a wdrożenie rozliczane z oszczędności nie wymaga ani środków inwestycyjnych, ani rozbudowanych struktur urzędniczych – analizę techniczną i ekonomiczną przygotowujemy my.\", unit:\"budynkach gminnych\", jst:true,\n    tier:\"Mniejsze gminy zostały objęte obowiązkiem w późniejszym terminie, jednak cel 1,9% rocznie dotyczy całego sektora publicznego, a przygotowanie planu wymaga danych, które system zaczyna zbierać od pierwszego dnia.\",\n    safety:\"mogą to być np. minimalne temperatury w szkole, przedszkolu czy ośrodku zdrowia, harmonogramy pracy budynków oraz zachowanie instalacji przy utracie komunikacji\" },\n  powiat:{ hook:\"Powiaty i województwa odpowiadają za wyznaczenie poziomów redukcji dla jednostek podległych (szkoły ponadpodstawowe, szpitale, DPS-y, urzędy) i za zasady rozliczania tego obowiązku – wdrożenie rozliczane z oszczędności pozwala objąć wiele jednostek jedną umową ramową bez środków inwestycyjnych.\", unit:\"jednostkach podległych\", jst:true,\n    tier:\"Jako jednostka odpowiedzialna za wyznaczenie poziomów redukcji dla podległych podmiotów mogą Państwo objąć wiele budynków jednym wdrożeniem, rozliczanym i raportowanym z jednego konta.\",\n    safety:\"mogą to być np. wymagania oddziałów szpitalnych, DPS-ów i szkół, harmonogramy oraz zachowanie instalacji przy utracie komunikacji\" },\n  university:{ hook:\"Budynki uczelni, szkół i szpitali mają duże kubatury, dużą bezwładność cieplną i zmienny sposób użytkowania w tygodniu – cechy, które klasyczna regulacja ignoruje, a sterowanie predykcyjne wykorzystuje. W 7 budynkach Politechniki Lubelskiej uzyskaliśmy 13–28% oszczędności.\", unit:\"Państwa obiektach\", jst:false,\n    safety:\"mogą to być np. wymagania laboratoriów, sal dydaktycznych czy oddziałów, harmonogramy zajęć oraz zachowanie instalacji przy utracie komunikacji\" },\n  industry:{ hook:\"W zakładach największe rezerwy tkwią zwykle w starszych, częściowo zakamienionych wymiennikach oraz w źródłach ciepła pracujących ze stałymi nastawami. Wdrożenie w ŠKO-ENERGO (Škoda Auto) pokazuje, że efekt jest mierzalny również w tej skali.\", unit:\"Państwa zakładzie\", jst:false,\n    safety:\"w obiektach technologicznych spadek temperatury poniżej określonej wartości nawet przez krótki czas może oznaczać realne straty – dlatego wartości graniczne i oczekiwaną reakcję systemu definiujemy wspólnie przed uruchomieniem\" }\n};\n\nconst $ = id => document.getElementById(id);\nconst val = name => document.querySelector(`input[name=\"${name}\"]:checked`).value;\nconst fmt = n => Math.round(n).toLocaleString(\"pl-PL\");\n\nfunction payBlock(S){\n  const amount = $(\"amount\").value.trim() || \"24 900\";\n  const share = +$(\"share\").value || 50;\n  const shareTemp = +$(\"shareTemp\").value || 25;\n  const m = $(\"pay\").value;\n  if (m === \"year2\") return `Model rozliczenia – opłata wdrożeniowa spłacana w 2. roku:\\n• rok 1 to okres weryfikacji – otrzymują Państwo pełny udział w oszczędnościach i nie ponoszą żadnej opłaty,\\n• w 2. roku eksploatacji opłata za wdrożenie (${amount} zł netto) spłacana jest z oszczędności – mogą Państwo przeznaczyć na nią do 100% oszczędności aż do pełnej spłaty,\\n• po spłacie obowiązuje standardowy podział korzyści: ${share}% dla Państwa / ${100-share}% dla ${S.brand}.\\nWarunki te odpowiadają zapisom umowy ${S.brand} (pkt 5.3–5.5).`;\n  if (m === \"deposit\") return `Model rozliczenia – kaucja zwrotna:\\n• wpłacają Państwo zwrotną kaucję w wysokości ${amount} zł netto,\\n• do czasu jej zwrotu podział korzyści wynosi ${shareTemp}% dla Państwa / ${100-shareTemp}% dla ${S.brand},\\n• po zwrocie kaucji obowiązuje udział docelowy: ${share}% / ${100-share}%.`;\n  if (m === \"fee\") return `Model rozliczenia – opłata wdrożeniowa:\\n• wnoszą Państwo jednorazową, bezzwrotną opłatę za wdrożenie w wysokości ${amount} zł netto,\\n• od pierwszego roku otrzymują Państwo ustalony udział w oszczędnościach: ${share}% / ${100-share}% dla ${S.brand}.`;\n  return `Model rozliczenia – bez opłat:\\n• nie ponoszą Państwo żadnej opłaty wdrożeniowej ani kaucji,\\n• od pierwszego roku otrzymują Państwo ustalony udział w oszczędnościach: ${share}% / ${100-share}% dla ${S.brand}.`;\n}\n\nfunction reductionSentence(){\n  const raw = $(\"base2021\").value.replace(/[^\\d.,]/g,\"\").replace(\",\",\".\");\n  const base = parseFloat(raw);\n  if (!base) return \"\";\n  const yearly = base * 0.019;\n  const to2030 = base * 0.019 * 9; // 2022–2030\n  return `Dla orientacji: przy zużyciu energii finalnej na poziomie ${fmt(base)} MWh w 2021 r. cel 1,9% oznacza obniżenie zużycia o ok. ${fmt(yearly)} MWh każdego roku, a do końca 2030 r. – łącznie o ok. ${fmt(to2030)} MWh (ok. 17%). Ciepło stanowi zwykle największą pozycję w tym bilansie, dlatego 20% oszczędności na ogrzewaniu budynków gminnych może pokryć znaczną część tego celu bez nakładów inwestycyjnych.`;\n}\n\nfunction build(){\n  const S = SENDERS[val(\"sender\")];\n  const T = val(\"type\");\n  const R = RECIP[$(\"recipient\").value];\n  const company = $(\"company\").value.trim();\n  const greet = $(\"person\").value.trim() || \"Szanowni Państwo\";\n  const date = $(\"date\").value.trim();\n  const o = {}; [\"Esco\",\"Uc77\",\"Debt\",\"Housing\",\"Platform\",\"Refs\",\"Safety\",\"Visit\",\"Data\",\"Audit\",\"White\",\"Esg\",\"Polish\",\"Scale\"].forEach(k => o[k.toLowerCase()] = $(\"opt\"+k).checked);\n  const where = company ? `w ${company}` : `w ${R.unit}`;\n  const p = [];\n\n  const results = `Technologia została dotychczas zweryfikowana w 14 obiektach (budynki administracyjne, uczelnie, wspólnoty mieszkaniowe, hotele, obiekty przemysłowe) w Polsce i na Słowacji. Uzyskane oszczędności wyniosły od ok. 10% do 38,6%, średnio ok. 20%${o.scale ? \", a w silnie zakamienionych układach nawet ok. 50%\" : \"\"}. Wyniki potwierdziły m.in. Urząd Miasta Lublin, Politechnika Lubelska oraz ŠKO-ENERGO (Škoda Auto). Komfort cieplny użytkowników został zachowany – oszczędności wynikają z eliminacji strat, a nie z ograniczania ogrzewania.`;\n  const esco = `Proponujemy wdrożenie w formule ESCO/EPC: nasze wynagrodzenie zależy wyłącznie od osiągniętych, zmierzonych oszczędności. Efekt rozliczamy metodą stopniodni (EN ISO 15927-6, zgodnie z protokołem IPMVP): na danych sprzed uruchomienia budujemy model zużycia bazowego uwzględniający warunki pogodowe, a różnica między zużyciem prognozowanym a rzeczywistym stanowi potwierdzoną oszczędność.`;\n  const uc77 = `Kontekst regulacyjny\\nNowelizacja ustawy o efektywności energetycznej (projekt UC77), wdrażająca dyrektywę EED 2023/1791, nakłada na sektor publiczny obowiązek zmniejszania całkowitego zużycia energii finalnej o co najmniej 1,9% rocznie względem roku bazowego 2021 (art. 9a), rozliczany w okresach trzyletnich. Jednostki samorządu terytorialnego mają sporządzać dziesięcioletnie plany zużycia energii finalnej (art. 9d), a przy ich tworzeniu lub aktualizacji – przeprowadzić i uwzględnić analizę wykonalności umów o poprawę efektywności energetycznej (EPC/ESCO). Plany i roczne sprawozdania z ich realizacji będą raportowane m.in. do Centralnej Ewidencji Emisyjności Budynków (CEEB) i do marszałka województwa. Obowiązek wprowadzany jest kaskadowo: gminy powyżej 50 tys. mieszkańców w pierwszej kolejności, gminy od 5 do 50 tys. mieszkańców – od 1 stycznia 2027 r., najmniejsze gminy w późniejszym terminie.${R.tier ? \"\\n\\n\" + R.tier : \"\"}`;\n  const debt = `Dwie kwestie, które zwykle blokowały gminy przed modelem ESCO, nowe przepisy adresują wprost: dla inwestycji realizowanych w formule EPC przewidziano uproszczoną procedurę zamówień publicznych, o ile wynagrodzenie wykonawcy zależy bezpośrednio od wykazanego poziomu oszczędności energii – dokładnie tak działa nasza umowa. Prawidłowo skonstruowana umowa EPC (zgodnie z wytycznymi Eurostatu i praktyką Regionalnych Izb Obrachunkowych) w większości przypadków nie obciąża wskaźnika zadłużenia gminy, co pozwala modernizować sterowanie budynkami nawet przy napiętym budżecie.`;\n  const housing = `Obowiązki wspólnot i spółdzielni związane z ciepłem\\n• Indywidualne rozliczanie ciepła (art. 45a Prawa energetycznego): w budynkach wielolokalowych zarządca ma obowiązek wdrożyć indywidualne rozliczenia kosztów ciepła, jeśli jest to technicznie możliwe i ekonomicznie uzasadnione, przyjąć regulamin rozliczeń i informować użytkowników o zużyciu; urządzenia bez zdalnego odczytu należy wymienić do 1 stycznia 2027 r.\\n• Okresowe kontrole systemów ogrzewania (ustawa z 29 sierpnia 2014 r. o charakterystyce energetycznej budynków): kotły i systemy ogrzewania co 3–5 lat w zależności od mocy – z wyłączeniem budynków wyposażonych w automatykę stale monitorującą sprawność instalacji i sterującą w celu optymalizacji energii (nasz system spełnia ten warunek).\\n• Przeglądy instalacji z Prawa budowlanego (roczne i pięcioletnie) oraz deklaracja źródła ciepła w CEEB; nowelizacja ustawy o własności lokali przenosi na wspólnotę utrzymanie, legalizację i wymianę ciepłomierzy, wodomierzy i podzielników jako części nieruchomości wspólnej oraz nakłada na właścicieli obowiązek udostępnienia lokalu do kontroli instalacji.\\n• Dyrektywa EPBD 2024/1275: termin transpozycji minął 29 maja 2026 r.; trwają prace nad nową ustawą i klasami energetycznymi A+–G na świadectwach. Minimalne standardy będą dotyczyć najgorszych energetycznie budynków, a od 2027–2028 r. system ETS2 obejmie paliwa do ogrzewania, podnosząc koszt ciepła z gazu i węgla.\\nDlaczego to ma znaczenie: dane o zużyciu rejestrowane co 10 minut i rozliczenie metodą stopniodni wpisują się w obowiązek informowania mieszkańców, monitoring i sterowanie predykcyjne pozwalają skorzystać ze zwolnienia z okresowych kontroli, a ok. 20% niższe zużycie ciepła poprawia wskaźnik EP budynku przed wprowadzeniem klas energetycznych – bez termomodernizacji i bez nakładów z funduszu remontowego.`;\n  const platform = `Cały proces jest dla Państwa w pełni przejrzysty dzięki platformie WaterAI Energy Control (control.waterai.cloud) – systemowi pomiaru i rozliczania oszczędności energii. Mają w niej Państwo dostęp do wszystkich obiektów objętych systemem, bieżących i historycznych pomiarów, okresów bazowych i rozliczeniowych, raportów, wartości oszczędności w PLN lub EUR, wynikającego z umowy podziału korzyści oraz faktur.${R.jst ? \" Dla gminy oznacza to gotowe, udokumentowane dane o zużyciu i oszczędnościach energii finalnej w podziale na budynki – bezpośrednio do rocznego sprawozdania z realizacji planu i raportowania do CEEB.\" : \" W przypadku wielu budynków platforma pozwala zarządzać całym portfolio z jednego konta.\"}`;\n  const refs = `Wybrane referencje i osiągnięte rezultaty:\\n• Premium Hotel, Bratislava (A Premium Services s.r.o.) – ${S.product} + SCAT: 38,60%,\\n• PreLipe, Dohňany – budynek mieszkalno-biurowy, ${S.product} + SCAT: 33,40%,\\n• Urząd Miasta Lublin (${S.product} samodzielnie): pl. Litewski 1 – 19,90%, ul. Wieniawska 14 – 30,40%, Ratusz, pl. Łokietka 1 – 20,30%,\\n• Politechnika Lubelska – 7 budynków (${S.product} samodzielnie): 13,21%, 20,75%, 19,87%, 15,69%, 13,44%, 27,19%, 27,96%.\\nInne wdrożenia: Gmina Gostyń (OSiR), ARTN Sp. z o.o. (Warszawa), MIDAS GROUP Sp. z o.o. (Wrocław), Janom Investments a.s. (Bratislava), Aplend s.r.o. (Veľký Slavkov), Panorama Servis s.r.o. (Považská Bystrica). Rozpiętość wyników pokazuje nasze podejście: nie zakładamy jednego poziomu oszczędności dla każdego budynku – potencjał zależy od jego charakterystyki, sposobu sterowania, źródła ciepła i stanu instalacji. Opisy przypadków: https://waterai.pl/pl/referencie`;\n  const safety = `Wymagania bezpieczeństwa i scenariusze awaryjne: ${S.product} posiada własne mechanizmy bezpieczeństwa, ale każdy obiekt może mieć dodatkowe wymagania wynikające z jego przeznaczenia lub standardów operatora. W Państwa przypadku ${R.safety}. Uwzględniamy je już na etapie projektowania integracji – potrzebujemy opisu scenariusza, warunków jego wystąpienia, parametrów pozwalających go rozpoznać, wartości granicznych i oczekiwanej reakcji. Możliwe jest też zdefiniowanie reakcji na nieprawidłowe wskazania czujników, automatycznego przejścia na lokalne sterowanie lub standardową krzywą grzewczą oraz ręcznego przejęcia sterowania przez obsługę techniczną.`;\n  const visit = `Jeżeli po wstępnej analizie obiektów będą Państwo zainteresowani szerszą weryfikacją rozwiązania, proponujemy wizytę Państwa delegacji na Politechnice Lubelskiej i spotkanie z osobami zaangażowanymi w projekt – pozwoli to bezpośrednio porozmawiać o doświadczeniach z eksploatacji, metodologii oceny efektów i kwestiach technicznych.`;\n  const data = `Prosimy o wytypowanie kilku potencjalnych budynków i przekazanie dla każdego z nich podstawowych informacji:\\n• lokalizacja i rodzaj obiektu, powierzchnia,\\n• roczny koszt ogrzewania oraz historyczne zużycie energii (minimum 12 miesięcy${R.jst ? \", najlepiej od 2021 r.\" : \"\"}),\\n• rodzaj źródła ciepła; czy analizujemy C.O., C.W.U. czy oba obszary,\\n• obecny sposób sterowania instalacją, wykorzystywany BMS lub automatyka,\\n• dostępne sposoby komunikacji i sygnały,\\n• wymagania bezpieczeństwa i scenariusze awaryjne, które powinniśmy uwzględnić,\\n• inne istotne wymagania techniczne lub organizacyjne.\\nWytypowanie obiektów nie oznacza decyzji o wdrożeniu – chcemy najpierw wspólnie określić, które budynki mają największy potencjał. Po analizie danych wrócimy z rekomendacją lokalizacji, a dla najlepiej rokujących zaproponujemy wizję lokalną z udziałem naszego zespołu technicznego.`;\n  const audit = `Zgodnie z ustawą z dnia 29 sierpnia 2014 r. o charakterystyce energetycznej budynków z obowiązku okresowych kontroli systemów ogrzewania wyłączone są budynki wyposażone w automatykę umożliwiającą stałe monitorowanie sprawności instalacji i skuteczne sterowanie w celu optymalizacji energii. Nasz system spełnia te wymogi (monitoring co 10 minut, sterowanie prognozowe), co pozwala ograniczyć koszty kontroli – zwykle 5–7 tys. zł za obiekt – oraz obowiązki formalne.`;\n  const white = `Wdrożenie może dodatkowo kwalifikować się do uzyskania białych certyfikatów (świadectw efektywności energetycznej wydawanych przez Prezesa URE na podstawie ustawy z 20 maja 2016 r.). Są to zbywalne prawa majątkowe notowane na Towarowej Giełdzie Energii, a przychód z ich sprzedaży może pokryć istotną część kosztów projektu. Oferujemy wsparcie w przygotowaniu audytu efektywności energetycznej i wniosku.`;\n  const esg = `Wdrożenie wspiera także realizację obowiązków ESG i CSRD: redukcję śladu węglowego (Scope 1 i 2), udokumentowaną poprawę efektywności energetycznej oraz przygotowanie do wymogów taksonomii UE.`;\n  const polish = `Wybierając nasze rozwiązanie, wspierają Państwo polski przemysł, rodzimą myśl technologiczną oraz pracę polskich naukowców i specjalistów.`;\n  const extras = () => { if (o.uc77 && T !== \"jst\") p.push(uc77); if (o.debt && T !== \"jst\") p.push(debt); if (o.housing && T !== \"housingmail\") p.push(housing); if (o.audit && !(o.housing || T === \"housingmail\")) p.push(audit); if (o.white) p.push(white); if (o.esg) p.push(esg); };\n  const red = reductionSentence();\n\n  let subject = \"\";\n\n  if (T === \"cold\") {\n    subject = `Ograniczenie zużycia ciepła ${company ? \"– \" + company : \"w Państwa obiektach\"} – rozliczenie z oszczędności`;\n    p.push(`Pragnę przedstawić możliwość realnego ograniczenia zużycia energii cieplnej na potrzeby C.O. i C.W.U. ${where} – dzięki połączeniu ${S.system}. Źródło ciepła nie ma znaczenia: sieć, kotłownia gazowa, olejowa czy pompa ciepła.`);\n    p.push(`Rozumiemy wyzwania związane z rosnącymi i nieprzewidywalnymi kosztami energii. W odpowiedzi na nie, ${S.intro}, oferujemy rozwiązanie, które nie wymaga wymiany sterowników, pomp ani zaworów – działa jako warstwa predykcyjna nad istniejącą automatyką lub BMS.`);\n    p.push(R.hook);\n    p.push(results);\n    if (o.esco) p.push(esco);\n    if (o.platform) p.push(platform);\n    extras();\n    if (R.jst && red) p.push(red);\n    p.push(`Zapraszam na 30-minutowe spotkanie – stacjonarnie lub online. Na podstawie faktur za ciepło przygotujemy bezpłatną, indywidualną prognozę oszczędności dla Państwa obiektów.`);\n    if (o.polish) p.push(polish);\n  }\n\n  if (T === \"jst\") {\n    subject = `Obowiązek analizy umów ESCO/EPC${R.jst && $(\"recipient\").value === \"gminaM\" ? \" od 2027 r.\" : \"\"} – gotowe wdrożenie rozliczane z oszczędności${company ? \" dla \" + company : \"\"}`;\n    p.push(`Piszę w związku ze zmianami, które nowelizacja ustawy o efektywności energetycznej wprowadza dla jednostek samorządu terytorialnego – a konkretnie z obowiązkiem analizy wykonalności umów ESCO/EPC oraz celem redukcji zużycia energii finalnej o 1,9% rocznie. Chciałbym pokazać, jak ${company || \"Państwa gmina\"} może spełnić oba te wymogi w budynkach ogrzewanych, bez środków inwestycyjnych i bez wymiany istniejącej infrastruktury.`);\n    p.push(uc77);\n    if (red) p.push(red);\n    p.push(`Na czym polega model ESCO w naszym wykonaniu\\nIstotą umowy EPC jest to, że partner zewnętrzny finansuje i realizuje przedsięwzięcie, a jest spłacany z realnie wypracowanych oszczędności; jeśli oszczędności nie zostaną osiągnięte, ryzyko ponosi firma ESCO. Dokładnie w tej formule działamy: ${S.brand} instaluje i utrzymuje system ${S.product} (${S.system}) w budynkach gminnych, a wynagrodzenie stanowi ustalony udział w zmierzonych, potwierdzonych oszczędnościach ciepła. Sterowanie predykcyjne oparte na AI eliminuje przegrzewanie budynków i dostosowuje pracę źródła ciepła do prognozy pogody i rzeczywistej charakterystyki obiektu; nie wymieniamy sterowników, pomp, zaworów ani automatyki – wszystkie zabezpieczenia pozostają bez zmian.`);\n    p.push(R.hook);\n    p.push(results);\n    if (o.esco) p.push(esco);\n    p.push(payBlock(S));\n    p.push(debt);\n    if (o.platform) p.push(platform);\n    p.push(`Co proponujemy w kontekście planu zużycia energii finalnej\\n• przeprowadzimy bezpłatną analizę techniczną i ekonomiczną wskazanych budynków – jej wynik może zostać wykorzystany jako element wymaganej analizy wykonalności umów EPC,\\n• wskażemy, które obiekty mają największy potencjał, i przedstawimy prognozę oszczędności w MWh i PLN,\\n• dla wybranych budynków uruchomimy wdrożenie tak, aby oszczędności były mierzalne i raportowalne już w pierwszym sezonie grzewczym,\\n• dostarczymy dane o zużyciu i oszczędnościach w formacie przydatnym do sprawozdania rocznego i raportowania do CEEB.`);\n    if (o.refs) p.push(refs);\n    if (o.audit) p.push(audit);\n    if (o.white) p.push(white);\n    if (o.esg) p.push(esg);\n    p.push(o.data ? data : `Aby przygotować analizę, potrzebujemy listy kilku budynków wraz z fakturami za ciepło z minimum 12 miesięcy (najlepiej od 2021 r.), informacją o źródle ciepła i obecnym sposobie sterowania. Wytypowanie obiektów nie oznacza decyzji o wdrożeniu.`);\n    if (o.visit) p.push(visit);\n    p.push(`Zapraszam na 30-minutowe spotkanie – stacjonarnie lub online – z udziałem osoby odpowiedzialnej za zarządzanie energią lub nieruchomościami gminnymi.`);\n    if (o.polish) p.push(polish);\n  }\n\n  if (T === \"housingmail\") {\n    const isCoop = $(\"recipient\").value === \"coop\";\n    subject = `Niższe koszty ciepła ${company ? \"w \" + company : (isCoop ? \"w zasobach spółdzielni\" : \"we wspólnocie\")} bez nakładów z funduszu remontowego – rozliczenie z oszczędności`;\n    p.push(`Piszę w związku z rosnącymi kosztami ciepła, które w budynkach wielorodzinnych trafiają bezpośrednio na zaliczki mieszkańców, oraz z obowiązkami, które przepisy nakładają na ${isCoop ? \"spółdzielnie i zarządców\" : \"wspólnoty mieszkaniowe\"} w zakresie ogrzewania. Chciałbym pokazać, jak ${company || (isCoop ? \"Państwa spółdzielnia\" : \"Państwa wspólnota\")} może ograniczyć zużycie ciepła o ok. 20% bez termomodernizacji, bez uchwały o remoncie i bez środków własnych.`);\n    p.push(R.hook);\n    p.push(`Jak to działa\\n${S.brand} montuje w węźle lub kotłowni system ${S.product} (${S.system}). Sterowanie predykcyjne oparte na AI analizuje co 10 minut parametry pracy węzła oraz prognozę pogody dla lokalizacji budynku i przekazuje istniejącemu regulatorowi zastępczą temperaturę zewnętrzną – regulator zaczyna reagować wcześniej, zanim zmiana pogody wpłynie na temperaturę w mieszkaniach. Nie wymieniamy regulatora, pomp ani zaworów, nie wchodzimy do lokali; wszystkie zabezpieczenia węzła pozostają bez zmian. Tam, gdzie analiza potwierdzi zakamienienie wymienników, dokładamy technologię SCAT ograniczającą kamień bez chemii.`);\n    p.push(results);\n    p.push(housing);\n    if (o.esco) p.push(esco);\n    p.push(payBlock(S));\n    if (o.platform) p.push(platform + (isCoop ? \"\" : \" Zarząd wspólnoty ma więc w każdej chwili dane, którymi może wykazać mieszkańcom, skąd wzięła się oszczędność na zaliczkach.\"));\n    if (o.refs) p.push(refs);\n    if (o.white) p.push(white);\n    if (o.esg) p.push(esg);\n    p.push(`Co jest potrzebne, aby przygotować analizę\\n• faktury za ciepło z minimum 12 miesięcy (najlepiej 2–3 sezony),\\n• informacja o źródle ciepła (węzeł sieciowy, kotłownia gazowa, inne) i sposobie sterowania,\\n• liczba budynków i węzłów${isCoop ? \" – dla większych zasobów zaczynamy od obiektów o najwyższym koszcie ciepła na m²\" : \"\"}.\\nNa tej podstawie przygotujemy bezpłatną prognozę oszczędności w GJ/MWh i złotych oraz materiał, który zarząd może przedstawić ${isCoop ? \"radzie nadzorczej\" : \"właścicielom na zebraniu wspólnoty\"}.`);\n    if (o.data) p.push(data);\n    if (o.visit) p.push(visit);\n    p.push(`Zapraszam na 30-minutowe spotkanie – stacjonarnie lub online – z udziałem osoby odpowiedzialnej za sprawy techniczne${isCoop ? \" lub energetykę spółdzielni\" : \" wspólnoty\"}.`);\n    if (o.polish) p.push(polish);\n  }\n\n  if (T === \"summary\") {\n    subject = `Podsumowanie spotkania${date ? \" z dnia \" + date : \"\"} – wdrożenie ${S.product}${company ? \" w \" + company : \"\"}`;\n    p.push(`Serdecznie dziękuję za ${date ? \"spotkanie w dniu \" + date : \"spotkanie\"} i merytoryczną rozmowę dotyczącą ograniczenia zużycia energii cieplnej na potrzeby C.O. i C.W.U. ${where}.`);\n    p.push(`Podczas rozmowy przedstawiliśmy:\\n• technologię ${S.brand} opracowaną i wdrażaną we współpracy z Politechniką Lubelską,\\n• dwa niezależne filary rozwiązania – sterowanie predykcyjne oparte na AI oraz technologię SCAT ograniczającą kamień kotłowy (stosowaną tylko tam, gdzie analiza potwierdzi osady),\\n• wyniki z 14 obiektów: oszczędności 10–38,6%, średnio ok. 20%${o.scale ? \", w silnie zakamienionych układach nawet ok. 50%\" : \"\"},\\n• brak ingerencji w istniejącą automatykę, BMS i instalację budynku.`);\n    if (o.esco) p.push(esco);\n    p.push(payBlock(S));\n    if (o.platform) p.push(platform);\n    if (o.refs) p.push(refs);\n    extras();\n    if (R.jst && red) p.push(red);\n    p.push(`Proces wdrożenia:\\n1. montaż przepływomierza bezinwazyjnego (bez ingerencji w rurociąg),\\n2. integracja z czujnikiem temperatury zewnętrznej lub BMS,\\n3. podłączenie do sieci LAN lub udostępnienie routera LTE,\\n4. ok. 30 dni zbierania danych i budowa modelu energetycznego budynku,\\n5. start optymalizacji i rozliczanie oszczędności metodą stopniodni.`);\n    p.push(o.data ? data : `Kolejne kroki: w załączeniu przesyłam prezentację, opis metodyki stopniodni, protokół obliczeń oszczędności oraz projekt umowy o efektywności energetycznej – do naniesienia Państwa uwag. Proszę o wskazanie obiektów do wdrożenia i przesłanie faktur za ciepło z minimum 12 miesięcy; po ich otrzymaniu przeprowadzimy wizję lokalną i odeślemy prognozę oszczędności wraz z wyliczonym okresem bazowym.`);\n    if (o.visit) p.push(visit);\n    if (o.polish) p.push(polish);\n    p.push(`Dziękuję raz jeszcze za otwartą dyskusję. W razie pytań pozostaję do dyspozycji.`);\n  }\n\n  if (T === \"technical\") {\n    subject = `${S.product} – integracja z infrastrukturą, referencje i propozycja dalszych kroków${company ? \" (\" + company + \")\" : \"\"}`;\n    p.push(`Serdecznie dziękuję za ${date ? \"spotkanie w dniu \" + date : \"spotkanie\"} i merytoryczną rozmowę dotyczącą możliwości zastosowania ${S.product} ${where}. Zgodnie z ustaleniami przesyłam szerszy opis najważniejszych kwestii, informacje o wdrożeniach i referencjach oraz propozycję dalszych kroków.`);\n    p.push(`Jak działa rozwiązanie\\n${S.product} wykorzystuje sztuczną inteligencję i sterowanie predykcyjne. System zbiera temperaturę zewnętrzną, parametry pracy instalacji, przepływ, zużycie energii w czasie, dane pogodowe i prognozy oraz historię obiektu, i na tej podstawie buduje indywidualny model energetyczny budynku. W odróżnieniu od klasycznej regulacji, reagującej na aktualne warunki, system przewiduje zmianę zapotrzebowania na ciepło i odpowiednio wcześniej dostosowuje pracę instalacji. Model jest stale aktualizowany na podstawie rzeczywistego zachowania obiektu.\\n\\nDrugą, niezależną technologią jest SCAT: sygnały elektromagnetyczne i radiowe o dobranych częstotliwościach, emitowane przez anteny instalowane wewnątrz rurociągu (liczba i konfiguracja dobierane do średnic, przepływu i stopnia zakamienienia), wpływają na krystalizację związków mineralnych, ograniczając powstawanie kamienia i stopniowo redukując osady istniejące. SCAT nie jest instalowany automatycznie – tylko tam, gdzie analiza instalacji potwierdzi osady wpływające na wymianę ciepła.`);\n    p.push(`Integracja z istniejącą infrastrukturą\\nNie zakładamy jednego, sztywnego sposobu integracji – dobieramy go do budynku.\\n• Wariant podstawowy: emulacja sygnału rezystancyjnego czujnika temperatury zewnętrznej. ${S.product} wyznacza wartość sterującą i przekazuje ją do istniejącego regulatora, wykorzystując jego dotychczasową logikę wykonawczą.\\n• Wariant BMS: system otrzymuje z BMS dostępne parametry (temperatury zasilania i powrotu, temperaturę zewnętrzną, przepływ), wyznacza zastępczą temperaturę zewnętrzną i zwraca ją do BMS, który wykorzystuje ją w istniejącym układzie regulacji.\\n• Inne warianty: sygnały analogowe (w tym prądowe), wejścia/wyjścia regulatorów, protokoły komunikacji przemysłowej, komunikacja z automatyką źródła ciepła, dodatkowe moduły lub bramki; w razie braku danych – montaż dodatkowych czujników.\\nNaszym założeniem nie jest wymiana BMS ani automatyki, ale wykorzystanie tego, co już jest w obiekcie. Dopiero po analizie regulatorów, dostępnych sygnałów i wymagań lokalizacji określamy najprostszy i najmniej inwazyjny sposób integracji.`);\n    p.push(safety);\n    if (o.platform) p.push(platform);\n    p.push(refs);\n    p.push(`W przypadku części nowszych wdrożeń nie dysponujemy jeszcze zamkniętym okresem referencyjnym; powyższe zestawienie nie jest też pełną listą klientów – ze względu na zobowiązania dotyczące poufności nie możemy ujawniać wszystkich podmiotów.`);\n    if (o.esco) p.push(esco);\n    p.push(payBlock(S));\n    extras();\n    p.push(`Weryfikacja technologii\\nRozumiemy potrzebę dodatkowej weryfikacji, szczególnie przy większej liczbie budynków. Proponujemy jednak w pierwszej kolejności wytypować obiekty i przeprowadzić ich wstępną analizę techniczną i ekonomiczną. ${visit}`);\n    p.push(`Proponowany kolejny krok\\n${data}`);\n    if (o.polish) p.push(polish);\n    p.push(`Dziękuję raz jeszcze za spotkanie, otwartą dyskusję i szczegółowe pytania techniczne.`);\n  }\n\n  if (T === \"tech\") {\n    subject = `Opis działania technologii ${S.product} – materiały uzupełniające`;\n    p.push(`Dziękuję za poświęcony czas oraz możliwość przedstawienia naszego rozwiązania. Zgodnie z ustaleniami zamieszczam opis działania technologii.`);\n    p.push(`Rozwiązanie składa się z dwóch niezależnych, uzupełniających się elementów: ${S.system}. Każdy może pracować samodzielnie; ich połączenie stosujemy tam, gdzie analiza instalacji potwierdzi osady wpływające na wymianę ciepła.`);\n    p.push(`1. Sterowanie predykcyjne (${S.product})\\nWiększość budynków pracuje w oparciu o regulację pogodową – sterownik reaguje na aktualną temperaturę zewnętrzną, ale dopiero wtedy, gdy warunki już się zmieniły, i nie uwzględnia bezwładności cieplnej budynku, zysków słonecznych, wiatru ani prognozy. Efektem jest okresowe przegrzewanie. W budynkach bez regulacji pogodowej (np. stałe 70°C zasilania przez cały sezon) straty są jeszcze większe.\\n\\nSystem co 10 minut zbiera dane z instalacji (temperatura zewnętrzna, zasilania i powrotu, przepływ, moc, zużycie energii) oraz aktualne i prognozowane dane meteorologiczne. Na tej podstawie uczy się rzeczywistej charakterystyki obiektu i wyznacza tzw. temperaturę zewnętrzną zastępczą, przekazywaną do istniejącego regulatora lub BMS. Nie wymieniamy sterowników, pomp, zaworów ani siłowników – wszystkie zabezpieczenia pozostają bez zmian. Regulator reaguje wcześniej, zanim zmiana pogody wpłynie na temperaturę w budynku. System wykrywa też anomalie i potencjalne awarie.`);\n    p.push(`2. Aktywacja wody (SCAT – System Catalytic Activation Technology)\\nRozpuszczone związki wapnia i magnezu w określonych warunkach tworzą kamień kotłowy na wymiennikach, rurach i armaturze; już cienka warstwa działa jak izolator. SCAT oddziałuje na wodę sygnałami elektromagnetycznymi o dobranych częstotliwościach poprzez anteny montowane w rurociągu, zmieniając kinetykę krystalizacji: minerały wytrącają się w objętości wody w postaci mikrokryształów, zamiast odkładać się na powierzchniach. Efekt: ograniczenie nowych osadów, stopniowa redukcja istniejących, lepsza wymiana ciepła, mniejsze opory hydrauliczne, dłuższa żywotność urządzeń. Bez chemii, bez zmiany składu wody.`);\n    p.push(`Główne źródła oszczędności:\\n• eliminacja przegrzewania i optymalizacja temperatury zasilania,\\n• wykorzystanie prognoz pogody i zysków słonecznych,\\n• uwzględnienie bezwładności cieplnej budynku,\\n• odzyskanie sprawności wymienników i zmniejszenie oporów przepływu,\\n• szybkie wykrywanie nieprawidłowości.`);\n    p.push(results);\n    if (o.refs) p.push(refs);\n    if (o.esco) p.push(esco);\n    if (o.platform) p.push(platform);\n    extras();\n    p.push(`W przypadku zainteresowania przygotujemy indywidualną analizę potencjału oszczędności dla ${company || \"Państwa obiektów\"} na podstawie historycznych danych o zużyciu i kosztach ciepła.`);\n  }\n\n  if (T === \"calc\") {\n    subject = `Kalkulator prognozy oszczędności – ${S.product}${company ? \" / \" + company : \"\"}`;\n    p.push(`W załączeniu przesyłam kalkulator w formacie Excel „Prognoza oszczędności i wzrost kosztów energii na przestrzeni 10 lat”.`);\n    p.push(`Plik zawiera zestawienie kosztów wdrożenia, prognozowanych kosztów ogrzewania, generowanych oszczędności oraz wskaźników finansowych (ROI, okres zwrotu, zysk netto). Wystarczy uzupełnić własne dane o kosztach ciepła – pozostałe wartości przeliczają się automatycznie.`);\n    p.push(`Kalkulator opiera się na wynikach 14 wdrożeń z lat 2015–2025 i zakłada konserwatywną średnią oszczędność 20%${o.scale ? \" (w silnie zakamienionych układach wyniki sięgały ok. 50%)\" : \"\"}. Po otrzymaniu faktur za ciepło przygotujemy prognozę dopasowaną do konkretnych obiektów.`);\n    p.push(`W arkuszu przyjęto następujący model rozliczenia:\\n${payBlock(S)}`);\n    if (o.esco) p.push(esco);\n    if (o.platform) p.push(platform);\n    extras();\n    if (R.jst && red) p.push(red);\n    p.push(`W razie pytań lub potrzeby wspólnego przejścia przez arkusz chętnie umówię krótkie spotkanie online.`);\n  }\n\n  if (T === \"offer\") {\n    subject = `Propozycja warunków współpracy – ${S.product}${company ? \" / \" + company : \"\"}`;\n    p.push(`W nawiązaniu do ${date ? \"rozmowy z dnia \" + date : \"naszych rozmów\"} przesyłam propozycję głównych warunków umowy o poprawę efektywności energetycznej dla ${company || \"Państwa obiektów\"}.`);\n    p.push(payBlock(S));\n    p.push(`Pozostałe warunki:\\n• obsługa, serwis i monitoring systemu: koszty i odpowiedzialność po stronie ${S.brand},\\n• okres umowy: 10 lat z możliwością wypowiedzenia,\\n• rozliczenie oszczędności metodą stopniodni na podstawie okresu bazowego ustalonego w protokole.`);\n    if (o.esco) p.push(esco);\n    if (o.platform) p.push(platform);\n    extras();\n    p.push(`Projekt umowy przesyłam w załączniku – do naniesienia Państwa uwag; ostateczny kształt ustalimy wspólnie. Proszę również o wskazanie osoby technicznej do uzgodnienia terminu wizji lokalnej.`);\n    if (o.polish) p.push(polish);\n  }\n\n  if (T === \"white\") {\n    subject = `Białe certyfikaty – dodatkowe korzyści z wdrożenia ${S.product}`;\n    p.push(`W uzupełnieniu ${date ? \"rozmowy z dnia \" + date : \"naszych rozmów\"} przesyłam informację o białych certyfikatach, które mogą stanowić dodatkowe źródło korzyści z wdrożenia ${S.product} ${where}.`);\n    p.push(`Czym są białe certyfikaty\\nBiałe certyfikaty to świadectwa efektywności energetycznej wydawane przez Prezesa Urzędu Regulacji Energetyki na podstawie ustawy z dnia 20 maja 2016 r. o efektywności energetycznej. Poświadczają zaoszczędzenie określonej ilości energii (w toe/rok) w wyniku przedsięwzięcia poprawiającego efektywność energetyczną. Są to prawa majątkowe dopuszczone do obrotu na Towarowej Giełdzie Energii – można je sprzedać, a przychód ze sprzedaży w praktyce pokrywa istotną część kosztów inwestycji.`);\n    p.push(`Warunki\\nWniosek składa się przed rozpoczęciem przedsięwzięcia, na podstawie audytu efektywności energetycznej sporządzonego zgodnie z rozporządzeniem Ministra Energii z 5 października 2017 r. Certyfikaty przysługują dla przedsięwzięć o oszczędności co najmniej 10 toe rocznie (można łączyć kilka obiektów tego samego rodzaju). Modernizacje obejmujące optymalizację sterowania i poprawę sprawności instalacji grzewczej należą do kwalifikowanych kategorii przedsięwzięć.`);\n    p.push(`Jak możemy pomóc\\n${S.brand} wspiera klientów w całym procesie: od wstępnej oceny potencjału, przez audyt efektywności energetycznej i przygotowanie wniosku do URE, po audyt powykonawczy potwierdzający uzyskane oszczędności. Dane z systemu (pomiar co 10 minut, okres bazowy, rozliczenie metodą stopniodni) stanowią gotową podstawę dokumentacji.`);\n    if (o.platform) p.push(platform);\n    if (o.uc77) p.push(uc77);\n    if (o.audit) p.push(audit);\n    if (o.esg) p.push(esg);\n    p.push(`Jeśli chcieliby Państwo sprawdzić, czy Państwa obiekty mają potencjał do uzyskania certyfikatów, wystarczy przesłać roczne zużycie ciepła i moc źródła – wrócimy z szacunkiem możliwej wartości.`);\n  }\n\n  if (T === \"followup\") {\n    subject = `Ponowny kontakt – ograniczenie zużycia ciepła ${company ? \"w \" + company : \"w Państwa obiektach\"}`;\n    p.push(`Pozwalam sobie wrócić do wiadomości${date ? \" z dnia \" + date : \", którą przesłałem niedawno\"}, dotyczącej ograniczenia zużycia energii cieplnej ${where}. Streszczam najważniejsze punkty w kilku zdaniach.`);\n    p.push(`Nasze rozwiązanie (${S.system}) obniża zużycie ciepła średnio o ok. 20% bez ingerencji w istniejącą instalację, automatykę i BMS. Wyniki z 14 obiektów potwierdziły m.in. Urząd Miasta Lublin i Politechnika Lubelska.`);\n    if (o.esco) p.push(`Rozliczamy się z osiągniętych oszczędności (formuła ESCO/EPC), a każdą wartość mogą Państwo na bieżąco zweryfikować${o.platform ? \" w platformie WaterAI Energy Control\" : \"\"}.`);\n    if (R.jst) p.push(`Przypominam też, że nowelizacja ustawy o efektywności energetycznej wprowadza dla samorządów cel redukcji zużycia energii finalnej o 1,9% rocznie oraz obowiązek analizy wykonalności umów EPC w planach zużycia energii – nasza bezpłatna analiza obiektów może być gotowym elementem tego planu.`);\n    p.push(R.hook);\n    if (o.audit) p.push(audit);\n    if (o.white) p.push(white);\n    p.push(`Czy znajdą Państwo 30 minut na rozmowę${date ? \"\" : \" w przyszłym tygodniu\"}? Jeżeli temat nie leży w Państwa kompetencjach, będę wdzięczny za wskazanie właściwej osoby.`);\n  }\n\n  $(\"subject\").value = subject;\n  $(\"body\").textContent = `${greet},\\n\\n${p.join(\"\\n\\n\")}\\n\\n${S.sig}`;\n  $(\"depositRow\").style.display = $(\"pay\").value === \"deposit\" ? \"\" : \"none\";\n  $(\"baseRow\").style.display = R.jst ? \"\" : \"none\";\n}\n\nfunction flash(msg){ $(\"status\").textContent = msg; setTimeout(()=>$(\"status\").textContent=\"\",2500); }\nasync function copy(text){ try{ await navigator.clipboard.writeText(text); flash(\"Skopiowano\"); }catch(e){ flash(\"Nie udało się skopiować – zaznacz tekst ręcznie\"); } }\n$(\"copyAll\").onclick = () => copy(`Temat: ${$(\"subject\").value}\\n\\n${$(\"body\").innerText}`);\n$(\"copyBody\").onclick = () => copy($(\"body\").innerText);\n$(\"reset\").onclick = build;\ndocument.querySelectorAll(\"aside input, aside select\").forEach(el => el.addEventListener(\"input\", build));\n$(\"recipient\").addEventListener(\"change\", () => { const r = $(\"recipient\").value; if (r.startsWith(\"gmina\") || r === \"powiat\") { $(\"optUc77\").checked = true; $(\"optDebt\").checked = true; } if (r === \"housing\" || r === \"coop\") { $(\"optHousing\").checked = true; } build(); });\nbuild();\nfunction __h(){parent.postMessage({mailH:document.documentElement.scrollHeight},\"*\");}\nnew ResizeObserver(__h).observe(document.body);window.addEventListener(\"load\",__h);\n<\/script>\n<\/body>\n<\/html>\n";
+const MAIL_MAP={urzad:"gminaM",oswiata:"university",szpital:"university",hotel:"hotel",spoldzielnia:"coop",wspolnota:"housing",biurowiec:"general",galeria:"general",przemysl:"industry",siec:"general",pec:"general",operator:"general",esco:"general",fm:"general",inne:"general"};
+
+
+
+  // ── Stan trwały między otwarciami zakładki ─────────────────────────────────
+  let cur, MAIL, AC, checked;
+  let $root = null;
+  const $id = function (id) { return document.getElementById('hb-' + id); };
+  const _once = {};
+  function hbOnce(ev, fn) { if (_once[ev]) return; _once[ev] = true; window.addEventListener(ev, fn); }
+
+  function ensureStyles() {
+    if (document.getElementById('wai-handbook-css')) return;
+    const st = document.createElement('style'); st.id = 'wai-handbook-css'; st.textContent = CSS;
+    document.head.appendChild(st);
+    if (!document.getElementById('wai-handbook-font')) {
+      const l = document.createElement('link'); l.id = 'wai-handbook-font'; l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap';
+      document.head.appendChild(l);
+    }
+  }
+
+  // ── Logika podręcznika (wiąże nasłuchy z aktualnym DOM) ────────────────────
+  function boot() {
+
+/* ===== nawigacja i rendering ===== */
+const SECTIONS=[["klienci","Klienci"],["prawo","Prawo"],["pec","Ciepłownie"],["decyzja","Kto decyduje"],["obiekcje","Obiekcje"],["narzedzia","Narzędzia"],["liczenie","Liczenie i ESCO"],["akademia","Akademia"],["maile","Maile"],["podstawy","Podstawy"]];
+const SEG_TABS=[["persona","Persona"],["diag","Otwarcie i diagnoza"],["insight","Do wniosku"],["args","Argumenty"],["obj","Obiekcje"],["path","Oferta i ścieżka"],["dialog","Dialog"]];
+const CALC_ITEMS=[["calc","Jak liczyć oszczędność"],["kalk","Kalkulator HDD"],["esco","ESCO – playbook"]];
+const ACAD_ITEMS=[["riposty","107 ripost","jedno zdanie na obiekcję"],["trening","Trening obiekcji","losowa obiekcja, oceń się"],["sym","Symulator klienta","napisz odpowiedź, sprawdź"],["brief","Jutro mam spotkanie","briefing z segmentu"],["fiszki","Fiszki","30 pytań i odpowiedzi"],["egzamin","Egzamin","20 pytań, 80 % zalicza"]];
+const TOOL_ITEMS=[["before","Checklista: przed"],["during","Checklista: w trakcie"],["after","Checklista: po"],["m30","Spotkanie 30 min"],["m60","Spotkanie 60 min"],["q20","20 pytań"],["avoid20","20 zdań do unikania"],["close20","20 zdań do decyzji"],["fu","Schemat follow-upu"],["stages","Strategia etapów"],["process","Proces sprzedaży"],["site","Wizja techniczna"]];
+cur=cur||{sec:"klienci",seg:"urzad",tab:"persona",tool:"before",objcat:"Wszystkie",hitsMode:false,acad:"riposty",calc:"calc"};
+MAIL=MAIL||{want:null};
+AC=AC||{i:0,show:false,ok:0,n:0,fi:0,flip:false,exam:null,sim:0};
+checked=checked||{};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function q(){return $id("q").value.trim();}
+function hl(s){const v=q();if(!v)return esc(s);const re=new RegExp("("+v.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig");return esc(s).replace(re,"<mark>$1</mark>");}
+function badge(status){const s=status.toUpperCase();let c="b-blue";if(s.startsWith("OBOWIĄZEK"))c="b-ok";else if(s.startsWith("PROJEKT")||s.includes("W TRAKCIE"))c="b-warn";else if(s.startsWith("PRZYSZŁE")||s.startsWith("PO TRANSPOZYCJI"))c="b-heat";return `<span class="badge ${c}">${esc(status)}</span>`;}
+function tagStatus(t){return t.replace(/\[(OBOWIĄZEK[^\]]*|PROJEKT[^\]]*|W TRAKCIE WDRAŻANIA|KIERUNEK[^\]]*|PRZYSZŁE[^\]]*|PO TRANSPOZYCJI[^\]]*|SPECJALNE|DO WERYFIKACJI|ZALEŻNE[^\]]*)\]/g,(m,s)=>badge(s));}
+function dialog(lines){return lines.map(([w,t])=>w==="N"?`<div class="line n"><div class="txt">${hl(t)}</div></div>`:`<div class="line ${w==="K"?"k":""}"><div class="who">${w==="K"?"Klient":"Handlowiec"}</div><div class="txt">${hl(t)}</div></div>`).join("");}
+function ul(items){return `<ul>${items.map(x=>`<li>${tagStatus(hl(x))}</li>`).join("")}</ul>`;}
+function checklist(items,key){return `<div class="chk">`+items.map((t,i)=>{const k=key+"-"+i,on=!!checked[k];return `<label class="${on?"done":""}"><input type="checkbox" data-k="${k}" ${on?"checked":""}> <span>${hl(t)}</span></label>`;}).join("")+`</div>`;}
+function objDetails(o,open){return `<details${open?" open":""}><summary>${hl(o.q)}${o.c?`<span class="tag">${esc(o.c)}</span>`:""}</summary><div class="body">${o.s?`<p class="lab">Krótko</p><p>${hl(o.s)}</p><p class="lab">Rozwinięcie</p><p>${hl(o.l)}</p>`:`<p>${hl(o.a)}</p>${o.why?`<p class="why">Dlaczego tak: ${hl(o.why)}</p>`:""}`}</div></details>`;}
+
+function setTitle(t,s){$id("ptitle").textContent=t;$id("psub").textContent=s||"";}
+function renderNav(){$id("nav").innerHTML=SECTIONS.map(([id,l])=>`<button data-s="${id}" class="${cur.sec===id?"on":""}">${l}</button>`).join("");}
+function renderSide(){
+  const side=$id("side");let html="";
+  if(cur.sec==="klienci"){const groups=[...new Set(SEGMENTS.map(s=>s.group))];groups.forEach(g=>{html+=`<p class="grp">${g}</p><ul class="plist">`+SEGMENTS.filter(s=>s.group===g).map(s=>`<li><button data-seg="${s.id}" class="${cur.seg===s.id?"on":""}">${s.name}<small>${s.short}</small></button></li>`).join("")+`</ul>`;});}
+  else if(cur.sec==="narzedzia"){html=`<p class="grp">Narzędzia</p><ul class="plist">`+TOOL_ITEMS.map(([id,l])=>`<li><button data-tool="${id}" class="${cur.tool===id?"on":""}">${l}</button></li>`).join("")+`</ul>`;}
+  else if(cur.sec==="obiekcje"){const cats=["Wszystkie",...new Set(OBJ_LIB.map(o=>o.c))];html=`<p class="grp">Kategorie</p><ul class="plist">`+cats.map(c=>`<li><button data-cat="${c}" class="${cur.objcat===c?"on":""}">${c}<small>${c==="Wszystkie"?OBJ_LIB.length:OBJ_LIB.filter(o=>o.c===c).length} obiekcji</small></button></li>`).join("")+`</ul>`;}
+  else if(cur.sec==="prawo"){html=`<p class="grp">Legenda</p><div style="font-size:13px;line-height:2">${badge("OBOWIĄZEK")}<br>${badge("PROJEKT / W TRAKCIE WDRAŻANIA")}<br>${badge("PRZYSZŁE / PO TRANSPOZYCJI")}<br>${badge("KIERUNEK / ZALEŻNE")}</div>`;}
+  else if(cur.sec==="pec"){html=`<p class="grp">W tym rozdziale</p><ul class="plist"><li><button disabled>Konflikt interesów</button></li><li><button disabled>11 argumentów z weryfikacją</button></li><li><button disabled>Z kim o czym w PEC</button></li></ul><p class="grp">Scenariusze</p><ul class="plist"><li><button data-goseg="pec">→ PEC</button></li><li><button data-goseg="operator">→ Operatorzy sieci</button></li></ul>`;}
+  else if(cur.sec==="decyzja"){html=`<p class="grp">W tym rozdziale</p><ul class="plist"><li><button disabled>3 typy rozmówców</button></li><li><button disabled>10 ról – jak rozmawiać</button></li></ul>`;}
+  else if(cur.sec==="liczenie"){html=`<p class="grp">W tym rozdziale</p><ul class="plist">`+CALC_ITEMS.map(([id,l])=>`<li><button data-calc="${id}" class="${cur.calc===id?"on":""}">${l}</button></li>`).join("")+`</ul>`;}
+  else if(cur.sec==="akademia"){html=`<p class="grp">Trening</p><ul class="plist">`+ACAD_ITEMS.map(([id,l,sm])=>`<li><button data-acad="${id}" class="${cur.acad===id?"on":""}">${l}<small>${sm}</small></button></li>`).join("")+`</ul>`;}
+  else if(cur.sec==="maile"){html=`<p class="grp">Szybki start</p><ul class="plist"><li><button data-mail="cold|">Pierwszy kontakt</button></li><li><button data-mail="summary|">Podsumowanie spotkania</button></li><li><button data-mail="technical|">Podsumowanie techniczne</button></li><li><button data-mail="followup|">Przypomnienie</button></li><li><button data-mail="offer|">Warunki umowy</button></li></ul><p class="grp">Do segmentu</p><ul class="plist">`+SEGMENTS.map(x=>`<li><button data-mail="cold|${MAIL_MAP[x.id]}">${x.name}</button></li>`).join("")+`</ul>`;}
+  else if(cur.sec==="podstawy"){html=`<p class="grp">W tym rozdziale</p><ul class="plist"><li><button disabled>Pitch</button></li><li><button disabled>Co sprzedajesz</button></li><li><button disabled>Liczby i referencje</button></li><li><button disabled>Metoda rozliczenia</button></li><li><button disabled>Czego nie mówić</button></li><li><button disabled>Dane do symulacji</button></li></ul>`;}
+  side.innerHTML=html;
+}
+function renderView(){
+  const view=$id("view"),tabs=$id("tabs");tabs.innerHTML="";
+  if(cur.hitsMode){renderHits();return;}
+  if(cur.sec==="podstawy"){setTitle("Podstawy","To, co musi być w głowie przed każdą rozmową.");view.innerHTML=`<div class="paper"><h3>Co naprawdę sprzedajesz</h3><p>${hl(SEQUENCE.principle)}</p><h3>Sekwencja każdej rozmowy</h3><p class="seq">${SEQUENCE.steps.map(x=>`<span>${esc(x)}</span>`).join("<i>→</i>")}</p><h3>Otwarcie, które działa wszędzie</h3><p>${hl(SEQUENCE.opening)}</p><h3>Pitch w 30 sekund</h3><p>${hl(CORE.pitch)}</p><h3>Prośba o spotkanie</h3><p>${hl(CORE.askMeeting)}</p><h3>Jak liczymy oszczędność</h3><ol>${CORE.method.map(x=>`<li>${hl(x)}</li>`).join("")}</ol><h3>Co sprzedajesz – dwa elementy</h3>${ul(CORE.product)}<h3>Jak mówić o liczbach</h3>${ul(CORE.numbers)}<h3>Referencje (waterai.pl)</h3><table class="tbl"><tr><th>Obiekt</th><th>Segment</th><th>Wynik</th></tr>${CORE.refs.map(r=>`<tr><td>${hl(r.name)}</td><td>${hl(r.seg)}</td><td>${hl(r.result)}</td></tr>`).join("")}</table><p class="small">${hl(CORE.refsNote)}</p><h3>Czego nie mówić</h3>${ul(CORE.dontSay)}<h3>Dane do symulacji</h3>${checklist(CORE.data,"core")}</div>`;return;}
+  if(cur.sec==="prawo"){setTitle("Prawo i regulacje – stan na wrzesień 2026","Każdy przepis: artykuł, kogo dotyczy, czego wymaga, jak użyć zgodnie z prawdą, pułapka.");view.innerHTML=`<div class="paper"><p style="font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;color:var(--ink-2)">${hl(LEGAL_NOTE)}</p></div>`+LEGAL.map(l=>`<details><summary>${hl(l.act)} – ${hl(l.art)}${badge(l.status)}</summary><div class="body"><p class="lab">Kogo dotyczy</p><p>${hl(l.who)}</p><p class="lab">Czego wymaga</p><p>${hl(l.what)}</p><p class="lab">Jak użyć w rozmowie</p><p>${hl(l.use)}</p><p class="lab">Pułapka – czego nie mówić</p><p>${hl(l.trap)}</p></div></details>`).join("");return;}
+  if(cur.sec==="pec"){setTitle("Ciepłownie – konflikt interesów i argumenty z weryfikacją","Które korzyści dla PEC są prawdziwe, kiedy i jak je udowodnić.");view.innerHTML=`<div class="paper"><h3>Punkt wyjścia</h3><p>${hl(PEC_CHAPTER.intro)}</p><h3>Konflikt interesów – nazwij go, zanim zrobi to klient</h3>${ul(PEC_CHAPTER.conflict)}</div><h3 style="font-size:14px;color:var(--ink-2);margin:0 0 8px">Argumenty i ich weryfikacja techniczna</h3>`+PEC_CHAPTER.args.map(a=>`<details><summary>${hl(a.t)}${badge(a.v)}</summary><div class="body"><p class="lab">Dlaczego / kiedy</p><p>${hl(a.why)}</p><p class="lab">Jak udowodnić</p><p>${hl(a.how)}</p></div></details>`).join("")+`<div class="paper" style="margin-top:16px"><h3>Z kim o czym w PEC</h3><table><tr><th>Rola</th><th>Jak rozmawiać</th></tr>${PEC_CHAPTER.roles.map(([r,t])=>`<tr><td><b>${esc(r)}</b></td><td>${hl(t)}</td></tr>`).join("")}</table></div>`;return;}
+  if(cur.sec==="decyzja"){setTitle("Kto naprawdę podejmuje decyzję?","Techniczny blokuje, finansowy opóźnia, decyzyjny mówi tak. Potrzebujesz wszystkich trzech – w tej kolejności.");view.innerHTML=`<div class="paper"><p>${hl(DECIDERS.intro)}</p></div><div class="cols">`+DECIDERS.types.map(t=>`<div class="paper"><h3>${esc(t.t)}</h3><p class="lab" style="font-family:'IBM Plex Sans';font-size:13px;color:var(--ink-2)">Czego chce</p><p>${hl(t.wants)}</p><p class="lab" style="font-family:'IBM Plex Sans';font-size:13px;color:var(--ink-2)">Rób</p><p>${hl(t.do)}</p><p class="lab" style="font-family:'IBM Plex Sans';font-size:13px;color:var(--ink-2)">Nie rób</p><p>${hl(t.dont)}</p></div>`).join("")+`</div><h3 style="font-size:14px;color:var(--ink-2);margin:8px 0">Jak rozmawiać z konkretnymi osobami</h3>`+DECIDERS.people.map(p=>`<details><summary>${hl(p.t)}</summary><div class="body"><p>${hl(p.how)}</p></div></details>`).join("");return;}
+  if(cur.sec==="obiekcje"){setTitle("Biblioteka obiekcji","Krótka odpowiedź na spotkanie, rozwinięcie do dalszej rozmowy. "+OBJ_LIB.length+" pozycji + obiekcje segmentowe w scenariuszach.");const v=q();let list=OBJ_LIB.filter(o=>cur.objcat==="Wszystkie"||o.c===cur.objcat);if(v)list=list.filter(o=>(o.q+o.s+o.l).toLowerCase().includes(v.toLowerCase()));view.innerHTML=list.length?list.map(o=>objDetails(o,!!v)).join(""):`<p class="empty">Brak obiekcji pasujących.</p>`;return;}
+  if(cur.sec==="narzedzia"){const T=TOOLKIT;let html="";const t=cur.tool;
+    if(t==="before"){setTitle("Checklista przed spotkaniem","Jedna strona. Odhacz.");html=`<div class="paper">${checklist(T.before,"before")}</div>`;}
+    else if(t==="during"){setTitle("Checklista w trakcie spotkania","Zerknij w połowie i na 5 minut przed końcem.");html=`<div class="paper">${checklist(T.during,"during")}</div>`;}
+    else if(t==="after"){setTitle("Checklista po spotkaniu","Do 24 godzin.");html=`<div class="paper">${checklist(T.after,"after")}<div class="bar"><button class="ghost" data-mail="summary|${MAIL_MAP[cur.seg]||"general"}">Wygeneruj mail podsumowujący</button><button class="ghost" data-mail="technical|${MAIL_MAP[cur.seg]||"general"}">Podsumowanie techniczne</button></div></div>`;}
+    else if(t==="m30"||t==="m60"){setTitle(t==="m30"?"Schemat spotkania 30 min":"Schemat spotkania 60 min","Czas jest orientacyjny – diagnoza zawsze przed prezentacją.");html=`<div class="paper"><table><tr><th>Czas</th><th>Blok</th><th>Co robisz</th></tr>${T[t].map(([a,b,c])=>`<tr><td>${a}</td><td><b>${hl(b)}</b></td><td>${hl(c)}</td></tr>`).join("")}</table></div>`;}
+    else if(t==="q20"){setTitle("20 najmocniejszych pytań sprzedażowych","Pytania, które zmuszają klienta do policzenia, nie do słuchania.");html=`<div class="paper"><ol>${T.q20.map(x=>`<li>${hl(x)}</li>`).join("")}</ol></div>`;}
+    else if(t==="avoid20"){setTitle("20 zdań, których handlowiec Water AI unika","I dlaczego.");html=`<div class="paper"><ol>${T.avoid20.map(x=>`<li>${hl(x)}</li>`).join("")}</ol></div>`;}
+    else if(t==="close20"){setTitle("20 zdań, które prowadzą do decyzji","Każde kończy się następnym krokiem, nie prośbą o zaufanie.");html=`<div class="paper"><ol>${T.close20.map(x=>`<li>${hl(x)}</li>`).join("")}</ol></div>`;}
+    else if(t==="fu"){setTitle("Schemat follow-upu","Każdy kontakt kończysz datą.");html=`<div class="paper"><table><tr><th>Kiedy</th><th>Co</th><th>Jak</th></tr>${T.followupSchema.map(([a,b,c])=>`<tr><td>${a}</td><td><b>${hl(b)}</b></td><td>${hl(c)}</td></tr>`).join("")}</table></div>`;}
+    else if(t==="process"){setTitle("Proces sprzedaży – etapy i warunki przejścia","Nie przechodź dalej, dopóki warunek nie jest spełniony.");html=`<div class="paper"><table><tr><th>Etap</th><th>Cel</th><th>Warunek przejścia</th></tr>${T.process.map(([a,b,c])=>`<tr><td><b>${hl(a)}</b></td><td>${hl(b)}</td><td>${hl(c)}</td></tr>`).join("")}</table><h3>Cold call – jedno zdanie</h3><p>${hl(SEQUENCE.coldCall)}</p><h3>Test zamknięcia</h3><p>${hl(SEQUENCE.closeTest)}</p></div>`;}
+    else if(t==="site"){setTitle("Checklista: wizja techniczna","Zanim cokolwiek obiecasz technicznemu.");html=`<div class="paper">${checklist(T.site,"site")}</div>`;}
+    else if(t==="stages"){setTitle("Strategia: pierwsze spotkanie → drugie → pilotaż → zamknięcie","Cel każdego etapu i co musi być spełnione, żeby przejść dalej.");html=T.stages.map(s=>`<div class="paper"><h3>${esc(s.t)}</h3><p><i>${hl(s.g)}</i></p>${ul(s.items)}</div>`).join("");}
+    view.innerHTML=html;return;}
+  if(cur.sec==="liczenie"){const c=cur.calc;
+    if(c==="calc"){setTitle("Jak dokładnie liczyć oszczędność","Baseline, normalizacja, korekty. To, co CFO i energetyk sprawdzą najpierw.");view.innerHTML=`<div class="paper"><p>${hl(CALC.intro)}</p><h3>Wzory</h3>${ul(CALC.formulas)}<h3>Korekty</h3><table><tr><th>Zmiana</th><th>Przykład</th><th>Postępowanie</th></tr>${CALC.corrections.map(([a,b,d])=>`<tr><td><b>${hl(a)}</b></td><td>${hl(b)}</td><td>${hl(d)}</td></tr>`).join("")}</table><h3>Czego nie robić</h3>${ul(CALC.dont)}<h3>Przykład</h3><table>${CALC.example.map(([a,b])=>`<tr><td>${hl(a)}</td><td><b>${hl(b)}</b></td></tr>`).join("")}</table></div>`;}
+    else if(c==="kalk"){setTitle("Kalkulator HDD","Szybka normalizacja pogodowa na spotkaniu. Do rozliczenia służy model z załącznika nr 3, nie ten kalkulator.");view.innerHTML=`<div class="paper"><div class="kalk"><label>Zużycie bazowe [GJ]<input id="hb-k1" type="number" value="2000"></label><label>HDD bazowe<input id="hb-k2" type="number" value="3400"></label><label>HDD rozliczeniowe<input id="hb-k3" type="number" value="3100"></label><label>Zużycie rzeczywiste [GJ]<input id="hb-k4" type="number" value="1600"></label><label>Koszt zmienny [zł/GJ]<input id="hb-k5" type="number" value="120"></label></div><div class="bar"><button id="hb-kgo">Policz</button></div><div id="hb-kout" class="kout"></div><p class="small">HDD (stopniodni) dla lokalizacji: IMGW, Eurostat lub dane z modelu bazowego. Bez normalizacji ciepła zima „robi” oszczędność za Ciebie – i klient to wie.</p></div>`;}
+    else{setTitle("ESCO – pełny playbook","Kiedy ESCO ma sens, co musi być w umowie, jak mówić do CFO i skarbnika.");view.innerHTML=`<div class="paper"><p>${hl(ESCO.intro)}</p><h3>Kiedy ESCO ma sens</h3>${ul(ESCO.when)}<h3>Co musi regulować umowa</h3>${checklist(ESCO.contract,"esco")}<h3>Rozmowa z finansowym</h3><p>${hl(ESCO.cfo)}</p><h3>Sektor publiczny</h3><p>${tagStatus(hl(ESCO.publicNote))}</p></div>`;}
+    return;}
+  if(cur.sec==="maile"){setTitle("Generator maili","Od kogo, o czym, do kogo – gotowy mail do skopiowania. Ta sama wersja co generator v4.");view.innerHTML=`<iframe id="hb-mailf" class="mailf" title="Generator maili"></iframe>`;const f=$id("mailf");f.srcdoc=MAIL_DOC;f.addEventListener("load",()=>{applyMail();});return;}
+  if(cur.sec==="akademia"){const a=cur.acad;const v=q();
+    if(a==="riposty"){setTitle("107 ripost – jedno zdanie na obiekcję","Do zapamiętania. Rozwinięcia są w rozdziale Obiekcje.");let list=RIPOSTES;if(v)list=list.filter(o=>(o.q+o.a).toLowerCase().includes(v.toLowerCase()));view.innerHTML=`<div class="paper"><table><tr><th>Klient</th><th>Ty</th></tr>${list.map(o=>`<tr><td>${hl(o.q)}</td><td>${hl(o.a)}</td></tr>`).join("")}</table></div>`;}
+    else if(a==="trening"){const pool=[...OBJ_LIB.map(o=>({q:o.q,a:o.s,l:o.l})),...RIPOSTES];const o=pool[AC.i%pool.length];setTitle("Trening obiekcji","Przeczytaj obiekcję, odpowiedz na głos, dopiero potem odsłoń.");view.innerHTML=`<div class="paper"><div class="line k"><div class="who">Klient</div><div class="txt">${esc(o.q)}</div></div>${AC.show?`<div class="line"><div class="who">Wzór</div><div class="txt">${esc(o.a)}${o.l?`<p class="small" style="margin:8px 0 0">${esc(o.l)}</p>`:""}</div></div><div class="bar"><button data-ac="ok">Miałem to</button><button class="ghost" data-ac="no">Muszę powtórzyć</button></div>`:`<div class="bar"><button data-ac="show">Odsłoń wzór</button><button class="ghost" data-ac="next">Inna obiekcja</button></div>`}<p class="small">Wynik sesji: ${AC.ok}/${AC.n}${AC.n?` (${Math.round(AC.ok/AC.n*100)} %)`:""}</p></div>`;}
+    else if(a==="sym"){const sm=SIMS[AC.sim%SIMS.length];setTitle("Symulator klienta","Wpisz, co byś powiedział. Sprawdzamy, czy są słowa-klucze i czy nie ma zdań zakazanych.");view.innerHTML=`<div class="paper"><div class="meta"><span><b>Klient</b> ${esc(sm.name)}</span><span><b>Trudność</b> ${esc(sm.diff)}</span><span><b>Cel</b> ${esc(sm.goal)}</span></div><div class="line k"><div class="who">${esc(sm.role.replace(":",""))}</div><div class="txt">${esc(sm.line)}</div></div><textarea id="hb-simin" rows="4" placeholder="Twoja odpowiedź…"></textarea><div class="bar"><button data-ac="simgo">Oceń</button><button class="ghost" data-ac="simnext">Następny klient</button></div><div id="hb-simout" class="kout"></div></div>`;}
+    else if(a==="brief"){const p=SEGMENTS.find(x=>x.id===cur.seg);setTitle("Jutro mam spotkanie","Wybierz segment – briefing składa się z podręcznika. Wydrukuj.");view.innerHTML=`<div class="bar" style="margin:0 0 14px"><select id="hb-bsel">${SEGMENTS.map(x=>`<option value="${x.id}" ${x.id===cur.seg?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div><div class="paper"><div class="meta"><span><b>Segment</b> ${esc(p.name)}</span></div><h3>Z kim</h3><p>${esc(p.who)}</p><h3>Czego się boi</h3><p>${esc(p.fear)}</p><h3>Otwarcie</h3><p>${esc(p.opening)}</p><h3>5 pytań, bez których nie wychodzę</h3><ol>${p.diag.slice(0,5).map(x=>`<li>${esc(x)}</li>`).join("")}</ol><h3>Pytanie do wniosku</h3><p>${esc(p.insight[0])}</p><h3>3 argumenty</h3><ul><li>${esc(p.args.econ[0])}</li><li>${esc(p.args.tech[0])}</li><li>${esc(p.args.board[0])}</li></ul><h3>Przepis, na który mogę się powołać</h3><p>${tagStatus(esc(p.args.legal[0]))}</p><h3>Obiekcje, które padną</h3>${p.objections.slice(0,3).map(o=>`<p><b>${esc(o.q)}</b><br>${esc(o.a)}</p>`).join("")}<h3>Kiedy oferta</h3><p>${esc(p.offerMoment)}</p><h3>Zamknięcie</h3><p>${esc(p.close[0])}</p><h3>Przed wyjściem</h3>${checklist(TOOLKIT.before,"brief-"+p.id)}</div>`;}
+    else if(a==="fiszki"){const f=FLASH[AC.fi%FLASH.length];setTitle("Fiszki","Odpowiedz w myślach, odwróć.");view.innerHTML=`<div class="paper card"><p class="small">${(AC.fi%FLASH.length)+1} / ${FLASH.length}</p><p class="big">${esc(AC.flip?f[1]:f[0])}</p><div class="bar"><button data-ac="flip">${AC.flip?"Pytanie":"Odwróć"}</button><button class="ghost" data-ac="fnext">Następna</button><button class="ghost" data-ac="frand">Losuj</button></div></div>`;}
+    else if(a==="egzamin"){setTitle("Egzamin końcowy","20 pytań z całego materiału. 80 % = zaliczenie.");if(!AC.exam){view.innerHTML=`<div class="paper"><p>Pytania jednokrotnego wyboru. Wynik pokażemy na końcu, bez podpowiedzi w trakcie.</p><div class="bar"><button data-ac="estart">Rozpocznij</button></div></div>`;}else{const E=AC.exam;if(E.i>=EXAM.length){const pct=Math.round(E.ok/EXAM.length*100);view.innerHTML=`<div class="paper"><h3>Wynik</h3><p class="big">${pct} % – ${pct>=80?"zaliczone":"powtórz materiał"}</p>${E.wrong.length?`<h3>Do powtórki</h3><ul>${E.wrong.map(w=>`<li><b>${esc(w[0])}</b> – poprawnie: ${esc(w[1])}</li>`).join("")}</ul>`:""}<div class="bar"><button data-ac="estart">Jeszcze raz</button></div></div>`;}else{const qq=EXAM[E.i];view.innerHTML=`<div class="paper"><p class="small">Pytanie ${E.i+1} / ${EXAM.length}</p><p class="big">${esc(qq[0])}</p><div class="opts">${qq[1].map((o,j)=>`<button data-ac="eans" data-j="${j}">${esc(o)}</button>`).join("")}</div></div>`;}}}
+    return;}
+  /* klienci */
+  const p=SEGMENTS.find(s=>s.id===cur.seg);setTitle(p.name,p.short);
+  tabs.innerHTML=SEG_TABS.map(([id,l])=>`<button data-t="${id}" class="${cur.tab===id?"on":""}">${l}</button>`).join("");
+  let html="";const A=p.args;
+  if(cur.tab==="persona")html=`<div class="paper"><h3>Z kim rozmawiasz</h3><p>${hl(p.who)}</p><h3>Jaki problem tej osoby rozwiązujemy</h3>${ul(p.pain)}<h3>Czego się boi</h3><p>${hl(p.fear)}</p><h3>Jak do niej mówić</h3><p>${hl(p.angle)}</p><div class="bar"><button class="ghost" data-mail="cold|${MAIL_MAP[p.id]}">Napisz pierwszego maila do tego segmentu</button><button class="ghost" data-mail="summary|${MAIL_MAP[p.id]}">Mail po spotkaniu</button></div></div>`;
+  else if(cur.tab==="diag")html=`<div class="paper"><h3>Najlepsze otwarcie</h3><p>${hl(p.opening)}</p><h3>Pytania diagnostyczne (${p.diag.length})</h3><ol>${p.diag.map(x=>`<li>${hl(x)}</li>`).join("")}</ol></div>`;
+  else if(cur.tab==="insight")html=`<div class="paper"><h3>Pytania, po których klient sam nazywa stratę</h3><p style="font-family:'IBM Plex Sans';font-size:13.5px;color:var(--ink-2)">Zadaj, zamilknij, zanotuj odpowiedź. Nie odpowiadaj za klienta.</p>${ul(p.insight)}</div>`;
+  else if(cur.tab==="args")html=`<div class="paper"><h3>Techniczne</h3>${ul(A.tech)}<h3>Ekonomiczne</h3>${ul(A.econ)}<h3>Dla zarządu / właściciela</h3>${ul(A.board)}<h3>Prawne i regulacyjne</h3>${ul(A.legal)}<h3>ESG, efektywność, dekarbonizacja</h3>${ul(A.esg)}</div>`;
+  else if(cur.tab==="obj")html=`<h3 style="font-size:14px;color:var(--ink-2);margin:0 0 8px">Specyficzne dla segmentu</h3>`+p.objections.map(o=>objDetails(o,!!q())).join("")+`<p class="note" style="margin-top:12px">Pozostałe obiekcje: zakładka „Obiekcje” w menu głównym (60 pozycji z kategoriami).</p>`;
+  else if(cur.tab==="path")html=`<div class="paper"><h3>Kiedy przedstawić ofertę</h3><p>${hl(p.offerMoment)}</p><h3>Od rozmowy do audytu / pilotażu / oferty</h3><ol>${p.path.map(x=>`<li>${hl(x)}</li>`).join("")}</ol><h3>Jak doprowadzić do decyzji</h3>${ul(p.close)}</div>`;
+  else if(cur.tab==="dialog")html=`<div class="paper"><div class="meta"><span><b>Od</b> „dzień dobry”</span><span><b>Do</b> ustalenia następnego kroku</span><span><b>Czas</b> 2–4 min</span></div>${dialog(p.dialog)}</div>`;
+  view.innerHTML=html;
+}
+function renderHits(){const v=q().toLowerCase();const hits=[];
+  SEGMENTS.forEach(s=>{const fields={persona:[s.who,s.fear,s.angle,...s.pain],diag:[s.opening,...s.diag],insight:s.insight,args:[].concat(...Object.values(s.args)),obj:s.objections.map(o=>o.q+" "+o.a),path:[s.offerMoment,...s.path,...s.close],dialog:s.dialog.map(d=>d[1])};for(const t in fields){const m=fields[t].find(x=>x.toLowerCase().includes(v));if(m)hits.push({go:{sec:"klienci",seg:s.id,tab:t},title:s.name+" › "+SEG_TABS.find(x=>x[0]===t)[1],snip:m});}});
+  LEGAL.forEach(l=>{const m=[l.act,l.what,l.use,l.trap,l.who].find(x=>x.toLowerCase().includes(v));if(m)hits.push({go:{sec:"prawo"},title:"Prawo › "+l.act,snip:m});});
+  PEC_CHAPTER.args.forEach(a=>{const m=[a.t,a.why,a.how].find(x=>x.toLowerCase().includes(v));if(m)hits.push({go:{sec:"pec"},title:"Ciepłownie › "+a.t,snip:m});});
+  DECIDERS.people.forEach(p=>{if((p.t+p.how).toLowerCase().includes(v))hits.push({go:{sec:"decyzja"},title:"Kto decyduje › "+p.t,snip:p.how});});
+  OBJ_LIB.forEach(o=>{if((o.q+o.s+o.l).toLowerCase().includes(v))hits.push({go:{sec:"obiekcje",objcat:"Wszystkie"},title:"Obiekcje › "+o.q,snip:o.s});});
+  TOOL_ITEMS.forEach(([id])=>{const src=id==="fu"?TOOLKIT.followupSchema:id==="stages"?TOOLKIT.stages:TOOLKIT[id];const flat=JSON.stringify(src).toLowerCase();if(flat.includes(v))hits.push({go:{sec:"narzedzia",tool:id},title:"Narzędzia › "+TOOL_ITEMS.find(x=>x[0]===id)[1],snip:""});});
+  RIPOSTES.forEach(o=>{if((o.q+o.a).toLowerCase().includes(v))hits.push({go:{sec:"akademia",acad:"riposty"},title:"Riposty › "+o.q,snip:o.a});});
+  setTitle(`Wyniki: „${q()}”`,hits.length+" trafień. Kliknij, żeby przejść.");
+  $id("view").innerHTML=hits.length?`<div class="hits">`+hits.map((h,i)=>`<div class="hit" data-i="${i}"><b>${esc(h.title)}</b><small></small>${h.snip?hl(h.snip.slice(0,220))+(h.snip.length>220?"…":""):""}</div>`).join("")+`</div>`:`<p class="empty">Brak trafień.</p>`;
+  HB.__hits=hits;
+}
+function render(){renderNav();renderSide();renderView();$root.querySelector(".hb-main").classList.toggle("wide",cur.sec==="maile");}
+$id("nav").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;cur.sec=b.dataset.s;cur.hitsMode=false;render();});
+$id("side").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.dataset.mail)return;if(b.dataset.seg){cur.seg=b.dataset.seg;}if(b.dataset.tool){cur.tool=b.dataset.tool;}if(b.dataset.cat){cur.objcat=b.dataset.cat;}if(b.dataset.calc){cur.calc=b.dataset.calc;}if(b.dataset.acad){cur.acad=b.dataset.acad;}if(b.dataset.goseg){cur.sec="klienci";cur.seg=b.dataset.goseg;cur.tab="persona";}cur.hitsMode=false;render();});
+
+function openMail(spec){const [type,rec]=spec.split("|");MAIL.want={type,rec};cur.sec="maile";cur.hitsMode=false;render();}
+function applyMail(){const f=$id("mailf");if(!f||!f.contentDocument)return;const d=f.contentDocument;const w=MAIL.want;if(!w)return;
+  if(w.type){const r=d.querySelector(`input[name=type][value="${w.type}"]`);if(r)r.checked=true;}
+  if(w.rec){const sel=d.getElementById("recipient");if(sel){sel.value=w.rec;sel.dispatchEvent(new f.contentWindow.Event("change"));}}
+  if(d.getElementById("reset"))d.getElementById("reset").click();MAIL.want=null;}
+hbOnce("message",e=>{if(e.data&&e.data.mailH){const f=$id("mailf");if(f)f.style.height=(e.data.mailH+24)+"px";}});
+$root.addEventListener("click",e=>{const b=e.target.closest("button[data-mail]");if(b){openMail(b.dataset.mail);}});
+$id("view").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;if(b.dataset.mail)return;
+  if(b.id==="hb-kgo"){const g=id=>parseFloat($id(id).value)||0;const base=g("k1"),h1=g("k2"),h2=g("k3"),real=g("k4"),pr=g("k5");if(!h1){return;}const ref=base*h2/h1,sav=ref-real,pct=ref?sav/ref*100:0;$id("kout").innerHTML=`<table><tr><td>Zużycie referencyjne po normalizacji</td><td><b>${ref.toFixed(0)} GJ</b></td></tr><tr><td>Oszczędność energii</td><td><b>${sav.toFixed(0)} GJ (${pct.toFixed(1)} %)</b></td></tr><tr><td>Wartość oszczędności (część zmienna)</td><td><b>${(sav*pr).toLocaleString("pl-PL",{maximumFractionDigits:0})} zł</b></td></tr><tr><td>Bez normalizacji byłoby</td><td>${(base-real).toFixed(0)} GJ (${(base?(base-real)/base*100:0).toFixed(1)} %) – różnica to efekt pogody, nie systemu</td></tr></table>`;return;}
+  const ac=b.dataset.ac;if(!ac)return;
+  if(ac==="show")AC.show=true;
+  else if(ac==="next"){AC.i=Math.floor(Math.random()*1e6);AC.show=false;}
+  else if(ac==="ok"||ac==="no"){AC.n++;if(ac==="ok")AC.ok++;AC.i=Math.floor(Math.random()*1e6);AC.show=false;}
+  else if(ac==="flip")AC.flip=!AC.flip;
+  else if(ac==="fnext"){AC.fi++;AC.flip=false;}
+  else if(ac==="frand"){AC.fi=Math.floor(Math.random()*FLASH.length);AC.flip=false;}
+  else if(ac==="estart")AC.exam={i:0,ok:0,wrong:[]};
+  else if(ac==="eans"){const E=AC.exam,qq=EXAM[E.i],j=+b.dataset.j;if(j===qq[2])E.ok++;else E.wrong.push([qq[0],qq[1][qq[2]]]);E.i++;}
+  else if(ac==="simnext"){AC.sim++;}
+  else if(ac==="simgo"){const sm=SIMS[AC.sim%SIMS.length];const t=($id("simin").value||"").toLowerCase();const good=sm.good.filter(k=>t.includes(k)),bad=sm.bad.filter(k=>t.includes(k));const score=Math.max(0,Math.round(good.length/sm.good.length*100)-bad.length*30);$id("simout").innerHTML=`<p><b>${score} %</b> – ${score>=60?"dobry kierunek":"za mało diagnozy, za dużo prezentacji"}.</p><p class="small">Trafione: ${good.length?good.join(", "):"nic"}. ${bad.length?`<span style="color:var(--heat)">Zdania zakazane: ${bad.join(", ")}.</span>`:""} Cel rozmowy: ${esc(sm.goal)}.</p>`;return;}
+  renderView();
+});
+$id("view").addEventListener("change",e=>{if(e.target.id==="hb-bsel"){cur.seg=e.target.value;renderView();}});
+$id("tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;cur.tab=b.dataset.t;render();});
+$id("view").addEventListener("click",e=>{const h=e.target.closest(".hit");if(h){const g=HB.__hits[+h.dataset.i].go;Object.assign(cur,g);cur.hitsMode=false;render();}});
+$id("view").addEventListener("change",e=>{if(e.target.matches("input[type=checkbox]")){checked[e.target.dataset.k]=e.target.checked;e.target.closest("label").classList.toggle("done",e.target.checked);}});
+$id("q").addEventListener("input",()=>{cur.hitsMode=q().length>=2;render();});
+$id("copy").addEventListener("click",async()=>{const t=$id("view").innerText;try{await navigator.clipboard.writeText(t);$id("status").textContent="Skopiowano.";}catch{$id("status").textContent="Nie udało się skopiować – zaznacz tekst ręcznie.";}setTimeout(()=>$id("status").textContent="",2500);});
+$id("print").addEventListener("click",()=>window.print());
+render();
+
+  }
+
+  window.SalesHandbookModule = {
+    render: function (container) {
+      ensureStyles();
+      container.innerHTML = HTML;
+      $root = document.getElementById('hb-root');
+      boot();
+    }
+  };
+
+  // ── Wpięcie do routingu modułów (wzorzec z backup.js / instructions.js) ────
   const _prev = window.openModule;
   window.openModule = function (moduleName) {
     if (moduleName === 'salesHandbook') {
@@ -49,9 +1530,7 @@ window.SalesHandbookModule = SalesHandbookModule;
       const descEl = document.getElementById('module-description');
       if (descEl) descEl.textContent = item ? item[2] : '';
       const content = document.getElementById('module-content');
-      if (content) content.innerHTML = SalesHandbookModule.render();
-      // Treść w ramce jest po polsku i nie przechodzi przez silnik i18n aplikacji;
-      // przy zmianie języka odświeżamy tylko tytuł/opis kafelka.
+      if (content) window.SalesHandbookModule.render(content);
       window._i18nRerender = function () { window.openModule('salesHandbook'); };
       return;
     }

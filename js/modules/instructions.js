@@ -111,7 +111,7 @@ const InstructionsModule = {
       icon: '📕', name: 'Podręcznik sprzedaży',
       poCo: 'Warsztat handlowca: jak prowadzić rozmowę z konkretnym typem klienta, na jakie przepisy się powołać i jak odpowiadać na obiekcje — zanim powstanie oferta w module „Oferta".',
       coZnajdziesz: 'Piętnaście segmentów klientów (urzędy, oświata, szpitale, hotele, spółdzielnie, biurowce, PEC…) z personą, pytaniami diagnostycznymi, argumentami i dialogiem; przegląd prawa ze statusem OBOWIĄZEK / PROJEKT / PRZYSZŁE; bibliotekę obiekcji i 107 ripost; checklisty spotkań; kalkulator HDD i playbook ESCO; akademię z treningiem, fiszkami i egzaminem oraz generator maili. Wyszukiwarka u góry przeszukuje całość.',
-      jakDodac: 'Materiał tylko do czytania. Liczby oznaczone [X] uzupełnia się z materiałów Water AI / SCAT; nie obiecuj procentów oszczędności przed symulacją. Przycisk „Otwórz w nowej karcie" daje pełny ekran i wydruk.'
+      jakDodac: 'Materiał tylko do czytania. Liczby oznaczone [X] uzupełnia się z materiałów Water AI / SCAT; nie obiecuj procentów oszczędności przed symulacją. Przycisk „Drukuj" drukuje bieżący rozdział.'
     },
 
     // ── Warianty klienckie: te same dane, ale zawężone do własnych obiektów ──
