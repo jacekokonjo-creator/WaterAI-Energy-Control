@@ -107,6 +107,12 @@ const InstructionsModule = {
       coZnajdziesz: 'Opis każdego modułu i zasady widoczności dokumentów.',
       jakDodac: ''
     },
+    salesHandbook: {
+      icon: '📕', name: 'Podręcznik sprzedaży',
+      poCo: 'Warsztat handlowca: jak prowadzić rozmowę z konkretnym typem klienta, na jakie przepisy się powołać i jak odpowiadać na obiekcje — zanim powstanie oferta w module „Oferta".',
+      coZnajdziesz: 'Piętnaście segmentów klientów (urzędy, oświata, szpitale, hotele, spółdzielnie, biurowce, PEC…) z personą, pytaniami diagnostycznymi, argumentami i dialogiem; przegląd prawa ze statusem OBOWIĄZEK / PROJEKT / PRZYSZŁE; bibliotekę obiekcji i 107 ripost; checklisty spotkań; kalkulator HDD i playbook ESCO; akademię z treningiem, fiszkami i egzaminem oraz generator maili. Wyszukiwarka u góry przeszukuje całość.',
+      jakDodac: 'Materiał tylko do czytania. Liczby oznaczone [X] uzupełnia się z materiałów Water AI / SCAT; nie obiecuj procentów oszczędności przed symulacją. Przycisk „Otwórz w nowej karcie" daje pełny ekran i wydruk.'
+    },
 
     // ── Warianty klienckie: te same dane, ale zawężone do własnych obiektów ──
     myObjects: {
@@ -228,7 +234,7 @@ const InstructionsModule = {
     admin: {
       nazwa: 'Administrator',
       wstep: 'Masz pełną kontrolę nad systemem. Widzisz i edytujesz wszystkie dane każdego klienta, zakładasz konta i decydujesz, kto co widzi. Jesteś jedyną rolą, która może usunąć dowolny rekord.',
-      moduly: ['clients', 'objects', 'simulation', 'readings', 'measurements', 'analyses', 'reports', 'invoicing', 'visibility', 'users', 'settings', 'rolePreview', 'instructions'],
+      moduly: ['clients', 'objects', 'simulation', 'readings', 'measurements', 'analyses', 'reports', 'invoicing', 'visibility', 'users', 'settings', 'rolePreview', 'instructions', 'salesHandbook'],
       widocznosc: [
         'Widzisz wszystko: wszystkich klientów, wszystkie obiekty, pomiary, okresy bazowe, analizy, raporty ESCO, faktury i symulacje.',
         'Możesz usunąć dowolny rekord, także cudzy. Żadna inna rola tego nie potrafi.',
@@ -240,7 +246,7 @@ const InstructionsModule = {
     backOffice: {
       nazwa: 'Back Office',
       wstep: 'Prowadzisz obsługę operacyjno-rozliczeniową: kartoteki klientów, obiekty, faktury i symulacje. Masz dostęp do wszystkich danych, ale nie zakładasz kont użytkowników.',
-      moduly: ['clients', 'objects', 'simulation', 'readings', 'invoicing', 'reports', 'visibility', 'users', 'instructions'],
+      moduly: ['clients', 'objects', 'simulation', 'readings', 'invoicing', 'reports', 'visibility', 'users', 'instructions', 'salesHandbook'],
       widocznosc: [
         'Widzisz wszystkich klientów i wszystkie ich dane, bez potrzeby udostępniania.',
         'Wystawiasz faktury i tworzysz symulacje oszczędności.',
@@ -252,7 +258,7 @@ const InstructionsModule = {
     energyAnalyst: {
       nazwa: 'Energy Analyst',
       wstep: 'Odpowiadasz za stronę merytoryczną: pomiary, okresy bazowe, analizy i raporty ESCO. To Twoje wyliczenia są podstawą faktur, dlatego analizę może wykonać wyłącznie konto z tą rolą.',
-      moduly: ['objects', 'simulation', 'readings', 'measurements', 'analyses', 'reports', 'visibility', 'instructions'],
+      moduly: ['objects', 'simulation', 'readings', 'measurements', 'analyses', 'reports', 'visibility', 'instructions', 'salesHandbook'],
       widocznosc: [
         'Widzisz wszystkie dane energetyczne: obiekty, pomiary, okresy bazowe, analizy i raporty ESCO.',
         'Tworzysz analizy, raporty ESCO i symulacje.',
@@ -264,7 +270,7 @@ const InstructionsModule = {
     salesRepresentative: {
       nazwa: 'Sales Representative',
       wstep: 'Jesteś opiekunem handlowym klienta. Dodajesz klientów i obiekty, wprowadzasz pomiary i przygotowujesz symulacje ofertowe. Dokumenty rozliczeniowe widzisz tylko wtedy, gdy zespół WaterAI wprost Ci je udostępni.',
-      moduly: ['clients', 'objects', 'simulation', 'readings', 'reports', 'instructions'],
+      moduly: ['clients', 'objects', 'simulation', 'readings', 'reports', 'instructions', 'salesHandbook'],
       widocznosc: [
         'Operacyjnie prowadzisz obiekty, przy których jesteś przypisany jako opiekun.',
         'Dokumenty — okresy bazowe, analizy, raporty ESCO, faktury i symulacje — widzisz WYŁĄCZNIE po udostępnieniu przez Administratora, Back Office albo Energy Analyst.',
