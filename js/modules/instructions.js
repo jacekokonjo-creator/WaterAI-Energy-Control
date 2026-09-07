@@ -270,7 +270,7 @@ const InstructionsModule = {
     salesRepresentative: {
       nazwa: 'Sales Representative',
       wstep: 'Jesteś opiekunem handlowym klienta. Dodajesz klientów i obiekty, wprowadzasz pomiary i przygotowujesz symulacje ofertowe. Dokumenty rozliczeniowe widzisz tylko wtedy, gdy zespół WaterAI wprost Ci je udostępni.',
-      moduly: ['clients', 'objects', 'simulation', 'readings', 'reports', 'instructions', 'salesHandbook'],
+      moduly: ['clients', 'objects', 'simulation', 'readings', 'reports', 'instructions'],
       widocznosc: [
         'Operacyjnie prowadzisz obiekty, przy których jesteś przypisany jako opiekun.',
         'Dokumenty — okresy bazowe, analizy, raporty ESCO, faktury i symulacje — widzisz WYŁĄCZNIE po udostępnieniu przez Administratora, Back Office albo Energy Analyst.',

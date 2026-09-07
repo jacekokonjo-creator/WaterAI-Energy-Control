@@ -9,7 +9,7 @@
 // kalkulator HDD, generator maili) działa w zamknięciu bez globali.
 // Kontener ma data-i18n-skip — treść jest po polsku i nie przechodzi przez
 // silnik tłumaczeń aplikacji. Moduł jest wyłącznie prezentacyjny.
-// Kafelek 📕: admin, backOffice, energyAnalyst, salesRepresentative (roleModules w index.html).
+// Kafelek 📕: admin, backOffice, energyAnalyst — Sales Rep i Klient na razie NIE (roleModules w index.html).
 // ─────────────────────────────────────────────────────────────────────────────
 (function () {
   const HB = {};
